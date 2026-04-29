@@ -1,4 +1,31 @@
-.vs
-bin
-obj
+# Visual Studio / MSBuild
+.vs/
+bin/
+obj/
 *.user
+*.suo
+*.cache
+
+# Build outputs and release artifacts
+Release/
+Build/
+artifacts/
+*.exe
+*.dll
+*.pdb
+*.zip
+*.7z
+
+# Local patch/runtime data
+.tmp/
+generated-release/
+restore-baseline/
+backups/
+logs/
+patchbuilder-smoke*/
+release-ja*/
+release-en*/
+
+# Local machine noise
+Thumbs.db
+Desktop.ini
