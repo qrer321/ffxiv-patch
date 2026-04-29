@@ -160,6 +160,8 @@ namespace FFXIVKoreanPatch.Main
             chatOnlyInstallButton.Visible = false;
             removeButton.Visible = false;
 #else
+            debugBuildReleaseButton.Visible = false;
+            buildReleaseButton.Visible = false;
             detectPathsButton.Visible = false;
             resetPathsButton.Visible = false;
 #endif
@@ -392,9 +394,7 @@ namespace FFXIVKoreanPatch.Main
             PlaceControl(preflightCheckButton, 24, contentTop + 368, 350, 44);
             PlaceControl(debugBuildReleaseButton, 386, contentTop + 368, 350, 44);
 #else
-            PlaceControl(preflightCheckButton, 24, contentTop + 368, 226, 42);
-            PlaceControl(debugBuildReleaseButton, 267, contentTop + 368, 226, 42);
-            PlaceControl(buildReleaseButton, 510, contentTop + 368, 226, 42);
+            PlaceControl(preflightCheckButton, 24, contentTop + 368, 712, 42);
             PlaceControl(installButton, 24, contentTop + 422, 226, 42);
             PlaceControl(chatOnlyInstallButton, 267, contentTop + 422, 226, 42);
             PlaceControl(removeButton, 510, contentTop + 422, 226, 42);
@@ -901,8 +901,8 @@ namespace FFXIVKoreanPatch.Main
                 chatOnlyInstallButton.Enabled = false;
                 removeButton.Enabled = false;
 #else
-                debugBuildReleaseButton.Enabled = enabled;
-                buildReleaseButton.Enabled = enabled;
+                debugBuildReleaseButton.Enabled = false;
+                buildReleaseButton.Enabled = false;
                 installButton.Enabled = enabled;
                 chatOnlyInstallButton.Enabled = enabled;
                 removeButton.Enabled = enabled;
@@ -2361,10 +2361,10 @@ namespace FFXIVKoreanPatch.Main
                     chatOnlyInstallButton.Enabled = false;
                     removeButton.Enabled = false;
 #else
-                    debugBuildReleaseButton.Enabled = true;
+                    debugBuildReleaseButton.Enabled = false;
                     preflightCheckButton.Enabled = true;
                     restoreBackupButton.Enabled = true;
-                    buildReleaseButton.Enabled = true;
+                    buildReleaseButton.Enabled = false;
                     installButton.Enabled = true;
                     chatOnlyInstallButton.Enabled = true;
                     removeButton.Enabled = true;
