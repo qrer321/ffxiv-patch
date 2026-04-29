@@ -599,6 +599,106 @@ namespace FFXIVKoreanPatch.Main
             }));
         }
 
+        private void ShowOperationResultDialog(string title, string summary, string logPath, IList<KeyValuePair<string, string>> details)
+        {
+            Invoke(new Action(() =>
+            {
+                using (Form dialog = new Form())
+                {
+                    dialog.Text = title;
+                    dialog.StartPosition = FormStartPosition.CenterParent;
+                    dialog.FormBorderStyle = FormBorderStyle.FixedDialog;
+                    dialog.MinimizeBox = false;
+                    dialog.MaximizeBox = false;
+                    dialog.ClientSize = new Size(720, 440);
+                    dialog.BackColor = Color.FromArgb(20, 24, 30);
+                    dialog.Font = new Font("맑은 고딕", 9F, FontStyle.Regular, GraphicsUnit.Point, 129);
+
+                    TableLayoutPanel root = new TableLayoutPanel();
+                    root.Dock = DockStyle.Fill;
+                    root.Padding = new Padding(18);
+                    root.BackColor = dialog.BackColor;
+                    root.ColumnCount = 1;
+                    root.RowCount = 4;
+                    root.RowStyles.Add(new RowStyle(SizeType.Absolute, 72));
+                    root.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
+                    root.RowStyles.Add(new RowStyle(SizeType.Absolute, 34));
+                    root.RowStyles.Add(new RowStyle(SizeType.Absolute, 46));
+                    dialog.Controls.Add(root);
+
+                    Label titleLabel = new Label();
+                    titleLabel.Dock = DockStyle.Fill;
+                    titleLabel.AutoSize = false;
+                    titleLabel.Text = title + Environment.NewLine + summary;
+                    titleLabel.ForeColor = Color.FromArgb(126, 208, 154);
+                    titleLabel.Font = new Font("맑은 고딕", 13F, FontStyle.Bold, GraphicsUnit.Point, 129);
+                    titleLabel.TextAlign = ContentAlignment.MiddleLeft;
+                    root.Controls.Add(titleLabel, 0, 0);
+
+                    ListView listView = new ListView();
+                    listView.Dock = DockStyle.Fill;
+                    listView.View = View.Details;
+                    listView.FullRowSelect = true;
+                    listView.GridLines = false;
+                    listView.HeaderStyle = ColumnHeaderStyle.Nonclickable;
+                    listView.BackColor = Color.FromArgb(26, 31, 38);
+                    listView.ForeColor = Color.FromArgb(230, 235, 242);
+                    listView.BorderStyle = BorderStyle.FixedSingle;
+                    listView.Columns.Add("항목", 170);
+                    listView.Columns.Add("내용", 500);
+
+                    foreach (KeyValuePair<string, string> detail in details ?? new KeyValuePair<string, string>[0])
+                    {
+                        ListViewItem item = new ListViewItem(detail.Key ?? string.Empty);
+                        item.SubItems.Add(detail.Value ?? string.Empty);
+                        item.ForeColor = Color.FromArgb(224, 231, 240);
+                        listView.Items.Add(item);
+                    }
+
+                    root.Controls.Add(listView, 0, 1);
+
+                    Label logLabel = new Label();
+                    logLabel.Dock = DockStyle.Fill;
+                    logLabel.AutoSize = false;
+                    logLabel.Text = "로그: " + logPath;
+                    logLabel.ForeColor = Color.FromArgb(178, 188, 200);
+                    logLabel.TextAlign = ContentAlignment.MiddleLeft;
+                    root.Controls.Add(logLabel, 0, 2);
+
+                    FlowLayoutPanel buttonPanel = new FlowLayoutPanel();
+                    buttonPanel.Dock = DockStyle.Fill;
+                    buttonPanel.FlowDirection = FlowDirection.RightToLeft;
+                    buttonPanel.WrapContents = false;
+                    buttonPanel.BackColor = dialog.BackColor;
+                    root.Controls.Add(buttonPanel, 0, 3);
+
+                    Button closeButton = CreateDialogButton("닫기", Color.FromArgb(64, 72, 84), Color.White);
+                    closeButton.DialogResult = DialogResult.OK;
+                    buttonPanel.Controls.Add(closeButton);
+
+                    Button openLogButton = CreateDialogButton("로그 열기", Color.FromArgb(58, 90, 142), Color.White);
+                    openLogButton.Click += (sender, args) =>
+                    {
+                        try
+                        {
+                            if (!string.IsNullOrEmpty(logPath) && File.Exists(logPath))
+                            {
+                                Process.Start(new ProcessStartInfo(logPath) { UseShellExecute = true });
+                            }
+                        }
+                        catch
+                        {
+                            MessageBox.Show("로그 파일을 열 수 없어요.", Text, MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                        }
+                    };
+                    buttonPanel.Controls.Add(openLogButton);
+
+                    dialog.AcceptButton = closeButton;
+                    dialog.ShowDialog(this);
+                }
+            }));
+        }
+
         private void AddPreflightStatLabel(FlowLayoutPanel panel, string text, Color backColor, Color foreColor)
         {
             Label label = new Label();
@@ -1978,14 +2078,17 @@ namespace FFXIVKoreanPatch.Main
                 "Files: " + string.Join(", ", backupFiles)
             });
 
-            MessageBox.Show(
-                "백업 복구가 완료되었어요." + Environment.NewLine + Environment.NewLine +
-                "복구한 백업: " + backupDir + Environment.NewLine +
-                "복구 전 백업: " + beforeRestoreBackup + Environment.NewLine +
-                "로그: " + logPath,
-                Text,
-                MessageBoxButtons.OK,
-                MessageBoxIcon.Information);
+            List<KeyValuePair<string, string>> resultDetails = new List<KeyValuePair<string, string>>();
+            resultDetails.Add(new KeyValuePair<string, string>("작업", "백업으로 복구"));
+            resultDetails.Add(new KeyValuePair<string, string>("복구한 백업", backupDir));
+            resultDetails.Add(new KeyValuePair<string, string>("복구 전 백업", beforeRestoreBackup));
+            resultDetails.Add(new KeyValuePair<string, string>("복구 파일", string.Join(", ", backupFiles)));
+
+            ShowOperationResultDialog(
+                "백업 복구 완료",
+                "선택한 백업으로 글로벌 서버 클라이언트 파일을 되돌렸습니다.",
+                logPath,
+                resultDetails);
         }
 
         private IEnumerable<string> GetLocalOrigIndexCandidateDirs()
@@ -3107,20 +3210,31 @@ namespace FFXIVKoreanPatch.Main
                 }
 
                 string logPath = WriteOperationLog("build-release", logLines);
+                string operationName = buildTextPatch && buildFontPatch ? "전체 한글 패치" : "한글 폰트 패치";
+                string completionSummary = useDebugApplyPath
+                    ? "원본 글로벌 서버 클라이언트는 변경하지 않고 테스트 경로에 적용했습니다."
+                    : "생성된 패치 파일을 글로벌 서버 클라이언트에 적용했습니다.";
+                UpdateStatusLabel(useDebugApplyPath ? "패치 생성과 테스트 적용 완료" : "패치 생성과 설치 완료");
 
-                ShowMessageBox(
-                    MessageBoxButtons.OK,
-                    MessageBoxIcon.Information,
-                    useDebugApplyPath ? "패치 생성과 테스트 적용이 완료되었어요." : "패치 생성과 설치가 완료되었어요.",
-                    "로그: " + logPath,
-                    "Manifest: " + manifestPath,
-                    (useDebugApplyPath ? applyGameDir : releaseOutputDir) +
-                    (string.IsNullOrEmpty(backupDir) ? "" : Environment.NewLine + "백업 위치: " + backupDir));
-                CloseForm();
+                List<KeyValuePair<string, string>> resultDetails = new List<KeyValuePair<string, string>>();
+                resultDetails.Add(new KeyValuePair<string, string>("작업", operationName));
+                resultDetails.Add(new KeyValuePair<string, string>("베이스 언어", targetLanguageDisplayName + " (" + targetLanguageCode + ")"));
+                resultDetails.Add(new KeyValuePair<string, string>("생성 폴더", releaseOutputDir));
+                resultDetails.Add(new KeyValuePair<string, string>("적용 위치", applyGameDir));
+                resultDetails.Add(new KeyValuePair<string, string>("Manifest", manifestPath));
+                resultDetails.Add(new KeyValuePair<string, string>("적용 파일", string.Join(", ", selectedPatchFiles)));
+                if (!string.IsNullOrEmpty(backupDir))
+                {
+                    resultDetails.Add(new KeyValuePair<string, string>("백업 위치", backupDir));
+                }
+
+                ShowOperationResultDialog("패치 작업 완료", completionSummary, logPath, resultDetails);
             }
             catch (Exception exception)
             {
                 UpdateDownloadLabel("");
+                UpdateStatusLabel("패치 release 생성 실패", true);
+                SetProgressValue(0);
                 logLines.Add("ERROR:");
                 logLines.Add(exception.ToString());
                 string logPath = WriteOperationLog("build-release-error", logLines);
@@ -3131,11 +3245,11 @@ namespace FFXIVKoreanPatch.Main
                     "로그: " + logPath,
                     "에러 내용:",
                     exception.ToString());
-                CloseForm();
             }
             finally
             {
                 SetProgressMarquee(false);
+                SetActionButtonsEnabled(true);
             }
         }
 
@@ -3160,14 +3274,23 @@ namespace FFXIVKoreanPatch.Main
                     logLines.Add("Local restore source: " + restoreSourceDir);
                     logLines.Add("Backup before restore: " + localBackupDir);
                     string localRestoreLogPath = WriteOperationLog("remove-local-restore", logLines);
-                    ShowMessageBox(
-                        MessageBoxButtons.OK,
-                        MessageBoxIcon.Information,
-                        "로컬 orig index로 한글 패치를 제거했어요.",
-                        "로그: " + localRestoreLogPath,
-                        "복구 원본: " + restoreSourceDir +
-                        (string.IsNullOrEmpty(localBackupDir) ? "" : Environment.NewLine + "백업 위치: " + localBackupDir));
-                    CloseForm();
+                    UpdateStatusLabel("한글 패치 제거 완료");
+                    SetProgressValue(100);
+
+                    List<KeyValuePair<string, string>> resultDetails = new List<KeyValuePair<string, string>>();
+                    resultDetails.Add(new KeyValuePair<string, string>("작업", "한글 패치 제거"));
+                    resultDetails.Add(new KeyValuePair<string, string>("복구 원본", restoreSourceDir));
+                    if (!string.IsNullOrEmpty(localBackupDir))
+                    {
+                        resultDetails.Add(new KeyValuePair<string, string>("복구 전 백업", localBackupDir));
+                    }
+                    resultDetails.Add(new KeyValuePair<string, string>("복구 파일", string.Join(", ", restoreFiles)));
+
+                    ShowOperationResultDialog(
+                        "패치 제거 완료",
+                        "로컬 orig index로 글로벌 서버 클라이언트를 복구했습니다.",
+                        localRestoreLogPath,
+                        resultDetails);
                     return;
                 }
 
@@ -3178,6 +3301,8 @@ namespace FFXIVKoreanPatch.Main
             }
             catch (Exception exception)
             {
+                UpdateStatusLabel(isRemove ? "한글 패치 제거 실패" : "패치 설치 실패", true);
+                SetProgressValue(0);
                 logLines.Add("ERROR:");
                 logLines.Add(exception.ToString());
                 string logPath = WriteOperationLog(isRemove ? "remove-error" : "install-error", logLines);
@@ -3188,8 +3313,11 @@ namespace FFXIVKoreanPatch.Main
                     "로그: " + logPath,
                     "에러 내용:",
                     exception.ToString());
-                CloseForm();
                 return;
+            }
+            finally
+            {
+                SetActionButtonsEnabled(true);
             }
         }
 
