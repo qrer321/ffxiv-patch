@@ -126,6 +126,7 @@ namespace FFXIVKoreanPatch.Main
         private bool buildTextPatch = true;
         private bool buildFontPatch = true;
         private bool initialPreflightStarted;
+        private bool lastPreflightPassed;
 
         // Target client version.
         private string targetVersion = string.Empty;
@@ -1176,6 +1177,7 @@ namespace FFXIVKoreanPatch.Main
             {
                 bool hasGlobalClient = HasValidGlobalClient();
                 bool hasKoreaClient = HasValidKoreaClient();
+                bool canApplyToRealClient = enabled && hasGlobalClient && hasKoreaClient && lastPreflightPassed;
 
                 globalPathBrowseButton.Enabled = enabled;
                 koreaPathBrowseButton.Enabled = enabled;
@@ -1200,8 +1202,8 @@ namespace FFXIVKoreanPatch.Main
 #else
                 debugBuildReleaseButton.Enabled = false;
                 buildReleaseButton.Enabled = false;
-                installButton.Enabled = enabled && hasGlobalClient && hasKoreaClient;
-                chatOnlyInstallButton.Enabled = enabled && hasGlobalClient && hasKoreaClient;
+                installButton.Enabled = canApplyToRealClient;
+                chatOnlyInstallButton.Enabled = canApplyToRealClient;
                 removeButton.Enabled = enabled && hasGlobalClient;
 #endif
             };
@@ -1271,6 +1273,29 @@ namespace FFXIVKoreanPatch.Main
             return normalizedPath.StartsWith(normalizedParent, StringComparison.OrdinalIgnoreCase);
         }
 
+        private void MarkPreflightRequired()
+        {
+            lastPreflightPassed = false;
+        }
+
+        private string GetRuntimeDataRootDir()
+        {
+            string localAppData = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
+            string rootDir = string.IsNullOrEmpty(localAppData)
+                ? Path.Combine(Application.CommonAppDataPath, "runtime-data")
+                : Path.Combine(localAppData, "FFXIVKoreanPatch");
+
+            Directory.CreateDirectory(rootDir);
+            return rootDir;
+        }
+
+        private string GetRuntimeDataChildDir(string childName)
+        {
+            string childDir = Path.Combine(GetRuntimeDataRootDir(), childName);
+            Directory.CreateDirectory(childDir);
+            return childDir;
+        }
+
         private string FindPatchGeneratorPath()
         {
             string[] candidatePaths = new string[]
@@ -1305,14 +1330,7 @@ namespace FFXIVKoreanPatch.Main
                 version = version.Replace(invalidChar, '_');
             }
 
-            string outputDir = Path.Combine(Application.StartupPath, "generated-release", targetLanguageCode, version);
-            if ((!string.IsNullOrEmpty(targetDir) && IsSameOrChildDirectory(outputDir, targetDir))
-                || (!string.IsNullOrEmpty(koreaSourceDir) && IsSameOrChildDirectory(outputDir, koreaSourceDir)))
-            {
-                outputDir = Path.Combine(Application.CommonAppDataPath, "generated-release", targetLanguageCode, version);
-            }
-
-            return outputDir;
+            return Path.Combine(GetRuntimeDataChildDir("generated-release"), targetLanguageCode, version);
         }
 
         private string GetRestoreBaselineBaseDir()
@@ -1323,14 +1341,7 @@ namespace FFXIVKoreanPatch.Main
                 version = version.Replace(invalidChar, '_');
             }
 
-            string outputDir = Path.Combine(Application.StartupPath, "restore-baseline", targetLanguageCode, version);
-            if ((!string.IsNullOrEmpty(targetDir) && IsSameOrChildDirectory(outputDir, targetDir))
-                || (!string.IsNullOrEmpty(koreaSourceDir) && IsSameOrChildDirectory(outputDir, koreaSourceDir)))
-            {
-                outputDir = Path.Combine(Application.CommonAppDataPath, "restore-baseline", targetLanguageCode, version);
-            }
-
-            return outputDir;
+            return Path.Combine(GetRuntimeDataChildDir("restore-baseline"), targetLanguageCode, version);
         }
 
         private string CreateManagedReleaseDirForRun()
@@ -1471,6 +1482,98 @@ namespace FFXIVKoreanPatch.Main
             return dat1Count;
         }
 
+        private bool IsCleanIndexFile(string indexPath, out int dat1Count, out string error)
+        {
+            dat1Count = 0;
+            error = null;
+
+            try
+            {
+                dat1Count = CountIndexDat1Entries(indexPath);
+                return dat1Count == 0;
+            }
+            catch (Exception exception)
+            {
+                error = exception.Message;
+                return false;
+            }
+        }
+
+        private bool HasCleanOrigIndexes(string candidateDir)
+        {
+            foreach (string fileName in restoreFiles)
+            {
+                string origIndexPath = Path.Combine(candidateDir, "orig." + fileName);
+                if (!File.Exists(origIndexPath))
+                {
+                    return false;
+                }
+
+                int dat1Count;
+                string error;
+                if (!IsCleanIndexFile(origIndexPath, out dat1Count, out error))
+                {
+                    return false;
+                }
+            }
+
+            return true;
+        }
+
+        private void ValidateDat1References(string indexPath, string dat1Path, string context)
+        {
+            byte[] bytes = File.ReadAllBytes(indexPath);
+            long dat1Length = new FileInfo(dat1Path).Length;
+            int sqpackHeaderSize = checked((int)ReadUInt32LittleEndian(bytes, 0x0C));
+            int indexHeaderOffset = sqpackHeaderSize;
+            int indexDataOffset = checked((int)ReadUInt32LittleEndian(bytes, indexHeaderOffset + 0x08));
+            int indexDataSize = checked((int)ReadUInt32LittleEndian(bytes, indexHeaderOffset + 0x0C));
+            int entryCount = indexDataSize / 16;
+            int dat1Count = 0;
+
+            for (int i = 0; i < entryCount; i++)
+            {
+                int entryOffset = indexDataOffset + i * 16;
+                uint data = ReadUInt32LittleEndian(bytes, entryOffset + 8);
+                byte datId = (byte)((data & 0xEu) >> 1);
+                if (datId != 1)
+                {
+                    continue;
+                }
+
+                dat1Count++;
+                long fileOffset = (long)(data & 0xFFFFFFF0u) * 8L;
+                if ((fileOffset % 0x80) != 0 || fileOffset < 0 || fileOffset + 24 > dat1Length)
+                {
+                    throw new InvalidDataException(context + " index가 dat1 범위 밖의 파일 오프셋을 가리킵니다: " + fileOffset.ToString());
+                }
+            }
+
+            if (dat1Count <= 0)
+            {
+                throw new InvalidDataException(context + " index에 dat1 엔트리가 없습니다.");
+            }
+        }
+
+        private void ValidateSelectedPatchReferences(string directory, IEnumerable<string> patchFiles, string context)
+        {
+            if (patchFiles.Any(fileName => string.Equals(fileName, "0a0000.win32.index", StringComparison.OrdinalIgnoreCase)))
+            {
+                ValidateDat1References(
+                    Path.Combine(directory, "0a0000.win32.index"),
+                    Path.Combine(directory, "0a0000.win32.dat1"),
+                    context + " 0a0000");
+            }
+
+            if (patchFiles.Any(fileName => string.Equals(fileName, "000000.win32.index", StringComparison.OrdinalIgnoreCase)))
+            {
+                ValidateDat1References(
+                    Path.Combine(directory, "000000.win32.index"),
+                    Path.Combine(directory, "000000.win32.dat1"),
+                    context + " 000000");
+            }
+        }
+
         private string GetTargetSqpackDir()
         {
             if (string.IsNullOrEmpty(targetDir))
@@ -1483,14 +1586,17 @@ namespace FFXIVKoreanPatch.Main
 
         private string GetBackupRootDir()
         {
-            string backupRoot = Path.Combine(Application.StartupPath, "backups");
-            if ((!string.IsNullOrEmpty(targetDir) && IsSameOrChildDirectory(backupRoot, targetDir))
-                || (!string.IsNullOrEmpty(koreaSourceDir) && IsSameOrChildDirectory(backupRoot, koreaSourceDir)))
-            {
-                backupRoot = Path.Combine(Application.CommonAppDataPath, "backups");
-            }
+            return GetRuntimeDataChildDir("backups");
+        }
 
-            return backupRoot;
+        private IEnumerable<string> GetBackupRootDirs()
+        {
+            return new string[]
+            {
+                GetBackupRootDir(),
+                Path.Combine(Application.StartupPath, "backups"),
+                Path.Combine(Application.CommonAppDataPath, "backups")
+            }.Distinct(StringComparer.OrdinalIgnoreCase);
         }
 
         private static string SanitizeFileNamePart(string value)
@@ -1572,9 +1678,18 @@ namespace FFXIVKoreanPatch.Main
 
                 if (File.Exists(installedOrigPath))
                 {
-                    sourcePath = installedOrigPath;
+                    int origDat1Count;
+                    string origError;
+                    if (IsCleanIndexFile(installedOrigPath, out origDat1Count, out origError))
+                    {
+                        sourcePath = installedOrigPath;
+                    }
+                    else if (lines != null)
+                    {
+                        lines.Add("[주의] " + Path.GetFileName(installedOrigPath) + "를 clean 복구 기준으로 저장하지 않았습니다. dat1 엔트리: " + origDat1Count.ToString() + (string.IsNullOrEmpty(origError) ? "" : ", 오류: " + origError));
+                    }
                 }
-                else if (File.Exists(currentIndexPath))
+                if (string.IsNullOrEmpty(sourcePath) && File.Exists(currentIndexPath))
                 {
                     int dat1Count = CountIndexDat1Entries(currentIndexPath);
                     if (dat1Count == 0)
@@ -1641,14 +1756,7 @@ namespace FFXIVKoreanPatch.Main
 
         private string GetLogRootDir()
         {
-            string logRoot = Path.Combine(Application.StartupPath, "logs");
-            if ((!string.IsNullOrEmpty(targetDir) && IsSameOrChildDirectory(logRoot, targetDir))
-                || (!string.IsNullOrEmpty(koreaSourceDir) && IsSameOrChildDirectory(logRoot, koreaSourceDir)))
-            {
-                logRoot = Path.Combine(Application.CommonAppDataPath, "logs");
-            }
-
-            return logRoot;
+            return GetRuntimeDataChildDir("logs");
         }
 
         private string WriteOperationLog(string operation, IEnumerable<string> lines)
@@ -1849,6 +1957,19 @@ namespace FFXIVKoreanPatch.Main
                     throw new InvalidDataException("생성된 000000.win32.index에 dat1 엔트리가 없습니다.");
                 }
             }
+
+#if !TEST_BUILD
+            foreach (string origFileName in requiredOrigFiles)
+            {
+                int origDat1Count = CountIndexDat1Entries(Path.Combine(outputDir, origFileName));
+                if (origDat1Count > 0)
+                {
+                    throw new InvalidDataException("생성된 " + origFileName + "가 clean index가 아닙니다. dat1 엔트리 " + origDat1Count.ToString() + "개가 포함되어 있습니다.");
+                }
+            }
+#endif
+
+            ValidateSelectedPatchReferences(outputDir, patchFiles, "생성된 release");
         }
 
         private void ValidateFilesExist(string directory, IEnumerable<string> fileNames, string context)
@@ -1897,17 +2018,19 @@ namespace FFXIVKoreanPatch.Main
                 return releaseOutputDir;
             }
 
-            string languageRoot = Path.Combine(Application.StartupPath, "generated-release", targetLanguageCode);
+            string languageRoot = Path.Combine(GetRuntimeDataRootDir(), "generated-release", targetLanguageCode);
+            string legacyStartupLanguageRoot = Path.Combine(Application.StartupPath, "generated-release", targetLanguageCode);
             string commonLanguageRoot = Path.Combine(Application.CommonAppDataPath, "generated-release", targetLanguageCode);
-            string latest = FindLatestDirectory(languageRoot, commonLanguageRoot);
+            string latest = FindLatestDirectory(languageRoot, legacyStartupLanguageRoot, commonLanguageRoot);
             if (!string.IsNullOrEmpty(latest))
             {
                 return latest;
             }
 
-            string appRoot = Path.Combine(Application.StartupPath, "generated-release");
+            string appRoot = Path.Combine(GetRuntimeDataRootDir(), "generated-release");
+            string legacyStartupRoot = Path.Combine(Application.StartupPath, "generated-release");
             string commonRoot = Path.Combine(Application.CommonAppDataPath, "generated-release");
-            return FindLatestDirectory(appRoot, commonRoot);
+            return FindLatestDirectory(appRoot, legacyStartupRoot, commonRoot);
         }
 
         private void OpenFolder(string folderPath, string missingMessage)
@@ -1929,12 +2052,18 @@ namespace FFXIVKoreanPatch.Main
         {
             return new string[]
             {
-                Path.Combine(Application.StartupPath, "generated-release"),
+                Path.Combine(GetRuntimeDataRootDir(), "generated-release"),
+                Path.Combine(GetRuntimeDataRootDir(), "restore-baseline"),
                 Path.Combine(Application.CommonAppDataPath, "generated-release"),
-                Path.Combine(Application.StartupPath, "restore-baseline"),
                 Path.Combine(Application.CommonAppDataPath, "restore-baseline"),
+                Path.Combine(Application.StartupPath, "generated-release"),
+                Path.Combine(Application.StartupPath, "restore-baseline"),
                 GetBackupRootDir(),
-                GetLogRootDir()
+                Path.Combine(Application.StartupPath, "backups"),
+                Path.Combine(Application.CommonAppDataPath, "backups"),
+                GetLogRootDir(),
+                Path.Combine(Application.StartupPath, "logs"),
+                Path.Combine(Application.CommonAppDataPath, "logs")
             }.Distinct(StringComparer.OrdinalIgnoreCase);
         }
 
@@ -1979,14 +2108,9 @@ namespace FFXIVKoreanPatch.Main
 
         private string SelectBackupDirectory()
         {
-            string backupRoot = GetBackupRootDir();
-            if (!Directory.Exists(backupRoot))
-            {
-                return null;
-            }
-
-            DirectoryInfo[] backups = new DirectoryInfo(backupRoot)
-                .GetDirectories()
+            DirectoryInfo[] backups = GetBackupRootDirs()
+                .Where(Directory.Exists)
+                .SelectMany(root => new DirectoryInfo(root).GetDirectories())
                 .OrderByDescending(directory => directory.LastWriteTimeUtc)
                 .Take(30)
                 .ToArray();
@@ -2010,7 +2134,7 @@ namespace FFXIVKoreanPatch.Main
                 listBox.Location = new Point(12, 12);
                 listBox.Size = new Size(536, 250);
                 listBox.Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right | AnchorStyles.Bottom;
-                listBox.DisplayMember = "Name";
+                listBox.DisplayMember = "FullName";
 
                 foreach (DirectoryInfo backup in backups)
                 {
@@ -2120,9 +2244,11 @@ namespace FFXIVKoreanPatch.Main
 
             string[] roots = new string[]
             {
+                Path.Combine(GetRuntimeDataRootDir(), "generated-release"),
+                Path.Combine(GetRuntimeDataRootDir(), "restore-baseline"),
                 Path.Combine(Application.StartupPath, "generated-release"),
-                Path.Combine(Application.CommonAppDataPath, "generated-release"),
                 Path.Combine(Application.StartupPath, "restore-baseline"),
+                Path.Combine(Application.CommonAppDataPath, "generated-release"),
                 Path.Combine(Application.CommonAppDataPath, "restore-baseline")
             };
 
@@ -2152,8 +2278,7 @@ namespace FFXIVKoreanPatch.Main
         {
             foreach (string candidateDir in GetLocalOrigIndexCandidateDirs())
             {
-                bool hasAllOrigIndexes = restoreFiles.All(fileName => File.Exists(Path.Combine(candidateDir, "orig." + fileName)));
-                if (!hasAllOrigIndexes)
+                if (!HasCleanOrigIndexes(candidateDir))
                 {
                     continue;
                 }
@@ -2224,8 +2349,23 @@ namespace FFXIVKoreanPatch.Main
 
                 if (File.Exists(origIndexPath))
                 {
-                    warnings++;
-                    lines.Add("[주의] 글로벌 " + indexFileName + "에 dat1 엔트리 " + dat1Count + "개가 있지만, 같은 폴더에 orig index가 있어 복구 또는 빌더 기준 파일로 사용할 수 있습니다.");
+                    int origDat1Count;
+                    string origError;
+                    if (IsCleanIndexFile(origIndexPath, out origDat1Count, out origError))
+                    {
+                        warnings++;
+                        lines.Add("[주의] 글로벌 " + indexFileName + "에 dat1 엔트리 " + dat1Count + "개가 있지만, 같은 폴더에 clean orig index가 있어 복구 또는 빌더 기준 파일로 사용할 수 있습니다.");
+                    }
+                    else
+                    {
+#if TEST_BUILD
+                        warnings++;
+                        lines.Add("[주의] 글로벌 " + indexFileName + "와 orig." + indexFileName + " 모두 clean index가 아닙니다. 테스트 빌드는 진행 가능하지만 실제 적용에 쓰면 안 됩니다.");
+#else
+                        failures++;
+                        lines.Add("[실패] 글로벌 " + indexFileName + "가 패치된 상태이고 orig." + indexFileName + "도 clean index가 아닙니다. orig dat1 엔트리: " + origDat1Count.ToString() + ". 런처 복구 또는 clean index가 필요합니다.");
+#endif
+                    }
                 }
                 else
                 {
@@ -2371,6 +2511,7 @@ namespace FFXIVKoreanPatch.Main
                     : "사전 점검 실패 - 조치 필요";
                 string logPath = WriteOperationLog("preflight", lines);
 
+                lastPreflightPassed = failures == 0;
                 UpdateStatusLabel(summary, failures > 0);
                 SetProgressValue(failures == 0 ? 100 : 0);
 
@@ -2378,6 +2519,7 @@ namespace FFXIVKoreanPatch.Main
             }
             catch (Exception exception)
             {
+                lastPreflightPassed = false;
                 UpdateStatusLabel("사전 점검 실패", true);
                 string logPath = WriteOperationLog("preflight-error", new string[] { exception.ToString() });
                 ShowMessageBox(
@@ -2406,7 +2548,8 @@ namespace FFXIVKoreanPatch.Main
                 actionName + " 작업은 실제 글로벌 서버 클라이언트 폴더에 파일을 복사합니다." + Environment.NewLine + Environment.NewLine +
                 "대상 경로:" + Environment.NewLine +
                 targetDir + Environment.NewLine + Environment.NewLine +
-                "작업 전에 현재 파일은 자동으로 backups 폴더에 저장됩니다." + Environment.NewLine + Environment.NewLine +
+                "작업 전에 현재 파일은 아래 백업 폴더에 저장됩니다." + Environment.NewLine +
+                GetBackupRootDir() + Environment.NewLine + Environment.NewLine +
                 "계속할까요?",
                 Text,
                 MessageBoxButtons.YesNo,
@@ -2664,8 +2807,8 @@ namespace FFXIVKoreanPatch.Main
                     preflightCheckButton.Enabled = true;
                     restoreBackupButton.Enabled = true;
                     buildReleaseButton.Enabled = false;
-                    installButton.Enabled = hasGlobalClient && hasKoreaClient;
-                    chatOnlyInstallButton.Enabled = hasGlobalClient && hasKoreaClient;
+                    installButton.Enabled = hasGlobalClient && hasKoreaClient && lastPreflightPassed;
+                    chatOnlyInstallButton.Enabled = hasGlobalClient && hasKoreaClient && lastPreflightPassed;
                     removeButton.Enabled = hasGlobalClient;
 #endif
                     progressBar.Value = 0;
@@ -2716,11 +2859,12 @@ namespace FFXIVKoreanPatch.Main
             }
 
             targetDir = selectedDir;
+            MarkPreflightRequired();
             RefreshTargetVersion();
             UpdatePathTextBoxes();
             UpdateStatusLabel(string.IsNullOrEmpty(koreaSourceDir)
                 ? "한국 서버 클라이언트 경로를 확인하거나 수동으로 지정해주세요."
-                : $"버전 {targetVersion}, 글로벌/한국 서버 클라이언트 경로 설정 완료");
+                : $"버전 {targetVersion}, 글로벌/한국 서버 클라이언트 경로 설정 완료. 사전 점검을 실행해주세요.");
             SetActionButtonsEnabled(true);
         }
 
@@ -2734,10 +2878,11 @@ namespace FFXIVKoreanPatch.Main
             }
 
             koreaSourceDir = selectedDir;
+            MarkPreflightRequired();
             UpdatePathTextBoxes();
             UpdateStatusLabel(string.IsNullOrEmpty(targetDir)
                 ? "글로벌 서버 클라이언트 경로를 확인하거나 수동으로 지정해주세요."
-                : $"버전 {targetVersion}, 글로벌/한국 서버 클라이언트 경로 설정 완료");
+                : $"버전 {targetVersion}, 글로벌/한국 서버 클라이언트 경로 설정 완료. 사전 점검을 실행해주세요.");
             if (!string.IsNullOrEmpty(targetDir))
             {
                 SetActionButtonsEnabled(true);
@@ -2758,9 +2903,10 @@ namespace FFXIVKoreanPatch.Main
             }
 
             serverPatchAvailable = false;
+            MarkPreflightRequired();
             if (statusLabel != null && statusLabel.IsHandleCreated)
             {
-                UpdateStatusLabel("베이스 클라이언트 언어: " + targetLanguageDisplayName + " (" + targetLanguageCode + "), 로컬 생성 모드");
+                UpdateStatusLabel("베이스 클라이언트 언어: " + targetLanguageDisplayName + " (" + targetLanguageCode + "), 사전 점검을 다시 실행해주세요.");
             }
         }
 
@@ -2770,6 +2916,7 @@ namespace FFXIVKoreanPatch.Main
             koreaSourceDir = string.Empty;
             targetVersion = string.Empty;
             releaseOutputDir = string.Empty;
+            MarkPreflightRequired();
 
             UpdateStatusLabel("경로 자동 탐색 중...");
             DetectGlobalClient();
@@ -2798,6 +2945,7 @@ namespace FFXIVKoreanPatch.Main
             serverPatchAvailable = false;
             releaseOutputDir = string.Empty;
             useDebugApplyPath = false;
+            MarkPreflightRequired();
 
             UpdatePathTextBoxes();
             UpdateStatusLabel("경로를 리셋했어요. 자동 탐색 또는 수동 변경을 사용해주세요.");
@@ -2911,6 +3059,15 @@ namespace FFXIVKoreanPatch.Main
             {
                 return;
             }
+
+#if !TEST_BUILD
+            if (!debugApply && !lastPreflightPassed)
+            {
+                MessageBox.Show("사전 점검을 통과한 뒤에 실제 글로벌 서버 클라이언트에 적용할 수 있어요.", Text, MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                SetActionButtonsEnabled(true);
+                return;
+            }
+#endif
 
             buildTextPatch = includeTextPatch;
             buildFontPatch = includeFontPatch;
@@ -3189,6 +3346,7 @@ namespace FFXIVKoreanPatch.Main
                 }
 
                 ValidateFilesExist(applySqpackDir, selectedPatchFiles, "적용 대상");
+                ValidateSelectedPatchReferences(applySqpackDir, selectedPatchFiles, "적용 대상");
                 logLines.Add("Apply validation: OK");
 
                 if (useDebugApplyPath)

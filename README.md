@@ -80,13 +80,15 @@ manifest.json
 orig.000000.win32.index
 ```
 
-UI 실행 중 생성/관리되는 주요 폴더:
+UI 실행 중 생성/관리되는 주요 폴더는 실행 파일이 있는 `Release` 폴더가 아니라 사용자별 영구 데이터 폴더에 저장됩니다.
+기본 위치는 `%LocalAppData%\FFXIVKoreanPatch`입니다.
 
 ```text
-generated-release\   자동 생성된 패치 release 파일
-restore-baseline\    복구용 clean/original index 보관
-backups\             실제 적용 전 백업
-logs\                작업 로그
+%LocalAppData%\FFXIVKoreanPatch\
+├─ generated-release\   자동 생성된 패치 release 파일
+├─ restore-baseline\    복구용 clean/original index 보관
+├─ backups\             실제 적용 전 백업
+└─ logs\                작업 로그
 ```
 
 테스트 빌드에서는 실제 글로벌 클라이언트에 적용하지 않고 생성된 release 폴더 아래의 `debug-apply\game\sqpack\ffxiv`에만 파일을 복사합니다.
@@ -145,6 +147,7 @@ Release\Test\
 - `Release\`
 - `bin\`
 - `obj\`
+- `%LocalAppData%\FFXIVKoreanPatch\`
 - `generated-release\`
 - `restore-baseline\`
 - `backups\`
@@ -157,8 +160,11 @@ Release\Test\
 
 - 원본 글로벌/한섭 게임 폴더에는 패치 생성물을 직접 쓰지 않습니다.
 - 패치 생성물은 UI가 관리하는 출력 폴더 아래에 먼저 생성됩니다.
+- 백업, 로그, 생성 release, 복구 기준은 `%LocalAppData%\FFXIVKoreanPatch` 아래에 저장되어 빌드 산출물 정리의 영향을 받지 않습니다.
 - 출력 폴더가 원본 게임 폴더 내부면 중단합니다.
 - 글로벌 index가 이미 dat1을 가리키는데 복구용 `orig.*.index`가 없으면 기본적으로 중단합니다.
+- 복구용 `orig.*.index` 자체가 dat1을 가리키는 오염 상태면 clean index로 인정하지 않습니다.
+- 릴리즈 빌드에서는 사전 점검을 통과해야 실제 적용 버튼이 활성화됩니다.
 - 테스트 빌드에서는 실제 글로벌 클라이언트 적용 버튼이 막히고, 테스트용 `debug-apply` 경로만 사용합니다.
 
 ## 현재 제한

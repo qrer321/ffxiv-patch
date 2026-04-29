@@ -243,19 +243,21 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
                 baseIndex = currentGlobalIndex;
             }
 
-            if (!explicitBaseIndex && !foundOrigIndex)
+            using (SqPackIndexFile probe = new SqPackIndexFile(baseIndex))
             {
-                using (SqPackIndexFile probe = new SqPackIndexFile(baseIndex))
+                Dictionary<byte, int> counts = probe.CountEntriesByDataFile();
+                int dat1Count = counts.ContainsKey(1) ? counts[1] : 0;
+                if (dat1Count > 0)
                 {
-                    Dictionary<byte, int> counts = probe.CountEntriesByDataFile();
-                    int dat1Count = counts.ContainsKey(1) ? counts[1] : 0;
-                    if (dat1Count > 0 && !_options.AllowPatchedGlobal)
+                    if (!_options.AllowPatchedGlobal)
                     {
                         throw new InvalidOperationException(
-                            "The installed global 0a0000.win32.index already contains " + dat1Count +
-                            " dat1 entries, but orig.0a0000.win32.index was not found. Use a clean client, restore the original index, or pass --base-index <clean index>. " +
+                            "The selected base 0a0000.win32.index already contains " + dat1Count +
+                            " dat1 entries. Use a clean client, restore the original index, or pass --base-index <clean index>. " +
                             "Use --allow-patched-global only for experiments.");
                     }
+
+                    Console.WriteLine("WARNING: selected base 0a0000.win32.index contains {0} dat1 entries. Experimental output only.", dat1Count);
                 }
             }
 

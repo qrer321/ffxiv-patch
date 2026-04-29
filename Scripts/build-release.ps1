@@ -29,10 +29,6 @@ if (!$resolvedReleaseDir.StartsWith($resolvedRepoRoot, [System.StringComparison]
     throw "Release path escaped repository root: $resolvedReleaseDir"
 }
 
-if (Test-Path $releaseDir) {
-    Remove-Item -LiteralPath $releaseDir -Recurse -Force
-}
-
 New-Item -ItemType Directory -Force -Path $releaseDir | Out-Null
 
 $uiBin = Join-Path $repoRoot "FFXIVPatchUI\bin\$Configuration"
@@ -47,6 +43,11 @@ $files = @(
 foreach ($file in $files) {
     $source = Join-Path $uiBin $file
     if (Test-Path $source) {
+        $destination = Join-Path $releaseDir $file
+        if (Test-Path $destination) {
+            Remove-Item -LiteralPath $destination -Force
+        }
+
         Copy-Item -LiteralPath $source -Destination $releaseDir -Force
     }
 }
