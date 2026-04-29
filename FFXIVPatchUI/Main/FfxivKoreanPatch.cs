@@ -1560,11 +1560,64 @@ namespace FFXIVKoreanPatch.Main
                 {
                     throw new InvalidDataException(context + " index가 dat1 범위 밖의 파일 오프셋을 가리킵니다: " + fileOffset.ToString());
                 }
+
+                ValidateDat1FileHeader(dat1Path, dat1Length, fileOffset, context);
             }
 
             if (dat1Count <= 0)
             {
                 throw new InvalidDataException(context + " index에 dat1 엔트리가 없습니다.");
+            }
+        }
+
+        private void ValidateDat1FileHeader(string dat1Path, long dat1Length, long fileOffset, string context)
+        {
+            byte[] header = new byte[24];
+            using (FileStream stream = new FileStream(dat1Path, FileMode.Open, FileAccess.Read, FileShare.ReadWrite))
+            {
+                stream.Position = fileOffset;
+                int read = stream.Read(header, 0, header.Length);
+                if (read != header.Length)
+                {
+                    throw new InvalidDataException(context + " dat1 파일 헤더를 읽을 수 없습니다: " + fileOffset.ToString());
+                }
+            }
+
+            uint headerSize = ReadUInt32LittleEndian(header, 0x00);
+            uint fileType = ReadUInt32LittleEndian(header, 0x04);
+            if (fileType != 2)
+            {
+                return;
+            }
+
+            uint rawFileSize = ReadUInt32LittleEndian(header, 0x08);
+            uint blockDataUnits = ReadUInt32LittleEndian(header, 0x10);
+            uint blockCount = ReadUInt32LittleEndian(header, 0x14);
+
+            if (headerSize < 24 || (headerSize % 0x80) != 0)
+            {
+                throw new InvalidDataException(context + " dat1 표준 파일 헤더 크기가 올바르지 않습니다: " + headerSize.ToString());
+            }
+
+            if (blockCount == 0)
+            {
+                throw new InvalidDataException(context + " dat1 표준 파일 block count가 0입니다: " + fileOffset.ToString());
+            }
+
+            if (blockDataUnits == 0)
+            {
+                throw new InvalidDataException(context + " dat1 표준 파일 block data 길이가 0입니다: " + fileOffset.ToString());
+            }
+
+            long packedEnd = checked(fileOffset + headerSize + (long)blockDataUnits * 0x80L);
+            if (packedEnd > dat1Length)
+            {
+                throw new InvalidDataException(context + " dat1 표준 파일이 dat1 범위를 벗어납니다: " + fileOffset.ToString());
+            }
+
+            if (rawFileSize == 0)
+            {
+                throw new InvalidDataException(context + " dat1 표준 파일 원본 크기가 0입니다: " + fileOffset.ToString());
             }
         }
 

@@ -389,7 +389,7 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
             writer.Write((uint)2);
             writer.Write((uint)rawData.Length);
             writer.Write((uint)0);
-            writer.Write((uint)0);
+            writer.Write((uint)(blockDataOffset / Alignment));
             writer.Write((uint)blockCount);
 
             for (int i = 0; i < pendingBlocks.Count; i++)
