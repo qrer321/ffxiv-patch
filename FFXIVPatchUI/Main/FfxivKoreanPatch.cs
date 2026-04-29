@@ -125,6 +125,7 @@ namespace FFXIVKoreanPatch.Main
         private bool useDebugApplyPath;
         private bool buildTextPatch = true;
         private bool buildFontPatch = true;
+        private bool initialPreflightStarted;
 
         // Target client version.
         private string targetVersion = string.Empty;
@@ -448,6 +449,189 @@ namespace FFXIVKoreanPatch.Main
             }));
         }
 
+        private void ShowPreflightResultDialog(string summary, int failures, int warnings, string logPath, IList<string> lines)
+        {
+            Invoke(new Action(() =>
+            {
+                using (Form dialog = new Form())
+                {
+                    dialog.Text = "사전 점검 결과";
+                    dialog.StartPosition = FormStartPosition.CenterParent;
+                    dialog.FormBorderStyle = FormBorderStyle.FixedDialog;
+                    dialog.MinimizeBox = false;
+                    dialog.MaximizeBox = false;
+                    dialog.ClientSize = new Size(760, 560);
+                    dialog.BackColor = Color.FromArgb(20, 24, 30);
+                    dialog.Font = new Font("맑은 고딕", 9F, FontStyle.Regular, GraphicsUnit.Point, 129);
+
+                    Color accent = failures > 0
+                        ? Color.FromArgb(235, 92, 92)
+                        : (warnings > 0 ? Color.FromArgb(232, 184, 92) : Color.FromArgb(86, 190, 128));
+
+                    TableLayoutPanel root = new TableLayoutPanel();
+                    root.Dock = DockStyle.Fill;
+                    root.Padding = new Padding(18);
+                    root.BackColor = dialog.BackColor;
+                    root.ColumnCount = 1;
+                    root.RowCount = 5;
+                    root.RowStyles.Add(new RowStyle(SizeType.Absolute, 58));
+                    root.RowStyles.Add(new RowStyle(SizeType.Absolute, 44));
+                    root.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
+                    root.RowStyles.Add(new RowStyle(SizeType.Absolute, 34));
+                    root.RowStyles.Add(new RowStyle(SizeType.Absolute, 46));
+                    dialog.Controls.Add(root);
+
+                    Label titleLabel = new Label();
+                    titleLabel.Dock = DockStyle.Fill;
+                    titleLabel.AutoSize = false;
+                    titleLabel.Text = summary;
+                    titleLabel.ForeColor = accent;
+                    titleLabel.Font = new Font("맑은 고딕", 15F, FontStyle.Bold, GraphicsUnit.Point, 129);
+                    titleLabel.TextAlign = ContentAlignment.MiddleLeft;
+                    root.Controls.Add(titleLabel, 0, 0);
+
+                    FlowLayoutPanel statPanel = new FlowLayoutPanel();
+                    statPanel.Dock = DockStyle.Fill;
+                    statPanel.FlowDirection = FlowDirection.LeftToRight;
+                    statPanel.WrapContents = false;
+                    statPanel.BackColor = dialog.BackColor;
+                    root.Controls.Add(statPanel, 0, 1);
+
+                    AddPreflightStatLabel(statPanel, "실패 " + failures.ToString(), failures > 0 ? Color.FromArgb(94, 36, 40) : Color.FromArgb(32, 38, 46), failures > 0 ? Color.FromArgb(255, 185, 185) : Color.FromArgb(190, 198, 208));
+                    AddPreflightStatLabel(statPanel, "주의 " + warnings.ToString(), warnings > 0 ? Color.FromArgb(86, 66, 28) : Color.FromArgb(32, 38, 46), warnings > 0 ? Color.FromArgb(255, 222, 150) : Color.FromArgb(190, 198, 208));
+                    AddPreflightStatLabel(statPanel, "전체 " + (lines == null ? 0 : lines.Count).ToString(), Color.FromArgb(32, 38, 46), Color.FromArgb(220, 226, 234));
+
+                    ListView listView = new ListView();
+                    listView.Dock = DockStyle.Fill;
+                    listView.View = View.Details;
+                    listView.FullRowSelect = true;
+                    listView.GridLines = false;
+                    listView.HeaderStyle = ColumnHeaderStyle.Nonclickable;
+                    listView.BackColor = Color.FromArgb(26, 31, 38);
+                    listView.ForeColor = Color.FromArgb(230, 235, 242);
+                    listView.BorderStyle = BorderStyle.FixedSingle;
+                    listView.Columns.Add("상태", 76);
+                    listView.Columns.Add("점검 항목", 245);
+                    listView.Columns.Add("상세", 395);
+
+                    foreach (string rawLine in lines ?? new string[0])
+                    {
+                        string state = "정보";
+                        string text = rawLine ?? string.Empty;
+                        Color rowColor = Color.FromArgb(215, 222, 230);
+
+                        if (text.StartsWith("[OK]", StringComparison.OrdinalIgnoreCase))
+                        {
+                            state = "OK";
+                            text = text.Substring(4).Trim();
+                            rowColor = Color.FromArgb(140, 220, 165);
+                        }
+                        else if (text.StartsWith("[주의]", StringComparison.OrdinalIgnoreCase))
+                        {
+                            state = "주의";
+                            text = text.Substring(4).Trim();
+                            rowColor = Color.FromArgb(255, 218, 135);
+                        }
+                        else if (text.StartsWith("[실패]", StringComparison.OrdinalIgnoreCase))
+                        {
+                            state = "실패";
+                            text = text.Substring(4).Trim();
+                            rowColor = Color.FromArgb(255, 170, 170);
+                        }
+
+                        string item = text;
+                        string detail = string.Empty;
+                        int colon = text.IndexOf(':');
+                        if (colon > 0 && colon < text.Length - 1)
+                        {
+                            item = text.Substring(0, colon).Trim();
+                            detail = text.Substring(colon + 1).Trim();
+                        }
+
+                        ListViewItem listItem = new ListViewItem(state);
+                        listItem.SubItems.Add(item);
+                        listItem.SubItems.Add(detail);
+                        listItem.ForeColor = rowColor;
+                        listView.Items.Add(listItem);
+                    }
+
+                    root.Controls.Add(listView, 0, 2);
+
+                    Label logLabel = new Label();
+                    logLabel.Dock = DockStyle.Fill;
+                    logLabel.AutoSize = false;
+                    logLabel.Text = "로그: " + logPath;
+                    logLabel.ForeColor = Color.FromArgb(178, 188, 200);
+                    logLabel.TextAlign = ContentAlignment.MiddleLeft;
+                    root.Controls.Add(logLabel, 0, 3);
+
+                    FlowLayoutPanel buttonPanel = new FlowLayoutPanel();
+                    buttonPanel.Dock = DockStyle.Fill;
+                    buttonPanel.FlowDirection = FlowDirection.RightToLeft;
+                    buttonPanel.WrapContents = false;
+                    buttonPanel.BackColor = dialog.BackColor;
+                    root.Controls.Add(buttonPanel, 0, 4);
+
+                    Button closeButton = CreateDialogButton("닫기", Color.FromArgb(64, 72, 84), Color.White);
+                    closeButton.DialogResult = DialogResult.OK;
+                    buttonPanel.Controls.Add(closeButton);
+
+                    Button openLogButton = CreateDialogButton("로그 열기", Color.FromArgb(58, 90, 142), Color.White);
+                    openLogButton.Click += (sender, args) =>
+                    {
+                        try
+                        {
+                            if (!string.IsNullOrEmpty(logPath) && File.Exists(logPath))
+                            {
+                                Process.Start(new ProcessStartInfo(logPath) { UseShellExecute = true });
+                            }
+                        }
+                        catch
+                        {
+                            MessageBox.Show("로그 파일을 열 수 없어요.", Text, MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                        }
+                    };
+                    buttonPanel.Controls.Add(openLogButton);
+
+                    dialog.AcceptButton = closeButton;
+                    dialog.ShowDialog(this);
+                }
+            }));
+        }
+
+        private void AddPreflightStatLabel(FlowLayoutPanel panel, string text, Color backColor, Color foreColor)
+        {
+            Label label = new Label();
+            label.AutoSize = false;
+            label.Width = 108;
+            label.Height = 28;
+            label.Margin = new Padding(0, 4, 10, 4);
+            label.BackColor = backColor;
+            label.ForeColor = foreColor;
+            label.Font = new Font("맑은 고딕", 9F, FontStyle.Bold, GraphicsUnit.Point, 129);
+            label.Text = text;
+            label.TextAlign = ContentAlignment.MiddleCenter;
+            panel.Controls.Add(label);
+        }
+
+        private Button CreateDialogButton(string text, Color backColor, Color foreColor)
+        {
+            Button button = new Button();
+            button.Text = text;
+            button.Width = 104;
+            button.Height = 32;
+            button.Margin = new Padding(8, 7, 0, 0);
+            button.FlatStyle = FlatStyle.Flat;
+            button.FlatAppearance.BorderColor = Color.FromArgb(92, 104, 120);
+            button.FlatAppearance.MouseOverBackColor = ControlPaint.Light(backColor, 0.12f);
+            button.FlatAppearance.MouseDownBackColor = ControlPaint.Dark(backColor, 0.12f);
+            button.BackColor = backColor;
+            button.ForeColor = foreColor;
+            button.Font = new Font("맑은 고딕", 9F, FontStyle.Bold, GraphicsUnit.Point, 129);
+            button.UseVisualStyleBackColor = false;
+            return button;
+        }
+
         // Update status label text always from UI thread.
         private void UpdateStatusLabel(string text, bool isRed = false)
         {
@@ -519,6 +703,16 @@ namespace FFXIVKoreanPatch.Main
             if (!requiredFiles.All(requiredFile => File.Exists(Path.Combine(targetDir, requiredFile)))) return null;
 
             return targetDir;
+        }
+
+        private bool HasValidGlobalClient()
+        {
+            return !string.IsNullOrEmpty(targetDir) && CheckTargetDir(targetDir) != null;
+        }
+
+        private bool HasValidKoreaClient()
+        {
+            return !string.IsNullOrEmpty(koreaSourceDir) && CheckTargetDir(koreaSourceDir) != null;
         }
 
         private string CleanRegistryPath(string rawPath)
@@ -880,6 +1074,9 @@ namespace FFXIVKoreanPatch.Main
         {
             Action action = () =>
             {
+                bool hasGlobalClient = HasValidGlobalClient();
+                bool hasKoreaClient = HasValidKoreaClient();
+
                 globalPathBrowseButton.Enabled = enabled;
                 koreaPathBrowseButton.Enabled = enabled;
                 targetLanguageComboBox.Enabled = enabled;
@@ -895,7 +1092,7 @@ namespace FFXIVKoreanPatch.Main
 #endif
                 preflightCheckButton.Enabled = enabled;
 #if TEST_BUILD
-                debugBuildReleaseButton.Enabled = enabled;
+                debugBuildReleaseButton.Enabled = enabled && hasGlobalClient && hasKoreaClient;
                 buildReleaseButton.Enabled = false;
                 installButton.Enabled = false;
                 chatOnlyInstallButton.Enabled = false;
@@ -903,9 +1100,9 @@ namespace FFXIVKoreanPatch.Main
 #else
                 debugBuildReleaseButton.Enabled = false;
                 buildReleaseButton.Enabled = false;
-                installButton.Enabled = enabled;
-                chatOnlyInstallButton.Enabled = enabled;
-                removeButton.Enabled = enabled;
+                installButton.Enabled = enabled && hasGlobalClient && hasKoreaClient;
+                chatOnlyInstallButton.Enabled = enabled && hasGlobalClient && hasKoreaClient;
+                removeButton.Enabled = enabled && hasGlobalClient;
 #endif
             };
 
@@ -2074,12 +2271,7 @@ namespace FFXIVKoreanPatch.Main
                 UpdateStatusLabel(summary, failures > 0);
                 SetProgressValue(failures == 0 ? 100 : 0);
 
-                ShowMessageBox(
-                    MessageBoxButtons.OK,
-                    failures > 0 ? MessageBoxIcon.Warning : (warnings > 0 ? MessageBoxIcon.Information : MessageBoxIcon.Information),
-                    summary,
-                    "로그: " + logPath,
-                    string.Join(Environment.NewLine, lines.ToArray()));
+                ShowPreflightResultDialog(summary, failures, warnings, logPath, lines);
             }
             catch (Exception exception)
             {
@@ -2282,6 +2474,7 @@ namespace FFXIVKoreanPatch.Main
                         progressBar.Value = 0;
                         downloadLabel.Text = "";
                     }));
+                    Invoke(new Action(StartInitialPreflightCheck));
                     return;
                 }
 
@@ -2344,6 +2537,9 @@ namespace FFXIVKoreanPatch.Main
 
                 Invoke(new Action(() =>
                 {
+                    bool hasGlobalClient = HasValidGlobalClient();
+                    bool hasKoreaClient = HasValidKoreaClient();
+
                     globalPathBrowseButton.Enabled = true;
                     koreaPathBrowseButton.Enabled = true;
                     targetLanguageComboBox.Enabled = true;
@@ -2353,7 +2549,7 @@ namespace FFXIVKoreanPatch.Main
                     openLogsButton.Enabled = true;
                     cleanupButton.Enabled = true;
 #if TEST_BUILD
-                    debugBuildReleaseButton.Enabled = true;
+                    debugBuildReleaseButton.Enabled = hasGlobalClient && hasKoreaClient;
                     preflightCheckButton.Enabled = true;
                     restoreBackupButton.Enabled = true;
                     buildReleaseButton.Enabled = false;
@@ -2365,13 +2561,14 @@ namespace FFXIVKoreanPatch.Main
                     preflightCheckButton.Enabled = true;
                     restoreBackupButton.Enabled = true;
                     buildReleaseButton.Enabled = false;
-                    installButton.Enabled = true;
-                    chatOnlyInstallButton.Enabled = true;
-                    removeButton.Enabled = true;
+                    installButton.Enabled = hasGlobalClient && hasKoreaClient;
+                    chatOnlyInstallButton.Enabled = hasGlobalClient && hasKoreaClient;
+                    removeButton.Enabled = hasGlobalClient;
 #endif
                     progressBar.Value = 0;
                     downloadLabel.Text = "";
                 }));
+                Invoke(new Action(StartInitialPreflightCheck));
             }
             catch (Exception exception)
             {
@@ -2688,10 +2885,31 @@ namespace FFXIVKoreanPatch.Main
 #endif
         }
 
-        private void preflightCheckButton_Click(object sender, EventArgs e)
+        private void StartPreflightCheck()
         {
+            if (preflightWorker.IsBusy)
+            {
+                return;
+            }
+
             SetActionButtonsEnabled(false);
             preflightWorker.RunWorkerAsync();
+        }
+
+        private void StartInitialPreflightCheck()
+        {
+            if (initialPreflightStarted)
+            {
+                return;
+            }
+
+            initialPreflightStarted = true;
+            StartPreflightCheck();
+        }
+
+        private void preflightCheckButton_Click(object sender, EventArgs e)
+        {
+            StartPreflightCheck();
         }
 
         private string[] GetSelectedPatchFiles()
