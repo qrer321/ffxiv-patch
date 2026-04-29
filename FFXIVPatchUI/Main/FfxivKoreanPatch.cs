@@ -3322,11 +3322,6 @@ namespace FFXIVKoreanPatch.Main
             MessageBox.Show("테스트 빌드에서는 실제 글로벌 서버 클라이언트 폴더를 변경할 수 없어요.", Text, MessageBoxButtons.OK, MessageBoxIcon.Warning);
             return;
 #else
-            if (!ConfirmActualClientWrite("백업으로 복구"))
-            {
-                return;
-            }
-
             string backupDir = SelectBackupDirectory();
             if (string.IsNullOrEmpty(backupDir))
             {
@@ -3335,6 +3330,21 @@ namespace FFXIVKoreanPatch.Main
                     Text,
                     MessageBoxButtons.OK,
                     MessageBoxIcon.Information);
+                return;
+            }
+
+            if (!HasRestorableBackupFiles(backupDir))
+            {
+                MessageBox.Show(
+                    "선택한 백업 폴더에 복구 가능한 index/dat 파일이 없습니다.\r\n\r\n백업 폴더:\r\n" + backupDir,
+                    Text,
+                    MessageBoxButtons.OK,
+                    MessageBoxIcon.Information);
+                return;
+            }
+
+            if (!ConfirmActualClientWrite("백업으로 복구"))
+            {
                 return;
             }
 
