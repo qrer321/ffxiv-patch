@@ -2208,6 +2208,21 @@ namespace FFXIVKoreanPatch.Main
                 .ToArray();
         }
 
+        private IEnumerable<string> EnumerateBackupCandidateDirs()
+        {
+            HashSet<string> dirs = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+            foreach (string root in GetBackupRootDirs())
+            {
+                AddRestoreCandidateDir(root, dirs, true);
+            }
+
+            return dirs
+                .Where(Directory.Exists)
+                .OrderByDescending(GetDirectoryLastWriteTimeUtcSafe)
+                .ToArray();
+        }
+
         private void AddRestoreCandidateDir(string dir, HashSet<string> dirs, bool includeChildren)
         {
             if (string.IsNullOrEmpty(dir) || !Directory.Exists(dir))
@@ -2364,6 +2379,15 @@ namespace FFXIVKoreanPatch.Main
                     .ToArray());
         }
 
+        private string GetBackupSearchRootsText()
+        {
+            return string.Join(
+                Environment.NewLine,
+                GetBackupRootDirs()
+                    .Distinct(StringComparer.OrdinalIgnoreCase)
+                    .ToArray());
+        }
+
         private static bool IsSamePath(string firstPath, string secondPath)
         {
             return string.Equals(
@@ -2374,7 +2398,7 @@ namespace FFXIVKoreanPatch.Main
 
         private string SelectBackupDirectory()
         {
-            DirectoryInfo[] backups = EnumerateRestoreCandidateDirs()
+            DirectoryInfo[] backups = EnumerateBackupCandidateDirs()
                 .Where(HasRestorableBackupFiles)
                 .Select(path => new DirectoryInfo(path))
                 .OrderByDescending(directory => directory.LastWriteTimeUtc)
@@ -3307,7 +3331,7 @@ namespace FFXIVKoreanPatch.Main
             if (string.IsNullOrEmpty(backupDir))
             {
                 MessageBox.Show(
-                    "복구할 수 있는 백업 또는 로컬 복구 기준을 찾지 못했습니다.\r\n\r\n검색 위치:\r\n" + GetRestoreSearchRootsText(),
+                    "복구할 수 있는 백업을 찾지 못했습니다.\r\n\r\n패치 제거는 [한글 패치 제거] 버튼을 사용해주세요.\r\n\r\n백업 검색 위치:\r\n" + GetBackupSearchRootsText(),
                     Text,
                     MessageBoxButtons.OK,
                     MessageBoxIcon.Information);
