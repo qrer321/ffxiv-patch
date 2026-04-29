@@ -22,6 +22,11 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
             return ((ulong)Crc32(folder) << 32) | Crc32(file);
         }
 
+        public static uint GetIndex2Hash(string path)
+        {
+            return Crc32(path.Replace('\\', '/').ToLowerInvariant().Trim());
+        }
+
         public static uint Crc32(string value)
         {
             byte[] bytes = Encoding.UTF8.GetBytes(value);

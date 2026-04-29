@@ -94,9 +94,11 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
             Console.WriteLine("  --source-language  Korean source language slot. Default: ko");
             Console.WriteLine("  --sheet            Limit to one root.exl sheet name for testing.");
             Console.WriteLine("  --base-index       Clean global 0a0000.win32.index to use instead of installed index.");
+            Console.WriteLine("  --base-index2      Clean global 0a0000.win32.index2 to use instead of installed index2.");
             Console.WriteLine("  --include-font     Also build 000000 font patch files.");
             Console.WriteLine("  --font-only        Build only 000000 font patch files.");
             Console.WriteLine("  --base-font-index  Clean global 000000.win32.index to use instead of installed index.");
+            Console.WriteLine("  --base-font-index2 Clean global 000000.win32.index2 to use instead of installed index2.");
             Console.WriteLine("  --allow-patched-global");
             Console.WriteLine("                     Allow using a global index that already points at dat1.");
         }
@@ -175,7 +177,9 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
         public string OutputPath;
         public string SheetLimit;
         public string BaseIndexPath;
+        public string BaseIndex2Path;
         public string BaseFontIndexPath;
+        public string BaseFontIndex2Path;
         public bool IncludeFont;
         public bool FontOnly;
         public bool AllowPatchedGlobal;
@@ -245,9 +249,19 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
                 options.BaseIndexPath = value.Trim('"');
             }
 
+            if (values.TryGetValue("--base-index2", out value))
+            {
+                options.BaseIndex2Path = value.Trim('"');
+            }
+
             if (values.TryGetValue("--base-font-index", out value))
             {
                 options.BaseFontIndexPath = value.Trim('"');
+            }
+
+            if (values.TryGetValue("--base-font-index2", out value))
+            {
+                options.BaseFontIndex2Path = value.Trim('"');
             }
 
             if (LanguageCodes.ToId(options.TargetLanguage) == 0)

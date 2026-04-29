@@ -54,7 +54,7 @@
 - `TEXT_...` 형태 string key 기반 row 매핑
 - string key가 없는 일부 sheet에서 row id 기반 fallback을 허용하는 목록
 - 폰트 리소스 대상 목록
-- `0a0000.win32.index/dat1`, `000000.win32.index/dat1`, `orig.*.index` 형태의 산출물 구성
+- `0a0000.win32.index/index2/dat1`, `000000.win32.index/index2/dat1`, `orig.*.index/index2` 형태의 산출물 구성
 
 단, 기존 제너레이터의 하드코딩된 설치 경로와 `distrib` 폴더 직접 삭제 방식은 사용하지 않았습니다. 이 프로젝트는 원본 게임 폴더에 바로 생성물을 쓰지 않고, UI가 관리하는 출력 폴더 아래에 먼저 release 파일을 생성합니다.
 
@@ -67,7 +67,9 @@
 ```text
 0a0000.win32.dat1
 0a0000.win32.index
+0a0000.win32.index2
 orig.0a0000.win32.index
+orig.0a0000.win32.index2
 ffxivgame.ver
 manifest.json
 ```
@@ -77,7 +79,9 @@ manifest.json
 ```text
 000000.win32.dat1
 000000.win32.index
+000000.win32.index2
 orig.000000.win32.index
+orig.000000.win32.index2
 ```
 
 UI 실행 중 생성/관리되는 주요 폴더는 실행 파일이 있는 `Release` 폴더가 아니라 사용자별 영구 데이터 폴더에 저장됩니다.
@@ -162,8 +166,8 @@ Release\Test\
 - 패치 생성물은 UI가 관리하는 출력 폴더 아래에 먼저 생성됩니다.
 - 백업, 로그, 생성 release, 복구 기준은 `%LocalAppData%\FFXIVKoreanPatch` 아래에 저장되어 빌드 산출물 정리의 영향을 받지 않습니다.
 - 출력 폴더가 원본 게임 폴더 내부면 중단합니다.
-- 글로벌 index가 이미 dat1을 가리키는데 복구용 `orig.*.index`가 없으면 기본적으로 중단합니다.
-- 복구용 `orig.*.index` 자체가 dat1을 가리키는 오염 상태면 clean index로 인정하지 않습니다.
+- 글로벌 index/index2가 이미 dat1을 가리키는데 복구용 `orig.*.index/index2`가 없으면 기본적으로 중단합니다.
+- 복구용 `orig.*.index/index2` 자체가 dat1을 가리키는 오염 상태면 clean index로 인정하지 않습니다.
 - 릴리즈 빌드에서는 사전 점검을 통과해야 실제 적용 버튼이 활성화됩니다.
 - 테스트 빌드에서는 실제 글로벌 클라이언트 적용 버튼이 막히고, 테스트용 `debug-apply` 경로만 사용합니다.
 

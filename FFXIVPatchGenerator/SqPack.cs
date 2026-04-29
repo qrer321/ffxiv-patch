@@ -333,6 +333,109 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
         }
     }
 
+    internal sealed class SqPackIndex2File : IDisposable
+    {
+        private readonly string _path;
+        private readonly byte[] _bytes;
+        private readonly Dictionary<uint, SqPackIndex2Entry> _entries = new Dictionary<uint, SqPackIndex2Entry>();
+        private readonly int _sqpackHeaderSize;
+        private readonly int _indexHeaderOffset;
+
+        public SqPackIndex2File(string path)
+        {
+            _path = path;
+            _bytes = File.ReadAllBytes(path);
+            _sqpackHeaderSize = (int)Endian.ReadUInt32LE(_bytes, 0x0C);
+            _indexHeaderOffset = _sqpackHeaderSize;
+
+            uint indexDataOffset = Endian.ReadUInt32LE(_bytes, _indexHeaderOffset + 0x08);
+            uint indexDataSize = Endian.ReadUInt32LE(_bytes, _indexHeaderOffset + 0x0C);
+            int entryCount = (int)(indexDataSize / 8);
+
+            for (int i = 0; i < entryCount; i++)
+            {
+                int entryOffset = (int)indexDataOffset + i * 8;
+                uint hash = Endian.ReadUInt32LE(_bytes, entryOffset);
+                uint data = Endian.ReadUInt32LE(_bytes, entryOffset + 4);
+
+                SqPackIndex2Entry entry = new SqPackIndex2Entry();
+                entry.Hash = hash;
+                entry.Data = data;
+                entry.EntryOffset = entryOffset;
+                _entries[hash] = entry;
+            }
+        }
+
+        public bool ContainsPath(string gamePath)
+        {
+            return _entries.ContainsKey(SqPackHash.GetIndex2Hash(gamePath));
+        }
+
+        public void SetFileOffset(string gamePath, byte datId, long absoluteOffset)
+        {
+            if (datId > 7)
+            {
+                throw new ArgumentOutOfRangeException("datId");
+            }
+
+            if (absoluteOffset < 0 || (absoluteOffset % 0x80) != 0)
+            {
+                throw new ArgumentException("SqPack file offsets must be 0x80-aligned.");
+            }
+
+            uint hash = SqPackHash.GetIndex2Hash(gamePath);
+            SqPackIndex2Entry entry;
+            if (!_entries.TryGetValue(hash, out entry))
+            {
+                throw new FileNotFoundException("Target index2 entry was not found: " + gamePath);
+            }
+
+            uint encodedOffset = checked((uint)(absoluteOffset / 8));
+            uint flags = (entry.Data & 0x1u) | ((uint)datId << 1);
+            uint data = (encodedOffset & 0xFFFFFFF0u) | flags;
+
+            Endian.WriteUInt32LE(_bytes, entry.EntryOffset + 4, data);
+            entry.Data = data;
+            _entries[hash] = entry;
+        }
+
+        public void EnsureDataFileCount(uint count)
+        {
+            int offset = _indexHeaderOffset + 0x50;
+            uint existing = Endian.ReadUInt32LE(_bytes, offset);
+            if (existing < count)
+            {
+                Endian.WriteUInt32LE(_bytes, offset, count);
+            }
+        }
+
+        public Dictionary<byte, int> CountEntriesByDataFile()
+        {
+            Dictionary<byte, int> counts = new Dictionary<byte, int>();
+            foreach (SqPackIndex2Entry entry in _entries.Values)
+            {
+                byte datId = entry.DataFileId;
+                if (!counts.ContainsKey(datId))
+                {
+                    counts[datId] = 0;
+                }
+
+                counts[datId]++;
+            }
+
+            return counts;
+        }
+
+        public void Save()
+        {
+            File.WriteAllBytes(_path, _bytes);
+        }
+
+        public void Dispose()
+        {
+        }
+    }
+
     internal sealed class SqPackDatWriter : IDisposable
     {
         private const int Alignment = 0x80;
@@ -523,6 +626,23 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
     internal struct SqPackIndexEntry
     {
         public ulong Hash;
+        public uint Data;
+        public int EntryOffset;
+
+        public byte DataFileId
+        {
+            get { return (byte)((Data & 0xEu) >> 1); }
+        }
+
+        public long Offset
+        {
+            get { return (long)(Data & 0xFFFFFFF0u) * 8L; }
+        }
+    }
+
+    internal struct SqPackIndex2Entry
+    {
+        public uint Hash;
         public uint Data;
         public int EntryOffset;
 

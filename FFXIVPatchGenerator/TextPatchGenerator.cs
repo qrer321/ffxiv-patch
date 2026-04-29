@@ -9,9 +9,11 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
     {
         private const string RepositoryDir = "sqpack\\ffxiv";
         private const string IndexFileName = "0a0000.win32.index";
+        private const string Index2FileName = "0a0000.win32.index2";
         private const string Dat0FileName = "0a0000.win32.dat0";
         private const string Dat1FileName = "0a0000.win32.dat1";
         private const string OrigIndexFileName = "orig.0a0000.win32.index";
+        private const string OrigIndex2FileName = "orig.0a0000.win32.index2";
         private const string VersionFileName = "ffxivgame.ver";
 
         private static readonly Regex[] RowKeySwappableSheets = new Regex[]
@@ -106,16 +108,24 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
             string currentGlobalIndex = Path.Combine(globalSqpack, IndexFileName);
             string originalGlobalIndex = Path.Combine(globalSqpack, OrigIndexFileName);
             string baseIndex = ResolveBaseIndex(currentGlobalIndex, originalGlobalIndex);
+            string currentGlobalIndex2 = Path.Combine(globalSqpack, Index2FileName);
+            string originalGlobalIndex2 = Path.Combine(globalSqpack, OrigIndex2FileName);
+            string baseIndex2 = ResolveBaseIndex2(currentGlobalIndex2, originalGlobalIndex2, baseIndex);
 
             string outputIndex = Path.Combine(outputDir, IndexFileName);
+            string outputIndex2 = Path.Combine(outputDir, Index2FileName);
             string outputOrigIndex = Path.Combine(outputDir, OrigIndexFileName);
+            string outputOrigIndex2 = Path.Combine(outputDir, OrigIndex2FileName);
             string outputDat1 = Path.Combine(outputDir, Dat1FileName);
 
             File.Copy(baseIndex, outputOrigIndex, true);
             File.Copy(baseIndex, outputIndex, true);
+            File.Copy(baseIndex2, outputOrigIndex2, true);
+            File.Copy(baseIndex2, outputIndex2, true);
             File.Copy(Path.Combine(globalGame, VersionFileName), Path.Combine(outputDir, VersionFileName), true);
 
             Console.WriteLine("Using base global index: {0}", baseIndex);
+            Console.WriteLine("Using base global index2:{0}", baseIndex2);
             Console.WriteLine("Writing output:          {0}", outputDir);
 
             byte targetLanguageId = LanguageCodes.ToId(_options.TargetLanguage);
@@ -124,9 +134,11 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
             using (SqPackArchive globalArchive = new SqPackArchive(baseIndex, globalSqpack, "0a0000.win32"))
             using (SqPackArchive koreaArchive = new SqPackArchive(Path.Combine(koreaSqpack, IndexFileName), koreaSqpack, "0a0000.win32"))
             using (SqPackIndexFile mutableIndex = new SqPackIndexFile(outputIndex))
+            using (SqPackIndex2File mutableIndex2 = new SqPackIndex2File(outputIndex2))
             using (SqPackDatWriter datWriter = new SqPackDatWriter(outputDat1, Path.Combine(globalSqpack, Dat0FileName)))
             {
                 mutableIndex.EnsureDataFileCount(2);
+                mutableIndex2.EnsureDataFileCount(2);
 
                 byte[] rootBytes = globalArchive.ReadFile("exd/root.exl");
                 List<string> sheetNames = ExcelRootList.Parse(rootBytes);
@@ -147,10 +159,11 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
                     ProgressReporter.Report(
                         5 + (processedSheets - 1) * 85 / totalSheets,
                         "EXD 처리 중: " + sheetName + " (" + processedSheets + "/" + totalSheets + ")");
-                    ProcessSheet(sheetName, globalArchive, koreaArchive, mutableIndex, datWriter, targetLanguageId, sourceLanguageId);
+                    ProcessSheet(sheetName, globalArchive, koreaArchive, mutableIndex, mutableIndex2, datWriter, targetLanguageId, sourceLanguageId);
                 }
 
                 mutableIndex.Save();
+                mutableIndex2.Save();
             }
 
             if (_options.IncludeFont)
@@ -187,6 +200,7 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
         {
             RequireFile(Path.Combine(globalGame, VersionFileName));
             RequireFile(Path.Combine(globalSqpack, IndexFileName));
+            RequireFile(Path.Combine(globalSqpack, Index2FileName));
             RequireFile(Path.Combine(globalSqpack, Dat0FileName));
             RequireFile(Path.Combine(koreaSqpack, IndexFileName));
             RequireFile(Path.Combine(koreaSqpack, Dat0FileName));
@@ -264,11 +278,62 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
             return baseIndex;
         }
 
+        private string ResolveBaseIndex2(string currentGlobalIndex2, string originalGlobalIndex2, string baseIndex)
+        {
+            string baseIndex2 = null;
+
+            if (!string.IsNullOrEmpty(_options.BaseIndex2Path))
+            {
+                baseIndex2 = Path.GetFullPath(_options.BaseIndex2Path);
+                RequireFile(baseIndex2);
+            }
+            else if (!string.IsNullOrEmpty(_options.BaseIndexPath))
+            {
+                string sibling = _options.BaseIndexPath.Trim('"') + "2";
+                if (File.Exists(sibling))
+                {
+                    baseIndex2 = Path.GetFullPath(sibling);
+                }
+            }
+
+            if (string.IsNullOrEmpty(baseIndex2) && File.Exists(originalGlobalIndex2))
+            {
+                baseIndex2 = originalGlobalIndex2;
+            }
+
+            if (string.IsNullOrEmpty(baseIndex2))
+            {
+                baseIndex2 = currentGlobalIndex2;
+            }
+
+            RequireFile(baseIndex2);
+            using (SqPackIndex2File probe = new SqPackIndex2File(baseIndex2))
+            {
+                Dictionary<byte, int> counts = probe.CountEntriesByDataFile();
+                int dat1Count = counts.ContainsKey(1) ? counts[1] : 0;
+                if (dat1Count > 0)
+                {
+                    if (!_options.AllowPatchedGlobal)
+                    {
+                        throw new InvalidOperationException(
+                            "The selected base 0a0000.win32.index2 already contains " + dat1Count +
+                            " dat1 entries. Use a clean client, restore the original index2, or pass --base-index2 <clean index2>. " +
+                            "Use --allow-patched-global only for experiments.");
+                    }
+
+                    Console.WriteLine("WARNING: selected base 0a0000.win32.index2 contains {0} dat1 entries. Experimental output only.", dat1Count);
+                }
+            }
+
+            return baseIndex2;
+        }
+
         private void ProcessSheet(
             string sheetName,
             SqPackArchive globalArchive,
             SqPackArchive koreaArchive,
             SqPackIndexFile mutableIndex,
+            SqPackIndex2File mutableIndex2,
             SqPackDatWriter datWriter,
             byte targetLanguageId,
             byte sourceLanguageId)
@@ -361,6 +426,7 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
 
                 long datOffset = datWriter.WriteStandardFile(patchResult.Data);
                 mutableIndex.SetFileOffset(targetPath, 1, datOffset);
+                mutableIndex2.SetFileOffset(targetPath, 1, datOffset);
                 _report.PagesPatched++;
                 _report.RowsPatched += patchResult.RowsPatched;
                 _report.StringKeyRowsPatched += patchResult.StringKeyRows;

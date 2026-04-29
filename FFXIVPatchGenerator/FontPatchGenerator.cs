@@ -8,9 +8,11 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
     {
         private const string RepositoryDir = "sqpack\\ffxiv";
         private const string IndexFileName = "000000.win32.index";
+        private const string Index2FileName = "000000.win32.index2";
         private const string Dat0FileName = "000000.win32.dat0";
         private const string Dat1FileName = "000000.win32.dat1";
         private const string OrigIndexFileName = "orig.000000.win32.index";
+        private const string OrigIndex2FileName = "orig.000000.win32.index2";
 
         private static readonly string[] FontPaths = new string[]
         {
@@ -83,6 +85,7 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
             string koreaSqpack = Path.Combine(koreaGame, RepositoryDir);
 
             RequireFile(Path.Combine(globalSqpack, IndexFileName));
+            RequireFile(Path.Combine(globalSqpack, Index2FileName));
             RequireFile(Path.Combine(globalSqpack, Dat0FileName));
             RequireFile(Path.Combine(koreaSqpack, IndexFileName));
             RequireFile(Path.Combine(koreaSqpack, Dat0FileName));
@@ -90,21 +93,31 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
             string currentGlobalIndex = Path.Combine(globalSqpack, IndexFileName);
             string originalGlobalIndex = Path.Combine(globalSqpack, OrigIndexFileName);
             string baseIndex = ResolveBaseIndex(currentGlobalIndex, originalGlobalIndex);
+            string currentGlobalIndex2 = Path.Combine(globalSqpack, Index2FileName);
+            string originalGlobalIndex2 = Path.Combine(globalSqpack, OrigIndex2FileName);
+            string baseIndex2 = ResolveBaseIndex2(currentGlobalIndex2, originalGlobalIndex2);
 
             string outputIndex = Path.Combine(outputDir, IndexFileName);
+            string outputIndex2 = Path.Combine(outputDir, Index2FileName);
             string outputOrigIndex = Path.Combine(outputDir, OrigIndexFileName);
+            string outputOrigIndex2 = Path.Combine(outputDir, OrigIndex2FileName);
             string outputDat1 = Path.Combine(outputDir, Dat1FileName);
 
             File.Copy(baseIndex, outputOrigIndex, true);
             File.Copy(baseIndex, outputIndex, true);
+            File.Copy(baseIndex2, outputOrigIndex2, true);
+            File.Copy(baseIndex2, outputIndex2, true);
 
             Console.WriteLine("Using base global font index: {0}", baseIndex);
+            Console.WriteLine("Using base global font index2:{0}", baseIndex2);
 
             using (SqPackArchive koreaArchive = new SqPackArchive(Path.Combine(koreaSqpack, IndexFileName), koreaSqpack, "000000.win32"))
             using (SqPackIndexFile mutableIndex = new SqPackIndexFile(outputIndex))
+            using (SqPackIndex2File mutableIndex2 = new SqPackIndex2File(outputIndex2))
             using (SqPackDatWriter datWriter = new SqPackDatWriter(outputDat1, Path.Combine(globalSqpack, Dat0FileName)))
             {
                 mutableIndex.EnsureDataFileCount(2);
+                mutableIndex2.EnsureDataFileCount(2);
 
                 for (int i = 0; i < FontPaths.Length; i++)
                 {
@@ -125,10 +138,12 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
 
                     long datOffset = datWriter.WritePackedFile(packedFile);
                     mutableIndex.SetFileOffset(path, 1, datOffset);
+                    mutableIndex2.SetFileOffset(path, 1, datOffset);
                     _report.FontFilesPatched++;
                 }
 
                 mutableIndex.Save();
+                mutableIndex2.Save();
             }
 
             ProgressReporter.Report(98, "폰트 패치 저장 완료");
@@ -181,6 +196,56 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
             }
 
             return baseIndex;
+        }
+
+        private string ResolveBaseIndex2(string currentGlobalIndex2, string originalGlobalIndex2)
+        {
+            string baseIndex2 = null;
+
+            if (!string.IsNullOrEmpty(_options.BaseFontIndex2Path))
+            {
+                baseIndex2 = Path.GetFullPath(_options.BaseFontIndex2Path);
+                RequireFile(baseIndex2);
+            }
+            else if (!string.IsNullOrEmpty(_options.BaseFontIndexPath))
+            {
+                string sibling = _options.BaseFontIndexPath.Trim('"') + "2";
+                if (File.Exists(sibling))
+                {
+                    baseIndex2 = Path.GetFullPath(sibling);
+                }
+            }
+
+            if (string.IsNullOrEmpty(baseIndex2) && File.Exists(originalGlobalIndex2))
+            {
+                baseIndex2 = originalGlobalIndex2;
+            }
+
+            if (string.IsNullOrEmpty(baseIndex2))
+            {
+                baseIndex2 = currentGlobalIndex2;
+            }
+
+            RequireFile(baseIndex2);
+            using (SqPackIndex2File probe = new SqPackIndex2File(baseIndex2))
+            {
+                Dictionary<byte, int> counts = probe.CountEntriesByDataFile();
+                int dat1Count = counts.ContainsKey(1) ? counts[1] : 0;
+                if (dat1Count > 0)
+                {
+                    if (!_options.AllowPatchedGlobal)
+                    {
+                        throw new InvalidOperationException(
+                            "The selected base 000000.win32.index2 already contains " + dat1Count +
+                            " dat1 entries. Use a clean client, restore the original index2, or pass --base-font-index2 <clean index2>. " +
+                            "Use --allow-patched-global only for experiments.");
+                    }
+
+                    Console.WriteLine("WARNING: selected base 000000.win32.index2 contains {0} dat1 entries. Experimental output only.", dat1Count);
+                }
+            }
+
+            return baseIndex2;
         }
 
         private void AddLimitedWarning(string message)
