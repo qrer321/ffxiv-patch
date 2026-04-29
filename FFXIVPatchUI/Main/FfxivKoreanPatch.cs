@@ -1324,6 +1324,37 @@ namespace FFXIVKoreanPatch.Main
             return null;
         }
 
+        private string FindFontPackageDir(string patchGeneratorPath)
+        {
+            if (string.IsNullOrEmpty(patchGeneratorPath))
+            {
+                return null;
+            }
+
+            string generatorDir = Path.GetDirectoryName(patchGeneratorPath);
+            string[] candidateDirs = new string[]
+            {
+                generatorDir,
+                Path.Combine(generatorDir, "FontPatchAssets")
+            };
+
+            foreach (string candidateDir in candidateDirs)
+            {
+                if (string.IsNullOrEmpty(candidateDir))
+                {
+                    continue;
+                }
+
+                if (File.Exists(Path.Combine(candidateDir, "TTMPD.mpd")) &&
+                    File.Exists(Path.Combine(candidateDir, "TTMPL.mpl")))
+                {
+                    return candidateDir;
+                }
+            }
+
+            return null;
+        }
+
         private string GetServerUrl()
         {
             return serverUrlBase + "release-" + targetLanguageCode;
@@ -2903,6 +2934,16 @@ namespace FFXIVKoreanPatch.Main
                 else
                 {
                     lines.Add("[OK] FFXIVPatchGenerator.exe: " + patchGeneratorPath);
+                    string fontPackageDir = FindFontPackageDir(patchGeneratorPath);
+                    if (string.IsNullOrEmpty(fontPackageDir))
+                    {
+                        failures++;
+                        lines.Add("[실패] TTMP font package not found. TTMPD.mpd and TTMPL.mpl must be next to FFXIVPatchGenerator.exe for Korean font patching.");
+                    }
+                    else
+                    {
+                        lines.Add("[OK] TTMP font package: " + fontPackageDir);
+                    }
                 }
 
                 if (!string.IsNullOrEmpty(targetDir) && Directory.Exists(targetDir))

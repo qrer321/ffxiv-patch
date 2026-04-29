@@ -22,6 +22,8 @@ generated-release/
 restore-baseline/
 backups/
 logs/
+FFXIVPatchGenerator/FontPatchAssets/TTMPD.mpd
+FFXIVPatchGenerator/FontPatchAssets/TTMPL.mpl
 patchbuilder-smoke*/
 release-ja*/
 release-en*/

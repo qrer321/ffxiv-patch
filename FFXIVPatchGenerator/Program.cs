@@ -97,6 +97,9 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
             Console.WriteLine("  --base-index2      Clean global 0a0000.win32.index2 to use instead of installed index2.");
             Console.WriteLine("  --include-font     Also build 000000 font patch files.");
             Console.WriteLine("  --font-only        Build only 000000 font patch files.");
+            Console.WriteLine("  --font-pack-dir    Directory containing TTMPD.mpd and TTMPL.mpl for font patching.");
+            Console.WriteLine("  --allow-korean-font-fallback");
+            Console.WriteLine("                     Experimental: copy Korean client font resources if TTMP files are missing.");
             Console.WriteLine("  --base-font-index  Clean global 000000.win32.index to use instead of installed index.");
             Console.WriteLine("  --base-font-index2 Clean global 000000.win32.index2 to use instead of installed index2.");
             Console.WriteLine("  --allow-patched-global");
@@ -180,9 +183,11 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
         public string BaseIndex2Path;
         public string BaseFontIndexPath;
         public string BaseFontIndex2Path;
+        public string FontPackDir;
         public bool IncludeFont;
         public bool FontOnly;
         public bool AllowPatchedGlobal;
+        public bool AllowKoreanFontFallback;
 
         public static BuildOptions Parse(string[] args)
         {
@@ -206,6 +211,12 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
                 if (string.Equals(arg, "--include-font", StringComparison.OrdinalIgnoreCase))
                 {
                     options.IncludeFont = true;
+                    continue;
+                }
+
+                if (string.Equals(arg, "--allow-korean-font-fallback", StringComparison.OrdinalIgnoreCase))
+                {
+                    options.AllowKoreanFontFallback = true;
                     continue;
                 }
 
@@ -262,6 +273,11 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
             if (values.TryGetValue("--base-font-index2", out value))
             {
                 options.BaseFontIndex2Path = value.Trim('"');
+            }
+
+            if (values.TryGetValue("--font-pack-dir", out value))
+            {
+                options.FontPackDir = value.Trim('"');
             }
 
             if (LanguageCodes.ToId(options.TargetLanguage) == 0)

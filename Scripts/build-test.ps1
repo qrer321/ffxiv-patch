@@ -36,6 +36,8 @@ $mappings = @{
     "FFXIVKoreanPatch.exe" = "FFXIVKoreanPatch.Test.exe"
     "FFXIVKoreanPatch.exe.config" = "FFXIVKoreanPatch.Test.exe.config"
     "FFXIVPatchGenerator.exe" = "FFXIVPatchGenerator.exe"
+    "TTMPD.mpd" = "TTMPD.mpd"
+    "TTMPL.mpl" = "TTMPL.mpl"
 }
 
 foreach ($sourceName in $mappings.Keys) {

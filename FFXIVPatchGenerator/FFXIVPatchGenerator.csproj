@@ -43,5 +43,15 @@
     <Compile Include="ExdStringPatcher.cs" />
     <Compile Include="HashAndEndian.cs" />
   </ItemGroup>
+  <ItemGroup>
+    <Content Include="FontPatchAssets\TTMPD.mpd" Condition="Exists('FontPatchAssets\TTMPD.mpd')">
+      <Link>TTMPD.mpd</Link>
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+    <Content Include="FontPatchAssets\TTMPL.mpl" Condition="Exists('FontPatchAssets\TTMPL.mpl')">
+      <Link>TTMPL.mpl</Link>
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+  </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
 </Project>

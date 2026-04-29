@@ -36,6 +36,8 @@ $files = @(
     "FFXIVKoreanPatch.exe",
     "FFXIVKoreanPatch.exe.config",
     "FFXIVPatchGenerator.exe",
+    "TTMPD.mpd",
+    "TTMPL.mpl",
     "FFXIVKoreanPatchUpdater.exe",
     "FFXIVKoreanPatchUpdater.exe.config"
 )

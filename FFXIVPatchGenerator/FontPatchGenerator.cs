@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Text.RegularExpressions;
 
 namespace FfxivKoreanPatch.FFXIVPatchGenerator
 {
@@ -13,6 +14,8 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
         private const string Dat1FileName = "000000.win32.dat1";
         private const string OrigIndexFileName = "orig.000000.win32.index";
         private const string OrigIndex2FileName = "orig.000000.win32.index2";
+        private const string TtmpMpdFileName = "TTMPD.mpd";
+        private const string TtmpMplFileName = "TTMPL.mpl";
 
         private static readonly string[] FontPaths = new string[]
         {
@@ -87,8 +90,27 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
             RequireFile(Path.Combine(globalSqpack, IndexFileName));
             RequireFile(Path.Combine(globalSqpack, Index2FileName));
             RequireFile(Path.Combine(globalSqpack, Dat0FileName));
-            RequireFile(Path.Combine(koreaSqpack, IndexFileName));
-            RequireFile(Path.Combine(koreaSqpack, Dat0FileName));
+
+            FontPatchPackage fontPackage = ResolveFontPatchPackage();
+            if (fontPackage == null)
+            {
+                if (!_options.AllowKoreanFontFallback)
+                {
+                    throw new FileNotFoundException(
+                        "TTMP font package files are required for reliable Korean font patching. " +
+                        "Place TTMPD.mpd and TTMPL.mpl next to FFXIVPatchGenerator.exe, under FontPatchAssets, " +
+                        "or pass --font-pack-dir <dir>. Use --allow-korean-font-fallback only for experiments.");
+                }
+
+                RequireFile(Path.Combine(koreaSqpack, IndexFileName));
+                RequireFile(Path.Combine(koreaSqpack, Dat0FileName));
+                AddLimitedWarning("TTMP font package was not found. Falling back to direct Korean client font copy.");
+                Console.WriteLine("TTMP font package was not found. Falling back to direct Korean client font copy.");
+            }
+            else
+            {
+                Console.WriteLine("Using TTMP font package: {0}", fontPackage.DirectoryPath);
+            }
 
             string currentGlobalIndex = Path.Combine(globalSqpack, IndexFileName);
             string originalGlobalIndex = Path.Combine(globalSqpack, OrigIndexFileName);
@@ -111,7 +133,6 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
             Console.WriteLine("Using base global font index: {0}", baseIndex);
             Console.WriteLine("Using base global font index2:{0}", baseIndex2);
 
-            using (SqPackArchive koreaArchive = new SqPackArchive(Path.Combine(koreaSqpack, IndexFileName), koreaSqpack, "000000.win32"))
             using (SqPackIndexFile mutableIndex = new SqPackIndexFile(outputIndex))
             using (SqPackIndex2File mutableIndex2 = new SqPackIndex2File(outputIndex2))
             using (SqPackDatWriter datWriter = new SqPackDatWriter(outputDat1, Path.Combine(globalSqpack, Dat0FileName)))
@@ -119,27 +140,16 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
                 mutableIndex.EnsureDataFileCount(2);
                 mutableIndex2.EnsureDataFileCount(2);
 
-                for (int i = 0; i < FontPaths.Length; i++)
+                if (fontPackage != null)
                 {
-                    string path = FontPaths[i];
-                    ProgressReporter.Report(90 + i * 8 / FontPaths.Length, "폰트 처리 중: " + (i + 1).ToString() + "/" + FontPaths.Length.ToString());
-                    if (!mutableIndex.ContainsPath(path))
+                    WriteTtmpFontFiles(fontPackage, mutableIndex, mutableIndex2, datWriter);
+                }
+                else
+                {
+                    using (SqPackArchive koreaArchive = new SqPackArchive(Path.Combine(koreaSqpack, IndexFileName), koreaSqpack, "000000.win32"))
                     {
-                        AddLimitedWarning("Missing global font target: " + path);
-                        continue;
+                        WriteKoreanFontFiles(koreaArchive, mutableIndex, mutableIndex2, datWriter);
                     }
-
-                    byte[] packedFile;
-                    if (!koreaArchive.TryReadPackedFile(path, out packedFile))
-                    {
-                        AddLimitedWarning("Missing Korean font source: " + path);
-                        continue;
-                    }
-
-                    long datOffset = datWriter.WritePackedFile(packedFile);
-                    mutableIndex.SetFileOffset(path, 1, datOffset);
-                    mutableIndex2.SetFileOffset(path, 1, datOffset);
-                    _report.FontFilesPatched++;
                 }
 
                 mutableIndex.Save();
@@ -155,6 +165,211 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
             {
                 throw new FileNotFoundException("Required file is missing.", path);
             }
+        }
+
+        private void WriteKoreanFontFiles(SqPackArchive koreaArchive, SqPackIndexFile mutableIndex, SqPackIndex2File mutableIndex2, SqPackDatWriter datWriter)
+        {
+            for (int i = 0; i < FontPaths.Length; i++)
+            {
+                string path = FontPaths[i];
+                ProgressReporter.Report(90 + i * 8 / FontPaths.Length, "폰트 처리 중: " + (i + 1).ToString() + "/" + FontPaths.Length.ToString());
+                if (!mutableIndex.ContainsPath(path))
+                {
+                    AddLimitedWarning("Missing global font target: " + path);
+                    continue;
+                }
+
+                if (!mutableIndex2.ContainsPath(path))
+                {
+                    AddLimitedWarning("Missing global font index2 target: " + path);
+                    continue;
+                }
+
+                byte[] packedFile;
+                if (!koreaArchive.TryReadPackedFile(path, out packedFile))
+                {
+                    AddLimitedWarning("Missing Korean font source: " + path);
+                    continue;
+                }
+
+                long datOffset = datWriter.WritePackedFile(packedFile);
+                mutableIndex.SetFileOffset(path, 1, datOffset);
+                mutableIndex2.SetFileOffset(path, 1, datOffset);
+                _report.FontFilesPatched++;
+            }
+        }
+
+        private void WriteTtmpFontFiles(FontPatchPackage fontPackage, SqPackIndexFile mutableIndex, SqPackIndex2File mutableIndex2, SqPackDatWriter datWriter)
+        {
+            using (FileStream mpdStream = new FileStream(fontPackage.MpdPath, FileMode.Open, FileAccess.Read, FileShare.ReadWrite))
+            {
+                for (int i = 0; i < fontPackage.Payloads.Count; i++)
+                {
+                    FontPayload payload = fontPackage.Payloads[i];
+                    string path = NormalizeGamePath(payload.FullPath);
+                    ProgressReporter.Report(90 + i * 8 / fontPackage.Payloads.Count, "Font patching " + (i + 1).ToString() + "/" + fontPackage.Payloads.Count.ToString());
+
+                    if (!mutableIndex.ContainsPath(path))
+                    {
+                        AddLimitedWarning("Missing global font target: " + path);
+                        continue;
+                    }
+
+                    if (!mutableIndex2.ContainsPath(path))
+                    {
+                        AddLimitedWarning("Missing global font index2 target: " + path);
+                        continue;
+                    }
+
+                    byte[] packedFile = ReadPackedPayload(mpdStream, payload.ModOffset, payload.ModSize, path);
+                    long datOffset = datWriter.WritePackedFile(packedFile);
+                    mutableIndex.SetFileOffset(path, 1, datOffset);
+                    mutableIndex2.SetFileOffset(path, 1, datOffset);
+                    _report.FontFilesPatched++;
+                }
+            }
+        }
+
+        private FontPatchPackage ResolveFontPatchPackage()
+        {
+            foreach (string directory in EnumerateFontPackageCandidateDirs())
+            {
+                if (string.IsNullOrWhiteSpace(directory))
+                {
+                    continue;
+                }
+
+                string fullDirectory = Path.GetFullPath(directory);
+                string mpdPath = Path.Combine(fullDirectory, TtmpMpdFileName);
+                string mplPath = Path.Combine(fullDirectory, TtmpMplFileName);
+                if (!File.Exists(mpdPath) || !File.Exists(mplPath))
+                {
+                    continue;
+                }
+
+                FontPatchPackage fontPackage = new FontPatchPackage();
+                fontPackage.DirectoryPath = fullDirectory;
+                fontPackage.MpdPath = mpdPath;
+                fontPackage.MplPath = mplPath;
+                fontPackage.Payloads = LoadFontPayloads(mplPath);
+                if (fontPackage.Payloads.Count == 0)
+                {
+                    throw new InvalidDataException("TTMPL.mpl does not contain any font payloads: " + mplPath);
+                }
+
+                return fontPackage;
+            }
+
+            return null;
+        }
+
+        private IEnumerable<string> EnumerateFontPackageCandidateDirs()
+        {
+            HashSet<string> seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            string[] candidates = new string[]
+            {
+                _options.FontPackDir,
+                AppDomain.CurrentDomain.BaseDirectory,
+                Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "FontPatchAssets"),
+                Directory.GetCurrentDirectory(),
+                Path.Combine(Directory.GetCurrentDirectory(), "FontPatchAssets")
+            };
+
+            for (int i = 0; i < candidates.Length; i++)
+            {
+                string candidate = candidates[i];
+                if (string.IsNullOrWhiteSpace(candidate))
+                {
+                    continue;
+                }
+
+                string fullPath = Path.GetFullPath(candidate);
+                if (seen.Add(fullPath))
+                {
+                    yield return fullPath;
+                }
+            }
+        }
+
+        private static List<FontPayload> LoadFontPayloads(string mplPath)
+        {
+            List<FontPayload> payloads = new List<FontPayload>();
+            foreach (string rawLine in File.ReadLines(mplPath))
+            {
+                if (string.IsNullOrWhiteSpace(rawLine))
+                {
+                    continue;
+                }
+
+                FontPayload payload = new FontPayload();
+                payload.FullPath = ExtractJsonString(rawLine, "FullPath");
+                payload.ModOffset = ExtractJsonInt(rawLine, "ModOffset");
+                payload.ModSize = ExtractJsonInt(rawLine, "ModSize");
+                if (payload.ModSize <= 0)
+                {
+                    throw new InvalidDataException("Invalid TTMP payload size for " + payload.FullPath);
+                }
+
+                payloads.Add(payload);
+            }
+
+            return payloads;
+        }
+
+        private static string ExtractJsonString(string jsonLine, string fieldName)
+        {
+            Match match = Regex.Match(jsonLine, "\"" + Regex.Escape(fieldName) + "\"\\s*:\\s*\"(?<value>(?:\\\\.|[^\"])*)\"");
+            if (!match.Success)
+            {
+                throw new InvalidDataException("Missing string field " + fieldName + " in TTMPL line: " + jsonLine);
+            }
+
+            return Regex.Unescape(match.Groups["value"].Value);
+        }
+
+        private static int ExtractJsonInt(string jsonLine, string fieldName)
+        {
+            Match match = Regex.Match(jsonLine, "\"" + Regex.Escape(fieldName) + "\"\\s*:\\s*(?<value>-?\\d+)");
+            if (!match.Success)
+            {
+                throw new InvalidDataException("Missing integer field " + fieldName + " in TTMPL line: " + jsonLine);
+            }
+
+            return int.Parse(match.Groups["value"].Value);
+        }
+
+        private static string NormalizeGamePath(string path)
+        {
+            return path.Replace('\\', '/').Trim();
+        }
+
+        private static byte[] ReadPackedPayload(FileStream mpdStream, int offset, int size, string path)
+        {
+            if (offset < 0 || size <= 0 || offset + (long)size > mpdStream.Length)
+            {
+                throw new InvalidDataException("TTMP payload is outside TTMPD.mpd: " + path);
+            }
+
+            byte[] buffer = new byte[size];
+            mpdStream.Position = offset;
+            int totalRead = 0;
+            while (totalRead < buffer.Length)
+            {
+                int read = mpdStream.Read(buffer, totalRead, buffer.Length - totalRead);
+                if (read == 0)
+                {
+                    break;
+                }
+
+                totalRead += read;
+            }
+
+            if (totalRead != buffer.Length)
+            {
+                throw new EndOfStreamException("Could not read TTMP payload: " + path);
+            }
+
+            return buffer;
         }
 
         private string ResolveBaseIndex(string currentGlobalIndex, string originalGlobalIndex)
@@ -254,6 +469,21 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
             {
                 _report.Warnings.Add(message);
             }
+        }
+
+        private sealed class FontPatchPackage
+        {
+            public string DirectoryPath;
+            public string MpdPath;
+            public string MplPath;
+            public List<FontPayload> Payloads;
+        }
+
+        private struct FontPayload
+        {
+            public string FullPath;
+            public int ModOffset;
+            public int ModSize;
         }
     }
 }
