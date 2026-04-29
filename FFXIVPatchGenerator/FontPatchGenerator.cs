@@ -62,15 +62,7 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
             "common/font/font2.tex",
             "common/font/font_lobby2.tex",
             "common/font/font3.tex",
-            "common/font/font_krn_1.tex",
-            "common/font/font_krn_2.tex",
-            "common/font/font_krn_3.tex",
-            "common/font/font_krn_4.tex",
-            "common/font/font_krn_5.tex",
-            "common/font/font_krn_6.tex",
-            "common/font/font_krn_7.tex",
-            "common/font/font_krn_8.tex",
-            "common/font/font_krn_9.tex"
+            "common/font/font_krn_1.tex"
         };
 
         private readonly BuildOptions _options;

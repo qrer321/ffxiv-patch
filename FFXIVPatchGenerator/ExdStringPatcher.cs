@@ -55,9 +55,10 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
                     }
                 }
 
+                byte[] rowRecord;
                 if (rowResult != null && rowResult.Touched)
                 {
-                    rowRecords.Add(rowResult.Data);
+                    rowRecord = rowResult.Data;
                     result.Changed = true;
                     result.RowsPatched++;
                     if (plan.Mode == RowPatchMode.StringKey)
@@ -71,9 +72,11 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
                 }
                 else
                 {
-                    rowRecords.Add(CopyOriginalRowRecord(target, row));
+                    rowRecord = CopyOriginalRowRecord(target, row);
                 }
 
+                rowRecord = PadRowRecordToAlignment(rowRecord);
+                rowRecords.Add(rowRecord);
                 dataSectionSize += checked((uint)rowRecords[rowRecords.Count - 1].Length);
             }
 
@@ -241,6 +244,21 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
             return copy;
         }
 
+        private static byte[] PadRowRecordToAlignment(byte[] rowRecord)
+        {
+            int paddingSize = (4 - (rowRecord.Length % 4)) % 4;
+            if (paddingSize == 0)
+            {
+                return rowRecord;
+            }
+
+            byte[] padded = new byte[rowRecord.Length + paddingSize];
+            Buffer.BlockCopy(rowRecord, 0, padded, 0, rowRecord.Length);
+            uint bodySize = Endian.ReadUInt32BE(padded, 0);
+            Endian.WriteUInt32BE(padded, 0, checked(bodySize + (uint)paddingSize));
+            return padded;
+        }
+
         private static RowPatchResult PatchRow(
             ExcelDataFile target,
             ExcelDataFile source,
@@ -312,13 +330,21 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
                 return new RowPatchResult(CopyOriginalRowRecord(target, targetRow), false);
             }
 
-            uint newBodySize = checked((uint)(fixedData.Length + stringData.Length));
+            byte[] strings = stringData.ToArray();
+            int bodySizeWithoutPadding = checked(fixedData.Length + strings.Length);
+            int rowRecordSizeWithoutPadding = checked(6 + bodySizeWithoutPadding);
+            int paddingSize = (4 - (rowRecordSizeWithoutPadding % 4)) % 4;
+            uint newBodySize = checked((uint)(bodySizeWithoutPadding + paddingSize));
+
             MemoryStream rowOutput = new MemoryStream(6 + (int)newBodySize);
             Endian.WriteUInt32BE(rowOutput, newBodySize);
             Endian.WriteUInt16BE(rowOutput, rowCount);
             rowOutput.Write(fixedData, 0, fixedData.Length);
-            byte[] strings = stringData.ToArray();
             rowOutput.Write(strings, 0, strings.Length);
+            for (int i = 0; i < paddingSize; i++)
+            {
+                rowOutput.WriteByte(0);
+            }
 
             if (originalBodySize == 0 && newBodySize == 0)
             {
