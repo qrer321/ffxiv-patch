@@ -24,6 +24,7 @@ namespace FFXIVKoreanPatch.Main
         private const string serverUrlBase = "https://github.com/korean-patch/ffxiv-korean-patch/releases/download/";
         private const string patchDisplayName = "FFXIV 글로벌 클라이언트용 한글 패치";
         private const string builderProgressPrefix = "@@FFXIVPATCHGENERATOR_PROGRESS|";
+        private const string manualRollbackDirName = "manual-sqpack-rollback";
 
         // Path for the main patch program.
         private string mainPath = string.Empty;
@@ -1520,6 +1521,18 @@ namespace FFXIVKoreanPatch.Main
             return true;
         }
 
+        private sealed class RestoreFileCopy
+        {
+            public string SourcePath;
+            public string DestinationFileName;
+
+            public RestoreFileCopy(string sourcePath, string destinationFileName)
+            {
+                SourcePath = sourcePath;
+                DestinationFileName = destinationFileName;
+            }
+        }
+
         private void ValidateDat1References(string indexPath, string dat1Path, string context)
         {
             byte[] bytes = File.ReadAllBytes(indexPath);
@@ -1628,7 +1641,7 @@ namespace FFXIVKoreanPatch.Main
                 DateTime.Now.ToString("yyyyMMdd-HHmmss") + "-" + SanitizeFileNamePart(reason));
             Directory.CreateDirectory(backupDir);
 
-            bool copiedAny = false;
+            List<string> copiedFiles = new List<string>();
             foreach (string fileName in fileNames.Distinct(StringComparer.OrdinalIgnoreCase))
             {
                 string sourcePath = Path.Combine(sqpackDir, fileName);
@@ -1638,10 +1651,85 @@ namespace FFXIVKoreanPatch.Main
                 }
 
                 File.Copy(sourcePath, Path.Combine(backupDir, fileName), true);
-                copiedAny = true;
+                copiedFiles.Add(fileName);
             }
 
-            return copiedAny ? backupDir : string.Empty;
+            if (copiedFiles.Count == 0)
+            {
+                return string.Empty;
+            }
+
+            WriteBackupInfoFile(backupDir, reason, copiedFiles);
+            CreateManualRollbackPackage(backupDir, copiedFiles);
+            return backupDir;
+        }
+
+        private void WriteBackupInfoFile(string backupDir, string reason, IEnumerable<string> copiedFiles)
+        {
+            string infoPath = Path.Combine(backupDir, "backup-info.txt");
+            StringBuilder builder = new StringBuilder();
+            builder.AppendLine("FFXIV Korean Patch backup");
+            builder.AppendLine("Created: " + DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss"));
+            builder.AppendLine("Reason: " + reason);
+            builder.AppendLine("Global game: " + targetDir);
+            builder.AppendLine("Sqpack: " + GetTargetSqpackDir());
+            builder.AppendLine("Files:");
+            foreach (string fileName in copiedFiles)
+            {
+                builder.AppendLine("  " + fileName);
+            }
+
+            builder.AppendLine();
+            builder.AppendLine("Manual rollback:");
+            builder.AppendLine("If this folder contains " + manualRollbackDirName + ", copy the files in that folder into the global client sqpack\\ffxiv folder.");
+            builder.AppendLine("Clean index files stop the client from referencing patched dat1 entries. Unused dat1 files may remain on disk.");
+            File.WriteAllText(infoPath, builder.ToString(), Encoding.UTF8);
+        }
+
+        private void CreateManualRollbackPackage(string backupDir, IEnumerable<string> copiedFiles)
+        {
+            string rollbackDir = Path.Combine(backupDir, manualRollbackDirName);
+            bool wroteAny = false;
+
+            foreach (string fileName in restoreFiles)
+            {
+                if (!copiedFiles.Contains(fileName, StringComparer.OrdinalIgnoreCase))
+                {
+                    continue;
+                }
+
+                string indexPath = Path.Combine(backupDir, fileName);
+                if (!File.Exists(indexPath))
+                {
+                    continue;
+                }
+
+                int dat1Count;
+                string error;
+                if (!IsCleanIndexFile(indexPath, out dat1Count, out error))
+                {
+                    continue;
+                }
+
+                string origPath = Path.Combine(backupDir, "orig." + fileName);
+                if (!File.Exists(origPath))
+                {
+                    File.Copy(indexPath, origPath, false);
+                }
+
+                Directory.CreateDirectory(rollbackDir);
+                File.Copy(indexPath, Path.Combine(rollbackDir, fileName), true);
+                wroteAny = true;
+            }
+
+            if (wroteAny)
+            {
+                File.WriteAllText(
+                    Path.Combine(rollbackDir, "README.txt"),
+                    "Copy these index files into the global client sqpack\\ffxiv folder to roll back manually." + Environment.NewLine +
+                    "This restores the clean index references captured before patch apply." + Environment.NewLine,
+                    Encoding.UTF8);
+            }
         }
 
         private bool TryCreateLocalRestoreBaseline(List<string> lines, out string baselineDir)
@@ -2053,14 +2141,8 @@ namespace FFXIVKoreanPatch.Main
             return new string[]
             {
                 Path.Combine(GetRuntimeDataRootDir(), "generated-release"),
-                Path.Combine(GetRuntimeDataRootDir(), "restore-baseline"),
                 Path.Combine(Application.CommonAppDataPath, "generated-release"),
-                Path.Combine(Application.CommonAppDataPath, "restore-baseline"),
                 Path.Combine(Application.StartupPath, "generated-release"),
-                Path.Combine(Application.StartupPath, "restore-baseline"),
-                GetBackupRootDir(),
-                Path.Combine(Application.StartupPath, "backups"),
-                Path.Combine(Application.CommonAppDataPath, "backups"),
                 GetLogRootDir(),
                 Path.Combine(Application.StartupPath, "logs"),
                 Path.Combine(Application.CommonAppDataPath, "logs")
@@ -2106,11 +2188,195 @@ namespace FFXIVKoreanPatch.Main
             return deleted;
         }
 
+        private IEnumerable<string> EnumerateRestoreCandidateDirs()
+        {
+            HashSet<string> dirs = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+            foreach (string root in GetBackupRootDirs())
+            {
+                AddRestoreCandidateDir(root, dirs, true);
+            }
+
+            foreach (string candidateDir in GetLocalOrigIndexCandidateDirs())
+            {
+                AddRestoreCandidateDir(candidateDir, dirs, false);
+            }
+
+            return dirs
+                .Where(Directory.Exists)
+                .OrderByDescending(GetDirectoryLastWriteTimeUtcSafe)
+                .ToArray();
+        }
+
+        private void AddRestoreCandidateDir(string dir, HashSet<string> dirs, bool includeChildren)
+        {
+            if (string.IsNullOrEmpty(dir) || !Directory.Exists(dir))
+            {
+                return;
+            }
+
+            dirs.Add(dir);
+
+            if (!includeChildren)
+            {
+                return;
+            }
+
+            try
+            {
+                foreach (string childDir in Directory.GetDirectories(dir, "*", SearchOption.AllDirectories))
+                {
+                    dirs.Add(childDir);
+                }
+            }
+            catch
+            {
+                // Keep any candidates already discovered.
+            }
+        }
+
+        private static DateTime GetDirectoryLastWriteTimeUtcSafe(string dir)
+        {
+            try
+            {
+                return Directory.GetLastWriteTimeUtc(dir);
+            }
+            catch
+            {
+                return DateTime.MinValue;
+            }
+        }
+
+        private bool TryBuildCleanIndexRestorePlan(string candidateDir, out List<RestoreFileCopy> plan)
+        {
+            plan = new List<RestoreFileCopy>();
+
+            string manualDir = Path.Combine(candidateDir, manualRollbackDirName);
+            string[] sourceDirs = new string[]
+            {
+                candidateDir,
+                manualDir
+            };
+
+            foreach (string sourceDir in sourceDirs)
+            {
+                if (!Directory.Exists(sourceDir))
+                {
+                    continue;
+                }
+
+                plan.Clear();
+                bool ok = true;
+                foreach (string fileName in restoreFiles)
+                {
+                    string sourcePath = Path.Combine(sourceDir, "orig." + fileName);
+                    if (!File.Exists(sourcePath))
+                    {
+                        sourcePath = Path.Combine(sourceDir, fileName);
+                    }
+
+                    if (!File.Exists(sourcePath))
+                    {
+                        ok = false;
+                        break;
+                    }
+
+                    int dat1Count;
+                    string error;
+                    if (!IsCleanIndexFile(sourcePath, out dat1Count, out error))
+                    {
+                        ok = false;
+                        break;
+                    }
+
+                    plan.Add(new RestoreFileCopy(sourcePath, fileName));
+                }
+
+                if (ok && plan.Count == restoreFiles.Length)
+                {
+                    return true;
+                }
+            }
+
+            plan.Clear();
+            return false;
+        }
+
+        private List<RestoreFileCopy> BuildBackupRestorePlan(string backupDir)
+        {
+            List<RestoreFileCopy> plan;
+            if (TryBuildCleanIndexRestorePlan(backupDir, out plan))
+            {
+                return plan;
+            }
+
+            plan = new List<RestoreFileCopy>();
+            AddExactBackupFiles(backupDir, plan);
+            return plan;
+        }
+
+        private void AddExactBackupFiles(string backupDir, List<RestoreFileCopy> plan)
+        {
+            string[] restorableFiles = textPatchFiles
+                .Concat(fontPatchFiles)
+                .Concat(restoreFiles)
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .ToArray();
+
+            foreach (string fileName in restorableFiles)
+            {
+                if (plan.Any(item => string.Equals(item.DestinationFileName, fileName, StringComparison.OrdinalIgnoreCase)))
+                {
+                    continue;
+                }
+
+                string sourcePath = Path.Combine(backupDir, fileName);
+                if (!File.Exists(sourcePath))
+                {
+                    sourcePath = Path.Combine(backupDir, manualRollbackDirName, fileName);
+                }
+
+                if (File.Exists(sourcePath))
+                {
+                    plan.Add(new RestoreFileCopy(sourcePath, fileName));
+                }
+            }
+        }
+
+        private bool HasRestorableBackupFiles(string backupDir)
+        {
+            List<RestoreFileCopy> plan = BuildBackupRestorePlan(backupDir);
+            return plan.Count > 0;
+        }
+
+        private string GetRestoreSearchRootsText()
+        {
+            return string.Join(
+                Environment.NewLine,
+                GetBackupRootDirs()
+                    .Concat(new string[]
+                    {
+                        Path.Combine(GetRuntimeDataRootDir(), "restore-baseline"),
+                        Path.Combine(Application.StartupPath, "restore-baseline"),
+                        Path.Combine(Application.CommonAppDataPath, "restore-baseline")
+                    })
+                    .Distinct(StringComparer.OrdinalIgnoreCase)
+                    .ToArray());
+        }
+
+        private static bool IsSamePath(string firstPath, string secondPath)
+        {
+            return string.Equals(
+                Path.GetFullPath(firstPath).TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar),
+                Path.GetFullPath(secondPath).TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar),
+                StringComparison.OrdinalIgnoreCase);
+        }
+
         private string SelectBackupDirectory()
         {
-            DirectoryInfo[] backups = GetBackupRootDirs()
-                .Where(Directory.Exists)
-                .SelectMany(root => new DirectoryInfo(root).GetDirectories())
+            DirectoryInfo[] backups = EnumerateRestoreCandidateDirs()
+                .Where(HasRestorableBackupFiles)
+                .Select(path => new DirectoryInfo(path))
                 .OrderByDescending(directory => directory.LastWriteTimeUtc)
                 .Take(30)
                 .ToArray();
@@ -2175,38 +2441,42 @@ namespace FFXIVKoreanPatch.Main
                 throw new DirectoryNotFoundException("글로벌 서버 클라이언트 sqpack 경로를 찾을 수 없어요.");
             }
 
-            string[] backupFiles = Directory.GetFiles(backupDir)
-                .Select(Path.GetFileName)
-                .Where(fileName =>
-                    textPatchFiles.Contains(fileName, StringComparer.OrdinalIgnoreCase)
-                    || fontPatchFiles.Contains(fileName, StringComparer.OrdinalIgnoreCase)
-                    || restoreFiles.Contains(fileName, StringComparer.OrdinalIgnoreCase))
-                .Distinct(StringComparer.OrdinalIgnoreCase)
-                .ToArray();
+            List<RestoreFileCopy> restorePlan = BuildBackupRestorePlan(backupDir);
 
-            if (backupFiles.Length == 0)
+            if (restorePlan.Count == 0)
             {
                 throw new FileNotFoundException("선택한 백업 폴더에 복구 가능한 index/dat 파일이 없습니다.", backupDir);
             }
 
-            string beforeRestoreBackup = BackupTargetFiles(backupFiles, "before-backup-restore");
-            foreach (string fileName in backupFiles)
+            string[] destinationFiles = restorePlan
+                .Select(item => item.DestinationFileName)
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .ToArray();
+
+            string beforeRestoreBackup = BackupTargetFiles(destinationFiles, "before-backup-restore");
+            foreach (RestoreFileCopy item in restorePlan)
             {
-                File.Copy(Path.Combine(backupDir, fileName), Path.Combine(sqpackDir, fileName), true);
+                string destinationPath = Path.Combine(sqpackDir, item.DestinationFileName);
+                if (IsSamePath(item.SourcePath, destinationPath))
+                {
+                    continue;
+                }
+
+                File.Copy(item.SourcePath, destinationPath, true);
             }
 
             string logPath = WriteOperationLog("backup-restore", new string[]
             {
                 "Restored backup: " + backupDir,
                 "Before restore backup: " + beforeRestoreBackup,
-                "Files: " + string.Join(", ", backupFiles)
+                "Files: " + string.Join(", ", destinationFiles)
             });
 
             List<KeyValuePair<string, string>> resultDetails = new List<KeyValuePair<string, string>>();
             resultDetails.Add(new KeyValuePair<string, string>("작업", "백업으로 복구"));
             resultDetails.Add(new KeyValuePair<string, string>("복구한 백업", backupDir));
             resultDetails.Add(new KeyValuePair<string, string>("복구 전 백업", beforeRestoreBackup));
-            resultDetails.Add(new KeyValuePair<string, string>("복구 파일", string.Join(", ", backupFiles)));
+            resultDetails.Add(new KeyValuePair<string, string>("복구 파일", string.Join(", ", destinationFiles)));
 
             ShowOperationResultDialog(
                 "백업 복구 완료",
@@ -2276,9 +2546,15 @@ namespace FFXIVKoreanPatch.Main
 
         private bool TryFindLocalOrigIndexDir(out string sourceDir)
         {
-            foreach (string candidateDir in GetLocalOrigIndexCandidateDirs())
+            List<RestoreFileCopy> plan;
+            return TryFindCleanIndexRestorePlan(out sourceDir, out plan);
+        }
+
+        private bool TryFindCleanIndexRestorePlan(out string sourceDir, out List<RestoreFileCopy> plan)
+        {
+            foreach (string candidateDir in EnumerateRestoreCandidateDirs())
             {
-                if (!HasCleanOrigIndexes(candidateDir))
+                if (!TryBuildCleanIndexRestorePlan(candidateDir, out plan))
                 {
                     continue;
                 }
@@ -2288,6 +2564,7 @@ namespace FFXIVKoreanPatch.Main
             }
 
             sourceDir = null;
+            plan = new List<RestoreFileCopy>();
             return false;
         }
 
@@ -2297,7 +2574,8 @@ namespace FFXIVKoreanPatch.Main
             backupDir = null;
 
             string sourceDir;
-            if (!TryFindLocalOrigIndexDir(out sourceDir))
+            List<RestoreFileCopy> restorePlan;
+            if (!TryFindCleanIndexRestorePlan(out sourceDir, out restorePlan))
             {
                 return false;
             }
@@ -2312,13 +2590,22 @@ namespace FFXIVKoreanPatch.Main
             UpdateDownloadLabel("");
             SetProgressValue(0);
 
-            backupDir = BackupTargetFiles(restoreFiles, "local-restore");
+            string[] destinationFiles = restorePlan
+                .Select(item => item.DestinationFileName)
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .ToArray();
+            backupDir = BackupTargetFiles(destinationFiles, "local-restore");
 
-            for (int i = 0; i < restoreFiles.Length; i++)
+            for (int i = 0; i < restorePlan.Count; i++)
             {
-                string fileName = restoreFiles[i];
-                File.Copy(Path.Combine(sourceDir, "orig." + fileName), Path.Combine(sqpackDir, fileName), true);
-                SetProgressValue((i + 1) * 100 / restoreFiles.Length);
+                RestoreFileCopy item = restorePlan[i];
+                string destinationPath = Path.Combine(sqpackDir, item.DestinationFileName);
+                if (!IsSamePath(item.SourcePath, destinationPath))
+                {
+                    File.Copy(item.SourcePath, destinationPath, true);
+                }
+
+                SetProgressValue((i + 1) * 100 / restorePlan.Count);
             }
 
             restoreSourceDir = sourceDir;
@@ -2969,7 +3256,7 @@ namespace FFXIVKoreanPatch.Main
         private void cleanupButton_Click(object sender, EventArgs e)
         {
             DialogResult result = MessageBox.Show(
-                "generated-release, backups, logs에서 30일 지난 파일과 빈 폴더를 정리할까요?",
+                "generated-release와 logs에서 30일 지난 파일과 빈 폴더를 정리할까요?\r\n\r\n백업과 로컬 복구 기준은 자동 정리하지 않습니다.",
                 Text,
                 MessageBoxButtons.YesNo,
                 MessageBoxIcon.Question,
@@ -3019,7 +3306,11 @@ namespace FFXIVKoreanPatch.Main
             string backupDir = SelectBackupDirectory();
             if (string.IsNullOrEmpty(backupDir))
             {
-                MessageBox.Show("복구할 백업을 찾지 못했거나 선택하지 않았어요.", Text, MessageBoxButtons.OK, MessageBoxIcon.Information);
+                MessageBox.Show(
+                    "복구할 수 있는 백업 또는 로컬 복구 기준을 찾지 못했습니다.\r\n\r\n검색 위치:\r\n" + GetRestoreSearchRootsText(),
+                    Text,
+                    MessageBoxButtons.OK,
+                    MessageBoxIcon.Information);
                 return;
             }
 
@@ -3453,8 +3744,9 @@ namespace FFXIVKoreanPatch.Main
                 }
 
                 throw new InvalidOperationException(
-                    "로컬 복구용 orig index를 찾지 못했어요." + Environment.NewLine +
-                    "이전 패쳐로 적용한 패치라면 그 패쳐의 제거 기능을 먼저 사용하거나, FFXIV 런처 파일 검사/복구로 글로벌 서버 클라이언트를 원본 상태로 되돌려주세요.");
+                    "로컬 복구용 clean index를 찾지 못했습니다." + Environment.NewLine +
+                    "검색 대상은 백업 폴더, manual-sqpack-rollback 폴더, 로컬 restore-baseline, 생성된 release의 orig index입니다." + Environment.NewLine +
+                    "백업을 직접 갖고 있다면 sqpack\\ffxiv 폴더에 clean index를 수동으로 붙여넣거나, FFXIV 런처 파일 검사/복구로 글로벌 서버 클라이언트를 원본 상태로 되돌려주세요.");
 #endif
             }
             catch (Exception exception)
