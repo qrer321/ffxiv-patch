@@ -19,6 +19,7 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
         private static readonly Regex[] RowKeySwappableSheets = new Regex[]
         {
             new Regex("^Achievement.*$", RegexOptions.IgnoreCase | RegexOptions.Compiled),
+            new Regex("^Addon$", RegexOptions.IgnoreCase | RegexOptions.Compiled),
             new Regex("^Action.*$", RegexOptions.IgnoreCase | RegexOptions.Compiled),
             new Regex("^AttackType$", RegexOptions.IgnoreCase | RegexOptions.Compiled),
             new Regex("^Attributive$", RegexOptions.IgnoreCase | RegexOptions.Compiled),
@@ -31,6 +32,7 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
             new Regex("^CollectablesShop.*$", RegexOptions.IgnoreCase | RegexOptions.Compiled),
             new Regex("^Companion.*$", RegexOptions.IgnoreCase | RegexOptions.Compiled),
             new Regex("^Company.*$", RegexOptions.IgnoreCase | RegexOptions.Compiled),
+            new Regex("^CompleteJournal.*$", RegexOptions.IgnoreCase | RegexOptions.Compiled),
             new Regex("^Content.*$", RegexOptions.IgnoreCase | RegexOptions.Compiled),
             new Regex("^Craft.*$", RegexOptions.IgnoreCase | RegexOptions.Compiled),
             new Regex("^CustomTalk$", RegexOptions.IgnoreCase | RegexOptions.Compiled),
@@ -55,6 +57,8 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
             new Regex("^JobDef.*$", RegexOptions.IgnoreCase | RegexOptions.Compiled),
             new Regex("^Journal.*$", RegexOptions.IgnoreCase | RegexOptions.Compiled),
             new Regex("^Leve.*$", RegexOptions.IgnoreCase | RegexOptions.Compiled),
+            new Regex("^Lobby$", RegexOptions.IgnoreCase | RegexOptions.Compiled),
+            new Regex("^LogMessage$", RegexOptions.IgnoreCase | RegexOptions.Compiled),
             new Regex("^MainCommand.*$", RegexOptions.IgnoreCase | RegexOptions.Compiled),
             new Regex("^Minion.*$", RegexOptions.IgnoreCase | RegexOptions.Compiled),
             new Regex("^MonsterNote$", RegexOptions.IgnoreCase | RegexOptions.Compiled),
