@@ -123,6 +123,8 @@ namespace FFXIVKoreanPatch.Main
 
         // If true, generated files are copied into a local sandbox instead of the real global client.
         private bool useDebugApplyPath;
+        private bool buildTextPatch = true;
+        private bool buildFontPatch = true;
 
         // Target client version.
         private string targetVersion = string.Empty;
@@ -901,8 +903,8 @@ namespace FFXIVKoreanPatch.Main
 #else
                 debugBuildReleaseButton.Enabled = enabled;
                 buildReleaseButton.Enabled = enabled;
-                installButton.Enabled = enabled && serverPatchAvailable;
-                chatOnlyInstallButton.Enabled = enabled && serverPatchAvailable;
+                installButton.Enabled = enabled;
+                chatOnlyInstallButton.Enabled = enabled;
                 removeButton.Enabled = enabled;
 #endif
             };
@@ -1497,11 +1499,22 @@ namespace FFXIVKoreanPatch.Main
             return manifestPath;
         }
 
-        private void ValidateReleaseOutput(string outputDir)
+        private void ValidateReleaseOutput(string outputDir, IEnumerable<string> expectedPatchFiles)
         {
-            List<string> requiredReleaseFiles = textPatchFiles
-                .Concat(fontPatchFiles)
-                .Concat(restoreFiles.Select(fileName => "orig." + fileName))
+            string[] patchFiles = expectedPatchFiles.Distinct(StringComparer.OrdinalIgnoreCase).ToArray();
+            List<string> requiredOrigFiles = new List<string>();
+            if (patchFiles.Any(fileName => textPatchFiles.Contains(fileName, StringComparer.OrdinalIgnoreCase)))
+            {
+                requiredOrigFiles.Add("orig.0a0000.win32.index");
+            }
+
+            if (patchFiles.Any(fileName => fontPatchFiles.Contains(fileName, StringComparer.OrdinalIgnoreCase)))
+            {
+                requiredOrigFiles.Add("orig.000000.win32.index");
+            }
+
+            List<string> requiredReleaseFiles = patchFiles
+                .Concat(requiredOrigFiles)
                 .Concat(new string[] { versionFileName })
                 .Distinct(StringComparer.OrdinalIgnoreCase)
                 .ToList();
@@ -1522,16 +1535,22 @@ namespace FFXIVKoreanPatch.Main
                 throw new InvalidDataException("생성된 ffxivgame.ver가 글로벌 클라이언트 버전과 다릅니다. 생성 버전: " + releaseVersion + ", 글로벌 버전: " + targetVersion);
             }
 
-            int textDat1Count = CountIndexDat1Entries(Path.Combine(outputDir, "0a0000.win32.index"));
-            if (textDat1Count <= 0)
+            if (patchFiles.Any(fileName => string.Equals(fileName, "0a0000.win32.index", StringComparison.OrdinalIgnoreCase)))
             {
-                throw new InvalidDataException("생성된 0a0000.win32.index에 dat1 엔트리가 없습니다.");
+                int textDat1Count = CountIndexDat1Entries(Path.Combine(outputDir, "0a0000.win32.index"));
+                if (textDat1Count <= 0)
+                {
+                    throw new InvalidDataException("생성된 0a0000.win32.index에 dat1 엔트리가 없습니다.");
+                }
             }
 
-            int fontDat1Count = CountIndexDat1Entries(Path.Combine(outputDir, "000000.win32.index"));
-            if (fontDat1Count <= 0)
+            if (patchFiles.Any(fileName => string.Equals(fileName, "000000.win32.index", StringComparison.OrdinalIgnoreCase)))
             {
-                throw new InvalidDataException("생성된 000000.win32.index에 dat1 엔트리가 없습니다.");
+                int fontDat1Count = CountIndexDat1Entries(Path.Combine(outputDir, "000000.win32.index"));
+                if (fontDat1Count <= 0)
+                {
+                    throw new InvalidDataException("생성된 000000.win32.index에 dat1 엔트리가 없습니다.");
+                }
             }
         }
 
@@ -2044,7 +2063,7 @@ namespace FFXIVKoreanPatch.Main
                 else
                 {
                     warnings++;
-                    lines.Add("[주의] 로컬 복구용 orig index를 찾지 못했습니다. 제거 시 원격 release 또는 이전 패쳐/런처 복구가 필요할 수 있습니다.");
+                    lines.Add("[주의] 로컬 복구용 orig index를 찾지 못했습니다. 제거 시 이전 패쳐의 제거 기능 또는 런처 파일 검사/복구가 필요할 수 있습니다.");
                 }
 
                 string summary = failures == 0
@@ -2160,44 +2179,9 @@ namespace FFXIVKoreanPatch.Main
                 // Clean up some stuff.
                 ClearCache();
 
-                // Check main executable's version and update if necessary.
-                UpdateStatusLabel("프로그램 버전 확인 중...");
-
-                try
-                {
-#if DEBUG
-#else
-                    // Check the current executable's checksum with the server.
-                    if (!CheckSHA1(mainPath, $"{GetServerUrl()}/{mainFileName}.exe.sha1", $"{mainFileName}.exe.sha1", initialChecker))
-                    {
-                        // If doesn't match, need to download the new binary and updater, then trigger an update.
-                        DownloadFile($"{GetServerUrl()}/{mainFileName}.exe", $"{mainFileName}.exe", initialChecker, mainTempPath);
-                        DownloadFile($"{GetServerUrl()}/{updaterFileName}.exe", $"{updaterFileName}.exe", initialChecker, updaterPath);
-
-                        // Run updater worker process to update the main executable.
-                        ShowMessageBox(
-                            MessageBoxButtons.OK,
-                            MessageBoxIcon.Information,
-                            "업데이트가 필요해 프로그램을 종료할 거예요.",
-                            "업데이트가 완료되면 자동으로 재실행할게요.");
-                        Process.Start(new ProcessStartInfo(updaterPath, $"\"{mainPath}\" \"{mainTempPath}\""));
-                        CloseForm();
-                        return;
-                    }
-#endif
-                }
-                catch (Exception exception)
-                {
-                    ShowMessageBox(
-                        MessageBoxButtons.OK,
-                        MessageBoxIcon.Error,
-                        "버전을 확인하는데 실패했어요.",
-                        "문제가 지속될 경우 디스코드를 통해 문의해주세요.",
-                        "에러 내용: ",
-                        exception.ToString());
-                    CloseForm();
-                    return;
-                }
+                // Remote self-update is intentionally disabled in this fork.
+                // Release builds generate patch files locally and should not depend on old upstream release assets.
+                UpdateStatusLabel("로컬 생성 모드로 실행 중...");
 
                 // Try to detect FFXIV client path.
                 UpdateStatusLabel("글로벌 서버 클라이언트를 찾는 중...");
@@ -2347,33 +2331,11 @@ namespace FFXIVKoreanPatch.Main
                 // Read the version from target client.
                 RefreshTargetVersion();
 
-                // Remote release assets are optional. Local builder/test flows do not require them.
-                UpdateStatusLabel($"원격 release 확인 중... 버전 {targetVersion}");
-
-                try
-                {
-                    serverVersion = Encoding.ASCII.GetString(DownloadFile($"{GetServerUrl()}/{versionFileName}", versionFileName, initialChecker)).Trim();
-                    serverPatchAvailable = true;
-
-                    if (!serverVersion.Equals(targetVersion))
-                    {
-                        ShowMessageBox(
-                            MessageBoxButtons.OK,
-                            MessageBoxIcon.Error,
-                            "현재 설치된 게임 클라이언트의 버전이 서버의 버전과 달라요!",
-                            $"클라이언트 버전: {targetVersion}, 서버 버전: {serverVersion}",
-                            "",
-                            "(버전이 다를 경우 한글 패치가 정상적으로 작동하지 않을 수도 있으니 유의해주세요.)",
-                            "문제가 지속되면 디스코드를 통해 문의해주세요.");
-                    }
-                }
-                catch
-                {
-                    serverVersion = "로컬 생성 모드";
-                    serverPatchAvailable = false;
-                    UpdateDownloadLabel("");
-                    UpdateStatusLabel("원격 release를 찾을 수 없어 로컬 생성 모드로 진행합니다.");
-                }
+                // This fork does not download prebuilt patch releases.
+                // All patch files are generated from the user's local Korean/global clients.
+                serverVersion = "로컬 생성 모드";
+                serverPatchAvailable = false;
+                UpdateDownloadLabel("");
 
                 // Check all done!
                 UpdateStatusLabel(serverPatchAvailable
@@ -2403,8 +2365,8 @@ namespace FFXIVKoreanPatch.Main
                     preflightCheckButton.Enabled = true;
                     restoreBackupButton.Enabled = true;
                     buildReleaseButton.Enabled = true;
-                    installButton.Enabled = serverPatchAvailable;
-                    chatOnlyInstallButton.Enabled = serverPatchAvailable;
+                    installButton.Enabled = true;
+                    chatOnlyInstallButton.Enabled = true;
                     removeButton.Enabled = true;
 #endif
                     progressBar.Value = 0;
@@ -2496,12 +2458,6 @@ namespace FFXIVKoreanPatch.Main
             }
 
             serverPatchAvailable = false;
-            if (installButton != null)
-            {
-                installButton.Enabled = false;
-                chatOnlyInstallButton.Enabled = false;
-            }
-
             if (statusLabel != null && statusLabel.IsHandleCreated)
             {
                 UpdateStatusLabel("베이스 클라이언트 언어: " + targetLanguageDisplayName + " (" + targetLanguageCode + "), 로컬 생성 모드");
@@ -2649,6 +2605,20 @@ namespace FFXIVKoreanPatch.Main
 #endif
         }
 
+        private void StartLocalPatchBuild(bool includeTextPatch, bool includeFontPatch, bool debugApply)
+        {
+            if (buildReleaseWorker.IsBusy)
+            {
+                return;
+            }
+
+            buildTextPatch = includeTextPatch;
+            buildFontPatch = includeFontPatch;
+            useDebugApplyPath = debugApply;
+            SetActionButtonsEnabled(false);
+            buildReleaseWorker.RunWorkerAsync();
+        }
+
         private void buildReleaseButton_Click(object sender, EventArgs e)
         {
 #if TEST_BUILD
@@ -2660,17 +2630,13 @@ namespace FFXIVKoreanPatch.Main
                 return;
             }
 
-            useDebugApplyPath = false;
-            SetActionButtonsEnabled(false);
-            buildReleaseWorker.RunWorkerAsync();
+            StartLocalPatchBuild(true, true, false);
 #endif
         }
 
         private void debugBuildReleaseButton_Click(object sender, EventArgs e)
         {
-            useDebugApplyPath = true;
-            SetActionButtonsEnabled(false);
-            buildReleaseWorker.RunWorkerAsync();
+            StartLocalPatchBuild(true, true, true);
         }
 
         private void installButton_Click(object sender, EventArgs e)
@@ -2684,11 +2650,7 @@ namespace FFXIVKoreanPatch.Main
                 return;
             }
 
-            // Block further inputs.
-            SetActionButtonsEnabled(false);
-
-            // Start the background worker to install the korean patch.
-            installWorker.RunWorkerAsync();
+            StartLocalPatchBuild(true, true, false);
 #endif
         }
 
@@ -2703,11 +2665,7 @@ namespace FFXIVKoreanPatch.Main
                 return;
             }
 
-            // Block further inputs.
-            SetActionButtonsEnabled(false);
-
-            // Start the background worker to install chat only.
-            chatOnlyWorker.RunWorkerAsync();
+            StartLocalPatchBuild(false, true, false);
 #endif
         }
 
@@ -2736,6 +2694,22 @@ namespace FFXIVKoreanPatch.Main
             preflightWorker.RunWorkerAsync();
         }
 
+        private string[] GetSelectedPatchFiles()
+        {
+            List<string> files = new List<string>();
+            if (buildTextPatch)
+            {
+                files.AddRange(textPatchFiles);
+            }
+
+            if (buildFontPatch)
+            {
+                files.AddRange(fontPatchFiles);
+            }
+
+            return files.Distinct(StringComparer.OrdinalIgnoreCase).ToArray();
+        }
+
         private void BuildReleaseWork()
         {
             StringBuilder processOutput = new StringBuilder();
@@ -2747,6 +2721,12 @@ namespace FFXIVKoreanPatch.Main
 #if TEST_BUILD
                 useDebugApplyPath = true;
 #endif
+                string[] selectedPatchFiles = GetSelectedPatchFiles();
+                if (selectedPatchFiles.Length == 0)
+                {
+                    throw new InvalidOperationException("생성할 패치 종류가 선택되지 않았어요.");
+                }
+
                 if (string.IsNullOrEmpty(targetDir))
                 {
                     throw new DirectoryNotFoundException("글로벌 서버 클라이언트 경로가 설정되지 않았어요.");
@@ -2780,15 +2760,27 @@ namespace FFXIVKoreanPatch.Main
                     "--global " + QuoteArgument(targetDir) + " " +
                     "--korea " + QuoteArgument(koreaSourceDir) + " " +
                     "--target-language " + targetLanguageCode + " " +
-                    "--include-font " +
                     "--output " + QuoteArgument(releaseOutputDir);
+                if (buildFontPatch)
+                {
+                    arguments += " --include-font";
+                }
+
+                if (!buildTextPatch && buildFontPatch)
+                {
+                    arguments += " --font-only";
+                }
+
 #if TEST_BUILD
                 arguments += " --allow-patched-global";
 #endif
                 logLines.Add("FFXIVPatchGenerator: " + patchGeneratorPath);
                 logLines.Add("Arguments: " + arguments);
 
-                UpdateStatusLabel(targetLanguageDisplayName + " 클라이언트용 패치 생성 중...");
+                string buildDescription = buildTextPatch && buildFontPatch
+                    ? targetLanguageDisplayName + " 클라이언트용 전체 패치"
+                    : "한글 폰트 패치";
+                UpdateStatusLabel(buildDescription + " 생성 중...");
                 UpdateDownloadLabel("0%");
                 SetProgressValue(0);
 
@@ -2847,7 +2839,7 @@ namespace FFXIVKoreanPatch.Main
                     }
                 }
 
-                ValidateReleaseOutput(releaseOutputDir);
+                ValidateReleaseOutput(releaseOutputDir, selectedPatchFiles);
                 logLines.Add("Release validation: OK");
 
                 string applyGameDir = GetApplyGameDir();
@@ -2861,10 +2853,10 @@ namespace FFXIVKoreanPatch.Main
                 string backupDir = string.Empty;
                 if (!useDebugApplyPath)
                 {
-                    backupDir = BackupTargetFiles(textPatchFiles.Concat(fontPatchFiles), "auto-apply");
+                    backupDir = BackupTargetFiles(selectedPatchFiles, buildTextPatch ? "auto-apply" : "font-apply");
                 }
 
-                foreach (string patchFile in textPatchFiles.Concat(fontPatchFiles))
+                foreach (string patchFile in selectedPatchFiles)
                 {
                     string sourcePath = Path.Combine(releaseOutputDir, patchFile);
                     if (!File.Exists(sourcePath))
@@ -2875,7 +2867,7 @@ namespace FFXIVKoreanPatch.Main
                     File.Copy(sourcePath, Path.Combine(applySqpackDir, patchFile), true);
                 }
 
-                ValidateFilesExist(applySqpackDir, textPatchFiles.Concat(fontPatchFiles), "적용 대상");
+                ValidateFilesExist(applySqpackDir, selectedPatchFiles, "적용 대상");
                 logLines.Add("Apply validation: OK");
 
                 if (useDebugApplyPath)
@@ -2938,77 +2930,32 @@ namespace FFXIVKoreanPatch.Main
 #if TEST_BUILD
                 throw new InvalidOperationException("테스트 빌드에서는 실제 글로벌 서버 클라이언트 폴더에 파일을 복사할 수 없어요.");
 #else
-                if (isRemove)
+                if (!isRemove)
                 {
-                    string restoreSourceDir;
-                    string localBackupDir;
-                    if (RestoreFromLocalOrigIndexes(out restoreSourceDir, out localBackupDir))
-                    {
-                        logLines.Add("Local restore source: " + restoreSourceDir);
-                        logLines.Add("Backup before restore: " + localBackupDir);
-                        string localRestoreLogPath = WriteOperationLog("remove-local-restore", logLines);
-                        ShowMessageBox(
-                            MessageBoxButtons.OK,
-                            MessageBoxIcon.Information,
-                            "로컬 orig index로 한글 패치를 제거했어요.",
-                            "로그: " + localRestoreLogPath,
-                            "복구 원본: " + restoreSourceDir +
-                            (string.IsNullOrEmpty(localBackupDir) ? "" : Environment.NewLine + "백업 위치: " + localBackupDir));
-                        CloseForm();
-                        return;
-                    }
-
-                    if (!serverPatchAvailable)
-                    {
-                        throw new InvalidOperationException(
-                            "로컬 복구용 orig index를 찾지 못했고, 원격 release도 사용할 수 없어요." + Environment.NewLine +
-                            "이전 패쳐로 적용한 패치라면 그 패쳐의 제거 기능을 먼저 사용하거나, FFXIV 런처 파일 검사/복구로 글로벌 서버 클라이언트를 원본 상태로 되돌려주세요.");
-                    }
+                    throw new InvalidOperationException("다운로드 설치 모드는 더 이상 사용하지 않아요. 전체 한글 패치 또는 한글 폰트 패치 버튼은 로컬 생성기를 통해 처리됩니다.");
                 }
 
-                // Clear cache.
-                ClearCache();
-
-                // Download all files.
-                UpdateStatusLabel($"파일 다운로드 중... {targetVersion}");
-
-                foreach (string patchFile in patchFiles)
+                string restoreSourceDir;
+                string localBackupDir;
+                if (RestoreFromLocalOrigIndexes(out restoreSourceDir, out localBackupDir))
                 {
-                    string url = $"{GetServerUrl()}/{(isRemove ? "orig." : "")}{patchFile}";
-                    string cachePath = Path.Combine(Application.CommonAppDataPath, patchFile);
-                    logLines.Add("Download: " + url);
-                    DownloadFile(url, patchFile, worker, cachePath);
+                    logLines.Add("Local restore source: " + restoreSourceDir);
+                    logLines.Add("Backup before restore: " + localBackupDir);
+                    string localRestoreLogPath = WriteOperationLog("remove-local-restore", logLines);
+                    ShowMessageBox(
+                        MessageBoxButtons.OK,
+                        MessageBoxIcon.Information,
+                        "로컬 orig index로 한글 패치를 제거했어요.",
+                        "로그: " + localRestoreLogPath,
+                        "복구 원본: " + restoreSourceDir +
+                        (string.IsNullOrEmpty(localBackupDir) ? "" : Environment.NewLine + "백업 위치: " + localBackupDir));
+                    CloseForm();
+                    return;
                 }
 
-                ValidateFilesExist(Application.CommonAppDataPath, patchFiles, "다운로드 캐시");
-                logLines.Add("Download validation: OK");
-
-                UpdateStatusLabel($"{(isRemove ? "원본 파일 복구" : "파일 설치")} 중... {targetVersion}");
-                Invoke(new Action(() =>
-                {
-                    progressBar.Value = 0;
-                }));
-
-                string backupDir = BackupTargetFiles(patchFiles, isRemove ? "remote-restore" : "remote-install");
-                logLines.Add("Backup: " + backupDir);
-
-                foreach (string patchFile in patchFiles)
-                {
-                    File.Copy(Path.Combine(Application.CommonAppDataPath, patchFile), Path.Combine(targetDir, "sqpack", "ffxiv", patchFile), true);
-                }
-
-                ValidateFilesExist(GetTargetSqpackDir(), patchFiles, "적용 대상");
-                logLines.Add("Apply validation: OK");
-                string remoteLogPath = WriteOperationLog(isRemove ? "remove-remote" : "install-remote", logLines);
-
-                ShowMessageBox(
-                    MessageBoxButtons.OK,
-                    MessageBoxIcon.Information,
-                    $"{(isRemove ? "제거" : "설치")}가 성공적으로 완료되었어요!",
-                    "로그: " + remoteLogPath,
-                    string.IsNullOrEmpty(backupDir) ? "백업할 기존 파일이 없었습니다." : "백업 위치: " + backupDir);
-                CloseForm();
-                return;
+                throw new InvalidOperationException(
+                    "로컬 복구용 orig index를 찾지 못했어요." + Environment.NewLine +
+                    "이전 패쳐로 적용한 패치라면 그 패쳐의 제거 기능을 먼저 사용하거나, FFXIV 런처 파일 검사/복구로 글로벌 서버 클라이언트를 원본 상태로 되돌려주세요.");
 #endif
             }
             catch (Exception exception)

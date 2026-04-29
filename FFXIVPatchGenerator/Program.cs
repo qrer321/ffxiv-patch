@@ -21,7 +21,16 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
                 }
 
                 BuildOptions options = BuildOptions.Parse(args);
-                BuildReport report = new TextPatchGenerator(options).Build();
+                BuildReport report;
+                if (options.FontOnly)
+                {
+                    report = BuildFontOnly(options);
+                }
+                else
+                {
+                    report = new TextPatchGenerator(options).Build();
+                }
+
                 ProgressReporter.Report(100, "완료");
 
                 Console.WriteLine();
@@ -86,9 +95,59 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
             Console.WriteLine("  --sheet            Limit to one root.exl sheet name for testing.");
             Console.WriteLine("  --base-index       Clean global 0a0000.win32.index to use instead of installed index.");
             Console.WriteLine("  --include-font     Also build 000000 font patch files.");
+            Console.WriteLine("  --font-only        Build only 000000 font patch files.");
             Console.WriteLine("  --base-font-index  Clean global 000000.win32.index to use instead of installed index.");
             Console.WriteLine("  --allow-patched-global");
             Console.WriteLine("                     Allow using a global index that already points at dat1.");
+        }
+
+        private static BuildReport BuildFontOnly(BuildOptions options)
+        {
+            string globalGame = Path.GetFullPath(options.GlobalGamePath);
+            string koreaGame = Path.GetFullPath(options.KoreaGamePath);
+            string outputDir = Path.GetFullPath(options.OutputPath);
+
+            RequireFile(Path.Combine(globalGame, "ffxivgame.ver"));
+            EnsureOutputIsOutsideInputs(outputDir, globalGame, koreaGame);
+            Directory.CreateDirectory(outputDir);
+            File.Copy(Path.Combine(globalGame, "ffxivgame.ver"), Path.Combine(outputDir, "ffxivgame.ver"), true);
+
+            BuildReport report = new BuildReport();
+            ProgressReporter.Report(2, "입력 파일 확인 완료");
+            ProgressReporter.Report(90, "폰트 패치 생성 중");
+            new FontPatchGenerator(options, report).Build();
+            return report;
+        }
+
+        private static void RequireFile(string path)
+        {
+            if (!File.Exists(path))
+            {
+                throw new FileNotFoundException("Required file is missing.", path);
+            }
+        }
+
+        private static void EnsureOutputIsOutsideInputs(string outputDir, string globalGame, string koreaGame)
+        {
+            string output = NormalizeDirectory(outputDir);
+            string global = NormalizeDirectory(globalGame);
+            string korea = NormalizeDirectory(koreaGame);
+
+            if (IsSameOrChild(output, global) || IsSameOrChild(output, korea))
+            {
+                throw new InvalidOperationException("--output must not be inside either source game directory. Choose a directory under E:\\codex or another staging path.");
+            }
+        }
+
+        private static string NormalizeDirectory(string path)
+        {
+            string full = Path.GetFullPath(path).TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+            return full + Path.DirectorySeparatorChar;
+        }
+
+        private static bool IsSameOrChild(string path, string parent)
+        {
+            return path.StartsWith(parent, StringComparison.OrdinalIgnoreCase);
         }
     }
 
@@ -118,6 +177,7 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
         public string BaseIndexPath;
         public string BaseFontIndexPath;
         public bool IncludeFont;
+        public bool FontOnly;
         public bool AllowPatchedGlobal;
 
         public static BuildOptions Parse(string[] args)
@@ -141,6 +201,13 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
 
                 if (string.Equals(arg, "--include-font", StringComparison.OrdinalIgnoreCase))
                 {
+                    options.IncludeFont = true;
+                    continue;
+                }
+
+                if (string.Equals(arg, "--font-only", StringComparison.OrdinalIgnoreCase))
+                {
+                    options.FontOnly = true;
                     options.IncludeFont = true;
                     continue;
                 }
