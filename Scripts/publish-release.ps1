@@ -265,7 +265,6 @@ try {
     $releaseArgs = @(
         "release", "create", $TagName,
         $artifactPath,
-        $shaPath,
         "--title", $ReleaseTitle,
         "--notes-file", $notesPath
     )
