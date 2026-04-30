@@ -184,6 +184,9 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
             new Regex("^Status$", RegexOptions.IgnoreCase | RegexOptions.Compiled),
             new Regex("^Submarine.*$", RegexOptions.IgnoreCase | RegexOptions.Compiled),
             new Regex("^SubmarineExploration.*$", RegexOptions.IgnoreCase | RegexOptions.Compiled),
+            // TerritoryType carries zone/instance territory labels but does not expose a stable string key.
+            // With matching game versions, row ids line up with the Korean sheet.
+            new Regex("^TerritoryType$", RegexOptions.IgnoreCase | RegexOptions.Compiled),
             new Regex("^Title$", RegexOptions.IgnoreCase | RegexOptions.Compiled),
             new Regex("^Tofu.*$", RegexOptions.IgnoreCase | RegexOptions.Compiled),
             new Regex("^TomestoneConvert$", RegexOptions.IgnoreCase | RegexOptions.Compiled),

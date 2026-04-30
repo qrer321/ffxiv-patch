@@ -91,21 +91,21 @@ function Write-ReleaseNotes {
     $builder = New-Object System.Text.StringBuilder
     [void]$builder.AppendLine("# $Title")
     [void]$builder.AppendLine()
-    [void]$builder.AppendLine("## Summary")
+    [void]$builder.AppendLine("## 요약")
     [void]$builder.AppendLine()
-    [void]$builder.AppendLine("- Tag: ``$Tag``")
-    [void]$builder.AppendLine("- Commit: ``$commit``")
-    [void]$builder.AppendLine("- Artifact: ``$ArtifactName``")
+    [void]$builder.AppendLine("- 태그: ``$Tag``")
+    [void]$builder.AppendLine("- 커밋: ``$commit``")
+    [void]$builder.AppendLine("- 배포 파일: ``$ArtifactName``")
     [void]$builder.AppendLine("- SHA256: ``$Sha256``")
     [void]$builder.AppendLine()
-    [void]$builder.AppendLine("## Included Files")
+    [void]$builder.AppendLine("## 포함 파일")
     [void]$builder.AppendLine()
     foreach ($file in $Files) {
         [void]$builder.AppendLine("- ``$file``")
     }
 
     [void]$builder.AppendLine()
-    [void]$builder.AppendLine("## Changes")
+    [void]$builder.AppendLine("## 변경 사항")
     [void]$builder.AppendLine()
     if ($changes) {
         foreach ($change in $changes) {
@@ -113,15 +113,15 @@ function Write-ReleaseNotes {
         }
     }
     else {
-        [void]$builder.AppendLine("- No changes found.")
+        [void]$builder.AppendLine("- 변경 사항을 찾지 못했습니다.")
     }
 
     [void]$builder.AppendLine()
-    [void]$builder.AppendLine("## Pre-Publish Checklist")
+    [void]$builder.AppendLine("## 배포 전 확인")
     [void]$builder.AppendLine()
-    [void]$builder.AppendLine("- Confirm the release build completed with 0 warnings and 0 errors.")
-    [void]$builder.AppendLine("- Confirm the GitHub Release asset is ``FFXIVKoreanPatch.exe``.")
-    [void]$builder.AppendLine("- Smoke test preflight, full patch, font patch, and patch removal flows.")
+    [void]$builder.AppendLine("- 릴리즈 빌드가 경고 0개, 오류 0개로 완료되었는지 확인합니다.")
+    [void]$builder.AppendLine("- GitHub Release 자산이 ``FFXIVKoreanPatch.exe``인지 확인합니다.")
+    [void]$builder.AppendLine("- 사전 점검, 전체 패치, 폰트 패치, 패치 제거 흐름을 점검합니다.")
 
     Set-Content -LiteralPath $Path -Value $builder.ToString() -Encoding UTF8
 }

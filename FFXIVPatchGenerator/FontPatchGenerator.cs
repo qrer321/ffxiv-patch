@@ -658,7 +658,7 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
                 return overlayFdt;
             }
 
-            Dictionary<uint, ushort> baseSjisByUtf8 = BuildSjisMap(baseFdt);
+            Dictionary<uint, FontGlyphEntry> baseEntriesByUtf8 = BuildGlyphEntryMap(baseFdt);
             byte[] output = (byte[])overlayFdt.Clone();
             uint glyphCount = Endian.ReadUInt32LE(output, FontTableEntryCountOffset);
 
@@ -667,13 +667,27 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
                 int entryOffset = GlyphTableStart + i * GlyphEntrySize;
                 uint charUtf8 = Endian.ReadUInt32LE(output, entryOffset + CharUtf8Offset);
                 ushort currentSjis = ReadUInt16LE(output, entryOffset + CharSjisOffset);
-                ushort baseSjis;
+                FontGlyphEntry baseEntry;
+
+                // Global UI often uses ASCII-looking glyphs as compact interface symbols.
+                // Keep their original atlas coordinates; changing only SJIS is not enough.
+                if (baseEntriesByUtf8.TryGetValue(charUtf8, out baseEntry) && ShouldRestoreBaseGlyphEntry(charUtf8))
+                {
+                    if (!RangeEquals(output, entryOffset + CharSjisOffset, baseEntry.Bytes, CharSjisOffset, GlyphEntrySize - CharSjisOffset))
+                    {
+                        Buffer.BlockCopy(baseEntry.Bytes, CharSjisOffset, output, entryOffset + CharSjisOffset, GlyphEntrySize - CharSjisOffset);
+                        repairedEntries++;
+                    }
+
+                    continue;
+                }
+
                 ushort targetSjis = GetAsciiSjis(charUtf8);
-                if (baseSjisByUtf8.TryGetValue(charUtf8, out baseSjis) && baseSjis != 0)
+                if (baseEntriesByUtf8.TryGetValue(charUtf8, out baseEntry) && baseEntry.Sjis != 0)
                 {
                     if (targetSjis != 0 || IsPrivateUseUiGlyph(charUtf8))
                     {
-                        targetSjis = baseSjis;
+                        targetSjis = baseEntry.Sjis;
                     }
                 }
 
@@ -694,9 +708,9 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
             return output;
         }
 
-        private static Dictionary<uint, ushort> BuildSjisMap(byte[] fdt)
+        private static Dictionary<uint, FontGlyphEntry> BuildGlyphEntryMap(byte[] fdt)
         {
-            Dictionary<uint, ushort> map = new Dictionary<uint, ushort>();
+            Dictionary<uint, FontGlyphEntry> map = new Dictionary<uint, FontGlyphEntry>();
             if (!IsValidFdt(fdt))
             {
                 return map;
@@ -708,13 +722,46 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
                 int entryOffset = GlyphTableStart + i * GlyphEntrySize;
                 uint charUtf8 = Endian.ReadUInt32LE(fdt, entryOffset + CharUtf8Offset);
                 ushort charSjis = ReadUInt16LE(fdt, entryOffset + CharSjisOffset);
-                if (charSjis != 0 && !map.ContainsKey(charUtf8))
+                if (!map.ContainsKey(charUtf8))
                 {
-                    map.Add(charUtf8, charSjis);
+                    byte[] bytes = new byte[GlyphEntrySize];
+                    Buffer.BlockCopy(fdt, entryOffset, bytes, 0, GlyphEntrySize);
+                    map.Add(charUtf8, new FontGlyphEntry(charSjis, bytes));
                 }
             }
 
             return map;
+        }
+
+        private static bool ShouldRestoreBaseGlyphEntry(uint charUtf8)
+        {
+            byte value = (byte)(charUtf8 & 0xFF);
+            return (charUtf8 & 0xFFFFFF00u) == 0 && value >= 0x20 && value <= 0x7E;
+        }
+
+        private static bool RangeEquals(byte[] left, int leftOffset, byte[] right, int rightOffset, int count)
+        {
+            for (int i = 0; i < count; i++)
+            {
+                if (left[leftOffset + i] != right[rightOffset + i])
+                {
+                    return false;
+                }
+            }
+
+            return true;
+        }
+
+        private struct FontGlyphEntry
+        {
+            public readonly ushort Sjis;
+            public readonly byte[] Bytes;
+
+            public FontGlyphEntry(ushort sjis, byte[] bytes)
+            {
+                Sjis = sjis;
+                Bytes = bytes;
+            }
         }
 
         private static bool IsValidFdt(byte[] fdt)
