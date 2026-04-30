@@ -62,14 +62,26 @@ function Get-SafeTagPart {
 }
 
 function Get-PreviousTag {
-    param([string]$Git)
+    param(
+        [string]$Git,
+        [string]$ExcludeTag = ""
+    )
 
     $tags = @(& $Git tag --sort=-creatordate)
-    if ($tags -and $tags.Count -gt 0 -and ![string]::IsNullOrWhiteSpace($tags[0])) {
-        return $tags[0].Trim()
+    foreach ($tag in $tags) {
+        $trimmed = $tag.Trim()
+        if (![string]::IsNullOrWhiteSpace($trimmed) -and $trimmed -ne $ExcludeTag) {
+            return $trimmed
+        }
     }
 
     return ""
+}
+
+function Get-Utf8Text {
+    param([string]$Value)
+
+    return [System.Text.RegularExpressions.Regex]::Unescape($Value)
 }
 
 function Write-ReleaseNotes {
@@ -84,28 +96,28 @@ function Write-ReleaseNotes {
     )
 
     $commit = (& $Git rev-parse --short HEAD).Trim()
-    $previousTag = Get-PreviousTag $Git
+    $previousTag = Get-PreviousTag $Git -ExcludeTag $Tag
     $range = if ([string]::IsNullOrWhiteSpace($previousTag)) { "-10" } else { "$previousTag..HEAD" }
     $changes = & $Git log $range --pretty=format:"- %s (%h)"
 
     $builder = New-Object System.Text.StringBuilder
     [void]$builder.AppendLine("# $Title")
     [void]$builder.AppendLine()
-    [void]$builder.AppendLine("## 요약")
+    [void]$builder.AppendLine("## " + (Get-Utf8Text "\uC694\uC57D"))
     [void]$builder.AppendLine()
-    [void]$builder.AppendLine("- 태그: ``$Tag``")
-    [void]$builder.AppendLine("- 커밋: ``$commit``")
-    [void]$builder.AppendLine("- 배포 파일: ``$ArtifactName``")
+    [void]$builder.AppendLine("- " + (Get-Utf8Text "\uD0DC\uADF8") + ": ``$Tag``")
+    [void]$builder.AppendLine("- " + (Get-Utf8Text "\uCEE4\uBC0B") + ": ``$commit``")
+    [void]$builder.AppendLine("- " + (Get-Utf8Text "\uBC30\uD3EC\u0020\uD30C\uC77C") + ": ``$ArtifactName``")
     [void]$builder.AppendLine("- SHA256: ``$Sha256``")
     [void]$builder.AppendLine()
-    [void]$builder.AppendLine("## 포함 파일")
+    [void]$builder.AppendLine("## " + (Get-Utf8Text "\uD3EC\uD568\u0020\uD30C\uC77C"))
     [void]$builder.AppendLine()
     foreach ($file in $Files) {
         [void]$builder.AppendLine("- ``$file``")
     }
 
     [void]$builder.AppendLine()
-    [void]$builder.AppendLine("## 변경 사항")
+    [void]$builder.AppendLine("## " + (Get-Utf8Text "\uBCC0\uACBD\u0020\uC0AC\uD56D"))
     [void]$builder.AppendLine()
     if ($changes) {
         foreach ($change in $changes) {
@@ -113,17 +125,18 @@ function Write-ReleaseNotes {
         }
     }
     else {
-        [void]$builder.AppendLine("- 변경 사항을 찾지 못했습니다.")
+        [void]$builder.AppendLine("- " + (Get-Utf8Text "\uBCC0\uACBD\u0020\uC0AC\uD56D\uC744\u0020\uCC3E\uC9C0\u0020\uBABB\uD588\uC2B5\uB2C8\uB2E4\u002E"))
     }
 
     [void]$builder.AppendLine()
-    [void]$builder.AppendLine("## 배포 전 확인")
+    [void]$builder.AppendLine("## " + (Get-Utf8Text "\uBC30\uD3EC\u0020\uC804\u0020\uD655\uC778"))
     [void]$builder.AppendLine()
-    [void]$builder.AppendLine("- 릴리즈 빌드가 경고 0개, 오류 0개로 완료되었는지 확인합니다.")
-    [void]$builder.AppendLine("- GitHub Release 자산이 ``FFXIVKoreanPatch.exe``인지 확인합니다.")
-    [void]$builder.AppendLine("- 사전 점검, 전체 패치, 폰트 패치, 패치 제거 흐름을 점검합니다.")
+    [void]$builder.AppendLine("- " + (Get-Utf8Text "\uB9B4\uB9AC\uC988\u0020\uBE4C\uB4DC\uAC00\u0020\uACBD\uACE0\u0020\u0030\uAC1C\u002C\u0020\uC624\uB958\u0020\u0030\uAC1C\uB85C\u0020\uC644\uB8CC\uB418\uC5C8\uB294\uC9C0\u0020\uD655\uC778\uD569\uB2C8\uB2E4\u002E"))
+    [void]$builder.AppendLine("- " + (Get-Utf8Text "\u0047\u0069\u0074\u0048\u0075\u0062\u0020\u0052\u0065\u006C\u0065\u0061\u0073\u0065\u0020\uC790\uC0B0\uC740") + " ``FFXIVKoreanPatch.exe`` " + (Get-Utf8Text "\uD558\uB098\uC778\uC9C0\u0020\uD655\uC778\uD569\uB2C8\uB2E4\u002E"))
+    [void]$builder.AppendLine("- " + (Get-Utf8Text "\uC0AC\uC804\u0020\uC810\uAC80\u002C\u0020\uC804\uCCB4\u0020\uD328\uCE58\u002C\u0020\uD3F0\uD2B8\u0020\uD328\uCE58\u002C\u0020\uD328\uCE58\u0020\uC81C\uAC70\u0020\uD750\uB984\uC744\u0020\uC810\uAC80\uD569\uB2C8\uB2E4\u002E"))
 
-    Set-Content -LiteralPath $Path -Value $builder.ToString() -Encoding UTF8
+    $utf8NoBom = New-Object System.Text.UTF8Encoding($false)
+    [System.IO.File]::WriteAllText($Path, $builder.ToString(), $utf8NoBom)
 }
 
 function Test-GitClean {
@@ -149,7 +162,7 @@ try {
     }
 
     if ([string]::IsNullOrWhiteSpace($ReleaseTitle)) {
-        $ReleaseTitle = "FFXIV Korean Patch $TagName"
+        $ReleaseTitle = (Get-Utf8Text "\u0046\u0046\u0058\u0049\u0056\u0020\uD55C\uAE00\u0020\uD328\uCE58") + " $TagName"
     }
 
     if (!$AllowDirty -and !(Test-GitClean $git)) {
