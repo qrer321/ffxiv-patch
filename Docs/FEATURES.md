@@ -205,7 +205,7 @@
 - `--include-font`: 텍스트와 폰트 동시 생성
 - `--font-only`: 폰트만 생성
 - `--font-pack-dir`: TTMP 패키지 위치 지정
-- `--font-profile`: 진단용 폰트 프로필 선택, 기본 `ui-numeric-safe`
+- `--font-profile`: 진단용 폰트 프로필 선택, 기본 `full`
 - `--base-index`, `--base-index2`: 텍스트 패치용 clean index 지정
 - `--base-font-index`, `--base-font-index2`: 폰트 패치용 clean index 지정
 - `--allow-patched-global`: 이미 패치된 index 사용 허용, 실험용

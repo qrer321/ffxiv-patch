@@ -86,6 +86,55 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
             }
         }
 
+        public static byte[] UnpackStandardFile(byte[] packedFile)
+        {
+            if (packedFile == null || packedFile.Length < 24)
+            {
+                throw new InvalidDataException("Packed SqPack file is too short.");
+            }
+
+            using (MemoryStream stream = new MemoryStream(packedFile, false))
+            using (BinaryReader reader = new BinaryReader(stream))
+            {
+                uint headerSize = reader.ReadUInt32();
+                uint fileType = reader.ReadUInt32();
+                uint rawFileSize = reader.ReadUInt32();
+                reader.ReadUInt32();
+                reader.ReadUInt32();
+                uint blockCount = reader.ReadUInt32();
+
+                if (fileType != 2)
+                {
+                    throw new InvalidDataException("Only standard SqPack files are supported. Type=" + fileType);
+                }
+
+                List<DatBlockInfo> blocks = new List<DatBlockInfo>();
+                for (int i = 0; i < blockCount; i++)
+                {
+                    DatBlockInfo block = new DatBlockInfo();
+                    block.Offset = reader.ReadUInt32();
+                    block.CompressedSize = reader.ReadUInt16();
+                    block.UncompressedSize = reader.ReadUInt16();
+                    blocks.Add(block);
+                }
+
+                MemoryStream output = new MemoryStream((int)rawFileSize);
+                for (int i = 0; i < blocks.Count; i++)
+                {
+                    stream.Position = headerSize + blocks[i].Offset;
+                    ReadDataBlock(reader, stream, output);
+                }
+
+                byte[] result = output.ToArray();
+                if (result.Length != rawFileSize)
+                {
+                    throw new InvalidDataException("Unexpected decompressed size. Expected " + rawFileSize + ", got " + result.Length);
+                }
+
+                return result;
+            }
+        }
+
         private byte[] ReadFile(SqPackIndexEntry entry)
         {
             FileStream stream = GetDatStream(entry.DataFileId);

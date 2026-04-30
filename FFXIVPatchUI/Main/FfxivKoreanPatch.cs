@@ -208,7 +208,7 @@ namespace FFXIVKoreanPatch.Main
             debugFontProfileComboBox.Items.Add(new FontProfileItem("AXIS 제외", "no-axis"));
             debugFontProfileComboBox.Items.Add(new FontProfileItem("FDT만 적용", "fdt-only"));
             debugFontProfileComboBox.Items.Add(new FontProfileItem("텍스처만 적용", "textures-only"));
-            debugFontProfileComboBox.SelectedIndex = 1;
+            debugFontProfileComboBox.SelectedIndex = 0;
 
 #if !TEST_BUILD
             debugFontProfileLabel.Visible = false;
