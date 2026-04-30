@@ -1257,8 +1257,9 @@ namespace FFXIVKoreanPatch.Main
         private string ComputeSHA1(string filePath)
         {
             using (SHA1CryptoServiceProvider cryptoProvider = new SHA1CryptoServiceProvider())
+            using (FileStream stream = new FileStream(filePath, FileMode.Open, FileAccess.Read, FileShare.ReadWrite))
             {
-                return BitConverter.ToString(cryptoProvider.ComputeHash(File.ReadAllBytes(filePath))).Replace("-", "");
+                return BitConverter.ToString(cryptoProvider.ComputeHash(stream)).Replace("-", "");
             }
         }
 
@@ -2602,6 +2603,38 @@ namespace FFXIVKoreanPatch.Main
                 if (!File.Exists(filePath))
                 {
                     throw new FileNotFoundException(context + " 파일이 누락되었습니다.", filePath);
+                }
+            }
+        }
+
+        private void ValidateAppliedFilesMatchRelease(string releaseDir, string applySqpackDir, IEnumerable<string> patchFiles)
+        {
+            foreach (string fileName in patchFiles.Distinct(StringComparer.OrdinalIgnoreCase))
+            {
+                string releasePath = Path.Combine(releaseDir, fileName);
+                string appliedPath = Path.Combine(applySqpackDir, fileName);
+
+                FileInfo releaseInfo = new FileInfo(releasePath);
+                FileInfo appliedInfo = new FileInfo(appliedPath);
+                if (!releaseInfo.Exists || !appliedInfo.Exists)
+                {
+                    throw new FileNotFoundException("적용 검증 중 패치 파일을 찾을 수 없습니다.", releaseInfo.Exists ? appliedPath : releasePath);
+                }
+
+                if (releaseInfo.Length != appliedInfo.Length)
+                {
+                    throw new InvalidDataException(
+                        "적용 검증 실패: " + fileName + " 크기가 생성물과 다릅니다. " +
+                        "게임 런처, 백신, 권한 문제로 파일 복사가 되돌려졌을 수 있습니다. 패치 제거 후 다시 시도해 주세요.");
+                }
+
+                string releaseHash = ComputeSHA1(releasePath);
+                string appliedHash = ComputeSHA1(appliedPath);
+                if (!string.Equals(releaseHash, appliedHash, StringComparison.OrdinalIgnoreCase))
+                {
+                    throw new InvalidDataException(
+                        "적용 검증 실패: " + fileName + " 해시가 생성물과 다릅니다. " +
+                        "특히 index가 원본으로 남으면 새 dat 파일이 있어도 게임은 일본어 리소스를 읽습니다. 패치 제거 후 다시 시도해 주세요.");
                 }
             }
         }
@@ -4284,6 +4317,8 @@ namespace FFXIVKoreanPatch.Main
 
                 ValidateFilesExist(applySqpackDir, selectedPatchFiles, "적용 대상");
                 ValidateSelectedPatchReferences(applySqpackDir, selectedPatchFiles, "적용 대상");
+                ValidateAppliedFilesMatchRelease(releaseOutputDir, applySqpackDir, selectedPatchFiles);
+                logLines.Add("Apply byte validation: OK");
                 logLines.Add("Apply validation: OK");
 
                 if (useDebugApplyPath)
