@@ -1184,7 +1184,8 @@ namespace FFXIVKoreanPatch.Main
             {
                 bool hasGlobalClient = HasValidGlobalClient();
                 bool hasKoreaClient = HasValidKoreaClient();
-                bool canApplyToRealClient = enabled && hasGlobalClient && hasKoreaClient && lastPreflightPassed;
+                bool targetAlreadyPatched = hasGlobalClient && HasPatchedTargetIndexes();
+                bool canApplyToRealClient = enabled && hasGlobalClient && hasKoreaClient && lastPreflightPassed && !targetAlreadyPatched;
 
                 globalPathBrowseButton.Enabled = enabled;
                 koreaPathBrowseButton.Enabled = enabled;
@@ -1567,6 +1568,39 @@ namespace FFXIVKoreanPatch.Main
             int dat1Count;
             string error;
             return IsCleanIndexFile(currentPath, out dat1Count, out error);
+        }
+
+        private bool HasPatchedTargetIndexes()
+        {
+            string sqpackDir = GetTargetSqpackDir();
+            if (string.IsNullOrEmpty(sqpackDir) || !Directory.Exists(sqpackDir))
+            {
+                return false;
+            }
+
+            foreach (string fileName in restoreFiles)
+            {
+                string indexPath = Path.Combine(sqpackDir, fileName);
+                if (!File.Exists(indexPath))
+                {
+                    continue;
+                }
+
+                try
+                {
+                    if (CountIndexDat1Entries(indexPath) > 0)
+                    {
+                        return true;
+                    }
+                }
+                catch
+                {
+                    // If index state cannot be read, keep real-client patch buttons locked.
+                    return true;
+                }
+            }
+
+            return false;
         }
 
         private bool HasCleanOrigIndexes(string candidateDir)
@@ -3279,6 +3313,7 @@ namespace FFXIVKoreanPatch.Main
                 {
                     bool hasGlobalClient = HasValidGlobalClient();
                     bool hasKoreaClient = HasValidKoreaClient();
+                    bool targetAlreadyPatched = hasGlobalClient && HasPatchedTargetIndexes();
 
                     globalPathBrowseButton.Enabled = true;
                     koreaPathBrowseButton.Enabled = true;
@@ -3301,8 +3336,8 @@ namespace FFXIVKoreanPatch.Main
                     preflightCheckButton.Enabled = true;
                     restoreBackupButton.Enabled = true;
                     buildReleaseButton.Enabled = false;
-                    installButton.Enabled = hasGlobalClient && hasKoreaClient && lastPreflightPassed;
-                    chatOnlyInstallButton.Enabled = hasGlobalClient && hasKoreaClient && lastPreflightPassed;
+                    installButton.Enabled = hasGlobalClient && hasKoreaClient && lastPreflightPassed && !targetAlreadyPatched;
+                    chatOnlyInstallButton.Enabled = hasGlobalClient && hasKoreaClient && lastPreflightPassed && !targetAlreadyPatched;
                     removeButton.Enabled = hasGlobalClient;
 #endif
                     progressBar.Value = 0;
@@ -3572,6 +3607,13 @@ namespace FFXIVKoreanPatch.Main
             if (!debugApply && !lastPreflightPassed)
             {
                 MessageBox.Show("사전 점검을 통과한 뒤에 실제 글로벌 서버 클라이언트에 적용할 수 있어요.", Text, MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                SetActionButtonsEnabled(true);
+                return;
+            }
+
+            if (!debugApply && HasPatchedTargetIndexes())
+            {
+                MessageBox.Show("이미 한글 패치가 적용된 index 상태입니다. 먼저 [한글 패치 제거]로 clean index를 복구한 뒤 다시 진행해주세요.", Text, MessageBoxButtons.OK, MessageBoxIcon.Warning);
                 SetActionButtonsEnabled(true);
                 return;
             }
