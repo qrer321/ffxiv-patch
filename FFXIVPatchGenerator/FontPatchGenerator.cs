@@ -1,7 +1,6 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
-using System.Text;
 using System.Text.RegularExpressions;
 
 namespace FfxivKoreanPatch.FFXIVPatchGenerator
@@ -203,42 +202,32 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
                     continue;
                 }
 
-                long datOffset;
-                if (FdtGlyphMerger.IsFdtPath(path))
+                byte[] packedFile;
+                if (!koreaArchive.TryReadPackedFile(path, out packedFile))
                 {
-                    byte[] baseFdt;
-                    if (!globalArchive.TryReadFile(path, out baseFdt))
-                    {
-                        AddLimitedWarning("Missing global font source: " + path);
-                        continue;
-                    }
+                    AddLimitedWarning("Missing Korean font source: " + path);
+                    continue;
+                }
 
-                    byte[] overlayFdt;
-                    if (!koreaArchive.TryReadFile(path, out overlayFdt))
+                long datOffset;
+                if (FdtSjisRepairer.IsFdtPath(path))
+                {
+                    byte[] baseFdt = null;
+                    globalArchive.TryReadFile(path, out baseFdt);
+                    byte[] overlayFdt = SqPackArchive.UnpackStandardFile(packedFile);
+                    int repairedEntries;
+                    byte[] repairedFdt = FdtSjisRepairer.Repair(baseFdt, overlayFdt, out repairedEntries);
+                    if (repairedEntries > 0)
                     {
-                        AddLimitedWarning("Missing Korean font source: " + path);
-                        continue;
+                        datOffset = datWriter.WriteStandardFile(repairedFdt);
                     }
-
-                    int hangulGlyphs;
-                    int changedGlyphs;
-                    byte[] mergedFdt = FdtGlyphMerger.MergeHangulGlyphs(baseFdt, overlayFdt, out hangulGlyphs, out changedGlyphs);
-                    if (hangulGlyphs == 0 || changedGlyphs == 0)
+                    else
                     {
-                        continue;
+                        datOffset = datWriter.WritePackedFile(packedFile);
                     }
-
-                    datOffset = datWriter.WriteStandardFile(mergedFdt);
                 }
                 else
                 {
-                    byte[] packedFile;
-                    if (!koreaArchive.TryReadPackedFile(path, out packedFile))
-                    {
-                        AddLimitedWarning("Missing Korean font source: " + path);
-                        continue;
-                    }
-
                     datOffset = datWriter.WritePackedFile(packedFile);
                 }
 
@@ -277,25 +266,21 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
 
                     byte[] packedFile = ReadPackedPayload(mpdStream, payload.ModOffset, payload.ModSize, path);
                     long datOffset;
-                    if (FdtGlyphMerger.IsFdtPath(path))
+                    if (FdtSjisRepairer.IsFdtPath(path))
                     {
-                        byte[] baseFdt;
-                        if (!globalArchive.TryReadFile(path, out baseFdt))
-                        {
-                            AddLimitedWarning("Missing global font source: " + path);
-                            continue;
-                        }
-
+                        byte[] baseFdt = null;
+                        globalArchive.TryReadFile(path, out baseFdt);
                         byte[] overlayFdt = SqPackArchive.UnpackStandardFile(packedFile);
-                        int hangulGlyphs;
-                        int changedGlyphs;
-                        byte[] mergedFdt = FdtGlyphMerger.MergeHangulGlyphs(baseFdt, overlayFdt, out hangulGlyphs, out changedGlyphs);
-                        if (hangulGlyphs == 0 || changedGlyphs == 0)
+                        int repairedEntries;
+                        byte[] repairedFdt = FdtSjisRepairer.Repair(baseFdt, overlayFdt, out repairedEntries);
+                        if (repairedEntries > 0)
                         {
-                            continue;
+                            datOffset = datWriter.WriteStandardFile(repairedFdt);
                         }
-
-                        datOffset = datWriter.WriteStandardFile(mergedFdt);
+                        else
+                        {
+                            datOffset = datWriter.WritePackedFile(packedFile);
+                        }
                     }
                     else
                     {
@@ -652,259 +637,119 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
         }
     }
 
-    internal static class FdtGlyphMerger
+    internal static class FdtSjisRepairer
     {
-        private const int OffsetKerningTableHeaderOffset = 0x0C;
-        private const int OffsetFontTableEntryCount = 0x24;
+        private const int FontTableEntryCountOffset = 0x24;
         private const int GlyphTableStart = 0x40;
         private const int GlyphEntrySize = 16;
+        private const int CharUtf8Offset = 0;
+        private const int CharSjisOffset = 4;
 
         public static bool IsFdtPath(string path)
         {
             return path != null && path.EndsWith(".fdt", StringComparison.OrdinalIgnoreCase);
         }
 
-        public static byte[] MergeHangulGlyphs(byte[] baseFdt, byte[] overlayFdt, out int hangulGlyphs, out int changedGlyphs)
+        public static byte[] Repair(byte[] baseFdt, byte[] overlayFdt, out int repairedEntries)
         {
-            hangulGlyphs = 0;
-            changedGlyphs = 0;
-            ValidateFdt(overlayFdt, "overlay");
-
-            if (!IsValidFdt(baseFdt))
-            {
-                return FilterHangulGlyphs(overlayFdt, out hangulGlyphs, out changedGlyphs);
-            }
-
-            uint baseGlyphCount = Endian.ReadUInt32LE(baseFdt, OffsetFontTableEntryCount);
-            uint overlayGlyphCount = Endian.ReadUInt32LE(overlayFdt, OffsetFontTableEntryCount);
-            SortedDictionary<uint, byte[]> entries = new SortedDictionary<uint, byte[]>();
-
-            for (int i = 0; i < baseGlyphCount; i++)
-            {
-                byte[] entry = CopyGlyphEntry(baseFdt, i);
-                entries[Endian.ReadUInt32LE(entry, 0)] = entry;
-            }
-
-            for (int i = 0; i < overlayGlyphCount; i++)
-            {
-                byte[] entry = CopyGlyphEntry(overlayFdt, i);
-                uint charUtf8 = Endian.ReadUInt32LE(entry, 0);
-                if (!IsHangulCharUtf8(charUtf8))
-                {
-                    continue;
-                }
-
-                hangulGlyphs++;
-                byte[] existing;
-                if (!entries.TryGetValue(charUtf8, out existing) || !BytesEqual(existing, entry))
-                {
-                    entries[charUtf8] = entry;
-                    changedGlyphs++;
-                }
-            }
-
-            if (changedGlyphs == 0)
-            {
-                return baseFdt;
-            }
-
-            uint baseKerningOffset = Endian.ReadUInt32LE(baseFdt, OffsetKerningTableHeaderOffset);
-            int baseGlyphEnd = checked(GlyphTableStart + (int)baseGlyphCount * GlyphEntrySize);
-            int kerningOffset = baseKerningOffset > 0 && baseKerningOffset <= baseFdt.Length
-                ? (int)baseKerningOffset
-                : baseGlyphEnd;
-            if (kerningOffset < baseGlyphEnd)
-            {
-                kerningOffset = baseGlyphEnd;
-            }
-
-            int kerningSize = Math.Max(0, baseFdt.Length - kerningOffset);
-            int newKerningOffset = checked(GlyphTableStart + entries.Count * GlyphEntrySize);
-            byte[] result = new byte[newKerningOffset + kerningSize];
-
-            Buffer.BlockCopy(baseFdt, 0, result, 0, Math.Min(GlyphTableStart, baseFdt.Length));
-            Endian.WriteUInt32LE(result, OffsetFontTableEntryCount, (uint)entries.Count);
-            Endian.WriteUInt32LE(result, OffsetKerningTableHeaderOffset, (uint)newKerningOffset);
-
-            int outputOffset = GlyphTableStart;
-            foreach (byte[] entry in entries.Values)
-            {
-                Buffer.BlockCopy(entry, 0, result, outputOffset, GlyphEntrySize);
-                outputOffset += GlyphEntrySize;
-            }
-
-            if (kerningSize > 0)
-            {
-                Buffer.BlockCopy(baseFdt, kerningOffset, result, newKerningOffset, kerningSize);
-            }
-
-            return result;
-        }
-
-        private static byte[] FilterHangulGlyphs(byte[] overlayFdt, out int hangulGlyphs, out int changedGlyphs)
-        {
-            hangulGlyphs = 0;
-            changedGlyphs = 0;
-            uint overlayGlyphCount = Endian.ReadUInt32LE(overlayFdt, OffsetFontTableEntryCount);
-            SortedDictionary<uint, byte[]> entries = new SortedDictionary<uint, byte[]>();
-
-            for (int i = 0; i < overlayGlyphCount; i++)
-            {
-                byte[] entry = CopyGlyphEntry(overlayFdt, i);
-                uint charUtf8 = Endian.ReadUInt32LE(entry, 0);
-                if (!IsHangulCharUtf8(charUtf8))
-                {
-                    continue;
-                }
-
-                hangulGlyphs++;
-                entries[charUtf8] = entry;
-            }
-
-            changedGlyphs = entries.Count;
-            if (changedGlyphs == 0)
+            repairedEntries = 0;
+            if (!IsValidFdt(overlayFdt))
             {
                 return overlayFdt;
             }
 
-            return BuildFdtWithEntries(overlayFdt, entries);
+            Dictionary<uint, ushort> baseSjisByUtf8 = BuildSjisMap(baseFdt);
+            byte[] output = (byte[])overlayFdt.Clone();
+            uint glyphCount = Endian.ReadUInt32LE(output, FontTableEntryCountOffset);
+
+            for (int i = 0; i < glyphCount; i++)
+            {
+                int entryOffset = GlyphTableStart + i * GlyphEntrySize;
+                uint charUtf8 = Endian.ReadUInt32LE(output, entryOffset + CharUtf8Offset);
+                ushort currentSjis = ReadUInt16LE(output, entryOffset + CharSjisOffset);
+                ushort targetSjis = GetAsciiSjis(charUtf8);
+                if (targetSjis == 0)
+                {
+                    continue;
+                }
+
+                ushort baseSjis;
+                if (baseSjisByUtf8.TryGetValue(charUtf8, out baseSjis) && baseSjis != 0)
+                {
+                    targetSjis = baseSjis;
+                }
+
+                if (currentSjis == targetSjis)
+                {
+                    continue;
+                }
+
+                WriteUInt16LE(output, entryOffset + CharSjisOffset, targetSjis);
+                repairedEntries++;
+            }
+
+            return output;
         }
 
-        private static byte[] BuildFdtWithEntries(byte[] templateFdt, SortedDictionary<uint, byte[]> entries)
+        private static Dictionary<uint, ushort> BuildSjisMap(byte[] fdt)
         {
-            uint templateGlyphCount = Endian.ReadUInt32LE(templateFdt, OffsetFontTableEntryCount);
-            uint templateKerningOffset = Endian.ReadUInt32LE(templateFdt, OffsetKerningTableHeaderOffset);
-            int templateGlyphEnd = checked(GlyphTableStart + (int)templateGlyphCount * GlyphEntrySize);
-            int kerningOffset = templateKerningOffset > 0 && templateKerningOffset <= templateFdt.Length
-                ? (int)templateKerningOffset
-                : templateGlyphEnd;
-            if (kerningOffset < templateGlyphEnd)
+            Dictionary<uint, ushort> map = new Dictionary<uint, ushort>();
+            if (!IsValidFdt(fdt))
             {
-                kerningOffset = templateGlyphEnd;
+                return map;
             }
 
-            int kerningSize = Math.Max(0, templateFdt.Length - kerningOffset);
-            int newKerningOffset = checked(GlyphTableStart + entries.Count * GlyphEntrySize);
-            byte[] result = new byte[newKerningOffset + kerningSize];
-
-            Buffer.BlockCopy(templateFdt, 0, result, 0, Math.Min(GlyphTableStart, templateFdt.Length));
-            Endian.WriteUInt32LE(result, OffsetFontTableEntryCount, (uint)entries.Count);
-            Endian.WriteUInt32LE(result, OffsetKerningTableHeaderOffset, (uint)newKerningOffset);
-
-            int outputOffset = GlyphTableStart;
-            foreach (byte[] entry in entries.Values)
+            uint glyphCount = Endian.ReadUInt32LE(fdt, FontTableEntryCountOffset);
+            for (int i = 0; i < glyphCount; i++)
             {
-                Buffer.BlockCopy(entry, 0, result, outputOffset, GlyphEntrySize);
-                outputOffset += GlyphEntrySize;
+                int entryOffset = GlyphTableStart + i * GlyphEntrySize;
+                uint charUtf8 = Endian.ReadUInt32LE(fdt, entryOffset + CharUtf8Offset);
+                ushort charSjis = ReadUInt16LE(fdt, entryOffset + CharSjisOffset);
+                if (charSjis != 0 && !map.ContainsKey(charUtf8))
+                {
+                    map.Add(charUtf8, charSjis);
+                }
             }
 
-            if (kerningSize > 0)
-            {
-                Buffer.BlockCopy(templateFdt, kerningOffset, result, newKerningOffset, kerningSize);
-            }
-
-            return result;
-        }
-
-        private static void ValidateFdt(byte[] fdt, string name)
-        {
-            string error;
-            if (!TryValidateFdt(fdt, out error))
-            {
-                throw new InvalidDataException("Invalid " + name + " FDT: " + error);
-            }
+            return map;
         }
 
         private static bool IsValidFdt(byte[] fdt)
         {
-            string ignored;
-            return TryValidateFdt(fdt, out ignored);
-        }
-
-        private static bool TryValidateFdt(byte[] fdt, out string error)
-        {
             if (fdt == null || fdt.Length < GlyphTableStart)
             {
-                error = "file is too short";
                 return false;
             }
 
-            string magic = Encoding.ASCII.GetString(fdt, 0, 4);
-            if (!string.Equals(magic, "fcsv", StringComparison.Ordinal))
+            if (fdt[0] != (byte)'f' || fdt[1] != (byte)'c' || fdt[2] != (byte)'s' || fdt[3] != (byte)'v')
             {
-                error = "bad magic " + magic;
                 return false;
             }
 
-            uint glyphCount = Endian.ReadUInt32LE(fdt, OffsetFontTableEntryCount);
-            long glyphEnd = GlyphTableStart + (long)glyphCount * GlyphEntrySize;
-            if (glyphEnd > fdt.Length)
-            {
-                error = "glyph table is outside file";
-                return false;
-            }
-
-            error = null;
-            return true;
+            uint glyphCount = Endian.ReadUInt32LE(fdt, FontTableEntryCountOffset);
+            return GlyphTableStart + (long)glyphCount * GlyphEntrySize <= fdt.Length;
         }
 
-        private static byte[] CopyGlyphEntry(byte[] fdt, int index)
+        private static ushort GetAsciiSjis(uint charUtf8)
         {
-            byte[] entry = new byte[GlyphEntrySize];
-            Buffer.BlockCopy(fdt, GlyphTableStart + index * GlyphEntrySize, entry, 0, GlyphEntrySize);
-            return entry;
+            byte value = (byte)(charUtf8 & 0xFF);
+            if ((charUtf8 & 0xFFFFFF00u) != 0 || value < 0x20 || value > 0x7E)
+            {
+                return 0;
+            }
+
+            return value;
         }
 
-        private static bool IsHangulCharUtf8(uint charUtf8)
+        private static ushort ReadUInt16LE(byte[] data, int offset)
         {
-            byte[] bytes = new byte[4];
-            bytes[0] = (byte)(charUtf8 >> 24);
-            bytes[1] = (byte)(charUtf8 >> 16);
-            bytes[2] = (byte)(charUtf8 >> 8);
-            bytes[3] = (byte)charUtf8;
-
-            int offset = 0;
-            while (offset < bytes.Length && bytes[offset] == 0)
-            {
-                offset++;
-            }
-
-            if (offset >= bytes.Length)
-            {
-                return false;
-            }
-
-            string text = new UTF8Encoding(false, false).GetString(bytes, offset, bytes.Length - offset);
-            for (int i = 0; i < text.Length; i++)
-            {
-                char ch = text[i];
-                if ((ch >= '\uac00' && ch <= '\ud7a3') ||
-                    (ch >= '\u1100' && ch <= '\u11ff') ||
-                    (ch >= '\u3130' && ch <= '\u318f'))
-                {
-                    return true;
-                }
-            }
-
-            return false;
+            return (ushort)(data[offset] | (data[offset + 1] << 8));
         }
 
-        private static bool BytesEqual(byte[] left, byte[] right)
+        private static void WriteUInt16LE(byte[] data, int offset, ushort value)
         {
-            if (left == null || right == null || left.Length != right.Length)
-            {
-                return false;
-            }
-
-            for (int i = 0; i < left.Length; i++)
-            {
-                if (left[i] != right[i])
-                {
-                    return false;
-                }
-            }
-
-            return true;
+            data[offset] = (byte)value;
+            data[offset + 1] = (byte)(value >> 8);
         }
     }
 }
