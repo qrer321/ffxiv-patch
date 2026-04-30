@@ -68,8 +68,9 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
             false,
             0,
             // TerritoryType points at localized zone title images used during area transitions.
+            // The second image also has a +2000 subtitle layer used by ImageLocationTitle.
             new IconColumnSpec(6, 12),
-            new IconColumnSpec(6, 16));
+            new IconColumnSpec(6, 16, 2000u));
 
         private readonly BuildOptions _options;
         private readonly BuildReport _report;
@@ -310,6 +311,26 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
                             mutableIndex2,
                             datWriter,
                             stats);
+
+                        for (int additionalIndex = 0; additionalIndex < spec.IconColumns[columnIndex].AdditionalIconIdOffsets.Length; additionalIndex++)
+                        {
+                            uint additionalIconId;
+                            if (!TryAddIconId(iconId, spec.IconColumns[columnIndex].AdditionalIconIdOffsets[additionalIndex], out additionalIconId))
+                            {
+                                continue;
+                            }
+
+                            CopyIconVariants(
+                                additionalIconId,
+                                spec.UsesLanguageFolders,
+                                copiedTargets,
+                                globalUiArchive,
+                                koreaUiArchive,
+                                mutableIndex,
+                                mutableIndex2,
+                                datWriter,
+                                stats);
+                        }
                     }
                 }
             }
@@ -610,6 +631,18 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
             throw new InvalidDataException("Unsupported icon ID column type: " + column.Type);
         }
 
+        private static bool TryAddIconId(uint iconId, uint additionalOffset, out uint additionalIconId)
+        {
+            additionalIconId = 0;
+            if (additionalOffset == 0 || iconId > 999999u - additionalOffset)
+            {
+                return false;
+            }
+
+            additionalIconId = iconId + additionalOffset;
+            return true;
+        }
+
         private static uint ReadUInt32(ExcelDataFile file, ExcelDataRow row, ushort columnOffset)
         {
             return Endian.ReadUInt32BE(file.Data, GetFieldOffset(file, row, columnOffset, 4));
@@ -774,11 +807,13 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
         {
             public readonly ushort Type;
             public readonly ushort Offset;
+            public readonly uint[] AdditionalIconIdOffsets;
 
-            public IconColumnSpec(ushort type, ushort offset)
+            public IconColumnSpec(ushort type, ushort offset, params uint[] additionalIconIdOffsets)
             {
                 Type = type;
                 Offset = offset;
+                AdditionalIconIdOffsets = additionalIconIdOffsets ?? new uint[0];
             }
         }
 
