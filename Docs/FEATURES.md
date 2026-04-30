@@ -33,6 +33,7 @@
 - 글로벌 클라이언트 필수 파일 확인
 - 한국 서버 클라이언트 필수 파일 확인
 - `ffxivgame.ver` 확인
+- 글로벌/한국 서버 `ffxivgame.ver` 불일치 확인
 - TTMP 폰트 패키지 확인
 - `0a0000.win32.index/index2` 상태 확인
 - `000000.win32.index/index2` 상태 확인
@@ -57,6 +58,7 @@
 - 적용할 release 파일의 `manifest.json` 생성
 - 패치 완료 후 프로그램을 종료하지 않음
 - 작업 결과를 별도 대화상자로 표시
+- 작업 결과 대화상자에 제너레이터 요약 표시
 - 작업 로그 저장
 - 생성 폴더 열기
 - 로그 폴더 열기
@@ -82,6 +84,7 @@
 - 테스트 빌드는 `debug-apply` 폴더에만 적용
 - 테스트 빌드에서는 폰트 프로필로 특정 폰트군 제외 패치를 생성해 UI glyph 깨짐 원인을 분리 가능
 - 사전 점검을 통과하지 않으면 실제 전체/폰트 패치 차단
+- 글로벌/한국 서버 버전이 다르면 실제 전체/폰트 패치 차단
 - 이미 패치된 index/index2가 감지되면 실제 전체/폰트 패치 차단
 - 출력 폴더가 원본 게임 폴더 내부면 제너레이터에서 중단
 - 원본 글로벌/한국 서버 게임 폴더에는 release 생성물을 직접 쓰지 않음
@@ -124,6 +127,7 @@
   - string-key row 수
   - row-key fallback row 수
   - 보호한 UI 토큰 수
+  - RSV 포함 row/string 수
   - mapping 누락 page 수
   - 원본/대상 page 누락 수
   - 미지원 sheet 수
@@ -137,13 +141,20 @@
 - 글로벌 대상 언어 `*_ja.exd` 또는 `*_en.exd`에 문자열만 반영
 - Default variant EXD 처리
 - Subrows variant sheet 스킵
+- Subrows variant sheet를 `unsupported-subrows`로 진단
 - string key 기반 row 매핑
 - 일부 allowlist sheet의 row id fallback
+- `row_key_fallback_files` 정책으로 row id fallback 대상 sheet 외부 확장
 - `Addon` sheet의 짧은 숫자/기호/SeString UI 토큰 보호
+- `patch-policy.json` 기반 sheet/row/column 보존과 row/column remap
+- `patch-diagnostics.tsv` 생성
+- `--diagnostic-csv` 지정 sheet의 row/column 비교 CSV 생성
+- `_rsv_` 토큰이 남은 row/string 수 집계
 - unsafe sheet 스킵
 - 새 `0a0000.win32.dat1` 생성
 - 수정된 `0a0000.win32.index` 생성
 - 수정된 `0a0000.win32.index2` 생성
+- 수정된 index/index2 파일 세그먼트 Adler32 checksum 갱신
 - 복구용 `orig.0a0000.win32.index` 생성
 - 복구용 `orig.0a0000.win32.index2` 생성
 
@@ -194,11 +205,14 @@
 - `--include-font`: 텍스트와 폰트 동시 생성
 - `--font-only`: 폰트만 생성
 - `--font-pack-dir`: TTMP 패키지 위치 지정
-- `--font-profile`: 진단용 폰트 프로필 선택, 기본 `full`
+- `--font-profile`: 진단용 폰트 프로필 선택, 기본 `ui-numeric-safe`
 - `--base-index`, `--base-index2`: 텍스트 패치용 clean index 지정
 - `--base-font-index`, `--base-font-index2`: 폰트 패치용 clean index 지정
 - `--allow-patched-global`: 이미 패치된 index 사용 허용, 실험용
 - `--allow-korean-font-fallback`: TTMP 없이 한국 서버 폰트 직접 복사, 실험용
+- `--policy`: JSON 패치 정책 파일
+- `--diagnostic-csv`: 지정 sheet의 row/column 비교 CSV 출력
+- `--allow-version-mismatch`: 글로벌/한국 서버 버전 불일치 허용, 진단용
 
 ## 빌드와 배포 기능
 
@@ -226,7 +240,7 @@
 ## 현재 제한
 
 - EXD Default variant 중심으로 처리합니다.
-- Subrows variant sheet는 아직 스킵합니다.
+- Subrows variant sheet는 아직 패치하지 않고 진단 파일에만 기록합니다.
 - 폰트 패치 실사용은 TTMP 패키지 포함을 전제로 합니다.
 - clean index 또는 복구용 original index가 없으면 이미 패치된 글로벌 index를 배포용 base로 쓰지 않습니다.
-- `--allow-patched-global`, `--allow-korean-font-fallback`은 실험용입니다.
+- `--allow-patched-global`, `--allow-korean-font-fallback`, `--allow-version-mismatch`는 실험/진단용입니다.

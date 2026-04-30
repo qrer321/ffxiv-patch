@@ -254,7 +254,7 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
         private bool ShouldIncludeFontPath(string path)
         {
             string profile = string.IsNullOrEmpty(_options.FontPatchProfile)
-                ? FontPatchProfiles.Full
+                ? FontPatchProfiles.Default
                 : _options.FontPatchProfile;
             if (string.Equals(profile, FontPatchProfiles.Full, StringComparison.OrdinalIgnoreCase))
             {
@@ -564,6 +564,7 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
     {
         public const string Full = "full";
         public const string UiNumericSafe = "ui-numeric-safe";
+        public const string Default = UiNumericSafe;
         public const string NoMiedingerMid = "no-miedingermid";
         public const string NoTrumpGothic = "no-trumpgothic";
         public const string NoJupiter = "no-jupiter";

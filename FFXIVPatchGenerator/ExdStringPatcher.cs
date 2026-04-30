@@ -38,12 +38,13 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
                 sourceMaps = new ExdSourceMaps();
             }
 
-            Dictionary<uint, RowPatchPlan> rowPlans = BuildStringKeyPlans(target, targetHeader, sourceMaps.StringKeyRows);
+            PatchSheetPolicy sheetPolicy = patchPolicy == null ? PatchSheetPolicy.Empty : patchPolicy.SheetPolicy;
+            Dictionary<uint, RowPatchPlan> rowPlans = BuildStringKeyPlans(target, targetHeader, sourceMaps.StringKeyRows, sourceMaps.RowKeyRows, sheetPolicy);
             bool usingStringKeyPlans = rowPlans.Count > 0;
 
             if (!usingStringKeyPlans && allowRowKeyFallback)
             {
-                rowPlans = BuildRowKeyPlans(target, sourceMaps.RowKeyRows);
+                rowPlans = BuildRowKeyPlans(target, sourceMaps.RowKeyRows, sheetPolicy);
             }
 
             ExdPatchResult result = new ExdPatchResult();
@@ -78,6 +79,8 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
                 if (rowResult != null)
                 {
                     result.ProtectedUiStrings += rowResult.ProtectedUiStrings;
+                    result.RsvRows += rowResult.RsvRows;
+                    result.RsvStrings += rowResult.RsvStrings;
                 }
 
                 if (rowResult != null && rowResult.Touched)
@@ -206,7 +209,9 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
         private static Dictionary<uint, RowPatchPlan> BuildStringKeyPlans(
             ExcelDataFile target,
             ExcelHeader targetHeader,
-            Dictionary<string, SourceRowRef> sourceStringKeyRows)
+            Dictionary<string, SourceRowRef> sourceStringKeyRows,
+            Dictionary<uint, SourceRowRef> sourceRowKeyRows,
+            PatchSheetPolicy sheetPolicy)
         {
             Dictionary<uint, RowPatchPlan> plans = new Dictionary<uint, RowPatchPlan>();
             if (sourceStringKeyRows.Count == 0 || !IsStringKeyHeader(targetHeader))
@@ -217,6 +222,11 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
             for (int i = 0; i < target.Rows.Count; i++)
             {
                 ExcelDataRow row = target.Rows[i];
+                if (sheetPolicy.ShouldKeepRow(row.RowId))
+                {
+                    continue;
+                }
+
                 string key;
                 if (!TryGetPlainString(target, targetHeader, row, 0, out key))
                 {
@@ -224,6 +234,14 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
                 }
 
                 SourceRowRef sourceRow;
+                uint overrideSourceRowId;
+                if (sheetPolicy.SourceRowOverrides.TryGetValue(row.RowId, out overrideSourceRowId) &&
+                    sourceRowKeyRows.TryGetValue(overrideSourceRowId, out sourceRow))
+                {
+                    plans[row.RowId] = new RowPatchPlan(sourceRow, RowPatchMode.RowKey);
+                    continue;
+                }
+
                 if (!StringKeyRegex.IsMatch(key) || !sourceStringKeyRows.TryGetValue(key, out sourceRow))
                 {
                     continue;
@@ -237,13 +255,25 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
 
         private static Dictionary<uint, RowPatchPlan> BuildRowKeyPlans(
             ExcelDataFile target,
-            Dictionary<uint, SourceRowRef> sourceRowKeyRows)
+            Dictionary<uint, SourceRowRef> sourceRowKeyRows,
+            PatchSheetPolicy sheetPolicy)
         {
             Dictionary<uint, RowPatchPlan> plans = new Dictionary<uint, RowPatchPlan>();
             for (int i = 0; i < target.Rows.Count; i++)
             {
+                if (sheetPolicy.ShouldKeepRow(target.Rows[i].RowId))
+                {
+                    continue;
+                }
+
+                uint sourceRowId;
+                if (!sheetPolicy.SourceRowOverrides.TryGetValue(target.Rows[i].RowId, out sourceRowId))
+                {
+                    sourceRowId = target.Rows[i].RowId;
+                }
+
                 SourceRowRef sourceRow;
-                if (sourceRowKeyRows.TryGetValue(target.Rows[i].RowId, out sourceRow))
+                if (sourceRowKeyRows.TryGetValue(sourceRowId, out sourceRow))
                 {
                     plans[target.Rows[i].RowId] = new RowPatchPlan(sourceRow, RowPatchMode.RowKey);
                 }
@@ -330,6 +360,7 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
             SourceRowRef sourceRow,
             StringPatchPolicy patchPolicy)
         {
+            PatchSheetPolicy sheetPolicy = patchPolicy == null ? PatchSheetPolicy.Empty : patchPolicy.SheetPolicy;
             int rowOffset = checked((int)targetRow.Offset);
             if (rowOffset < 0 || rowOffset + 6 > target.Data.Length)
             {
@@ -355,6 +386,8 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
 
             bool touched = false;
             int protectedUiStrings = 0;
+            int rsvStrings = 0;
+            bool rowHasRsv = false;
             MemoryStream stringData = new MemoryStream();
             for (int i = 0; i < stringColumns.Count; i++)
             {
@@ -373,20 +406,43 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
 
                 byte[] replacement = sourceRow.File.GetStringBytesByColumnOffset(sourceRow.Row, sourceHeader, targetColumn.Offset);
                 byte[] selected = original;
-                if (replacement != null && replacement.Length > 0)
+                if (sheetPolicy.ShouldKeepColumn(targetRow.RowId, targetColumn.Offset))
                 {
-                    if (ShouldKeepOriginalForUiGlyph(patchPolicy, original, replacement))
+                    selected = original;
+                }
+                else
+                {
+                    ColumnRemap columnRemap = sheetPolicy.GetColumnRemap(targetRow.RowId, targetColumn.Offset);
+                    if (columnRemap.Mode == ColumnRemapMode.SourceColumn && columnRemap.SourceColumnOffset.HasValue)
                     {
-                        protectedUiStrings++;
+                        replacement = sourceRow.File.GetStringBytesByColumnOffset(sourceRow.Row, sourceHeader, columnRemap.SourceColumnOffset.Value);
                     }
-                    else
+                    else if (columnRemap.Mode == ColumnRemapMode.Literal)
                     {
-                        selected = replacement;
-                        if (!BytesEqual(original, replacement))
+                        replacement = columnRemap.LiteralBytes;
+                    }
+
+                    if (replacement != null && replacement.Length > 0)
+                    {
+                        if (ShouldKeepOriginalForUiGlyph(patchPolicy, original, replacement))
                         {
-                            touched = true;
+                            protectedUiStrings++;
+                        }
+                        else
+                        {
+                            selected = replacement;
+                            if (!BytesEqual(original, replacement))
+                            {
+                                touched = true;
+                            }
                         }
                     }
+                }
+
+                if (ContainsRsvToken(selected))
+                {
+                    rsvStrings++;
+                    rowHasRsv = true;
                 }
 
                 uint newStringOffset = checked((uint)stringData.Position);
@@ -397,7 +453,7 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
 
             if (!touched)
             {
-                return new RowPatchResult(CopyOriginalRowRecord(target, targetRow), false, protectedUiStrings);
+                return new RowPatchResult(CopyOriginalRowRecord(target, targetRow), false, protectedUiStrings, rowHasRsv ? 1 : 0, rsvStrings);
             }
 
             byte[] strings = stringData.ToArray();
@@ -421,7 +477,7 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
                 throw new InvalidDataException("Unexpected empty EXD row.");
             }
 
-            return new RowPatchResult(rowOutput.ToArray(), true, protectedUiStrings);
+            return new RowPatchResult(rowOutput.ToArray(), true, protectedUiStrings, rowHasRsv ? 1 : 0, rsvStrings);
         }
 
         private static bool ShouldKeepOriginalForUiGlyph(StringPatchPolicy patchPolicy, byte[] original, byte[] replacement)
@@ -514,6 +570,28 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
             for (int i = 0; i < bytes.Length; i++)
             {
                 if (bytes[i] == 0x02 || bytes[i] == 0x03)
+                {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
+        private static bool ContainsRsvToken(byte[] bytes)
+        {
+            if (bytes == null || bytes.Length < 5)
+            {
+                return false;
+            }
+
+            for (int i = 0; i <= bytes.Length - 5; i++)
+            {
+                if (bytes[i] == (byte)'_' &&
+                    (bytes[i + 1] == (byte)'r' || bytes[i + 1] == (byte)'R') &&
+                    (bytes[i + 2] == (byte)'s' || bytes[i + 2] == (byte)'S') &&
+                    (bytes[i + 3] == (byte)'v' || bytes[i + 3] == (byte)'V') &&
+                    bytes[i + 4] == (byte)'_')
                 {
                     return true;
                 }
@@ -619,12 +697,16 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
             public readonly byte[] Data;
             public readonly bool Touched;
             public readonly int ProtectedUiStrings;
+            public readonly int RsvRows;
+            public readonly int RsvStrings;
 
-            public RowPatchResult(byte[] data, bool touched, int protectedUiStrings)
+            public RowPatchResult(byte[] data, bool touched, int protectedUiStrings, int rsvRows, int rsvStrings)
             {
                 Data = data;
                 Touched = touched;
                 ProtectedUiStrings = protectedUiStrings;
+                RsvRows = rsvRows;
+                RsvStrings = rsvStrings;
             }
         }
 
@@ -643,18 +725,22 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
         public int StringKeyRows;
         public int RowKeyRows;
         public int ProtectedUiStrings;
+        public int RsvRows;
+        public int RsvStrings;
     }
 
     internal sealed class StringPatchPolicy
     {
-        public static readonly StringPatchPolicy Default = new StringPatchPolicy(false);
-        public static readonly StringPatchPolicy ProtectAddonUiGlyphs = new StringPatchPolicy(true);
+        public static readonly StringPatchPolicy Default = new StringPatchPolicy(false, PatchSheetPolicy.Empty);
+        public static readonly StringPatchPolicy ProtectAddonUiGlyphs = new StringPatchPolicy(true, PatchSheetPolicy.Empty);
 
         public readonly bool ProtectShortNonKoreanUiTokens;
+        public readonly PatchSheetPolicy SheetPolicy;
 
-        private StringPatchPolicy(bool protectShortNonKoreanUiTokens)
+        public StringPatchPolicy(bool protectShortNonKoreanUiTokens, PatchSheetPolicy sheetPolicy)
         {
             ProtectShortNonKoreanUiTokens = protectShortNonKoreanUiTokens;
+            SheetPolicy = sheetPolicy ?? PatchSheetPolicy.Empty;
         }
     }
 

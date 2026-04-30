@@ -18,11 +18,12 @@ $sources = @(
     "SqPack.cs",
     "Excel.cs",
     "ExdStringPatcher.cs",
-    "HashAndEndian.cs"
+    "HashAndEndian.cs",
+    "PatchPolicy.cs"
 ) | ForEach-Object { Join-Path $PSScriptRoot $_ }
 
 $exePath = Join-Path $outDir "FFXIVPatchGenerator.exe"
-& $csc /nologo /optimize+ /target:exe "/out:$exePath" /r:System.IO.Compression.dll $sources
+& $csc /nologo /optimize+ /target:exe "/out:$exePath" /r:System.IO.Compression.dll /r:System.Web.Extensions.dll $sources
 if ($LASTEXITCODE -ne 0) {
     exit $LASTEXITCODE
 }

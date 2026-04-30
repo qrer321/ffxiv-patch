@@ -29,6 +29,7 @@
   <ItemGroup>
     <Reference Include="System" />
     <Reference Include="System.Core" />
+    <Reference Include="System.Web.Extensions" />
     <Reference Include="System.IO.Compression" />
   </ItemGroup>
   <ItemGroup>
@@ -42,6 +43,7 @@
     <Compile Include="Excel.cs" />
     <Compile Include="ExdStringPatcher.cs" />
     <Compile Include="HashAndEndian.cs" />
+    <Compile Include="PatchPolicy.cs" />
   </ItemGroup>
   <ItemGroup>
     <Content Include="FontPatchAssets\TTMPD.mpd" Condition="Exists('FontPatchAssets\TTMPD.mpd')">

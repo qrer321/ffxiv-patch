@@ -1,0 +1,31 @@
+{
+  "delete_files": [
+    "ExampleUnsafeSheet"
+  ],
+  "row_key_fallback_files": [
+    "custom/example*"
+  ],
+  "keep_rows": {
+    "ExampleSheet": [1000, 1001]
+  },
+  "keep_columns": {
+    "ExampleSheet": [0, 4]
+  },
+  "remap_keys": {
+    "custom/example": {
+      "2000": 3000,
+      "2001": 3001
+    }
+  },
+  "remap_columns": {
+    "SomeSheet": {
+      "4": "G",
+      "8": 12,
+      "16": {
+        "4000": "KEEP",
+        "4001": 20,
+        "4002": "literal override"
+      }
+    }
+  }
+}

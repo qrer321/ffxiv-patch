@@ -64,6 +64,7 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
             new Regex("^GroupPoseFrame$", RegexOptions.IgnoreCase | RegexOptions.Compiled),
             new Regex("^Guildleve.*$", RegexOptions.IgnoreCase | RegexOptions.Compiled),
             new Regex("^Housing.*$", RegexOptions.IgnoreCase | RegexOptions.Compiled),
+            new Regex("^InstanceContentTextData$", RegexOptions.IgnoreCase | RegexOptions.Compiled),
             new Regex("^Item.*$", RegexOptions.IgnoreCase | RegexOptions.Compiled),
             new Regex("^JobDef.*$", RegexOptions.IgnoreCase | RegexOptions.Compiled),
             new Regex("^Journal.*$", RegexOptions.IgnoreCase | RegexOptions.Compiled),
@@ -116,9 +117,11 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
             string koreaSqpack = Path.Combine(koreaGame, RepositoryDir);
 
             ValidateInput(globalGame, globalSqpack, koreaGame, koreaSqpack);
+            ClientVersionGuard.Validate(globalGame, koreaGame, _options.AllowVersionMismatch);
             EnsureOutputIsOutsideInputs(outputDir, globalGame, koreaGame);
             Directory.CreateDirectory(outputDir);
             ProgressReporter.Report(2, "입력 파일 확인 완료");
+            PatchPolicy patchPolicyRoot = PatchPolicy.Load(_options.PolicyPath);
 
             string currentGlobalIndex = Path.Combine(globalSqpack, IndexFileName);
             string originalGlobalIndex = Path.Combine(globalSqpack, OrigIndexFileName);
@@ -133,6 +136,7 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
             string outputOrigIndex2 = Path.Combine(outputDir, OrigIndex2FileName);
             string outputDat1 = Path.Combine(outputDir, Dat1FileName);
             string diagnosticsPath = Path.Combine(outputDir, "patch-diagnostics.tsv");
+            string diagnosticCsvDir = Path.Combine(outputDir, "diagnostic-csv");
             _report.DiagnosticsPath = diagnosticsPath;
 
             File.Copy(baseIndex, outputOrigIndex, true);
@@ -155,7 +159,7 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
             using (SqPackDatWriter datWriter = new SqPackDatWriter(outputDat1, Path.Combine(globalSqpack, Dat0FileName)))
             using (StreamWriter diagnostics = new StreamWriter(diagnosticsPath, false, new UTF8Encoding(false)))
             {
-                diagnostics.WriteLine("sheet\tpage\tstatus\trows\tstringKeyRows\trowKeyRows\tnote");
+                diagnostics.WriteLine("sheet\tpage\tstatus\trows\tstringKeyRows\trowKeyRows\trsvRows\trsvStrings\tnote");
                 mutableIndex.EnsureDataFileCount(2);
                 mutableIndex2.EnsureDataFileCount(2);
 
@@ -178,7 +182,7 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
                     ProgressReporter.Report(
                         5 + (processedSheets - 1) * 85 / totalSheets,
                         "EXD 처리 중: " + sheetName + " (" + processedSheets + "/" + totalSheets + ")");
-                    ProcessSheet(sheetName, globalArchive, koreaArchive, mutableIndex, mutableIndex2, datWriter, diagnostics, targetLanguageId, sourceLanguageId);
+                    ProcessSheet(sheetName, globalArchive, koreaArchive, mutableIndex, mutableIndex2, datWriter, diagnostics, targetLanguageId, sourceLanguageId, patchPolicyRoot, diagnosticCsvDir);
                 }
 
                 mutableIndex.Save();
@@ -218,6 +222,7 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
         private static void ValidateInput(string globalGame, string globalSqpack, string koreaGame, string koreaSqpack)
         {
             RequireFile(Path.Combine(globalGame, VersionFileName));
+            RequireFile(Path.Combine(koreaGame, VersionFileName));
             RequireFile(Path.Combine(globalSqpack, IndexFileName));
             RequireFile(Path.Combine(globalSqpack, Index2FileName));
             RequireFile(Path.Combine(globalSqpack, Dat0FileName));
@@ -356,16 +361,25 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
             SqPackDatWriter datWriter,
             StreamWriter diagnostics,
             byte targetLanguageId,
-            byte sourceLanguageId)
+            byte sourceLanguageId,
+            PatchPolicy patchPolicyRoot,
+            string diagnosticCsvDir)
         {
             _report.SheetsScanned++;
+            if (patchPolicyRoot.ShouldSkipSheet(sheetName))
+            {
+                WriteDiagnostic(diagnostics, sheetName, "-", "policy-skip-sheet", 0, 0, 0, 0, 0, string.Empty);
+                return;
+            }
+
+            PatchSheetPolicy sheetPolicy = patchPolicyRoot.GetSheetPolicy(sheetName);
 
             string headerPath = "exd/" + sheetName + ".exh";
             byte[] globalHeaderBytes;
             if (!globalArchive.TryReadFile(headerPath, out globalHeaderBytes))
             {
                 AddLimitedWarning("Missing global EXH: " + headerPath);
-                WriteDiagnostic(diagnostics, sheetName, "-", "missing-global-exh", 0, 0, 0, headerPath);
+                WriteDiagnostic(diagnostics, sheetName, "-", "missing-global-exh", 0, 0, 0, 0, 0, headerPath);
                 return;
             }
 
@@ -374,14 +388,14 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
             bool targetUsesNeutralPath = !targetUsesLanguageSuffix && HasAnyPageFile(globalArchive, sheetName, globalHeader, null);
             if (!targetUsesLanguageSuffix && !targetUsesNeutralPath)
             {
-                WriteDiagnostic(diagnostics, sheetName, "-", "missing-target-language", 0, 0, 0, _options.TargetLanguage);
+                WriteDiagnostic(diagnostics, sheetName, "-", "missing-target-language", 0, 0, 0, 0, 0, _options.TargetLanguage);
                 return;
             }
 
             List<int> stringColumns = globalHeader.GetStringColumnIndexes();
             if (stringColumns.Count == 0)
             {
-                WriteDiagnostic(diagnostics, sheetName, "-", "no-string-columns", 0, 0, 0, string.Empty);
+                WriteDiagnostic(diagnostics, sheetName, "-", "no-string-columns", 0, 0, 0, 0, 0, string.Empty);
                 return;
             }
 
@@ -389,14 +403,15 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
             {
                 _report.UnsupportedSheets++;
                 AddLimitedWarning("Skipped unsupported EXH variant " + globalHeader.Variant + ": " + sheetName);
-                WriteDiagnostic(diagnostics, sheetName, "-", "unsupported-variant", 0, 0, 0, globalHeader.Variant.ToString());
+                string unsupportedStatus = globalHeader.Variant == ExcelVariant.Subrows ? "unsupported-subrows" : "unsupported-variant";
+                WriteDiagnostic(diagnostics, sheetName, "-", unsupportedStatus, 0, 0, 0, 0, 0, globalHeader.Variant.ToString());
                 return;
             }
 
             if (IsKnownUnsafeSheet(sheetName))
             {
                 AddLimitedWarning("Skipped known unsafe sheet: " + sheetName);
-                WriteDiagnostic(diagnostics, sheetName, "-", "known-unsafe-skip", 0, 0, 0, string.Empty);
+                WriteDiagnostic(diagnostics, sheetName, "-", "known-unsafe-skip", 0, 0, 0, 0, 0, string.Empty);
                 return;
             }
 
@@ -417,30 +432,28 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
             if (sourceHeader.Variant != ExcelVariant.Default)
             {
                 sourceHeader = globalHeader;
-                WriteDiagnostic(diagnostics, sheetName, "-", "source-header-fallback", 0, 0, 0, "Korean EXH variant was not Default");
+                WriteDiagnostic(diagnostics, sheetName, "-", "source-header-fallback", 0, 0, 0, 0, 0, "Korean EXH variant was not Default");
             }
 
             bool sourceUsesLanguageSuffix = sourceHeader.HasLanguage(sourceLanguageId);
             bool sourceUsesNeutralPath = !sourceUsesLanguageSuffix && HasAnyPageFile(koreaArchive, sheetName, sourceHeader, null);
             if (!sourceUsesLanguageSuffix && !sourceUsesNeutralPath)
             {
-                WriteDiagnostic(diagnostics, sheetName, "-", "missing-source-language", 0, 0, 0, _options.SourceLanguage);
+                WriteDiagnostic(diagnostics, sheetName, "-", "missing-source-language", 0, 0, 0, 0, 0, _options.SourceLanguage);
                 return;
             }
 
-            bool allowRowKeyFallback = IsRowKeyFallbackAllowed(sheetName);
+            bool allowRowKeyFallback = IsRowKeyFallbackAllowed(sheetName) || patchPolicyRoot.ShouldAllowRowKeyFallback(sheetName);
             List<ExcelDataFile> sourceExds = LoadSourcePages(sheetName, sourceHeader, koreaArchive, diagnostics, sourceUsesLanguageSuffix);
             if (sourceExds.Count == 0)
             {
                 _report.MissingSourcePages += globalHeader.Pages.Count;
-                WriteDiagnostic(diagnostics, sheetName, "-", "missing-all-source-pages", 0, 0, 0, _options.SourceLanguage);
+                WriteDiagnostic(diagnostics, sheetName, "-", "missing-all-source-pages", 0, 0, 0, 0, 0, _options.SourceLanguage);
                 return;
             }
 
-            ExdSourceMaps sourceMaps = ExdStringPatcher.BuildSourceMaps(sourceExds, sourceHeader, allowRowKeyFallback);
-            StringPatchPolicy patchPolicy = IsAddonSheet(sheetName)
-                ? StringPatchPolicy.ProtectAddonUiGlyphs
-                : StringPatchPolicy.Default;
+            ExdSourceMaps sourceMaps = ExdStringPatcher.BuildSourceMaps(sourceExds, sourceHeader, allowRowKeyFallback || sheetPolicy.HasSourceRowOverrides);
+            StringPatchPolicy stringPatchPolicy = new StringPatchPolicy(IsAddonSheet(sheetName), sheetPolicy);
 
             for (int i = 0; i < globalHeader.Pages.Count; i++)
             {
@@ -451,11 +464,12 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
                 if (!globalArchive.TryReadFile(targetPath, out targetExdBytes))
                 {
                     _report.MissingTargetPages++;
-                    WriteDiagnostic(diagnostics, sheetName, page.StartId.ToString(), "missing-target-page", 0, 0, 0, targetPath);
+                    WriteDiagnostic(diagnostics, sheetName, page.StartId.ToString(), "missing-target-page", 0, 0, 0, 0, 0, targetPath);
                     continue;
                 }
 
                 ExcelDataFile targetExd = ExcelDataFile.Parse(targetExdBytes);
+                WriteDiagnosticCsvIfRequested(sheetName, page.StartId, diagnosticCsvDir, targetExd, sourceMaps, globalHeader, sourceHeader, stringColumns, allowRowKeyFallback, sheetPolicy);
                 ExdPatchResult patchResult = ExdStringPatcher.PatchDefaultVariant(
                     targetExd,
                     globalHeader,
@@ -463,8 +477,10 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
                     stringColumns,
                     sourceMaps,
                     allowRowKeyFallback,
-                    patchPolicy);
+                    stringPatchPolicy);
                 _report.ProtectedUiStrings += patchResult.ProtectedUiStrings;
+                _report.RsvRows += patchResult.RsvRows;
+                _report.RsvStrings += patchResult.RsvStrings;
 
                 if (!patchResult.Changed)
                 {
@@ -477,6 +493,8 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
                         0,
                         0,
                         0,
+                        patchResult.RsvRows,
+                        patchResult.RsvStrings,
                         BuildPatchNote(allowRowKeyFallback ? "row-key fallback allowed" : "row-key fallback not allowed", patchResult.ProtectedUiStrings));
                     continue;
                 }
@@ -496,6 +514,8 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
                     patchResult.RowsPatched,
                     patchResult.StringKeyRows,
                     patchResult.RowKeyRows,
+                    patchResult.RsvRows,
+                    patchResult.RsvStrings,
                     BuildPatchNote(string.Empty, patchResult.ProtectedUiStrings));
 
                 if (_report.PagesPatched % 100 == 0)
@@ -521,7 +541,7 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
                 if (!koreaArchive.TryReadFile(sourcePath, out sourceExdBytes))
                 {
                     _report.MissingSourcePages++;
-                    WriteDiagnostic(diagnostics, sheetName, page.StartId.ToString(), "missing-source-page", 0, 0, 0, sourcePath);
+                    WriteDiagnostic(diagnostics, sheetName, page.StartId.ToString(), "missing-source-page", 0, 0, 0, 0, 0, sourcePath);
                     continue;
                 }
 
@@ -533,7 +553,7 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
                 {
                     _report.MissingSourcePages++;
                     AddLimitedWarning("Invalid Korean EXD: " + sourcePath);
-                    WriteDiagnostic(diagnostics, sheetName, page.StartId.ToString(), "invalid-source-page", 0, 0, 0, exception.Message);
+                    WriteDiagnostic(diagnostics, sheetName, page.StartId.ToString(), "invalid-source-page", 0, 0, 0, 0, 0, exception.Message);
                 }
             }
 
@@ -569,6 +589,246 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
             return false;
         }
 
+        private void WriteDiagnosticCsvIfRequested(
+            string sheetName,
+            uint pageStartId,
+            string diagnosticCsvDir,
+            ExcelDataFile targetExd,
+            ExdSourceMaps sourceMaps,
+            ExcelHeader targetHeader,
+            ExcelHeader sourceHeader,
+            List<int> stringColumns,
+            bool allowRowKeyFallback,
+            PatchSheetPolicy sheetPolicy)
+        {
+            if (string.IsNullOrEmpty(_options.DiagnosticCsvSheet) ||
+                !string.Equals(NormalizeSheetName(_options.DiagnosticCsvSheet), NormalizeSheetName(sheetName), StringComparison.OrdinalIgnoreCase))
+            {
+                return;
+            }
+
+            Directory.CreateDirectory(diagnosticCsvDir);
+            string safeSheetName = sheetName.Replace('/', '_').Replace('\\', '_');
+            string csvPath = Path.Combine(diagnosticCsvDir, safeSheetName + "_" + pageStartId.ToString() + ".csv");
+            using (StreamWriter writer = new StreamWriter(csvPath, false, new UTF8Encoding(false)))
+            {
+                writer.WriteLine("sheet,page,rowId,columnOffset,mappingMode,sourceRowId,action,globalText,koreaText,selectedText,note");
+                for (int rowIndex = 0; rowIndex < targetExd.Rows.Count; rowIndex++)
+                {
+                    ExcelDataRow targetRow = targetExd.Rows[rowIndex];
+                    SourceRowRef sourceRow;
+                    string mappingMode;
+                    if (!TryResolveDiagnosticSourceRow(targetExd, targetHeader, targetRow, sourceMaps, allowRowKeyFallback, sheetPolicy, out sourceRow, out mappingMode))
+                    {
+                        WriteDiagnosticCsvRow(writer, sheetName, pageStartId, targetRow.RowId, 0, "none", "-", "keep-global", string.Empty, string.Empty, string.Empty, "no source row");
+                        continue;
+                    }
+
+                    for (int columnIndex = 0; columnIndex < stringColumns.Count; columnIndex++)
+                    {
+                        ExcelColumnDefinition column = targetHeader.Columns[stringColumns[columnIndex]];
+                        byte[] globalBytes = targetExd.GetStringBytes(targetRow, targetHeader, stringColumns[columnIndex]);
+                        byte[] koreaBytes = sourceRow.File.GetStringBytesByColumnOffset(sourceRow.Row, sourceHeader, column.Offset);
+                        byte[] selectedBytes = koreaBytes;
+                        string action = "replace";
+                        string note = string.Empty;
+
+                        if (sheetPolicy.ShouldKeepRow(targetRow.RowId) || sheetPolicy.ShouldKeepColumn(targetRow.RowId, column.Offset))
+                        {
+                            selectedBytes = globalBytes;
+                            action = "keep-global";
+                        }
+                        else
+                        {
+                            ColumnRemap remap = sheetPolicy.GetColumnRemap(targetRow.RowId, column.Offset);
+                            if (remap.Mode == ColumnRemapMode.SourceColumn && remap.SourceColumnOffset.HasValue)
+                            {
+                                selectedBytes = sourceRow.File.GetStringBytesByColumnOffset(sourceRow.Row, sourceHeader, remap.SourceColumnOffset.Value);
+                                note = "source-column=" + remap.SourceColumnOffset.Value.ToString();
+                            }
+                            else if (remap.Mode == ColumnRemapMode.Literal)
+                            {
+                                selectedBytes = remap.LiteralBytes;
+                                note = "literal";
+                            }
+                        }
+
+                        if (ContainsRsvToken(selectedBytes))
+                        {
+                            note = string.IsNullOrEmpty(note) ? "rsv" : note + "; rsv";
+                        }
+
+                        WriteDiagnosticCsvRow(
+                            writer,
+                            sheetName,
+                            pageStartId,
+                            targetRow.RowId,
+                            column.Offset,
+                            mappingMode,
+                            sourceRow.Row.RowId.ToString(),
+                            action,
+                            DecodeString(globalBytes),
+                            DecodeString(koreaBytes),
+                            DecodeString(selectedBytes),
+                            note);
+                    }
+                }
+            }
+        }
+
+        private static bool TryResolveDiagnosticSourceRow(
+            ExcelDataFile targetExd,
+            ExcelHeader targetHeader,
+            ExcelDataRow targetRow,
+            ExdSourceMaps sourceMaps,
+            bool allowRowKeyFallback,
+            PatchSheetPolicy sheetPolicy,
+            out SourceRowRef sourceRow,
+            out string mappingMode)
+        {
+            uint overrideSourceRowId;
+            if (sheetPolicy.SourceRowOverrides.TryGetValue(targetRow.RowId, out overrideSourceRowId) &&
+                sourceMaps.RowKeyRows.TryGetValue(overrideSourceRowId, out sourceRow))
+            {
+                mappingMode = "remap-key";
+                return true;
+            }
+
+            string key;
+            if (TryGetPlainStringByOffset(targetExd, targetHeader, targetRow, 0, out key) &&
+                sourceMaps.StringKeyRows.TryGetValue(key, out sourceRow))
+            {
+                mappingMode = "string-key";
+                return true;
+            }
+
+            if (allowRowKeyFallback && sourceMaps.RowKeyRows.TryGetValue(targetRow.RowId, out sourceRow))
+            {
+                mappingMode = "row-key";
+                return true;
+            }
+
+            sourceRow = null;
+            mappingMode = "none";
+            return false;
+        }
+
+        private static bool TryGetPlainStringByOffset(
+            ExcelDataFile file,
+            ExcelHeader header,
+            ExcelDataRow row,
+            ushort columnOffset,
+            out string value)
+        {
+            value = string.Empty;
+            byte[] bytes = file.GetStringBytesByColumnOffset(row, header, columnOffset);
+            if (bytes == null || bytes.Length == 0)
+            {
+                return false;
+            }
+
+            for (int i = 0; i < bytes.Length; i++)
+            {
+                if (bytes[i] == 0x02)
+                {
+                    return false;
+                }
+            }
+
+            value = DecodeString(bytes);
+            return true;
+        }
+
+        private static void WriteDiagnosticCsvRow(
+            StreamWriter writer,
+            string sheetName,
+            uint pageStartId,
+            uint rowId,
+            ushort columnOffset,
+            string mappingMode,
+            string sourceRowId,
+            string action,
+            string globalText,
+            string koreaText,
+            string selectedText,
+            string note)
+        {
+            writer.Write(CsvEscape(sheetName));
+            writer.Write(',');
+            writer.Write(pageStartId.ToString());
+            writer.Write(',');
+            writer.Write(rowId.ToString());
+            writer.Write(',');
+            writer.Write(columnOffset.ToString());
+            writer.Write(',');
+            writer.Write(CsvEscape(mappingMode));
+            writer.Write(',');
+            writer.Write(CsvEscape(sourceRowId));
+            writer.Write(',');
+            writer.Write(CsvEscape(action));
+            writer.Write(',');
+            writer.Write(CsvEscape(globalText));
+            writer.Write(',');
+            writer.Write(CsvEscape(koreaText));
+            writer.Write(',');
+            writer.Write(CsvEscape(selectedText));
+            writer.Write(',');
+            writer.WriteLine(CsvEscape(note));
+        }
+
+        private static string CsvEscape(string value)
+        {
+            if (value == null)
+            {
+                value = string.Empty;
+            }
+
+            return "\"" + value.Replace("\"", "\"\"").Replace("\r", " ").Replace("\n", " ") + "\"";
+        }
+
+        private static string DecodeString(byte[] bytes)
+        {
+            if (bytes == null || bytes.Length == 0)
+            {
+                return string.Empty;
+            }
+
+            return new UTF8Encoding(false, false).GetString(bytes);
+        }
+
+        private static bool ContainsRsvToken(byte[] bytes)
+        {
+            if (bytes == null || bytes.Length < 5)
+            {
+                return false;
+            }
+
+            for (int i = 0; i <= bytes.Length - 5; i++)
+            {
+                if (bytes[i] == (byte)'_' &&
+                    (bytes[i + 1] == (byte)'r' || bytes[i + 1] == (byte)'R') &&
+                    (bytes[i + 2] == (byte)'s' || bytes[i + 2] == (byte)'S') &&
+                    (bytes[i + 3] == (byte)'v' || bytes[i + 3] == (byte)'V') &&
+                    bytes[i + 4] == (byte)'_')
+                {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
+        private static string NormalizeSheetName(string sheetName)
+        {
+            string value = (sheetName ?? string.Empty).Trim().Replace('\\', '/').ToLowerInvariant();
+            if (value.EndsWith(".csv", StringComparison.OrdinalIgnoreCase))
+            {
+                value = value.Substring(0, value.Length - 4);
+            }
+
+            return value;
+        }
+
         private static void WriteDiagnostic(
             StreamWriter diagnostics,
             string sheetName,
@@ -577,6 +837,8 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
             int rows,
             int stringKeyRows,
             int rowKeyRows,
+            int rsvRows,
+            int rsvStrings,
             string note)
         {
             if (diagnostics == null)
@@ -595,6 +857,10 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
             diagnostics.Write(stringKeyRows.ToString());
             diagnostics.Write('\t');
             diagnostics.Write(rowKeyRows.ToString());
+            diagnostics.Write('\t');
+            diagnostics.Write(rsvRows.ToString());
+            diagnostics.Write('\t');
+            diagnostics.Write(rsvStrings.ToString());
             diagnostics.Write('\t');
             diagnostics.WriteLine(EscapeTsv(note));
         }

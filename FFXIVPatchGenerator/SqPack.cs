@@ -325,6 +325,7 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
 
         public void Save()
         {
+            SqPackIndexChecksum.UpdateFileSegmentAdler32(_bytes, _indexHeaderOffset);
             File.WriteAllBytes(_path, _bytes);
         }
 
@@ -428,6 +429,7 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
 
         public void Save()
         {
+            SqPackIndexChecksum.UpdateFileSegmentAdler32(_bytes, _indexHeaderOffset);
             File.WriteAllBytes(_path, _bytes);
         }
 
@@ -626,6 +628,47 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
             public int StoredSize;
             public bool Compressed;
             public byte[] Payload;
+        }
+    }
+
+    internal static class SqPackIndexChecksum
+    {
+        public static void UpdateFileSegmentAdler32(byte[] indexBytes, int indexHeaderOffset)
+        {
+            int segmentOffsetPtr = indexHeaderOffset + 0x08;
+            int segmentSizePtr = indexHeaderOffset + 0x0C;
+            int segmentAdlerPtr = indexHeaderOffset + 0x10;
+            if (segmentAdlerPtr + 4 > indexBytes.Length)
+            {
+                return;
+            }
+
+            uint segmentOffset = Endian.ReadUInt32LE(indexBytes, segmentOffsetPtr);
+            uint segmentSize = Endian.ReadUInt32LE(indexBytes, segmentSizePtr);
+            if (segmentSize == 0 ||
+                segmentOffset > int.MaxValue ||
+                segmentSize > int.MaxValue ||
+                (long)segmentOffset + segmentSize > indexBytes.Length)
+            {
+                return;
+            }
+
+            uint checksum = CalculateAdler32(indexBytes, (int)segmentOffset, (int)segmentSize);
+            Endian.WriteUInt32LE(indexBytes, segmentAdlerPtr, checksum);
+        }
+
+        public static uint CalculateAdler32(byte[] data, int offset, int size)
+        {
+            const uint ModAdler = 65521;
+            uint a = 1;
+            uint b = 0;
+            for (int i = 0; i < size; i++)
+            {
+                a = (a + data[offset + i]) % ModAdler;
+                b = (b + a) % ModAdler;
+            }
+
+            return (b << 16) | a;
         }
     }
 

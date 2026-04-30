@@ -208,7 +208,7 @@ namespace FFXIVKoreanPatch.Main
             debugFontProfileComboBox.Items.Add(new FontProfileItem("AXIS 제외", "no-axis"));
             debugFontProfileComboBox.Items.Add(new FontProfileItem("FDT만 적용", "fdt-only"));
             debugFontProfileComboBox.Items.Add(new FontProfileItem("텍스처만 적용", "textures-only"));
-            debugFontProfileComboBox.SelectedIndex = 0;
+            debugFontProfileComboBox.SelectedIndex = 1;
 
 #if !TEST_BUILD
             debugFontProfileLabel.Visible = false;
@@ -1412,6 +1412,26 @@ namespace FFXIVKoreanPatch.Main
             return null;
         }
 
+        private string FindPatchPolicyPath(string patchGeneratorPath)
+        {
+            string generatorDir = string.IsNullOrEmpty(patchGeneratorPath) ? null : Path.GetDirectoryName(patchGeneratorPath);
+            string[] candidatePaths = new string[]
+            {
+                string.IsNullOrEmpty(generatorDir) ? null : Path.Combine(generatorDir, "patch-policy.json"),
+                Path.Combine(Application.StartupPath, "patch-policy.json")
+            };
+
+            foreach (string candidatePath in candidatePaths)
+            {
+                if (!string.IsNullOrEmpty(candidatePath) && File.Exists(candidatePath))
+                {
+                    return candidatePath;
+                }
+            }
+
+            return null;
+        }
+
         private string GetManagedReleaseBaseDir()
         {
             string version = string.IsNullOrWhiteSpace(targetVersion) ? "unknown" : targetVersion.Trim();
@@ -1499,6 +1519,16 @@ namespace FFXIVKoreanPatch.Main
         private string FormatPatchGeneratorFailure(string output)
         {
             if (!string.IsNullOrEmpty(output) &&
+                output.IndexOf("Global and Korean client versions do not match", StringComparison.OrdinalIgnoreCase) >= 0)
+            {
+                return
+                    "글로벌 서버 클라이언트와 한국 서버 클라이언트 버전이 달라서 패치를 중단했습니다." + Environment.NewLine + Environment.NewLine +
+                    "row-id fallback이 필요한 시트는 두 클라이언트 버전이 다르면 엉뚱한 행에 한글을 주입할 수 있습니다." + Environment.NewLine +
+                    "두 클라이언트를 같은 패치 버전으로 맞춘 뒤 다시 사전 점검과 패치를 실행해주세요." + Environment.NewLine + Environment.NewLine +
+                    Tail(output, 2000);
+            }
+
+            if (!string.IsNullOrEmpty(output) &&
                 (output.IndexOf("already contains", StringComparison.OrdinalIgnoreCase) >= 0 ||
                  output.IndexOf("already containes", StringComparison.OrdinalIgnoreCase) >= 0) &&
                 output.IndexOf("dat1 entries", StringComparison.OrdinalIgnoreCase) >= 0)
@@ -1524,6 +1554,51 @@ namespace FFXIVKoreanPatch.Main
             }
 
             return "FFXIVPatchGenerator 실행에 실패했어요." + Environment.NewLine + Tail(output, 4000);
+        }
+
+        private static void AddGeneratorSummaryDetails(StringBuilder processOutput, IList<KeyValuePair<string, string>> resultDetails)
+        {
+            if (processOutput == null || resultDetails == null)
+            {
+                return;
+            }
+
+            Dictionary<string, string> labels = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+            {
+                { "EXD pages patched", "EXD 패치 페이지" },
+                { "EXD rows patched", "EXD 패치 행" },
+                { "String-key rows", "문자열 키 매칭 행" },
+                { "Row-key rows", "row-id 매칭 행" },
+                { "Protected UI tokens", "보호된 UI glyph" },
+                { "RSV rows", "RSV 포함 행" },
+                { "RSV strings", "RSV 포함 문자열" },
+                { "Pages without mapping", "매핑 없음 페이지" },
+                { "Unsupported sheets", "미지원 시트" },
+                { "Font files patched", "폰트 패치 파일" },
+                { "Diagnostics", "진단 파일" }
+            };
+
+            using (StringReader reader = new StringReader(processOutput.ToString()))
+            {
+                string line;
+                while ((line = reader.ReadLine()) != null)
+                {
+                    string trimmed = line.Trim();
+                    int separator = trimmed.IndexOf(':');
+                    if (separator <= 0)
+                    {
+                        continue;
+                    }
+
+                    string key = trimmed.Substring(0, separator).Trim();
+                    string value = trimmed.Substring(separator + 1).Trim();
+                    string label;
+                    if (labels.TryGetValue(key, out label) && !string.IsNullOrEmpty(value))
+                    {
+                        resultDetails.Add(new KeyValuePair<string, string>(label, value));
+                    }
+                }
+            }
         }
 
         private static uint ReadUInt32LittleEndian(byte[] bytes, int offset)
@@ -2980,6 +3055,9 @@ namespace FFXIVKoreanPatch.Main
 #endif
                 lines.Add("[OK] 베이스 클라이언트 언어: " + targetLanguageDisplayName + " (" + targetLanguageCode + ")");
 
+                string globalVersion = string.Empty;
+                string koreaVersion = string.Empty;
+
                 if (string.IsNullOrEmpty(targetDir) || CheckTargetDir(targetDir) == null)
                 {
                     failures++;
@@ -2991,7 +3069,13 @@ namespace FFXIVKoreanPatch.Main
                     string versionPath = Path.Combine(targetDir, versionFileName);
                     if (File.Exists(versionPath))
                     {
-                        lines.Add("[OK] 글로벌 서버 버전: " + File.ReadAllText(versionPath).Trim());
+                        globalVersion = File.ReadAllText(versionPath).Trim();
+                        lines.Add("[OK] 글로벌 서버 버전: " + globalVersion);
+                    }
+                    else
+                    {
+                        failures++;
+                        lines.Add("[실패] 글로벌 서버 ffxivgame.ver를 찾을 수 없습니다.");
                     }
                 }
 
@@ -3006,8 +3090,27 @@ namespace FFXIVKoreanPatch.Main
                     string versionPath = Path.Combine(koreaSourceDir, versionFileName);
                     if (File.Exists(versionPath))
                     {
-                        lines.Add("[OK] 한국 서버 버전: " + File.ReadAllText(versionPath).Trim());
+                        koreaVersion = File.ReadAllText(versionPath).Trim();
+                        lines.Add("[OK] 한국 서버 버전: " + koreaVersion);
                     }
+                    else
+                    {
+                        failures++;
+                        lines.Add("[실패] 한국 서버 ffxivgame.ver를 찾을 수 없습니다.");
+                    }
+                }
+
+                if (!string.IsNullOrEmpty(globalVersion) &&
+                    !string.IsNullOrEmpty(koreaVersion) &&
+                    !string.Equals(globalVersion, koreaVersion, StringComparison.OrdinalIgnoreCase))
+                {
+#if TEST_BUILD
+                    warnings++;
+                    lines.Add("[주의] 글로벌/한국 서버 버전이 다릅니다. 테스트 빌드는 진행 가능하지만 row-id fallback 결과는 신뢰하면 안 됩니다.");
+#else
+                    failures++;
+                    lines.Add("[실패] 글로벌/한국 서버 버전이 다릅니다. row-id fallback 패치가 위험하므로 실제 패치를 차단합니다.");
+#endif
                 }
 
                 string patchGeneratorPath = FindPatchGeneratorPath();
@@ -3019,6 +3122,16 @@ namespace FFXIVKoreanPatch.Main
                 else
                 {
                     lines.Add("[OK] FFXIVPatchGenerator.exe: " + patchGeneratorPath);
+                    string patchPolicyPath = FindPatchPolicyPath(patchGeneratorPath);
+                    if (string.IsNullOrEmpty(patchPolicyPath))
+                    {
+                        lines.Add("[OK] 외부 JSON 패치 정책 없음, 기본 내장 정책 사용");
+                    }
+                    else
+                    {
+                        lines.Add("[OK] JSON 패치 정책: " + patchPolicyPath);
+                    }
+
                     string fontPackageDir = FindFontPackageDir(patchGeneratorPath);
                     if (string.IsNullOrEmpty(fontPackageDir))
                     {
@@ -3846,8 +3959,16 @@ namespace FFXIVKoreanPatch.Main
                     arguments += " --font-only";
                 }
 
+                string patchPolicyPath = FindPatchPolicyPath(patchGeneratorPath);
+                if (!string.IsNullOrEmpty(patchPolicyPath))
+                {
+                    arguments += " --policy " + QuoteArgument(patchPolicyPath);
+                    logLines.Add("Patch policy: " + patchPolicyPath);
+                }
+
 #if TEST_BUILD
                 arguments += " --allow-patched-global";
+                arguments += " --allow-version-mismatch";
                 if (buildFontPatch)
                 {
                     arguments += " --font-profile " + GetSelectedFontPatchProfile();
@@ -3983,6 +4104,7 @@ namespace FFXIVKoreanPatch.Main
                 resultDetails.Add(new KeyValuePair<string, string>("적용 위치", applyGameDir));
                 resultDetails.Add(new KeyValuePair<string, string>("Manifest", manifestPath));
                 resultDetails.Add(new KeyValuePair<string, string>("적용 파일", string.Join(", ", selectedPatchFiles)));
+                AddGeneratorSummaryDetails(processOutput, resultDetails);
                 if (!string.IsNullOrEmpty(backupDir))
                 {
                     resultDetails.Add(new KeyValuePair<string, string>("백업 위치", backupDir));
@@ -4013,7 +4135,7 @@ namespace FFXIVKoreanPatch.Main
             }
         }
 
-        private void DownloadWork(string[] patchFiles, BackgroundWorker worker, bool isRemove = false)
+        private void LegacyWorkerRestoreWork(bool isRemove)
         {
             List<string> logLines = new List<string>();
 
@@ -4024,7 +4146,7 @@ namespace FFXIVKoreanPatch.Main
 #else
                 if (!isRemove)
                 {
-                    throw new InvalidOperationException("다운로드 설치 모드는 더 이상 사용하지 않아요. 전체 한글 패치 또는 한글 폰트 패치 버튼은 로컬 생성기를 통해 처리됩니다.");
+                    throw new InvalidOperationException("기존 원격 설치 모드는 더 이상 사용하지 않아요. 전체 한글 패치 또는 한글 폰트 패치 버튼은 로컬 생성기를 통해 처리됩니다.");
                 }
 
                 string restoreSourceDir;
@@ -4084,7 +4206,7 @@ namespace FFXIVKoreanPatch.Main
 
         private void installWorker_DoWork(object sender, DoWorkEventArgs e)
         {
-            DownloadWork(textPatchFiles.Concat(fontPatchFiles).ToArray(), installWorker);
+            LegacyWorkerRestoreWork(false);
         }
 
         private void buildReleaseWorker_DoWork(object sender, DoWorkEventArgs e)
@@ -4099,12 +4221,12 @@ namespace FFXIVKoreanPatch.Main
 
         private void chatOnlyWorker_DoWork(object sender, DoWorkEventArgs e)
         {
-            DownloadWork(fontPatchFiles, chatOnlyWorker);
+            LegacyWorkerRestoreWork(false);
         }
 
         private void removeWorker_DoWork(object sender, DoWorkEventArgs e)
         {
-            DownloadWork(restoreFiles, removeWorker, true);
+            LegacyWorkerRestoreWork(true);
         }
 
         #endregion

@@ -45,6 +45,10 @@
   - 글로벌 클라이언트의 `root.exl`과 EXH 구조를 기준으로 대상 언어 EXD를 재생성합니다.
   - 한섭 `*_ko.exd`의 SeString 바이트를 글로벌 `*_ja.exd` 또는 `*_en.exd`에 반영합니다.
   - `Addon` sheet의 짧은 숫자/기호/UI glyph 토큰은 글로벌 원본을 유지해 파티 리스트 같은 UI 표시가 깨질 가능성을 줄입니다.
+  - 글로벌/한국 서버 `ffxivgame.ver`가 다르면 릴리즈 패치를 차단해 row-id fallback 오매핑 위험을 줄입니다.
+  - 선택적으로 `patch-policy.json`을 읽어 특정 sheet/row/column을 보존하거나 row/column 매핑을 보정합니다.
+  - `patch-diagnostics.tsv`와 선택형 CSV 진단 파일을 생성해 매핑 실패, RSV 잔존, Subrows 스킵 상태를 확인할 수 있습니다.
+  - 수정된 index/index2의 파일 세그먼트 Adler32 checksum을 다시 계산합니다.
   - 텍스트 패치 파일과 폰트 패치 파일을 생성합니다.
 
 ## 상세 문서
@@ -84,6 +88,7 @@
 orig.0a0000.win32.index
 orig.0a0000.win32.index2
 ffxivgame.ver
+patch-diagnostics.tsv
 manifest.json
 ```
 
@@ -96,6 +101,8 @@ manifest.json
 orig.000000.win32.index
 orig.000000.win32.index2
 ```
+
+`--diagnostic-csv <sheet>`를 사용하면 `diagnostic-csv\` 폴더에 해당 sheet의 row/column 비교 CSV가 추가로 생성됩니다.
 
 UI 실행 중 생성/관리되는 주요 폴더는 실행 파일이 있는 `Release` 폴더가 아니라 사용자별 영구 데이터 폴더에 저장됩니다.
 기본 위치는 `%LocalAppData%\FFXIVKoreanPatch`입니다.
@@ -183,11 +190,13 @@ Release\Test\
 - 출력 폴더가 원본 게임 폴더 내부면 중단합니다.
 - 글로벌 index/index2가 이미 dat1을 가리키는데 복구용 `orig.*.index/index2`가 없으면 기본적으로 중단합니다.
 - 복구용 `orig.*.index/index2` 자체가 dat1을 가리키는 오염 상태면 clean index로 인정하지 않습니다.
+- 글로벌/한국 서버 `ffxivgame.ver`가 다르면 릴리즈 빌드에서는 패치를 차단합니다.
 - 릴리즈 빌드에서는 사전 점검을 통과해야 실제 적용 버튼이 활성화됩니다.
 - 테스트 빌드에서는 실제 글로벌 클라이언트 적용 버튼이 막히고, 테스트용 `debug-apply` 경로만 사용합니다.
 
 ## 현재 제한
 
 - EXD Default variant 중심으로 처리합니다.
-- Subrows variant sheet는 아직 스킵합니다.
+- Subrows variant sheet는 아직 패치하지 않고 진단 파일에 `unsupported-subrows`로 기록합니다.
+- `patch-policy.json`은 위험 sheet/row/column을 보정하는 외부 정책이며, Subrows 자체를 패치 가능하게 만들지는 않습니다.
 - 실제 배포용 release 생성에는 clean index 또는 복구용 original index 확보가 필요합니다.
