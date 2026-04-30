@@ -78,6 +78,8 @@ UI가 release 폴더를 적용할 때는 별도로 `manifest.json`을 생성해 
 - string key가 안정적이지 않은 일부 sheet는 명시된 allowlist에 한해 row id 기반 fallback을 사용합니다.
 - `Addon` sheet에서는 한글이 없는 짧은 숫자/기호/SeString UI 토큰을 치환하지 않고 글로벌 원본 값을 유지합니다. 파티 리스트 번호처럼 별도 glyph 경로를 타는 UI 요소가 한국 서버 토큰으로 바뀌어 깨지는 상황을 줄이기 위한 보호 로직입니다.
 - `Addon` row `44`, `45`, `49`는 기본 내장 정책으로 글로벌 원본을 유지합니다. 이 row들은 글로벌 클라이언트에서 `h`, `m`, `s`처럼 좁은 영역용 시간 단위로 쓰이며, 한국어 `시간`, `분`, `초`로 바뀌면 핫바/아이콘 타이머 같은 UI에서 텍스트가 영역 밖으로 넘칠 수 있습니다.
+- `Addon` row `2338`, `6166`은 SeString 내부 길이값을 깨지 않도록 글로벌 영어 템플릿을 사용합니다. 버프/남은시간 UI에서 `시간`, `분`이 좁은 영역 밖으로 나가는 문제를 줄이기 위한 예외입니다.
+- `Addon` row `10952`는 파티 리스트 본인 표시 glyph가 한글 폰트 적용 후 `=`로 보이는 문제를 피하기 위해 ASCII `1`로 고정합니다.
 - `ExcelVariant.Default` sheet만 처리합니다.
 - `ExcelVariant.Subrows` sheet는 아직 스킵하고 `patch-diagnostics.tsv`에 `unsupported-subrows`로 기록합니다.
 
@@ -89,7 +91,7 @@ UI가 release 폴더를 적용할 때는 별도로 `manifest.json`을 생성해 
 
 선택적으로 `--policy <json>` 또는 실행 파일 옆 `patch-policy.json`으로 외부 보정 정책을 적용할 수 있습니다. 지원하는 항목은 다음과 같습니다.
 
-외부 정책 파일이 없어도 일부 안전 정책은 기본 내장됩니다. 현재는 `Addon` row `44`, `45`, `49`를 글로벌 원본으로 유지해 좁은 UI 시간 단위가 `1시간`, `32분`처럼 넘치는 상황을 줄입니다.
+외부 정책 파일이 없어도 일부 안전 정책은 기본 내장됩니다. 현재는 `Addon` row `44`, `45`, `49`를 글로벌 원본으로 유지하고, row `2338`, `6166`은 글로벌 영어 시간 템플릿을 사용해 좁은 UI 시간 단위가 `1시간`, `32분`처럼 넘치는 상황을 줄입니다. row `10952`는 파티 리스트 본인 표시 glyph 보정용으로 ASCII `1`을 사용합니다.
 
 - `delete_files`: sheet 전체 스킵
 - `row_key_fallback_files`: string key가 없는 sheet의 row-id fallback 허용. `*`, `?` wildcard를 사용할 수 있습니다.
@@ -137,7 +139,12 @@ UI 텍스처 패치는 `060000` UI 패키지를 대상으로 하며 새 `060000.
 현재 포함되는 대상:
 
 - `ui/uld/PartyListTargetBase.tex`: 파티 리스트에서 본인을 표시하는 번호/glyph 텍스처 차이를 보정합니다.
-- `ScreenImage` 언어별 이미지: `exd/screenimage.exh`와 `screenimage_*.exd`에서 `Lang` 플래그가 켜진 이미지 ID를 읽고, 글로벌 대상 언어 폴더(`ja` 또는 `en`)의 `ui/icon/...` 파일을 한국 서버 `ko` 이미지로 교체합니다. 지역/컨텐츠 입장 시 표시되는 타이틀처럼 텍스트가 아니라 이미지로 렌더링되는 요소를 보정하기 위한 처리입니다.
+- `ScreenImage` 언어별 이미지: `exd/screenimage.exh`와 `screenimage_*.exd`에서 `Lang` 플래그가 켜진 이미지 ID를 읽고, 글로벌 대상 언어 폴더(`ja` 또는 `en`)의 `ui/icon/...` 파일을 한국 서버 `ko` 이미지로 교체합니다.
+- `CutScreenImage` 언어별 이미지: 지역 이동, 던전/컨텐츠 진입, 컷신 전환에서 쓰이는 타이틀 이미지 ID를 읽어 같은 방식으로 한국 서버 `ko` 이미지를 복사합니다.
+- `TerritoryType` 언어별 이미지: 필드 지역 진입 시 표시되는 지역 타이틀 이미지 ID를 읽어, 저지/중부 라노시아처럼 `PlaceName` 문자열과 별도로 렌더링되는 이미지형 지역명을 한국 서버 `ko` 이미지로 보정합니다.
+- `DynamicEventScreenImage`, `EventImage`, `TradeScreenImage`, `LoadingImage`: 언어 폴더가 없는 이미지형 UI 리소스는 글로벌과 한국 서버의 동일 경로 파일을 비교하고, 실제 바이트가 다른 경우에만 한국 서버 리소스로 교체합니다.
+
+이 처리는 지역/컨텐츠 입장 시 표시되는 타이틀처럼 텍스트가 아니라 이미지로 렌더링되는 요소를 보정하기 위한 처리입니다.
 
 ## 안전장치
 

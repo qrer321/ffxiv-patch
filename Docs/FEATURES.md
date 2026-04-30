@@ -150,6 +150,8 @@
 - `row_key_fallback_files` 정책으로 row id fallback 대상 sheet 외부 확장
 - `Addon` sheet의 짧은 숫자/기호/SeString UI 토큰 보호
 - `Addon` row `44`, `45`, `49` 기본 보호로 좁은 UI의 `h/m/s` 시간 단위가 `시간/분/초`로 늘어나 영역을 넘치는 문제 완화
+- `Addon` row `2338`, `6166`은 글로벌 영어 시간 템플릿을 사용해 버프/남은시간 UI의 `시간/분` overflow 완화
+- `Addon` row `10952`는 파티 리스트 본인 표시 glyph가 `=`로 보이는 문제를 피하기 위해 ASCII `1`로 보정
 - `patch-policy.json` 기반 sheet/row/column 보존과 row/column remap
 - `patch-diagnostics.tsv` 생성
 - `--diagnostic-csv` 지정 sheet의 row/column 비교 CSV 생성
@@ -199,6 +201,9 @@
 - 복구용 `orig.060000.win32.index2` 생성
 - `ui/uld/PartyListTargetBase.tex`를 한국 서버 텍스처로 교체해 파티 리스트 본인 번호/glyph 표시 차이 보정
 - `ScreenImage` sheet의 `Lang` 플래그가 켜진 이미지 ID를 읽어 글로벌 대상 언어 폴더(`ja`/`en`)의 `ui/icon/...` 텍스처를 한국 서버 `ko` 텍스처로 교체
+- `CutScreenImage` sheet의 타이틀 이미지 ID를 읽어 지역 이동, 던전/컨텐츠 진입, 컷신 전환에 쓰이는 언어별 이미지 보정
+- `TerritoryType` sheet의 지역 타이틀 이미지 ID를 읽어 필드 지역 진입 시 표시되는 이미지형 지역명 보정
+- `DynamicEventScreenImage`, `EventImage`, `TradeScreenImage`, `LoadingImage`는 언어 폴더가 없는 동일 경로 리소스를 비교하고 실제 파일이 다른 경우에만 한국 서버 리소스로 교체
 - 지역/컨텐츠 입장 시 표시되는 타이틀 이미지처럼 텍스트가 아니라 이미지로 렌더링되는 UI 요소 보정
 - `--base-ui-index`, `--base-ui-index2`로 clean `060000` index/index2 지정
 - `--skip-ui-texture-fix`로 UI 텍스처 패치 생성 제외

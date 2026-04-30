@@ -438,7 +438,8 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
 
                     if (replacement != null && replacement.Length > 0)
                     {
-                        if (ShouldKeepOriginalForUiGlyph(patchPolicy, original, replacement))
+                        if (!sheetPolicy.GlobalEnglishRows.Contains(targetRow.RowId) &&
+                            ShouldKeepOriginalForUiGlyph(patchPolicy, original, replacement))
                         {
                             protectedUiStrings++;
                         }

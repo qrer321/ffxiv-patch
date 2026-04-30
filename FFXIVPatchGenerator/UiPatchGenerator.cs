@@ -12,16 +12,64 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
         private const string Dat0FileName = "060000.win32.dat0";
         private const string Dat4FileName = "060000.win32.dat4";
         private const string ExcelIndexFileName = "0a0000.win32.index";
-        private const string ScreenImageExhPath = "exd/screenimage.exh";
-        private const string ScreenImageExdPrefix = "exd/screenimage_";
         private const byte PatchDatId = 4;
         private const uint PatchDataFileCount = PatchDatId + 1u;
         private const string OrigIndexFileName = "orig.060000.win32.index";
         private const string OrigIndex2FileName = "orig.060000.win32.index2";
         private const string PartyListTargetBaseTexPath = "ui/uld/PartyListTargetBase.tex";
-        private const ushort ScreenImageIconIdOffset = 0;
-        private const ushort ScreenImageLangFlagOffset = 11;
+        // ScreenImage.Lang marks image IDs that are stored under language folders such as ui/icon/120000/ja.
         private const int ScreenImageLangFlagBit = 0;
+        private static readonly IconSheetSpec ScreenImageSpec = new IconSheetSpec(
+            "screenimage",
+            "ScreenImage",
+            true,
+            true,
+            11,
+            new IconColumnSpec(7, 0),
+            new IconColumnSpec(6, 4));
+        private static readonly IconSheetSpec CutScreenImageSpec = new IconSheetSpec(
+            "cutscreenimage",
+            "CutScreenImage",
+            true,
+            false,
+            0,
+            new IconColumnSpec(6, 0),
+            new IconColumnSpec(6, 4));
+        private static readonly IconSheetSpec DynamicEventScreenImageSpec = new IconSheetSpec(
+            "dynamiceventscreenimage",
+            "DynamicEventScreenImage",
+            false,
+            false,
+            0,
+            new IconColumnSpec(7, 0),
+            new IconColumnSpec(7, 4),
+            new IconColumnSpec(7, 8));
+        private static readonly IconSheetSpec EventImageSpec = new IconSheetSpec(
+            "eventimage",
+            "EventImage",
+            false,
+            false,
+            0,
+            new IconColumnSpec(6, 0));
+        private static readonly IconSheetSpec TradeScreenImageSpec = new IconSheetSpec(
+            "tradescreenimage",
+            "TradeScreenImage",
+            false,
+            false,
+            0,
+            new IconColumnSpec(7, 0),
+            new IconColumnSpec(7, 4),
+            new IconColumnSpec(7, 8),
+            new IconColumnSpec(7, 12));
+        private static readonly IconSheetSpec TerritoryTypeSpec = new IconSheetSpec(
+            "territorytype",
+            "TerritoryType",
+            true,
+            false,
+            0,
+            // TerritoryType points at localized zone title images used during area transitions.
+            new IconColumnSpec(6, 12),
+            new IconColumnSpec(6, 16));
 
         private readonly BuildOptions _options;
         private readonly BuildReport _report;
@@ -79,6 +127,7 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
                 mutableIndex2.EnsureDataFileCount(PatchDataFileCount);
 
                 int patched = 0;
+                HashSet<string> copiedTargets = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
                 patched += CopyRequiredUiTexture(
                     koreaUiArchive,
                     mutableIndex,
@@ -87,13 +136,68 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
                     PartyListTargetBaseTexPath,
                     PartyListTargetBaseTexPath,
                     "Korean PartyList target texture");
-                patched += CopyLocalizedScreenImages(
+                patched += CopyIconSheetImages(
+                    ScreenImageSpec,
                     globalExcelArchive,
                     globalUiArchive,
                     koreaUiArchive,
                     mutableIndex,
                     mutableIndex2,
-                    datWriter);
+                    datWriter,
+                    copiedTargets);
+                patched += CopyIconSheetImages(
+                    CutScreenImageSpec,
+                    globalExcelArchive,
+                    globalUiArchive,
+                    koreaUiArchive,
+                    mutableIndex,
+                    mutableIndex2,
+                    datWriter,
+                    copiedTargets);
+                patched += CopyIconSheetImages(
+                    DynamicEventScreenImageSpec,
+                    globalExcelArchive,
+                    globalUiArchive,
+                    koreaUiArchive,
+                    mutableIndex,
+                    mutableIndex2,
+                    datWriter,
+                    copiedTargets);
+                patched += CopyIconSheetImages(
+                    EventImageSpec,
+                    globalExcelArchive,
+                    globalUiArchive,
+                    koreaUiArchive,
+                    mutableIndex,
+                    mutableIndex2,
+                    datWriter,
+                    copiedTargets);
+                patched += CopyIconSheetImages(
+                    TradeScreenImageSpec,
+                    globalExcelArchive,
+                    globalUiArchive,
+                    koreaUiArchive,
+                    mutableIndex,
+                    mutableIndex2,
+                    datWriter,
+                    copiedTargets);
+                patched += CopyIconSheetImages(
+                    TerritoryTypeSpec,
+                    globalExcelArchive,
+                    globalUiArchive,
+                    koreaUiArchive,
+                    mutableIndex,
+                    mutableIndex2,
+                    datWriter,
+                    copiedTargets);
+                patched += CopyLoadingImages(
+                    globalExcelArchive,
+                    globalUiArchive,
+                    koreaUiArchive,
+                    mutableIndex,
+                    mutableIndex2,
+                    datWriter,
+                    copiedTargets);
 
                 mutableIndex.Save();
                 mutableIndex2.Save();
@@ -140,45 +244,41 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
             return 1;
         }
 
-        private int CopyLocalizedScreenImages(
+        private int CopyIconSheetImages(
+            IconSheetSpec spec,
             SqPackArchive globalExcelArchive,
             SqPackArchive globalUiArchive,
             SqPackArchive koreaUiArchive,
             SqPackIndexFile mutableIndex,
             SqPackIndex2File mutableIndex2,
-            SqPackDatWriter datWriter)
+            SqPackDatWriter datWriter,
+            HashSet<string> copiedTargets)
         {
             byte[] headerBytes;
-            if (!globalExcelArchive.TryReadFile(ScreenImageExhPath, out headerBytes))
+            string exhPath = "exd/" + spec.SheetName + ".exh";
+            if (!globalExcelArchive.TryReadFile(exhPath, out headerBytes))
             {
-                _report.Warnings.Add("ScreenImage EXH was not found. Area/title image localization was skipped.");
+                _report.Warnings.Add(spec.DisplayName + " EXH was not found. UI image localization was skipped.");
                 return 0;
             }
 
             ExcelHeader header = ExcelHeader.Parse(headerBytes);
-            if (header.Variant != ExcelVariant.Default ||
-                !HasColumn(header, 7, ScreenImageIconIdOffset) ||
-                !HasColumn(header, 25, ScreenImageLangFlagOffset))
+            if (header.Variant != ExcelVariant.Default || !SpecColumnsExist(header, spec))
             {
-                _report.Warnings.Add("ScreenImage schema was not recognized. Area/title image localization was skipped.");
+                _report.Warnings.Add(spec.DisplayName + " schema was not recognized. UI image localization was skipped.");
                 return 0;
             }
 
-            HashSet<string> copiedTargets = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-            int patched = 0;
-            int candidates = 0;
-            int missingGlobalTargets = 0;
-            int missingKoreanSources = 0;
-            int identical = 0;
+            IconPatchStats stats = new IconPatchStats();
 
             for (int pageIndex = 0; pageIndex < header.Pages.Count; pageIndex++)
             {
                 ExcelPageDefinition page = header.Pages[pageIndex];
-                string exdPath = ScreenImageExdPrefix + page.StartId.ToString() + ".exd";
+                string exdPath = "exd/" + spec.SheetName + "_" + page.StartId.ToString() + ".exd";
                 byte[] exdBytes;
                 if (!globalExcelArchive.TryReadFile(exdPath, out exdBytes))
                 {
-                    _report.Warnings.Add("ScreenImage page was not found and was skipped: " + exdPath);
+                    _report.Warnings.Add(spec.DisplayName + " page was not found and was skipped: " + exdPath);
                     continue;
                 }
 
@@ -186,108 +286,265 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
                 for (int rowIndex = 0; rowIndex < dataFile.Rows.Count; rowIndex++)
                 {
                     ExcelDataRow row = dataFile.Rows[rowIndex];
-                    if (!ReadPackedBool(dataFile, row, ScreenImageLangFlagOffset, ScreenImageLangFlagBit))
+                    if (spec.RequiresLanguageFlag &&
+                        !ReadPackedBool(dataFile, row, spec.LanguageFlagOffset, ScreenImageLangFlagBit))
                     {
                         continue;
                     }
 
-                    uint iconId = ReadUInt32(dataFile, row, ScreenImageIconIdOffset);
-                    if (iconId == 0)
+                    for (int columnIndex = 0; columnIndex < spec.IconColumns.Length; columnIndex++)
                     {
-                        continue;
-                    }
+                        uint iconId = ReadIconId(dataFile, row, spec.IconColumns[columnIndex]);
+                        if (iconId == 0)
+                        {
+                            continue;
+                        }
 
-                    patched += CopyLocalizedScreenImageVariant(
-                        iconId,
-                        ".tex",
-                        copiedTargets,
-                        globalUiArchive,
-                        koreaUiArchive,
-                        mutableIndex,
-                        mutableIndex2,
-                        datWriter,
-                        ref candidates,
-                        ref missingGlobalTargets,
-                        ref missingKoreanSources,
-                        ref identical);
-                    patched += CopyLocalizedScreenImageVariant(
-                        iconId,
-                        "_hr1.tex",
-                        copiedTargets,
-                        globalUiArchive,
-                        koreaUiArchive,
-                        mutableIndex,
-                        mutableIndex2,
-                        datWriter,
-                        ref candidates,
-                        ref missingGlobalTargets,
-                        ref missingKoreanSources,
-                        ref identical);
+                        CopyIconVariants(
+                            iconId,
+                            spec.UsesLanguageFolders,
+                            copiedTargets,
+                            globalUiArchive,
+                            koreaUiArchive,
+                            mutableIndex,
+                            mutableIndex2,
+                            datWriter,
+                            stats);
+                    }
                 }
             }
 
             Console.WriteLine(
-                "Localized ScreenImage textures patched: {0} (candidates={1}, identical={2}, missingGlobal={3}, missingKorea={4})",
-                patched,
-                candidates,
-                identical,
-                missingGlobalTargets,
-                missingKoreanSources);
+                "{0} textures patched: {1} (candidates={2}, identical={3}, missingGlobal={4}, missingKorea={5})",
+                spec.DisplayName,
+                stats.Patched,
+                stats.Candidates,
+                stats.Identical,
+                stats.MissingGlobalTargets,
+                stats.MissingKoreanSources);
 
-            if (patched == 0)
+            if (spec.DisplayName == "ScreenImage" && stats.Patched == 0)
             {
                 _report.Warnings.Add("No localized ScreenImage textures were patched. Check target/source language folders.");
             }
 
-            return patched;
+            return stats.Patched;
         }
 
-        private int CopyLocalizedScreenImageVariant(
+        private int CopyLoadingImages(
+            SqPackArchive globalExcelArchive,
+            SqPackArchive globalUiArchive,
+            SqPackArchive koreaUiArchive,
+            SqPackIndexFile mutableIndex,
+            SqPackIndex2File mutableIndex2,
+            SqPackDatWriter datWriter,
+            HashSet<string> copiedTargets)
+        {
+            const string sheetName = "loadingimage";
+            const string displayName = "LoadingImage";
+            byte[] headerBytes;
+            if (!globalExcelArchive.TryReadFile("exd/" + sheetName + ".exh", out headerBytes))
+            {
+                _report.Warnings.Add(displayName + " EXH was not found. Loading image localization was skipped.");
+                return 0;
+            }
+
+            ExcelHeader header = ExcelHeader.Parse(headerBytes);
+            if (header.Variant != ExcelVariant.Default || !HasColumn(header, 0, 0))
+            {
+                _report.Warnings.Add(displayName + " schema was not recognized. Loading image localization was skipped.");
+                return 0;
+            }
+
+            IconPatchStats stats = new IconPatchStats();
+            for (int pageIndex = 0; pageIndex < header.Pages.Count; pageIndex++)
+            {
+                ExcelPageDefinition page = header.Pages[pageIndex];
+                string exdPath = "exd/" + sheetName + "_" + page.StartId.ToString() + ".exd";
+                byte[] exdBytes;
+                if (!globalExcelArchive.TryReadFile(exdPath, out exdBytes))
+                {
+                    _report.Warnings.Add(displayName + " page was not found and was skipped: " + exdPath);
+                    continue;
+                }
+
+                ExcelDataFile dataFile = ExcelDataFile.Parse(exdBytes);
+                for (int rowIndex = 0; rowIndex < dataFile.Rows.Count; rowIndex++)
+                {
+                    ExcelDataRow row = dataFile.Rows[rowIndex];
+                    byte[] fileNameBytes = dataFile.GetStringBytesByColumnOffset(row, header, 0);
+                    if (fileNameBytes == null || fileNameBytes.Length == 0)
+                    {
+                        continue;
+                    }
+
+                    string fileName = System.Text.Encoding.UTF8.GetString(fileNameBytes);
+                    if (fileName.Length == 0 || fileName.IndexOf('/') >= 0 || fileName.IndexOf('\\') >= 0)
+                    {
+                        continue;
+                    }
+
+                    CopySamePathTextureVariant(
+                        "ui/loadingimage/" + fileName + ".tex",
+                        copiedTargets,
+                        globalUiArchive,
+                        koreaUiArchive,
+                        mutableIndex,
+                        mutableIndex2,
+                        datWriter,
+                        stats);
+                    CopySamePathTextureVariant(
+                        "ui/loadingimage/" + fileName + "_hr1.tex",
+                        copiedTargets,
+                        globalUiArchive,
+                        koreaUiArchive,
+                        mutableIndex,
+                        mutableIndex2,
+                        datWriter,
+                        stats);
+                }
+            }
+
+            Console.WriteLine(
+                "{0} textures patched: {1} (candidates={2}, identical={3}, missingGlobal={4}, missingKorea={5})",
+                displayName,
+                stats.Patched,
+                stats.Candidates,
+                stats.Identical,
+                stats.MissingGlobalTargets,
+                stats.MissingKoreanSources);
+
+            return stats.Patched;
+        }
+
+        private void CopyIconVariants(
             uint iconId,
-            string suffix,
+            bool usesLanguageFolders,
             HashSet<string> copiedTargets,
             SqPackArchive globalUiArchive,
             SqPackArchive koreaUiArchive,
             SqPackIndexFile mutableIndex,
             SqPackIndex2File mutableIndex2,
             SqPackDatWriter datWriter,
-            ref int candidates,
-            ref int missingGlobalTargets,
-            ref int missingKoreanSources,
-            ref int identical)
+            IconPatchStats stats)
         {
-            string targetPath = BuildLocalizedIconPath(iconId, _options.TargetLanguage, suffix);
+            CopyIconVariant(
+                iconId,
+                ".tex",
+                usesLanguageFolders,
+                copiedTargets,
+                globalUiArchive,
+                koreaUiArchive,
+                mutableIndex,
+                mutableIndex2,
+                datWriter,
+                stats);
+            CopyIconVariant(
+                iconId,
+                "_hr1.tex",
+                usesLanguageFolders,
+                copiedTargets,
+                globalUiArchive,
+                koreaUiArchive,
+                mutableIndex,
+                mutableIndex2,
+                datWriter,
+                stats);
+        }
+
+        private void CopyIconVariant(
+            uint iconId,
+            string suffix,
+            bool usesLanguageFolders,
+            HashSet<string> copiedTargets,
+            SqPackArchive globalUiArchive,
+            SqPackArchive koreaUiArchive,
+            SqPackIndexFile mutableIndex,
+            SqPackIndex2File mutableIndex2,
+            SqPackDatWriter datWriter,
+            IconPatchStats stats)
+        {
+            string targetPath = usesLanguageFolders
+                ? BuildLocalizedIconPath(iconId, _options.TargetLanguage, suffix)
+                : BuildIconPath(iconId, suffix);
+            string sourcePath = usesLanguageFolders
+                ? BuildLocalizedIconPath(iconId, _options.SourceLanguage, suffix)
+                : targetPath;
+            CopyTextureVariant(
+                sourcePath,
+                targetPath,
+                copiedTargets,
+                globalUiArchive,
+                koreaUiArchive,
+                mutableIndex,
+                mutableIndex2,
+                datWriter,
+                stats);
+        }
+
+        private void CopySamePathTextureVariant(
+            string path,
+            HashSet<string> copiedTargets,
+            SqPackArchive globalUiArchive,
+            SqPackArchive koreaUiArchive,
+            SqPackIndexFile mutableIndex,
+            SqPackIndex2File mutableIndex2,
+            SqPackDatWriter datWriter,
+            IconPatchStats stats)
+        {
+            CopyTextureVariant(
+                path,
+                path,
+                copiedTargets,
+                globalUiArchive,
+                koreaUiArchive,
+                mutableIndex,
+                mutableIndex2,
+                datWriter,
+                stats);
+        }
+
+        private void CopyTextureVariant(
+            string sourcePath,
+            string targetPath,
+            HashSet<string> copiedTargets,
+            SqPackArchive globalUiArchive,
+            SqPackArchive koreaUiArchive,
+            SqPackIndexFile mutableIndex,
+            SqPackIndex2File mutableIndex2,
+            SqPackDatWriter datWriter,
+            IconPatchStats stats)
+        {
             if (!copiedTargets.Add(targetPath))
             {
-                return 0;
+                return;
             }
 
-            candidates++;
+            stats.Candidates++;
             byte[] globalPacked;
             if (!globalUiArchive.TryReadPackedFile(targetPath, out globalPacked))
             {
-                missingGlobalTargets++;
-                return 0;
+                stats.MissingGlobalTargets++;
+                return;
             }
 
-            string sourcePath = BuildLocalizedIconPath(iconId, _options.SourceLanguage, suffix);
             byte[] koreaPacked;
             if (!koreaUiArchive.TryReadPackedFile(sourcePath, out koreaPacked))
             {
-                missingKoreanSources++;
-                return 0;
+                stats.MissingKoreanSources++;
+                return;
             }
 
             if (BytesEqual(globalPacked, koreaPacked))
             {
-                identical++;
-                return 0;
+                stats.Identical++;
+                return;
             }
 
             long offset = datWriter.WritePackedFile(koreaPacked);
             mutableIndex.SetFileOffset(targetPath, PatchDatId, offset);
             mutableIndex2.SetFileOffset(targetPath, PatchDatId, offset);
-            return 1;
+            stats.Patched++;
         }
 
         private static string BuildLocalizedIconPath(uint iconId, string language, string suffix)
@@ -301,6 +558,29 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
                 suffix);
         }
 
+        private static string BuildIconPath(uint iconId, string suffix)
+        {
+            uint folder = iconId / 1000u * 1000u;
+            return string.Format(
+                "ui/icon/{0:D6}/{1:D6}{2}",
+                folder,
+                iconId,
+                suffix);
+        }
+
+        private static bool SpecColumnsExist(ExcelHeader header, IconSheetSpec spec)
+        {
+            for (int i = 0; i < spec.IconColumns.Length; i++)
+            {
+                if (!HasColumn(header, spec.IconColumns[i].Type, spec.IconColumns[i].Offset))
+                {
+                    return false;
+                }
+            }
+
+            return !spec.RequiresLanguageFlag || HasColumn(header, 25, spec.LanguageFlagOffset);
+        }
+
         private static bool HasColumn(ExcelHeader header, ushort type, ushort offset)
         {
             for (int i = 0; i < header.Columns.Count; i++)
@@ -312,6 +592,22 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
             }
 
             return false;
+        }
+
+        private static uint ReadIconId(ExcelDataFile file, ExcelDataRow row, IconColumnSpec column)
+        {
+            if (column.Type == 7)
+            {
+                return ReadUInt32(file, row, column.Offset);
+            }
+
+            if (column.Type == 6)
+            {
+                int value = unchecked((int)ReadUInt32(file, row, column.Offset));
+                return value > 0 ? (uint)value : 0;
+            }
+
+            throw new InvalidDataException("Unsupported icon ID column type: " + column.Type);
         }
 
         private static uint ReadUInt32(ExcelDataFile file, ExcelDataRow row, ushort columnOffset)
@@ -334,7 +630,7 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
             int fieldOffset = rowDataOffset + columnOffset;
             if (fieldOffset < rowDataOffset || fieldOffset + size > rowEnd)
             {
-                throw new InvalidDataException("ScreenImage field is outside row body.");
+                throw new InvalidDataException("UI image field is outside row body.");
             }
 
             return fieldOffset;
@@ -446,6 +742,53 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
                 int count;
                 return counts.TryGetValue(PatchDatId, out count) ? count : 0;
             }
+        }
+
+        private sealed class IconSheetSpec
+        {
+            public readonly string SheetName;
+            public readonly string DisplayName;
+            public readonly bool UsesLanguageFolders;
+            public readonly bool RequiresLanguageFlag;
+            public readonly ushort LanguageFlagOffset;
+            public readonly IconColumnSpec[] IconColumns;
+
+            public IconSheetSpec(
+                string sheetName,
+                string displayName,
+                bool usesLanguageFolders,
+                bool requiresLanguageFlag,
+                ushort languageFlagOffset,
+                params IconColumnSpec[] iconColumns)
+            {
+                SheetName = sheetName;
+                DisplayName = displayName;
+                UsesLanguageFolders = usesLanguageFolders;
+                RequiresLanguageFlag = requiresLanguageFlag;
+                LanguageFlagOffset = languageFlagOffset;
+                IconColumns = iconColumns;
+            }
+        }
+
+        private struct IconColumnSpec
+        {
+            public readonly ushort Type;
+            public readonly ushort Offset;
+
+            public IconColumnSpec(ushort type, ushort offset)
+            {
+                Type = type;
+                Offset = offset;
+            }
+        }
+
+        private sealed class IconPatchStats
+        {
+            public int Patched;
+            public int Candidates;
+            public int MissingGlobalTargets;
+            public int MissingKoreanSources;
+            public int Identical;
         }
     }
 }

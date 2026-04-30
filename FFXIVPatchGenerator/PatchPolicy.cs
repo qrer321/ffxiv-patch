@@ -12,6 +12,7 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
     {
         public static readonly PatchPolicy Empty = new PatchPolicy();
         private static readonly uint[] CompactTimeUnitAddonRows = new uint[] { 44, 45, 49 };
+        private static readonly uint[] EnglishCompactDurationAddonRows = new uint[] { 2338, 6166 };
 
         private readonly HashSet<string> _deleteFiles = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         private readonly Dictionary<string, PatchSheetPolicy> _sheets = new Dictionary<string, PatchSheetPolicy>(StringComparer.OrdinalIgnoreCase);
@@ -60,6 +61,19 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
             for (int i = 0; i < CompactTimeUnitAddonRows.Length; i++)
             {
                 addonPolicy.KeepRows.Add(CompactTimeUnitAddonRows[i]);
+            }
+
+            // Addon row 10952 is the party-list self marker. It is a private glyph
+            // token in the original client, but Korean font replacement can render it
+            // as "=". Use plain ASCII here to avoid touching global font glyph tables.
+            addonPolicy.SetRowColumnRemap(10952, 0, ColumnRemap.Literal("1"));
+
+            // Some short duration templates embed h/m labels inside SeString branches.
+            // Rewriting the Korean bytes in-place would require recalculating SeString
+            // branch lengths, so use the global English templates for these rows.
+            for (int i = 0; i < EnglishCompactDurationAddonRows.Length; i++)
+            {
+                addonPolicy.GlobalEnglishRows.Add(EnglishCompactDurationAddonRows[i]);
             }
 
             return policy;
@@ -380,6 +394,7 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
         public readonly Dictionary<uint, uint> SourceRowOverrides = new Dictionary<uint, uint>();
         public readonly Dictionary<ushort, ColumnRemap> ColumnRemaps = new Dictionary<ushort, ColumnRemap>();
         public readonly Dictionary<ushort, Dictionary<uint, ColumnRemap>> RowColumnRemaps = new Dictionary<ushort, Dictionary<uint, ColumnRemap>>();
+        public readonly HashSet<uint> GlobalEnglishRows = new HashSet<uint>();
 
         private readonly bool _readOnly;
 
@@ -395,6 +410,11 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
         public bool HasSourceRowOverrides
         {
             get { return SourceRowOverrides.Count > 0; }
+        }
+
+        public bool HasGlobalEnglishRows
+        {
+            get { return GlobalEnglishRows.Count > 0; }
         }
 
         public bool IsReadOnly
@@ -428,6 +448,23 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
             }
 
             return ColumnRemap.Default;
+        }
+
+        public void SetRowColumnRemap(uint rowId, ushort columnOffset, ColumnRemap remap)
+        {
+            if (_readOnly)
+            {
+                throw new InvalidOperationException("Cannot mutate read-only patch policy.");
+            }
+
+            Dictionary<uint, ColumnRemap> remapsByRow;
+            if (!RowColumnRemaps.TryGetValue(columnOffset, out remapsByRow))
+            {
+                remapsByRow = new Dictionary<uint, ColumnRemap>();
+                RowColumnRemaps[columnOffset] = remapsByRow;
+            }
+
+            remapsByRow[rowId] = remap;
         }
     }
 

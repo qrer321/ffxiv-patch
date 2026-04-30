@@ -576,7 +576,11 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
                 return;
             }
 
-            ExdSourceMaps sourceMaps = ExdStringPatcher.BuildSourceMaps(sourceExds, sourceHeader, allowRowKeyFallback || sheetPolicy.HasSourceRowOverrides);
+            ExdSourceMaps sourceMaps = ExdStringPatcher.BuildSourceMaps(
+                sourceExds,
+                sourceHeader,
+                allowRowKeyFallback || sheetPolicy.HasSourceRowOverrides || sheetPolicy.HasGlobalEnglishRows);
+            ApplyGlobalEnglishSourceRows(sheetName, globalHeader, globalArchive, sheetPolicy, sourceMaps, diagnostics);
             StringPatchPolicy stringPatchPolicy = new StringPatchPolicy(IsAddonSheet(sheetName), sheetPolicy);
 
             for (int i = 0; i < globalHeader.Pages.Count; i++)
@@ -682,6 +686,69 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
             }
 
             return sourceExds;
+        }
+
+        private void ApplyGlobalEnglishSourceRows(
+            string sheetName,
+            ExcelHeader globalHeader,
+            SqPackArchive globalArchive,
+            PatchSheetPolicy sheetPolicy,
+            ExdSourceMaps sourceMaps,
+            StreamWriter diagnostics)
+        {
+            if (!sheetPolicy.HasGlobalEnglishRows)
+            {
+                return;
+            }
+
+            byte englishLanguageId = LanguageCodes.ToId("en");
+            if (!globalHeader.HasLanguage(englishLanguageId))
+            {
+                AddLimitedWarning("Global English EXD is not available for " + sheetName + ". Compact UI fallback rows were skipped.");
+                return;
+            }
+
+            HashSet<uint> pendingRows = new HashSet<uint>(sheetPolicy.GlobalEnglishRows);
+            for (int i = 0; i < globalHeader.Pages.Count && pendingRows.Count > 0; i++)
+            {
+                ExcelPageDefinition page = globalHeader.Pages[i];
+                string englishPath = BuildExdPath(sheetName, page.StartId, "en");
+                byte[] englishExdBytes;
+                if (!globalArchive.TryReadFile(englishPath, out englishExdBytes))
+                {
+                    WriteDiagnostic(diagnostics, sheetName, page.StartId.ToString(), "missing-global-english-page", 0, 0, 0, 0, 0, englishPath);
+                    continue;
+                }
+
+                ExcelDataFile englishFile;
+                try
+                {
+                    englishFile = ExcelDataFile.Parse(englishExdBytes);
+                }
+                catch (Exception exception)
+                {
+                    AddLimitedWarning("Invalid global English EXD: " + englishPath);
+                    WriteDiagnostic(diagnostics, sheetName, page.StartId.ToString(), "invalid-global-english-page", 0, 0, 0, 0, 0, exception.Message);
+                    continue;
+                }
+
+                for (int rowIndex = 0; rowIndex < englishFile.Rows.Count && pendingRows.Count > 0; rowIndex++)
+                {
+                    ExcelDataRow row = englishFile.Rows[rowIndex];
+                    if (!pendingRows.Contains(row.RowId))
+                    {
+                        continue;
+                    }
+
+                    sourceMaps.RowKeyRows[row.RowId] = new SourceRowRef(englishFile, row);
+                    pendingRows.Remove(row.RowId);
+                }
+            }
+
+            if (pendingRows.Count > 0)
+            {
+                AddLimitedWarning("Some global English compact UI rows were not found for " + sheetName + ".");
+            }
         }
 
         private static string BuildExdPath(string sheetName, uint startId, string languageCode)

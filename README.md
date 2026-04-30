@@ -45,6 +45,7 @@
   - 글로벌 클라이언트의 `root.exl`과 EXH 구조를 기준으로 대상 언어 EXD를 재생성합니다.
   - 한섭 `*_ko.exd`의 SeString 바이트를 글로벌 `*_ja.exd` 또는 `*_en.exd`에 반영합니다.
   - `Addon` sheet의 짧은 숫자/기호/UI glyph 토큰은 글로벌 원본을 유지해 파티 리스트 같은 UI 표시가 깨질 가능성을 줄입니다.
+  - 파티 리스트 본인 표시 glyph와 일부 버프/남은시간 UI는 별도 내장 예외로 `=` 표시와 시간 단위 overflow를 완화합니다.
   - 글로벌/한국 서버 `ffxivgame.ver`가 다르면 릴리즈 패치를 차단해 row-id fallback 오매핑 위험을 줄입니다.
   - 선택적으로 `patch-policy.json`을 읽어 특정 sheet/row/column을 보존하거나 row/column 매핑을 보정합니다.
   - `patch-diagnostics.tsv`와 선택형 CSV 진단 파일을 생성해 매핑 실패, RSV 잔존, Subrows 스킵 상태를 확인할 수 있습니다.
@@ -112,7 +113,7 @@ orig.060000.win32.index
 orig.060000.win32.index2
 ```
 
-`060000` UI 패치는 파티 리스트 본인 번호에 쓰이는 텍스처와 `ScreenImage` 언어별 이미지 리소스를 한국 서버 리소스로 복사합니다. `ScreenImage`는 지역/컨텐츠 입장 시 표시되는 타이틀 이미지처럼 텍스트가 아니라 이미지로 렌더링되는 UI 요소를 보정하기 위한 대상입니다.
+`060000` UI 패치는 파티 리스트 본인 번호에 쓰이는 텍스처와 이미지형 UI 리소스를 한국 서버 리소스로 복사합니다. `ScreenImage`, `CutScreenImage`, `TerritoryType` 같은 언어별 타이틀 이미지와 일부 이벤트/로딩 이미지를 보정해, 지역 이동이나 던전 진입 시 텍스트가 아니라 이미지로 렌더링되는 요소도 한국어 리소스를 사용하도록 처리합니다. `ScreenImage`의 보조 이미지 ID 컬럼과 `TerritoryType`의 지역 타이틀 이미지 컬럼도 함께 검사합니다.
 
 `--diagnostic-csv <sheet>`를 사용하면 `diagnostic-csv\` 폴더에 해당 sheet의 row/column 비교 CSV가 추가로 생성됩니다.
 
