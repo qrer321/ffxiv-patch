@@ -312,6 +312,11 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
             {
                 ProgressReporter.Report(90, "폰트 패치 생성 중");
                 new FontPatchGenerator(_options, _report).Build();
+                if (_options.ShouldBuildUiTextureFix)
+                {
+                    ProgressReporter.Report(98, "UI texture patch build");
+                    new UiPatchGenerator(_options, _report).Build();
+                }
             }
             else
             {

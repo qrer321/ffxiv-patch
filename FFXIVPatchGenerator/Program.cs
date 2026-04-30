@@ -52,6 +52,7 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
                 Console.WriteLine("  Unsupported sheets:   {0}", report.UnsupportedSheets);
                 Console.WriteLine("  Font files patched:   {0}", report.FontFilesPatched);
                 Console.WriteLine("  Font files skipped:   {0}", report.FontFilesSkippedByProfile);
+                Console.WriteLine("  UI files patched:     {0}", report.UiFilesPatched);
                 Console.WriteLine("  Output:               {0}", Path.GetFullPath(options.OutputPath));
                 if (!string.IsNullOrEmpty(report.DiagnosticsPath))
                 {
@@ -116,6 +117,10 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
             Console.WriteLine("                     Experimental: copy Korean client font resources if TTMP files are missing.");
             Console.WriteLine("  --base-font-index  Clean global 000000.win32.index to use instead of installed index.");
             Console.WriteLine("  --base-font-index2 Clean global 000000.win32.index2 to use instead of installed index2.");
+            Console.WriteLine("  --skip-ui-texture-fix");
+            Console.WriteLine("                     Do not build the 060000 UI texture fixes with font patches.");
+            Console.WriteLine("  --base-ui-index    Clean global 060000.win32.index to use instead of installed index.");
+            Console.WriteLine("  --base-ui-index2   Clean global 060000.win32.index2 to use instead of installed index2.");
             Console.WriteLine("  --allow-patched-global");
             Console.WriteLine("                     Allow using a global index that already points at dat1.");
             Console.WriteLine("  --allow-version-mismatch");
@@ -138,6 +143,11 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
             ProgressReporter.Report(2, "입력 파일 확인 완료");
             ProgressReporter.Report(90, "폰트 패치 생성 중");
             new FontPatchGenerator(options, report).Build();
+            if (options.ShouldBuildUiTextureFix)
+            {
+                ProgressReporter.Report(98, "UI texture patch build");
+                new UiPatchGenerator(options, report).Build();
+            }
             return report;
         }
 
@@ -207,6 +217,8 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
         public string BaseIndex2Path;
         public string BaseFontIndexPath;
         public string BaseFontIndex2Path;
+        public string BaseUiIndexPath;
+        public string BaseUiIndex2Path;
         public string FontPackDir;
         public string FontPatchProfile = FontPatchProfiles.Default;
         public bool IncludeFont;
@@ -214,7 +226,13 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
         public bool AllowPatchedGlobal;
         public bool AllowKoreanFontFallback;
         public bool AllowVersionMismatch;
+        public bool SkipUiTextureFix;
         public bool IncludeCommandSheets = true;
+
+        public bool ShouldBuildUiTextureFix
+        {
+            get { return IncludeFont && !SkipUiTextureFix; }
+        }
 
         public static BuildOptions Parse(string[] args)
         {
@@ -250,6 +268,13 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
                 if (string.Equals(arg, "--allow-version-mismatch", StringComparison.OrdinalIgnoreCase))
                 {
                     options.AllowVersionMismatch = true;
+                    continue;
+                }
+
+                if (string.Equals(arg, "--skip-ui-texture-fix", StringComparison.OrdinalIgnoreCase) ||
+                    string.Equals(arg, "--skip-partylist-ui-fix", StringComparison.OrdinalIgnoreCase))
+                {
+                    options.SkipUiTextureFix = true;
                     continue;
                 }
 
@@ -318,6 +343,16 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
                 options.BaseFontIndex2Path = value.Trim('"');
             }
 
+            if (values.TryGetValue("--base-ui-index", out value))
+            {
+                options.BaseUiIndexPath = value.Trim('"');
+            }
+
+            if (values.TryGetValue("--base-ui-index2", out value))
+            {
+                options.BaseUiIndex2Path = value.Trim('"');
+            }
+
             if (values.TryGetValue("--font-pack-dir", out value))
             {
                 options.FontPackDir = value.Trim('"');
@@ -369,6 +404,7 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
         public int UnsupportedSheets;
         public int FontFilesPatched;
         public int FontFilesSkippedByProfile;
+        public int UiFilesPatched;
         public string DiagnosticsPath;
         public readonly List<string> Warnings = new List<string>();
     }

@@ -50,9 +50,11 @@
 - 전체 한글 패치
   - 텍스트 패치 생성
   - 폰트 패치 생성
+  - UI 텍스처 패치 생성
   - 생성된 release 파일 적용
 - 한글 폰트 패치
   - 폰트 패치만 생성
+  - UI 텍스처 패치 생성
   - 생성된 font release 파일 적용
 - 제너레이터 진행도를 UI progress bar에 표시
 - 적용할 release 파일의 `manifest.json` 생성
@@ -132,6 +134,7 @@
   - 원본/대상 page 누락 수
   - 미지원 sheet 수
   - 패치한 font 파일 수
+  - 패치한 UI 텍스처 파일 수
 
 ### 텍스트 패치
 
@@ -185,6 +188,20 @@
 - 수정된 `000000.win32.index2` 생성
 - 복구용 `orig.000000.win32.index` 생성
 - 복구용 `orig.000000.win32.index2` 생성
+
+### UI 텍스처 패치
+
+- 폰트 패치 포함 시 `060000` UI 패키지 패치 생성
+- 새 `060000.win32.dat4` 생성
+- 수정된 `060000.win32.index` 생성
+- 수정된 `060000.win32.index2` 생성
+- 복구용 `orig.060000.win32.index` 생성
+- 복구용 `orig.060000.win32.index2` 생성
+- `ui/uld/PartyListTargetBase.tex`를 한국 서버 텍스처로 교체해 파티 리스트 본인 번호/glyph 표시 차이 보정
+- `ScreenImage` sheet의 `Lang` 플래그가 켜진 이미지 ID를 읽어 글로벌 대상 언어 폴더(`ja`/`en`)의 `ui/icon/...` 텍스처를 한국 서버 `ko` 텍스처로 교체
+- 지역/컨텐츠 입장 시 표시되는 타이틀 이미지처럼 텍스트가 아니라 이미지로 렌더링되는 UI 요소 보정
+- `--base-ui-index`, `--base-ui-index2`로 clean `060000` index/index2 지정
+- `--skip-ui-texture-fix`로 UI 텍스처 패치 생성 제외
 
 ### clean index 처리
 

@@ -54,6 +54,9 @@ namespace FFXIVKoreanPatch.Main
             "sqpack/ffxiv/000000.win32.index",
             "sqpack/ffxiv/000000.win32.index2",
             "sqpack/ffxiv/000000.win32.dat0",
+            "sqpack/ffxiv/060000.win32.index",
+            "sqpack/ffxiv/060000.win32.index2",
+            "sqpack/ffxiv/060000.win32.dat0",
             "sqpack/ffxiv/0a0000.win32.index",
             "sqpack/ffxiv/0a0000.win32.index2",
             "sqpack/ffxiv/0a0000.win32.dat0"
@@ -89,6 +92,14 @@ namespace FFXIVKoreanPatch.Main
             "000000.win32.index2"
         };
 
+        // 060000 contains UI layout and icon resources. UI patch output is written to dat4.
+        private string[] uiPatchFiles = new string[]
+        {
+            "060000.win32.dat4",
+            "060000.win32.index",
+            "060000.win32.index2"
+        };
+
         // 0a0000 is the Excel/EXD text package rewritten for the selected global language slot.
         private string[] textPatchFiles = new string[]
         {
@@ -97,11 +108,13 @@ namespace FFXIVKoreanPatch.Main
             "0a0000.win32.index2"
         };
 
-        // Removal restores clean index/index2 files; leftover dat1 files are harmless once unreferenced.
+        // Removal restores clean index/index2 files; leftover patch dat files are harmless once unreferenced.
         private string[] restoreFiles = new string[]
         {
             "000000.win32.index",
             "000000.win32.index2",
+            "060000.win32.index",
+            "060000.win32.index2",
             "0a0000.win32.index",
             "0a0000.win32.index2"
         };
@@ -1615,9 +1628,10 @@ namespace FFXIVKoreanPatch.Main
             if (!string.IsNullOrEmpty(output) &&
                 (output.IndexOf("already contains", StringComparison.OrdinalIgnoreCase) >= 0 ||
                  output.IndexOf("already containes", StringComparison.OrdinalIgnoreCase) >= 0) &&
-                output.IndexOf("dat1 entries", StringComparison.OrdinalIgnoreCase) >= 0)
+                (output.IndexOf("dat1 entries", StringComparison.OrdinalIgnoreCase) >= 0 ||
+                 output.IndexOf("dat4 entries", StringComparison.OrdinalIgnoreCase) >= 0))
             {
-                string pollutedIndex = "0a0000/000000.win32.index";
+                string pollutedIndex = "0a0000/000000/060000.win32.index";
                 if (output.IndexOf("0a0000.win32.index", StringComparison.OrdinalIgnoreCase) >= 0)
                 {
                     pollutedIndex = "0a0000.win32.index";
@@ -1625,6 +1639,10 @@ namespace FFXIVKoreanPatch.Main
                 else if (output.IndexOf("000000.win32.index", StringComparison.OrdinalIgnoreCase) >= 0)
                 {
                     pollutedIndex = "000000.win32.index";
+                }
+                else if (output.IndexOf("060000.win32.index", StringComparison.OrdinalIgnoreCase) >= 0)
+                {
+                    pollutedIndex = "060000.win32.index";
                 }
 
                 return
@@ -1695,6 +1713,28 @@ namespace FFXIVKoreanPatch.Main
 
         private int CountIndexDat1Entries(string indexPath)
         {
+            return CountIndexDataFileEntries(indexPath, 1);
+        }
+
+        private int CountPatchedDataFileEntries(string indexPath)
+        {
+            return CountIndexDataFileEntries(indexPath, GetPatchDataFileId(indexPath));
+        }
+
+        private int GetPatchDataFileId(string indexPathOrFileName)
+        {
+            string fileName = Path.GetFileName(indexPathOrFileName);
+            if (fileName.StartsWith("060000.", StringComparison.OrdinalIgnoreCase) ||
+                fileName.StartsWith("orig.060000.", StringComparison.OrdinalIgnoreCase))
+            {
+                return 4;
+            }
+
+            return 1;
+        }
+
+        private int CountIndexDataFileEntries(string indexPath, int dataFileId)
+        {
             byte[] bytes = File.ReadAllBytes(indexPath);
             if (bytes.Length < 0x100)
             {
@@ -1719,19 +1759,19 @@ namespace FFXIVKoreanPatch.Main
             int entrySize = index2 ? 8 : 16;
             int dataOffsetInEntry = index2 ? 4 : 8;
             int entryCount = indexDataSize / entrySize;
-            int dat1Count = 0;
+            int count = 0;
             for (int i = 0; i < entryCount; i++)
             {
                 int entryOffset = indexDataOffset + i * entrySize;
                 uint data = ReadUInt32LittleEndian(bytes, entryOffset + dataOffsetInEntry);
                 byte datId = (byte)((data & 0xEu) >> 1);
-                if (datId == 1)
+                if (datId == dataFileId)
                 {
-                    dat1Count++;
+                    count++;
                 }
             }
 
-            return dat1Count;
+            return count;
         }
 
         private bool IsCleanIndexFile(string indexPath, out int dat1Count, out string error)
@@ -1741,7 +1781,7 @@ namespace FFXIVKoreanPatch.Main
 
             try
             {
-                dat1Count = CountIndexDat1Entries(indexPath);
+                dat1Count = CountPatchedDataFileEntries(indexPath);
                 return dat1Count == 0;
             }
             catch (Exception exception)
@@ -1758,7 +1798,8 @@ namespace FFXIVKoreanPatch.Main
 
         private bool CanSkipMissingRestoreFile(string fileName)
         {
-            if (!IsIndex2FileName(fileName))
+            if (!fileName.EndsWith(".index", StringComparison.OrdinalIgnoreCase) &&
+                !IsIndex2FileName(fileName))
             {
                 return false;
             }
@@ -1798,7 +1839,7 @@ namespace FFXIVKoreanPatch.Main
 
                 try
                 {
-                    if (CountIndexDat1Entries(indexPath) > 0)
+                    if (CountPatchedDataFileEntries(indexPath) > 0)
                     {
                         return true;
                     }
@@ -1891,6 +1932,46 @@ namespace FFXIVKoreanPatch.Main
             }
         }
 
+        private void ValidateDatReferences(string indexPath, string datPath, int dataFileId, string context)
+        {
+            byte[] bytes = File.ReadAllBytes(indexPath);
+            long datLength = new FileInfo(datPath).Length;
+            int sqpackHeaderSize = checked((int)ReadUInt32LittleEndian(bytes, 0x0C));
+            int indexHeaderOffset = sqpackHeaderSize;
+            int indexDataOffset = checked((int)ReadUInt32LittleEndian(bytes, indexHeaderOffset + 0x08));
+            int indexDataSize = checked((int)ReadUInt32LittleEndian(bytes, indexHeaderOffset + 0x0C));
+            bool index2 = indexPath.EndsWith(".index2", StringComparison.OrdinalIgnoreCase);
+            int entrySize = index2 ? 8 : 16;
+            int dataOffsetInEntry = index2 ? 4 : 8;
+            int entryCount = indexDataSize / entrySize;
+            int dataFileEntryCount = 0;
+
+            for (int i = 0; i < entryCount; i++)
+            {
+                int entryOffset = indexDataOffset + i * entrySize;
+                uint data = ReadUInt32LittleEndian(bytes, entryOffset + dataOffsetInEntry);
+                byte datId = (byte)((data & 0xEu) >> 1);
+                if (datId != dataFileId)
+                {
+                    continue;
+                }
+
+                dataFileEntryCount++;
+                long fileOffset = (long)(data & 0xFFFFFFF0u) * 8L;
+                if ((fileOffset % 0x80) != 0 || fileOffset < 0 || fileOffset + 24 > datLength)
+                {
+                    throw new InvalidDataException(context + " index points outside dat" + dataFileId.ToString() + ": " + fileOffset.ToString());
+                }
+
+                ValidateDat1FileHeader(datPath, datLength, fileOffset, context);
+            }
+
+            if (dataFileEntryCount <= 0)
+            {
+                throw new InvalidDataException(context + " index has no dat" + dataFileId.ToString() + " entries.");
+            }
+        }
+
         private void ValidateDat1FileHeader(string dat1Path, long dat1Length, long fileOffset, string context)
         {
             byte[] header = new byte[24];
@@ -1974,6 +2055,24 @@ namespace FFXIVKoreanPatch.Main
                     Path.Combine(directory, "000000.win32.index2"),
                     Path.Combine(directory, "000000.win32.dat1"),
                     context + " 000000 index2");
+            }
+
+            if (patchFiles.Any(fileName => string.Equals(fileName, "060000.win32.index", StringComparison.OrdinalIgnoreCase)))
+            {
+                ValidateDatReferences(
+                    Path.Combine(directory, "060000.win32.index"),
+                    Path.Combine(directory, "060000.win32.dat4"),
+                    4,
+                    context + " 060000");
+            }
+
+            if (patchFiles.Any(fileName => string.Equals(fileName, "060000.win32.index2", StringComparison.OrdinalIgnoreCase)))
+            {
+                ValidateDatReferences(
+                    Path.Combine(directory, "060000.win32.index2"),
+                    Path.Combine(directory, "060000.win32.dat4"),
+                    4,
+                    context + " 060000 index2");
             }
         }
 
@@ -2072,7 +2171,7 @@ namespace FFXIVKoreanPatch.Main
             builder.AppendLine();
             builder.AppendLine("Manual rollback:");
             builder.AppendLine("If this folder contains " + manualRollbackDirName + ", copy the files in that folder into the global client sqpack\\ffxiv folder.");
-            builder.AppendLine("Clean index files stop the client from referencing patched dat1 entries. Unused dat1 files may remain on disk.");
+            builder.AppendLine("Clean index files stop the client from referencing patched dat entries. Unused patch dat files may remain on disk.");
             File.WriteAllText(infoPath, builder.ToString(), Encoding.UTF8);
         }
 
@@ -2169,7 +2268,7 @@ namespace FFXIVKoreanPatch.Main
                 }
                 if (string.IsNullOrEmpty(sourcePath) && File.Exists(currentIndexPath))
                 {
-                    int dat1Count = CountIndexDat1Entries(currentIndexPath);
+                    int dat1Count = CountPatchedDataFileEntries(currentIndexPath);
                     if (dat1Count == 0)
                     {
                         sourcePath = currentIndexPath;
@@ -2338,6 +2437,7 @@ namespace FFXIVKoreanPatch.Main
             string manifestPath = Path.Combine(outputDir, "manifest.json");
             List<string> manifestFiles = textPatchFiles
                 .Concat(fontPatchFiles)
+                .Concat(uiPatchFiles)
                 .Concat(restoreFiles.Select(fileName => "orig." + fileName))
                 .Concat(new string[] { versionFileName })
                 .Distinct(StringComparer.OrdinalIgnoreCase)
@@ -2398,6 +2498,12 @@ namespace FFXIVKoreanPatch.Main
                 requiredOrigFiles.Add("orig.000000.win32.index2");
             }
 
+            if (patchFiles.Any(fileName => uiPatchFiles.Contains(fileName, StringComparer.OrdinalIgnoreCase)))
+            {
+                requiredOrigFiles.Add("orig.060000.win32.index");
+                requiredOrigFiles.Add("orig.060000.win32.index2");
+            }
+
             List<string> requiredReleaseFiles = patchFiles
                 .Concat(requiredOrigFiles)
                 .Concat(new string[] { versionFileName })
@@ -2456,10 +2562,28 @@ namespace FFXIVKoreanPatch.Main
                 }
             }
 
+            if (patchFiles.Any(fileName => string.Equals(fileName, "060000.win32.index", StringComparison.OrdinalIgnoreCase)))
+            {
+                int uiDat1Count = CountIndexDataFileEntries(Path.Combine(outputDir, "060000.win32.index"), 4);
+                if (uiDat1Count <= 0)
+                {
+                    throw new InvalidDataException("생성된 060000.win32.index에 dat4 엔트리가 없습니다.");
+                }
+            }
+
+            if (patchFiles.Any(fileName => string.Equals(fileName, "060000.win32.index2", StringComparison.OrdinalIgnoreCase)))
+            {
+                int uiIndex2Dat1Count = CountIndexDataFileEntries(Path.Combine(outputDir, "060000.win32.index2"), 4);
+                if (uiIndex2Dat1Count <= 0)
+                {
+                    throw new InvalidDataException("생성된 060000.win32.index2에 dat4 엔트리가 없습니다.");
+                }
+            }
+
 #if !TEST_BUILD
             foreach (string origFileName in requiredOrigFiles)
             {
-                int origDat1Count = CountIndexDat1Entries(Path.Combine(outputDir, origFileName));
+                int origDat1Count = CountPatchedDataFileEntries(Path.Combine(outputDir, origFileName));
                 if (origDat1Count > 0)
                 {
                     throw new InvalidDataException("생성된 " + origFileName + "가 clean index가 아닙니다. dat1 엔트리 " + origDat1Count.ToString() + "개가 포함되어 있습니다.");
@@ -2749,6 +2873,7 @@ namespace FFXIVKoreanPatch.Main
         {
             string[] restorableFiles = textPatchFiles
                 .Concat(fontPatchFiles)
+                .Concat(uiPatchFiles)
                 .Concat(restoreFiles)
                 .Distinct(StringComparer.OrdinalIgnoreCase)
                 .ToArray();
@@ -3066,7 +3191,7 @@ namespace FFXIVKoreanPatch.Main
 
             try
             {
-                int dat1Count = CountIndexDat1Entries(indexPath);
+                int dat1Count = CountPatchedDataFileEntries(indexPath);
                 if (dat1Count <= 0)
                 {
                     lines.Add("[OK] 글로벌 " + indexFileName + "는 clean index로 보입니다.");
@@ -3235,6 +3360,8 @@ namespace FFXIVKoreanPatch.Main
                     {
                         "000000.win32.index",
                         "000000.win32.dat0",
+                        "060000.win32.index",
+                        "060000.win32.dat0",
                         "0a0000.win32.index",
                         "0a0000.win32.dat0"
                     };
@@ -3256,6 +3383,8 @@ namespace FFXIVKoreanPatch.Main
                     AddPreflightIndexStatus(lines, ref failures, ref warnings, "0a0000.win32.index2");
                     AddPreflightIndexStatus(lines, ref failures, ref warnings, "000000.win32.index");
                     AddPreflightIndexStatus(lines, ref failures, ref warnings, "000000.win32.index2");
+                    AddPreflightIndexStatus(lines, ref failures, ref warnings, "060000.win32.index");
+                    AddPreflightIndexStatus(lines, ref failures, ref warnings, "060000.win32.index2");
                 }
 
                 try
@@ -3966,6 +4095,7 @@ namespace FFXIVKoreanPatch.Main
             if (buildFontPatch)
             {
                 files.AddRange(fontPatchFiles);
+                files.AddRange(uiPatchFiles);
             }
 
             return files.Distinct(StringComparer.OrdinalIgnoreCase).ToArray();

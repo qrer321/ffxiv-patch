@@ -39,6 +39,7 @@
     <Compile Include="Program.cs" />
     <Compile Include="TextPatchGenerator.cs" />
     <Compile Include="FontPatchGenerator.cs" />
+    <Compile Include="UiPatchGenerator.cs" />
     <Compile Include="SqPack.cs" />
     <Compile Include="Excel.cs" />
     <Compile Include="ExdStringPatcher.cs" />

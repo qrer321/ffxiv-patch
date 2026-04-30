@@ -498,8 +498,13 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
         private readonly FileStream _stream;
 
         public SqPackDatWriter(string outputPath, string sourceDat0Path)
+            : this(outputPath, sourceDat0Path, 2)
         {
-            byte[] header = ReadSqPackHeader(sourceDat0Path);
+        }
+
+        public SqPackDatWriter(string outputPath, string sourceDat0Path, uint dataFileCount)
+        {
+            byte[] header = ReadSqPackHeader(sourceDat0Path, dataFileCount);
             _stream = new FileStream(outputPath, FileMode.Create, FileAccess.Write, FileShare.Read);
             _stream.Write(header, 0, header.Length);
             PadToAlignment(_stream, Alignment);
@@ -621,7 +626,7 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
             return raw;
         }
 
-        private static byte[] ReadSqPackHeader(string sourceDat0Path)
+        private static byte[] ReadSqPackHeader(string sourceDat0Path, uint dataFileCount)
         {
             using (FileStream stream = new FileStream(sourceDat0Path, FileMode.Open, FileAccess.Read, FileShare.ReadWrite))
             using (BinaryReader reader = new BinaryReader(stream))
@@ -635,8 +640,8 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
                     throw new InvalidDataException("SqPack dat header is shorter than expected.");
                 }
 
-                // Header field at 0x410 stores the number of data files; set at least 2 so dat1 is accepted.
-                Endian.WriteUInt32LE(header, 0x400 + 0x10, 2);
+                // Header field at 0x410 stores the number of data files; raise it so the selected patch dat is accepted.
+                Endian.WriteUInt32LE(header, 0x400 + 0x10, dataFileCount);
                 return header;
             }
         }

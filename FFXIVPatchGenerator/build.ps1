@@ -15,6 +15,7 @@ $sources = @(
     "Program.cs",
     "TextPatchGenerator.cs",
     "FontPatchGenerator.cs",
+    "UiPatchGenerator.cs",
     "SqPack.cs",
     "Excel.cs",
     "ExdStringPatcher.cs",

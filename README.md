@@ -49,7 +49,7 @@
   - 선택적으로 `patch-policy.json`을 읽어 특정 sheet/row/column을 보존하거나 row/column 매핑을 보정합니다.
   - `patch-diagnostics.tsv`와 선택형 CSV 진단 파일을 생성해 매핑 실패, RSV 잔존, Subrows 스킵 상태를 확인할 수 있습니다.
   - 수정된 index/index2의 파일 세그먼트 Adler32 checksum을 다시 계산합니다.
-  - 텍스트 패치 파일과 폰트 패치 파일을 생성합니다.
+  - 텍스트, 폰트, UI 텍스처 패치 파일을 생성합니다.
 
 ## 상세 문서
 
@@ -101,6 +101,18 @@ manifest.json
 orig.000000.win32.index
 orig.000000.win32.index2
 ```
+
+UI 텍스처 패치 추가 생성:
+
+```text
+060000.win32.dat4
+060000.win32.index
+060000.win32.index2
+orig.060000.win32.index
+orig.060000.win32.index2
+```
+
+`060000` UI 패치는 파티 리스트 본인 번호에 쓰이는 텍스처와 `ScreenImage` 언어별 이미지 리소스를 한국 서버 리소스로 복사합니다. `ScreenImage`는 지역/컨텐츠 입장 시 표시되는 타이틀 이미지처럼 텍스트가 아니라 이미지로 렌더링되는 UI 요소를 보정하기 위한 대상입니다.
 
 `--diagnostic-csv <sheet>`를 사용하면 `diagnostic-csv\` 폴더에 해당 sheet의 row/column 비교 CSV가 추가로 생성됩니다.
 
