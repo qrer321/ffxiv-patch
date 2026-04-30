@@ -199,6 +199,14 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
                     mutableIndex2,
                     datWriter,
                     copiedTargets);
+                patched += CopyMapTextures(
+                    globalExcelArchive,
+                    globalUiArchive,
+                    koreaUiArchive,
+                    mutableIndex,
+                    mutableIndex2,
+                    datWriter,
+                    copiedTargets);
 
                 mutableIndex.Save();
                 mutableIndex2.Save();
@@ -438,6 +446,84 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
             return stats.Patched;
         }
 
+        private int CopyMapTextures(
+            SqPackArchive globalExcelArchive,
+            SqPackArchive globalUiArchive,
+            SqPackArchive koreaUiArchive,
+            SqPackIndexFile mutableIndex,
+            SqPackIndex2File mutableIndex2,
+            SqPackDatWriter datWriter,
+            HashSet<string> copiedTargets)
+        {
+            const string sheetName = "map";
+            const string displayName = "Map";
+            byte[] headerBytes;
+            if (!globalExcelArchive.TryReadFile("exd/" + sheetName + ".exh", out headerBytes))
+            {
+                _report.Warnings.Add(displayName + " EXH was not found. Map texture localization was skipped.");
+                return 0;
+            }
+
+            ExcelHeader header = ExcelHeader.Parse(headerBytes);
+            if (header.Variant != ExcelVariant.Default || !HasColumn(header, 0, 0))
+            {
+                _report.Warnings.Add(displayName + " schema was not recognized. Map texture localization was skipped.");
+                return 0;
+            }
+
+            IconPatchStats stats = new IconPatchStats();
+            for (int pageIndex = 0; pageIndex < header.Pages.Count; pageIndex++)
+            {
+                ExcelPageDefinition page = header.Pages[pageIndex];
+                string exdPath = "exd/" + sheetName + "_" + page.StartId.ToString() + ".exd";
+                byte[] exdBytes;
+                if (!globalExcelArchive.TryReadFile(exdPath, out exdBytes))
+                {
+                    _report.Warnings.Add(displayName + " page was not found and was skipped: " + exdPath);
+                    continue;
+                }
+
+                ExcelDataFile dataFile = ExcelDataFile.Parse(exdBytes);
+                for (int rowIndex = 0; rowIndex < dataFile.Rows.Count; rowIndex++)
+                {
+                    ExcelDataRow row = dataFile.Rows[rowIndex];
+                    byte[] mapIdBytes = dataFile.GetStringBytesByColumnOffset(row, header, 0);
+                    if (mapIdBytes == null || mapIdBytes.Length == 0)
+                    {
+                        continue;
+                    }
+
+                    string mapId = System.Text.Encoding.UTF8.GetString(mapIdBytes);
+                    string mapTexturePath;
+                    if (!TryBuildMapTexturePath(mapId, out mapTexturePath))
+                    {
+                        continue;
+                    }
+
+                    CopySamePathTextureVariant(
+                        mapTexturePath,
+                        copiedTargets,
+                        globalUiArchive,
+                        koreaUiArchive,
+                        mutableIndex,
+                        mutableIndex2,
+                        datWriter,
+                        stats);
+                }
+            }
+
+            Console.WriteLine(
+                "{0} textures patched: {1} (candidates={2}, identical={3}, missingGlobal={4}, missingKorea={5})",
+                displayName,
+                stats.Patched,
+                stats.Candidates,
+                stats.Identical,
+                stats.MissingGlobalTargets,
+                stats.MissingKoreanSources);
+
+            return stats.Patched;
+        }
+
         private void CopyIconVariants(
             uint iconId,
             bool usesLanguageFolders,
@@ -587,6 +673,43 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
                 folder,
                 iconId,
                 suffix);
+        }
+
+        private static bool TryBuildMapTexturePath(string mapId, out string path)
+        {
+            path = null;
+            if (string.IsNullOrWhiteSpace(mapId))
+            {
+                return false;
+            }
+
+            string normalized = mapId.Replace('\\', '/').Trim('/');
+            if (normalized.Length == 0 ||
+                normalized.IndexOf('/') < 0 ||
+                normalized.IndexOf("..", StringComparison.Ordinal) >= 0)
+            {
+                return false;
+            }
+
+            for (int i = 0; i < normalized.Length; i++)
+            {
+                char c = normalized[i];
+                bool allowed =
+                    (c >= 'a' && c <= 'z') ||
+                    (c >= 'A' && c <= 'Z') ||
+                    (c >= '0' && c <= '9') ||
+                    c == '_' ||
+                    c == '-' ||
+                    c == '/';
+                if (!allowed)
+                {
+                    return false;
+                }
+            }
+
+            string fileName = normalized.Replace("/", string.Empty) + "_m.tex";
+            path = "ui/map/" + normalized + "/" + fileName;
+            return true;
         }
 
         private static bool SpecColumnsExist(ExcelHeader header, IconSheetSpec spec)

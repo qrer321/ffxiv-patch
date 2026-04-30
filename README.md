@@ -113,7 +113,7 @@ orig.060000.win32.index
 orig.060000.win32.index2
 ```
 
-`060000` UI 패치는 파티 리스트 본인 번호에 쓰이는 텍스처와 이미지형 UI 리소스를 한국 서버 리소스로 복사합니다. `ScreenImage`, `CutScreenImage`, `TerritoryType` 같은 언어별 타이틀 이미지와 일부 이벤트/로딩 이미지를 보정해, 지역 이동이나 던전 진입 시 텍스트가 아니라 이미지로 렌더링되는 요소도 한국어 리소스를 사용하도록 처리합니다. `ScreenImage`의 보조 이미지 ID 컬럼과 `TerritoryType`의 지역 타이틀 이미지 컬럼, 지역 타이틀의 `+2000` 부제 이미지도 함께 검사합니다.
+`060000` UI 패치는 파티 리스트 본인 번호에 쓰이는 텍스처와 이미지형 UI 리소스를 한국 서버 리소스로 복사합니다. `ScreenImage`, `CutScreenImage`, `TerritoryType` 같은 언어별 타이틀 이미지와 일부 이벤트/로딩 이미지를 보정해, 지역 이동이나 던전 진입 시 텍스트가 아니라 이미지로 렌더링되는 요소도 한국어 리소스를 사용하도록 처리합니다. `ScreenImage`의 보조 이미지 ID 컬럼과 `TerritoryType`의 지역 타이틀 이미지 컬럼, 지역 타이틀의 `+2000` 부제 이미지도 함께 검사합니다. `Map` sheet의 지도 텍스처(`ui/map/.../*_m.tex`)도 한국 서버 텍스처와 비교해 다를 때 복사하므로, 지도 이미지 안에 박힌 지역명 표기도 함께 보정합니다.
 
 `--diagnostic-csv <sheet>`를 사용하면 `diagnostic-csv\` 폴더에 해당 sheet의 row/column 비교 CSV가 추가로 생성됩니다.
 
