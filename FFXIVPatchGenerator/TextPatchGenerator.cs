@@ -7,15 +7,22 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
 {
     internal sealed class TextPatchGenerator
     {
+        // FFXIV sqpack repository that contains Excel/EXD text data.
         private const string RepositoryDir = "sqpack\\ffxiv";
+
+        // 0a0000 is the Excel package. The patch writes a new dat1 and points selected index entries to it.
         private const string IndexFileName = "0a0000.win32.index";
         private const string Index2FileName = "0a0000.win32.index2";
         private const string Dat0FileName = "0a0000.win32.dat0";
         private const string Dat1FileName = "0a0000.win32.dat1";
+
+        // Clean index copies used by the UI for rollback without deleting dat1 manually.
         private const string OrigIndexFileName = "orig.0a0000.win32.index";
         private const string OrigIndex2FileName = "orig.0a0000.win32.index2";
         private const string VersionFileName = "ffxivgame.ver";
 
+        // Some sheets do not expose stable string keys, but their Korean/global rows line up by row id.
+        // Keep this allowlist explicit so risky row-id swaps are not applied to every sheet.
         private static readonly Regex[] RowKeySwappableSheets = new Regex[]
         {
             new Regex("^Achievement.*$", RegexOptions.IgnoreCase | RegexOptions.Compiled),

@@ -32,14 +32,26 @@ if (!$resolvedReleaseDir.StartsWith($resolvedRepoRoot, [System.StringComparison]
 New-Item -ItemType Directory -Force -Path $releaseDir | Out-Null
 
 $uiBin = Join-Path $repoRoot "FFXIVPatchUI\bin\$Configuration"
+
+# Old upstream self-updater output is no longer part of this local-generator based patcher.
+$legacyFiles = @(
+    "FFXIVKoreanPatchUpdater.exe",
+    "FFXIVKoreanPatchUpdater.exe.config"
+)
+
+foreach ($legacyFile in $legacyFiles) {
+    $legacyPath = Join-Path $releaseDir $legacyFile
+    if (Test-Path $legacyPath) {
+        Remove-Item -LiteralPath $legacyPath -Force
+    }
+}
+
 $files = @(
     "FFXIVKoreanPatch.exe",
     "FFXIVKoreanPatch.exe.config",
     "FFXIVPatchGenerator.exe",
     "TTMPD.mpd",
-    "TTMPL.mpl",
-    "FFXIVKoreanPatchUpdater.exe",
-    "FFXIVKoreanPatchUpdater.exe.config"
+    "TTMPL.mpl"
 )
 
 foreach ($file in $files) {

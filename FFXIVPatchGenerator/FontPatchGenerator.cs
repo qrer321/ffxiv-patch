@@ -7,16 +7,24 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
 {
     internal sealed class FontPatchGenerator
     {
+        // FFXIV sqpack repository that contains common/font resources.
         private const string RepositoryDir = "sqpack\\ffxiv";
+
+        // 000000 is the common package. The font patch writes selected font entries into dat1.
         private const string IndexFileName = "000000.win32.index";
         private const string Index2FileName = "000000.win32.index2";
         private const string Dat0FileName = "000000.win32.dat0";
         private const string Dat1FileName = "000000.win32.dat1";
+
+        // Clean index copies used by the UI for rollback without deleting dat1 manually.
         private const string OrigIndexFileName = "orig.000000.win32.index";
         private const string OrigIndex2FileName = "orig.000000.win32.index2";
+
+        // TTMP package exported from the original generator flow; preferred over raw Korean client copy.
         private const string TtmpMpdFileName = "TTMPD.mpd";
         private const string TtmpMplFileName = "TTMPL.mpl";
 
+        // Explicit font resource set used by the global client for in-game and lobby text rendering.
         private static readonly string[] FontPaths = new string[]
         {
             "common/font/Jupiter_45.fdt",

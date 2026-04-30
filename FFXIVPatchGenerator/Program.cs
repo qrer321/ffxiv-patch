@@ -1,3 +1,6 @@
+// 이 프로젝트는 FFXIV 한글 패치 원작자 https://github.com/korean-patch 의 작업을 참고했습니다.
+// 한글 패치의 기반과 구현 흐름을 만들어주신 원작자에게 감사드립니다.
+
 using System;
 using System.Collections.Generic;
 using System.IO;
@@ -158,6 +161,7 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
 
     internal static class ProgressReporter
     {
+        // UI watches stdout for this token and updates the progress bar from "percent|message".
         private const string Prefix = "@@FFXIVPATCHGENERATOR_PROGRESS|";
 
         public static void Report(int percent, string message)
@@ -175,7 +179,11 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
     {
         public string GlobalGamePath;
         public string KoreaGamePath;
+
+        // ja is the default global target because the primary workflow is Japanese client Korean patching.
         public string TargetLanguage = "ja";
+
+        // Korean server EXD files use the ko suffix and are the only supported source language today.
         public string SourceLanguage = "ko";
         public string OutputPath;
         public string SheetLimit;

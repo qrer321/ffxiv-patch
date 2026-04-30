@@ -1,3 +1,6 @@
+// 이 프로젝트는 FFXIV 한글 패치 원작자 https://github.com/korean-patch 의 작업을 참고했습니다.
+// 한글 패치의 기반과 구현 흐름을 만들어주신 원작자에게 감사드립니다.
+
 using Microsoft.Win32;
 using System;
 using System.Collections.Generic;
@@ -8,10 +11,8 @@ using System.Drawing.Drawing2D;
 using System.Drawing.Imaging;
 using System.IO;
 using System.Linq;
-using System.Net.Http;
 using System.Security.Cryptography;
 using System.Text;
-using System.Threading.Tasks;
 using System.Windows.Forms;
 
 namespace FFXIVKoreanPatch.Main
@@ -20,22 +21,18 @@ namespace FFXIVKoreanPatch.Main
     {
         #region Variables
 
-        // Github release server URL that hosts distributed patch files.
-        private const string serverUrlBase = "https://github.com/korean-patch/ffxiv-korean-patch/releases/download/";
         private const string patchDisplayName = "FFXIV 글로벌 클라이언트용 한글 패치";
+
+        // Generator stdout protocol. Progress lines are "prefix + percent|message".
         private const string builderProgressPrefix = "@@FFXIVPATCHGENERATOR_PROGRESS|";
+
+        // Local backup folder kept outside release output so users can manually restore sqpack files.
         private const string manualRollbackDirName = "manual-sqpack-rollback";
 
-        // Path for the main patch program.
-        private string mainPath = string.Empty;
+        // Main executable name used only for duplicate patcher process detection.
         private const string mainFileName = "FFXIVKoreanPatch";
-        private string mainTempPath = string.Empty;
 
-        // Path for the updater program.
-        private string updaterPath = string.Empty;
-        private const string updaterFileName = "FFXIVKoreanPatchUpdater";
-
-        // Process names to check for before doing the patch.
+        // Release builds block patching while these FFXIV processes may have sqpack files open.
         private string[] gameProcessNames = new string[]
         {
             "ffxivboot", "ffxivboot64",
@@ -43,7 +40,7 @@ namespace FFXIVKoreanPatch.Main
             "ffxiv", "ffxiv_dx11"
         };
 
-        // List of known files that will be used to verify installation path.
+        // Minimal files that identify a valid FFXIV game folder for this patcher.
         private string[] requiredFiles = new string[]
         {
             "ffxiv_dx11.exe",
@@ -56,6 +53,7 @@ namespace FFXIVKoreanPatch.Main
             "sqpack/ffxiv/0a0000.win32.dat0"
         };
 
+        // Fallback install-location guesses checked under common drive roots when registry detection fails.
         private string[] knownGameDirLocations = new string[]
         {
             "SquareEnix/FINAL FANTASY XIV - A Realm Reborn/game",
@@ -66,6 +64,7 @@ namespace FFXIVKoreanPatch.Main
             "Program Files/Steam/steamapps/common/FINAL FANTASY XIV Online/game"
         };
 
+        // Korean client has different publisher/install names, so it needs its own fallback list.
         private string[] knownKoreaGameDirLocations = new string[]
         {
             "FINAL FANTASY XIV - KOREA/game",
@@ -76,7 +75,7 @@ namespace FFXIVKoreanPatch.Main
             "Program Files/SquareEnix/FINAL FANTASY XIV - KOREA/game"
         };
 
-        // List of file names that need to be manipulated.
+        // 000000 is the common package; global font resources live under common/font there.
         private string[] fontPatchFiles = new string[]
         {
             "000000.win32.dat1",
@@ -84,6 +83,7 @@ namespace FFXIVKoreanPatch.Main
             "000000.win32.index2"
         };
 
+        // 0a0000 is the Excel/EXD text package rewritten for the selected global language slot.
         private string[] textPatchFiles = new string[]
         {
             "0a0000.win32.dat1",
@@ -91,6 +91,7 @@ namespace FFXIVKoreanPatch.Main
             "0a0000.win32.index2"
         };
 
+        // Removal restores clean index/index2 files; leftover dat1 files are harmless once unreferenced.
         private string[] restoreFiles = new string[]
         {
             "000000.win32.index",
@@ -99,7 +100,7 @@ namespace FFXIVKoreanPatch.Main
             "0a0000.win32.index2"
         };
 
-        // Scancode Map value for registry.
+        // Registry Scancode Map: maps Right Alt (E0 38) to Hangul key (00 72) for Korean chat IME toggle.
         private byte[] scancodeMap = new byte[]
         {
             0x00, 0x00, 0x00, 0x00,
@@ -118,7 +119,7 @@ namespace FFXIVKoreanPatch.Main
         // Korean client directory used when generating release files locally.
         private string koreaSourceDir = string.Empty;
 
-        // Global client language slot to replace when generating release files locally.
+        // Global EXD language suffix to rewrite. Default is ja because the primary target is Japanese client.
         private string targetLanguageCode = "ja";
         private string targetLanguageDisplayName = "일본어";
 
@@ -137,12 +138,6 @@ namespace FFXIVKoreanPatch.Main
 
         // Target client version.
         private string targetVersion = string.Empty;
-
-        // Patch version.
-        private string serverVersion = string.Empty;
-
-        // Whether the remote release assets are available for direct download/install buttons.
-        private bool serverPatchAvailable;
 
         #endregion
 
@@ -1092,77 +1087,6 @@ namespace FFXIVKoreanPatch.Main
             }
         }
 
-        // Downloads a file from given url while reporting progress on given background worker, then return the response as byte array.
-        // If filePath is given, it will write to FileStream instead of memory.
-        private byte[] DownloadFile(string url, string fileName, BackgroundWorker worker, string filePath = null)
-        {
-            using (HttpClient client = new HttpClient())
-            {
-                // Default user agent and timeout values.
-                client.DefaultRequestHeaders.Add("User-Agent", "request");
-                client.Timeout = TimeSpan.FromMinutes(5);
-
-                // Indicate what file we're downloading...
-                UpdateDownloadLabel($"다운로드중: {fileName}");
-
-                // Download the header first to look at the content length.
-                using (HttpResponseMessage responseMessage = client.GetAsync(url, HttpCompletionOption.ResponseHeadersRead).GetAwaiter().GetResult())
-                {
-                    responseMessage.EnsureSuccessStatusCode();
-
-                    if (responseMessage.Content.Headers.ContentLength != null)
-                    {
-                        long contentLength = (long)responseMessage.Content.Headers.ContentLength;
-
-                        // Create memory stream or file stream based on param and feed it with the client stream.
-                        using (Stream s = string.IsNullOrEmpty(filePath) ? (Stream)new MemoryStream() : new FileStream(filePath, FileMode.Create))
-                        using (Stream inStream = responseMessage.Content.ReadAsStreamAsync().GetAwaiter().GetResult())
-                        {
-                            // Create a progress reporter that reports the progress to the designated background worker.
-                            Progress<int> p = new Progress<int>(new Action<int>((value) =>
-                            {
-                                worker.ReportProgress(value);
-                            }));
-
-                            // Use a reasonable minimum buffer so tiny version/checksum files still copy correctly.
-                            // Grab data from http client stream and copy to destination stream.
-                            inStream.CopyToAsync(s, Math.Max(81920, (int)(contentLength / 10)), contentLength, p).GetAwaiter().GetResult();
-
-                            // Empty the progress bar after download is complete.
-                            worker.ReportProgress(0);
-
-                            // Reset the label.
-                            UpdateDownloadLabel("");
-
-                            // If no file path was specified, return as byte array. Else just return.
-                            if (string.IsNullOrEmpty(filePath))
-                            {
-                                return ((MemoryStream)s).ToArray();
-                            }
-                            else
-                            {
-                                return new byte[0];
-                            }
-                        }
-                    }
-                }
-            }
-
-            // If anything happened and didn't reach successful download, throw an exception.
-            throw new Exception($"다음 파일을 다운로드하는 중 오류가 발생하였습니다. {url}");
-        }
-
-        // Clear all cached files.
-        private void ClearCache()
-        {
-            Directory.CreateDirectory(Application.CommonAppDataPath);
-
-            foreach (string s in Directory.GetFiles(Application.CommonAppDataPath))
-            {
-                File.Delete(s);
-            }
-        }
-
         // Get the SHA1 checksum from a file.
         private string ComputeSHA1(string filePath)
         {
@@ -1170,12 +1094,6 @@ namespace FFXIVKoreanPatch.Main
             {
                 return BitConverter.ToString(cryptoProvider.ComputeHash(File.ReadAllBytes(filePath))).Replace("-", "");
             }
-        }
-
-        // Check SHA1 checksum between given file and server record and return true if they match.
-        private bool CheckSHA1(string filePath, string url, string fileName, BackgroundWorker worker)
-        {
-            return ComputeSHA1(filePath) == Encoding.ASCII.GetString(DownloadFile(url, fileName, worker)).Trim();
         }
 
         private void SetActionButtonsEnabled(bool enabled)
@@ -1354,11 +1272,6 @@ namespace FFXIVKoreanPatch.Main
             }
 
             return null;
-        }
-
-        private string GetServerUrl()
-        {
-            return serverUrlBase + "release-" + targetLanguageCode;
         }
 
         private string GetManagedReleaseBaseDir()
@@ -3137,14 +3050,6 @@ namespace FFXIVKoreanPatch.Main
                 }
 #endif
 
-                // Populate necessary paths.
-                mainPath = Application.ExecutablePath;
-                mainTempPath = Path.Combine(Application.CommonAppDataPath, $"{mainFileName}.exe");
-                updaterPath = Path.Combine(Application.CommonAppDataPath, $"{updaterFileName}.exe");
-
-                // Clean up some stuff.
-                ClearCache();
-
                 // Remote self-update is intentionally disabled in this fork.
                 // Release builds generate patch files locally and should not depend on old upstream release assets.
                 UpdateStatusLabel("로컬 생성 모드로 실행 중...");
@@ -3300,14 +3205,10 @@ namespace FFXIVKoreanPatch.Main
 
                 // This fork does not download prebuilt patch releases.
                 // All patch files are generated from the user's local Korean/global clients.
-                serverVersion = "로컬 생성 모드";
-                serverPatchAvailable = false;
                 UpdateDownloadLabel("");
 
                 // Check all done!
-                UpdateStatusLabel(serverPatchAvailable
-                    ? $"버전 {targetVersion}, {targetLanguageDisplayName}용 패치 버전 {serverVersion}"
-                    : $"버전 {targetVersion}, 로컬 생성 모드", serverPatchAvailable && !serverVersion.Equals(targetVersion));
+                UpdateStatusLabel($"버전 {targetVersion}, 로컬 생성 모드", false);
 
                 Invoke(new Action(() =>
                 {
@@ -3431,7 +3332,6 @@ namespace FFXIVKoreanPatch.Main
                 targetLanguageDisplayName = "일본어";
             }
 
-            serverPatchAvailable = false;
             MarkPreflightRequired();
             if (statusLabel != null && statusLabel.IsHandleCreated)
             {
@@ -3470,8 +3370,6 @@ namespace FFXIVKoreanPatch.Main
             targetDir = string.Empty;
             koreaSourceDir = string.Empty;
             targetVersion = string.Empty;
-            serverVersion = string.Empty;
-            serverPatchAvailable = false;
             releaseOutputDir = string.Empty;
             useDebugApplyPath = false;
             MarkPreflightRequired();
@@ -4058,43 +3956,4 @@ namespace FFXIVKoreanPatch.Main
         #endregion
     }
 
-    // Extending HTTP client stream to report download progress while copying.
-    public static class StreamExtensions
-    {
-        // Extending CopyToAsync to accept interface that reports an integer progress.
-        public static async Task CopyToAsync(this Stream source, Stream destination, int bufferSize, long totalLength, IProgress<int> progress)
-        {
-            // Check parameters.
-            if (source == null) throw new ArgumentNullException(nameof(source));
-            if (!source.CanRead) throw new ArgumentException("Has to be readable.", nameof(source));
-            if (destination == null) throw new ArgumentNullException(nameof(destination));
-            if (!destination.CanWrite) throw new ArgumentException("Has to be writable.", nameof(destination));
-            if (bufferSize < 0) throw new ArgumentOutOfRangeException(nameof(bufferSize));
-
-            // Make a buffer with given buffer size.
-            byte[] buffer = new byte[bufferSize];
-            long totalBytesRead = 0;
-            int bytesRead;
-            int progressReport = 0;
-
-            // Fill buffer.
-            while ((bytesRead = await source.ReadAsync(buffer, 0, buffer.Length).ConfigureAwait(false)) != 0)
-            {
-                // Write buffer to destination.
-                await destination.WriteAsync(buffer, 0, bytesRead).ConfigureAwait(false);
-
-                // Up the total counter.
-                totalBytesRead += bytesRead;
-                int newProgressReport = (int)(totalBytesRead * 100 / totalLength);
-
-                // Only report if progress became higher.
-                if (newProgressReport > progressReport)
-                {
-                    // Report the progress.
-                    progressReport = newProgressReport;
-                    progress.Report(progressReport);
-                }
-            }
-        }
-    }
 }

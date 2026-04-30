@@ -438,7 +438,10 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
 
     internal sealed class SqPackDatWriter : IDisposable
     {
+        // SqPack dat file offsets and block payloads are aligned to 0x80 bytes.
         private const int Alignment = 0x80;
+
+        // Payload size used by FFXIV standard file blocks; larger files are split across blocks.
         private const int MaxBlockSize = 16000;
 
         private readonly FileStream _stream;
@@ -573,12 +576,15 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
             using (BinaryReader reader = new BinaryReader(stream))
             {
                 stream.Position = 0;
+
+                // dat headers are 0x800 bytes. Reuse dat0 metadata so generated dat1 matches the client format.
                 byte[] header = reader.ReadBytes(0x800);
                 if (header.Length != 0x800)
                 {
                     throw new InvalidDataException("SqPack dat header is shorter than expected.");
                 }
 
+                // Header field at 0x410 stores the number of data files; set at least 2 so dat1 is accepted.
                 Endian.WriteUInt32LE(header, 0x400 + 0x10, 2);
                 return header;
             }
@@ -631,11 +637,13 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
 
         public byte DataFileId
         {
+            // Low data bits: bit 0 is an entry flag, bits 1-3 encode dat id.
             get { return (byte)((Data & 0xEu) >> 1); }
         }
 
         public long Offset
         {
+            // Index offsets are stored as absoluteOffset / 8 in the upper bits.
             get { return (long)(Data & 0xFFFFFFF0u) * 8L; }
         }
     }
@@ -648,11 +656,13 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
 
         public byte DataFileId
         {
+            // Low data bits: bit 0 is an entry flag, bits 1-3 encode dat id.
             get { return (byte)((Data & 0xEu) >> 1); }
         }
 
         public long Offset
         {
+            // Index offsets are stored as absoluteOffset / 8 in the upper bits.
             get { return (long)(Data & 0xFFFFFFF0u) * 8L; }
         }
     }
@@ -666,6 +676,7 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
 
     internal static class DatBlockTypes
     {
+        // FFXIV uses 32000 in the compressed-size field to mean the block payload is stored raw.
         public const uint Uncompressed = 32000;
     }
 }

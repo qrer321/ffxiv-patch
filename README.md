@@ -1,5 +1,9 @@
 # FFXIV Korean Patch Tool
 
+## 원작자에 대한 감사
+
+이 프로젝트는 FFXIV 한글 패치 원작자인 [korean-patch](https://github.com/korean-patch)의 작업과 공개/공유된 구현을 참고해 확장한 작업본입니다. 한글 패치의 기반이 되는 아이디어와 구현 흐름을 만들어주신 원작자에게 감사드립니다.
+
 ## 원본 리포지토리와 이 저장소의 목적
 
 이 저장소는 기존 FFXIV 한글 패치 WinForms UI 리포지토리를 기반으로 만든 확장 작업본입니다. 원본 리포지토리는 배포된 패치 파일을 내려받아 글로벌 서버 클라이언트에 설치/제거하는 패쳐 UI 역할을 중심으로 구성되어 있었습니다.
@@ -111,9 +115,9 @@ UI 실행 중 생성/관리되는 주요 폴더는 실행 파일이 있는 `Rele
 Release\Public\
 ├─ FFXIVKoreanPatch.exe
 ├─ FFXIVKoreanPatch.exe.config
-├─ FFXIVKoreanPatchUpdater.exe
-├─ FFXIVKoreanPatchUpdater.exe.config
-└─ FFXIVPatchGenerator.exe
+├─ FFXIVPatchGenerator.exe
+├─ TTMPD.mpd
+└─ TTMPL.mpl
 ```
 
 테스트 빌드:
@@ -128,7 +132,9 @@ Release\Public\
 Release\Test\
 ├─ FFXIVKoreanPatch.Test.exe
 ├─ FFXIVKoreanPatch.Test.exe.config
-└─ FFXIVPatchGenerator.exe
+├─ FFXIVPatchGenerator.exe
+├─ TTMPD.mpd
+└─ TTMPL.mpl
 ```
 
 ## GitHub 업로드 기준
