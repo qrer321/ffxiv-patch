@@ -21,9 +21,9 @@
 ```text
 .
 ├─ FFXIVPatchUI/          WinForms UI, 설치/제거/테스트/경로 탐색 담당
-├─ FFXIVPatchGenerator/          패치 release 파일을 생성하는 콘솔 빌더
+├─ FFXIVPatchGenerator/   패치 release 파일을 생성하는 콘솔 빌더
 ├─ Scripts/               릴리즈/테스트 빌드 스크립트
-├─ Docs/                  릴리즈 빌드 메모
+├─ Docs/                  기능 목록과 릴리즈 빌드 문서
 ├─ Release/               빌드 결과물 출력 폴더, Git에는 올리지 않음
 ├─ FfxivKoreanPatch.sln   UI와 FFXIVPatchGenerator를 묶은 루트 솔루션
 └─ README.md
@@ -44,6 +44,13 @@
   - 글로벌 클라이언트의 `root.exl`과 EXH 구조를 기준으로 대상 언어 EXD를 재생성합니다.
   - 한섭 `*_ko.exd`의 SeString 바이트를 글로벌 `*_ja.exd` 또는 `*_en.exd`에 반영합니다.
   - 텍스트 패치 파일과 폰트 패치 파일을 생성합니다.
+
+## 상세 문서
+
+- `FFXIVPatchUI\README.md`: UI 버튼, 테스트/릴리즈 빌드 동작, 백업/복구 흐름
+- `FFXIVPatchGenerator\README.md`: 제너레이터 입력/출력, CLI 옵션, 텍스트/폰트 패치 방식
+- `Docs\FEATURES.md`: 현재 코드 기준 기능 전수 조사
+- `Docs\RELEASE.md`: 릴리즈/테스트 빌드 산출물과 배포 전 확인 항목
 
 ## 참고한 코드
 

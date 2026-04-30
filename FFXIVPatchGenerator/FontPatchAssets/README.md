@@ -1,8 +1,14 @@
 # FontPatchAssets
 
-Place the original font patch package files here when building local test or release artifacts:
+이 폴더는 폰트 패치용 TTMP 패키지를 로컬 빌드에 포함하기 위한 위치입니다.
+
+필요 파일:
 
 - `TTMPD.mpd`
 - `TTMPL.mpl`
 
-These files are copied next to `FFXIVPatchGenerator.exe` during build and are used first for font patch generation. They are intentionally ignored by Git because they are generated/mod package data, not source code.
+두 파일이 이 폴더에 있으면 빌드 시 `FFXIVPatchGenerator.exe` 옆으로 복사됩니다. 제너레이터는 폰트 패치를 만들 때 이 TTMP 패키지를 우선 사용합니다.
+
+TTMP 패키지는 소스 코드가 아니라 생성된 모드/패치 데이터이므로 Git에는 커밋하지 않습니다. 실제 릴리즈 빌드나 테스트 빌드를 만들 때만 로컬에 배치합니다.
+
+TTMP 파일이 없으면 기본적으로 폰트 패치 생성을 중단합니다. `--allow-korean-font-fallback`으로 한국 서버 클라이언트의 폰트 리소스를 직접 복사할 수 있지만, 글로벌 클라이언트에서 글리프가 누락될 수 있어 실사용 릴리즈에는 권장하지 않습니다.
