@@ -6,7 +6,8 @@
     "custom/example*"
   ],
   "keep_rows": {
-    "ExampleSheet": [1000, 1001]
+    "ExampleSheet": [1000, 1001],
+    "Addon": [44, 45, 49]
   },
   "keep_columns": {
     "ExampleSheet": [0, 4]

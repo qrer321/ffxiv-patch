@@ -11,6 +11,7 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
     internal sealed class PatchPolicy
     {
         public static readonly PatchPolicy Empty = new PatchPolicy();
+        private static readonly uint[] CompactTimeUnitAddonRows = new uint[] { 44, 45, 49 };
 
         private readonly HashSet<string> _deleteFiles = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         private readonly Dictionary<string, PatchSheetPolicy> _sheets = new Dictionary<string, PatchSheetPolicy>(StringComparer.OrdinalIgnoreCase);
@@ -18,9 +19,10 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
 
         public static PatchPolicy Load(string policyPath)
         {
+            PatchPolicy policy = CreateBuiltInDefault();
             if (string.IsNullOrWhiteSpace(policyPath))
             {
-                return Empty;
+                return policy;
             }
 
             string fullPath = Path.GetFullPath(policyPath);
@@ -37,7 +39,6 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
                 throw new InvalidDataException("Patch policy root must be a JSON object: " + fullPath);
             }
 
-            PatchPolicy policy = new PatchPolicy();
             policy.LoadDeleteFiles(root);
             policy.LoadPatternList(root, "row_key_fallback_files", policy._rowKeyFallbackFiles);
             policy.LoadRowLists(root, "keep_rows", delegate(PatchSheetPolicy sheetPolicy, uint rowId) { sheetPolicy.KeepRows.Add(rowId); });
@@ -46,6 +47,21 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
             policy.LoadColumnLists(root, "delete_columns", delegate(PatchSheetPolicy sheetPolicy, ushort columnOffset) { sheetPolicy.KeepColumns.Add(columnOffset); });
             policy.LoadRemapKeys(root);
             policy.LoadRemapColumns(root);
+            return policy;
+        }
+
+        private static PatchPolicy CreateBuiltInDefault()
+        {
+            PatchPolicy policy = new PatchPolicy();
+            PatchSheetPolicy addonPolicy = policy.GetOrCreateSheetPolicy("Addon");
+
+            // Global Addon rows 44/45/49 are compact h/m/s time-unit labels.
+            // Korean "시간/분/초" overflows narrow global UI slots such as icon timers.
+            for (int i = 0; i < CompactTimeUnitAddonRows.Length; i++)
+            {
+                addonPolicy.KeepRows.Add(CompactTimeUnitAddonRows[i]);
+            }
+
             return policy;
         }
 

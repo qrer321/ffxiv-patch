@@ -146,6 +146,7 @@
 - 일부 allowlist sheet의 row id fallback
 - `row_key_fallback_files` 정책으로 row id fallback 대상 sheet 외부 확장
 - `Addon` sheet의 짧은 숫자/기호/SeString UI 토큰 보호
+- `Addon` row `44`, `45`, `49` 기본 보호로 좁은 UI의 `h/m/s` 시간 단위가 `시간/분/초`로 늘어나 영역을 넘치는 문제 완화
 - `patch-policy.json` 기반 sheet/row/column 보존과 row/column remap
 - `patch-diagnostics.tsv` 생성
 - `--diagnostic-csv` 지정 sheet의 row/column 비교 CSV 생성

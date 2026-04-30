@@ -64,6 +64,7 @@ UI가 release 폴더를 적용할 때는 별도로 `manifest.json`을 생성해 
 - 문자열 key가 있는 sheet는 `TEXT_...` 형태의 string key로 row를 매핑합니다.
 - string key가 안정적이지 않은 일부 sheet는 명시된 allowlist에 한해 row id 기반 fallback을 사용합니다.
 - `Addon` sheet에서는 한글이 없는 짧은 숫자/기호/SeString UI 토큰을 치환하지 않고 글로벌 원본 값을 유지합니다. 파티 리스트 번호처럼 별도 glyph 경로를 타는 UI 요소가 한국 서버 토큰으로 바뀌어 깨지는 상황을 줄이기 위한 보호 로직입니다.
+- `Addon` row `44`, `45`, `49`는 기본 내장 정책으로 글로벌 원본을 유지합니다. 이 row들은 글로벌 클라이언트에서 `h`, `m`, `s`처럼 좁은 영역용 시간 단위로 쓰이며, 한국어 `시간`, `분`, `초`로 바뀌면 핫바/아이콘 타이머 같은 UI에서 텍스트가 영역 밖으로 넘칠 수 있습니다.
 - `ExcelVariant.Default` sheet만 처리합니다.
 - `ExcelVariant.Subrows` sheet는 아직 스킵하고 `patch-diagnostics.tsv`에 `unsupported-subrows`로 기록합니다.
 
@@ -74,6 +75,8 @@ UI가 release 폴더를 적용할 때는 별도로 `manifest.json`을 생성해 
 추가 진단이 필요하면 `--diagnostic-csv <sheet>`를 사용합니다. 지정한 sheet에 대해 글로벌 문자열, 한국 서버 문자열, 실제 선택된 문자열, 매핑 방식, row/column 정책 적용 여부를 CSV로 확인할 수 있습니다.
 
 선택적으로 `--policy <json>` 또는 실행 파일 옆 `patch-policy.json`으로 외부 보정 정책을 적용할 수 있습니다. 지원하는 항목은 다음과 같습니다.
+
+외부 정책 파일이 없어도 일부 안전 정책은 기본 내장됩니다. 현재는 `Addon` row `44`, `45`, `49`를 글로벌 원본으로 유지해 좁은 UI 시간 단위가 `1시간`, `32분`처럼 넘치는 상황을 줄입니다.
 
 - `delete_files`: sheet 전체 스킵
 - `row_key_fallback_files`: string key가 없는 sheet의 row-id fallback 허용. `*`, `?` wildcard를 사용할 수 있습니다.
