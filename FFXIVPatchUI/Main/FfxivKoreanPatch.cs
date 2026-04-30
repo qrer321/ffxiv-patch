@@ -144,6 +144,7 @@ namespace FFXIVKoreanPatch.Main
         public FFXIVKoreanPatch()
         {
             InitializeComponent();
+            SetStyle(ControlStyles.AllPaintingInWmPaint | ControlStyles.OptimizedDoubleBuffer | ControlStyles.ResizeRedraw, true);
 
             Text = patchDisplayName;
             debugBuildReleaseButton.Text = "테스트 자동 패치 (원본 변경 없음)";
@@ -227,6 +228,86 @@ namespace FFXIVKoreanPatch.Main
             BackgroundImage = newImage;
         }
 
+        protected override void OnPaint(PaintEventArgs e)
+        {
+            base.OnPaint(e);
+
+            e.Graphics.SmoothingMode = SmoothingMode.AntiAlias;
+            e.Graphics.PixelOffsetMode = PixelOffsetMode.HighQuality;
+
+            using (SolidBrush veil = new SolidBrush(Color.FromArgb(76, 7, 10, 14)))
+            {
+                e.Graphics.FillRectangle(veil, 0, 0, ClientSize.Width, 210);
+            }
+
+            using (LinearGradientBrush brush = new LinearGradientBrush(
+                new Rectangle(0, 0, ClientSize.Width, 280),
+                Color.FromArgb(120, 18, 33, 44),
+                Color.FromArgb(8, 18, 21, 26),
+                90f))
+            {
+                e.Graphics.FillRectangle(brush, 0, 0, ClientSize.Width, 280);
+            }
+
+            DrawSurface(e.Graphics, new Rectangle(24, 240, 852, 285));
+            DrawSurface(e.Graphics, new Rectangle(24, 542, 852, 104));
+            DrawSurface(e.Graphics, new Rectangle(24, 662, 852, 112));
+
+            using (SolidBrush accent = new SolidBrush(Color.FromArgb(76, 169, 232)))
+            {
+                e.Graphics.FillRectangle(accent, 42, 255, 4, 22);
+                e.Graphics.FillRectangle(accent, 42, 557, 4, 22);
+                e.Graphics.FillRectangle(accent, 42, 677, 4, 22);
+            }
+
+            DrawModeBadge(e.Graphics);
+        }
+
+        private void DrawSurface(Graphics graphics, Rectangle bounds)
+        {
+            using (GraphicsPath path = CreateRoundedRectangle(bounds, 8))
+            using (SolidBrush fill = new SolidBrush(Color.FromArgb(232, 24, 28, 34)))
+            using (Pen border = new Pen(Color.FromArgb(72, 102, 118, 138)))
+            {
+                graphics.FillPath(fill, path);
+                graphics.DrawPath(border, path);
+            }
+        }
+
+        private void DrawModeBadge(Graphics graphics)
+        {
+            Rectangle bounds = new Rectangle(758, 38, 118, 32);
+            Color fillColor;
+            Color borderColor;
+#if TEST_BUILD
+            fillColor = Color.FromArgb(82, 64, 39, 18);
+            borderColor = Color.FromArgb(230, 174, 83);
+#else
+            fillColor = Color.FromArgb(74, 24, 64, 45);
+            borderColor = Color.FromArgb(86, 190, 128);
+#endif
+
+            using (GraphicsPath path = CreateRoundedRectangle(bounds, 8))
+            using (SolidBrush fill = new SolidBrush(fillColor))
+            using (Pen border = new Pen(borderColor))
+            {
+                graphics.FillPath(fill, path);
+                graphics.DrawPath(border, path);
+            }
+        }
+
+        private static GraphicsPath CreateRoundedRectangle(Rectangle bounds, int radius)
+        {
+            int diameter = radius * 2;
+            GraphicsPath path = new GraphicsPath();
+            path.AddArc(bounds.Left, bounds.Top, diameter, diameter, 180, 90);
+            path.AddArc(bounds.Right - diameter, bounds.Top, diameter, diameter, 270, 90);
+            path.AddArc(bounds.Right - diameter, bounds.Bottom - diameter, diameter, diameter, 0, 90);
+            path.AddArc(bounds.Left, bounds.Bottom - diameter, diameter, diameter, 90, 90);
+            path.CloseFigure();
+            return path;
+        }
+
         private Label CreateLayoutLabel(string name, string text, int x, int y, int width, int height, Font font, Color color)
         {
             Label label = new Label();
@@ -274,6 +355,7 @@ namespace FFXIVKoreanPatch.Main
             button.Dock = DockStyle.None;
             button.BackColor = backColor;
             button.ForeColor = Color.FromArgb(246, 248, 250);
+            button.Cursor = Cursors.Hand;
             button.FlatStyle = FlatStyle.Flat;
             button.FlatAppearance.BorderColor = borderColor;
             button.FlatAppearance.BorderSize = 1;
@@ -297,18 +379,19 @@ namespace FFXIVKoreanPatch.Main
         {
             SuspendLayout();
 
-            ClientSize = new Size(760, 980);
+            ClientSize = new Size(900, 790);
             BackColor = Color.FromArgb(18, 21, 26);
             ForeColor = Color.FromArgb(240, 243, 247);
             Font = new Font("맑은 고딕", 9F, FontStyle.Regular, GraphicsUnit.Point, 129);
 
-            Font titleFont = new Font("맑은 고딕", 18F, FontStyle.Bold, GraphicsUnit.Point, 129);
+            Font eyebrowFont = new Font("맑은 고딕", 8.5F, FontStyle.Bold, GraphicsUnit.Point, 129);
+            Font titleFont = new Font("맑은 고딕", 22F, FontStyle.Bold, GraphicsUnit.Point, 129);
             Font sectionFont = new Font("맑은 고딕", 10F, FontStyle.Bold, GraphicsUnit.Point, 129);
             Font smallFont = new Font("맑은 고딕", 8.5F, FontStyle.Bold, GraphicsUnit.Point, 129);
 
-            int contentTop = 330;
-
-            CreateLayoutLabel("titleLabel", "FFXIV 한글 패치", 24, contentTop, 420, 36, titleFont, Color.White);
+            CreateLayoutLabel("eyebrowLabel", "GLOBAL CLIENT PATCHER", 34, 30, 260, 22, eyebrowFont, Color.FromArgb(166, 218, 255));
+            CreateLayoutLabel("titleLabel", "FFXIV 한글 패치", 32, 56, 480, 52, titleFont, Color.White);
+            CreateLayoutLabel("subtitleLabel", "일본어 / 영어 클라이언트", 36, 108, 320, 24, smallFont, Color.FromArgb(220, 227, 236));
             CreateLayoutLabel(
                 "modeLabel",
 #if TEST_BUILD
@@ -316,10 +399,10 @@ namespace FFXIVKoreanPatch.Main
 #else
                 "RELEASE",
 #endif
-                646,
-                contentTop + 8,
-                90,
-                26,
+                758,
+                40,
+                118,
+                28,
                 smallFont,
 #if TEST_BUILD
                 Color.FromArgb(255, 202, 113)
@@ -327,9 +410,9 @@ namespace FFXIVKoreanPatch.Main
                 Color.FromArgb(125, 220, 151)
 #endif
                 );
-            CreateLayoutLabel("pathsSectionLabel", "클라이언트 경로", 24, contentTop + 60, 180, 24, sectionFont, Color.FromArgb(230, 235, 241));
-            CreateLayoutLabel("manageSectionLabel", "관리", 24, contentTop + 266, 180, 24, sectionFont, Color.FromArgb(230, 235, 241));
-            CreateLayoutLabel("actionsSectionLabel", "작업", 24, contentTop + 336, 180, 24, sectionFont, Color.FromArgb(230, 235, 241));
+            CreateLayoutLabel("pathsSectionLabel", "클라이언트", 54, 254, 180, 24, sectionFont, Color.FromArgb(236, 241, 247));
+            CreateLayoutLabel("actionsSectionLabel", "패치 작업", 54, 556, 180, 24, sectionFont, Color.FromArgb(236, 241, 247));
+            CreateLayoutLabel("statusSectionLabel", "상태", 54, 676, 180, 24, sectionFont, Color.FromArgb(236, 241, 247));
 
             StyleFieldLabel(globalPathLabel);
             StyleFieldLabel(koreaPathLabel);
@@ -338,21 +421,21 @@ namespace FFXIVKoreanPatch.Main
             StyleTextBox(koreaPathTextBox);
             StyleComboBox(targetLanguageComboBox);
 
-            Color neutral = Color.FromArgb(44, 50, 58);
-            Color neutralBorder = Color.FromArgb(77, 86, 98);
-            Color neutralHover = Color.FromArgb(58, 67, 78);
-            Color primary = Color.FromArgb(30, 116, 176);
-            Color primaryBorder = Color.FromArgb(73, 152, 208);
-            Color primaryHover = Color.FromArgb(38, 134, 202);
-            Color success = Color.FromArgb(31, 132, 88);
-            Color successBorder = Color.FromArgb(73, 174, 123);
-            Color successHover = Color.FromArgb(38, 150, 101);
-            Color caution = Color.FromArgb(143, 106, 35);
-            Color cautionBorder = Color.FromArgb(198, 154, 63);
-            Color cautionHover = Color.FromArgb(165, 124, 43);
-            Color danger = Color.FromArgb(137, 55, 55);
-            Color dangerBorder = Color.FromArgb(194, 91, 91);
-            Color dangerHover = Color.FromArgb(158, 65, 65);
+            Color neutral = Color.FromArgb(42, 50, 61);
+            Color neutralBorder = Color.FromArgb(82, 96, 112);
+            Color neutralHover = Color.FromArgb(56, 67, 80);
+            Color primary = Color.FromArgb(34, 126, 188);
+            Color primaryBorder = Color.FromArgb(90, 184, 235);
+            Color primaryHover = Color.FromArgb(42, 145, 214);
+            Color success = Color.FromArgb(32, 139, 94);
+            Color successBorder = Color.FromArgb(91, 204, 148);
+            Color successHover = Color.FromArgb(40, 160, 110);
+            Color caution = Color.FromArgb(151, 111, 38);
+            Color cautionBorder = Color.FromArgb(218, 169, 70);
+            Color cautionHover = Color.FromArgb(174, 129, 46);
+            Color danger = Color.FromArgb(147, 59, 67);
+            Color dangerBorder = Color.FromArgb(218, 101, 110);
+            Color dangerHover = Color.FromArgb(171, 70, 79);
 
             foreach (Button button in new Button[]
             {
@@ -376,42 +459,42 @@ namespace FFXIVKoreanPatch.Main
             StyleButton(chatOnlyInstallButton, neutral, neutralBorder, neutralHover);
             StyleButton(removeButton, danger, dangerBorder, dangerHover);
 
-            PlaceControl(globalPathLabel, 24, contentTop + 90, 220, 20);
-            PlaceControl(globalPathTextBox, 24, contentTop + 113, 610, 26);
-            PlaceControl(globalPathBrowseButton, 646, contentTop + 112, 90, 28);
+            PlaceControl(globalPathLabel, 42, 290, 220, 20);
+            PlaceControl(globalPathTextBox, 42, 314, 720, 28);
+            PlaceControl(globalPathBrowseButton, 778, 313, 80, 30);
 
-            PlaceControl(koreaPathLabel, 24, contentTop + 153, 220, 20);
-            PlaceControl(koreaPathTextBox, 24, contentTop + 176, 610, 26);
-            PlaceControl(koreaPathBrowseButton, 646, contentTop + 175, 90, 28);
+            PlaceControl(koreaPathLabel, 42, 354, 220, 20);
+            PlaceControl(koreaPathTextBox, 42, 378, 720, 28);
+            PlaceControl(koreaPathBrowseButton, 778, 377, 80, 30);
 
-            PlaceControl(targetLanguageLabel, 24, contentTop + 216, 220, 20);
-            PlaceControl(targetLanguageComboBox, 24, contentTop + 239, 230, 28);
-            PlaceControl(detectPathsButton, 270, contentTop + 238, 172, 30);
-            PlaceControl(resetPathsButton, 454, contentTop + 238, 140, 30);
+            PlaceControl(targetLanguageLabel, 42, 418, 220, 20);
+            PlaceControl(targetLanguageComboBox, 42, 442, 260, 30);
+            PlaceControl(detectPathsButton, 318, 441, 170, 32);
+            PlaceControl(resetPathsButton, 500, 441, 132, 32);
 
-            PlaceControl(openReleaseButton, 24, contentTop + 294, 170, 32);
-            PlaceControl(openLogsButton, 204, contentTop + 294, 160, 32);
-            PlaceControl(cleanupButton, 374, contentTop + 294, 170, 32);
-            PlaceControl(restoreBackupButton, 554, contentTop + 294, 182, 32);
+            PlaceControl(openReleaseButton, 42, 484, 194, 32);
+            PlaceControl(openLogsButton, 248, 484, 184, 32);
+            PlaceControl(cleanupButton, 444, 484, 190, 32);
+            PlaceControl(restoreBackupButton, 646, 484, 212, 32);
 
 #if TEST_BUILD
-            PlaceControl(preflightCheckButton, 24, contentTop + 368, 350, 44);
-            PlaceControl(debugBuildReleaseButton, 386, contentTop + 368, 350, 44);
+            PlaceControl(preflightCheckButton, 42, 590, 404, 42);
+            PlaceControl(debugBuildReleaseButton, 458, 590, 400, 42);
 #else
-            PlaceControl(preflightCheckButton, 24, contentTop + 368, 712, 42);
-            PlaceControl(installButton, 24, contentTop + 422, 226, 42);
-            PlaceControl(chatOnlyInstallButton, 267, contentTop + 422, 226, 42);
-            PlaceControl(removeButton, 510, contentTop + 422, 226, 42);
+            PlaceControl(preflightCheckButton, 42, 590, 238, 42);
+            PlaceControl(installButton, 294, 590, 178, 42);
+            PlaceControl(chatOnlyInstallButton, 486, 590, 178, 42);
+            PlaceControl(removeButton, 678, 590, 180, 42);
 #endif
 
             statusLabel.AutoSize = false;
             statusLabel.Dock = DockStyle.None;
-            statusLabel.BackColor = Color.FromArgb(24, 28, 34);
-            statusLabel.BorderStyle = BorderStyle.FixedSingle;
+            statusLabel.BackColor = Color.FromArgb(30, 36, 44);
+            statusLabel.BorderStyle = BorderStyle.None;
             statusLabel.ForeColor = Color.White;
             statusLabel.Padding = new Padding(12, 0, 12, 0);
             statusLabel.TextAlign = ContentAlignment.MiddleLeft;
-            PlaceControl(statusLabel, 24, contentTop + 548, 712, 38);
+            PlaceControl(statusLabel, 42, 706, 816, 34);
 
             downloadLabel.AutoSize = false;
             downloadLabel.Dock = DockStyle.None;
@@ -419,10 +502,10 @@ namespace FFXIVKoreanPatch.Main
             downloadLabel.ForeColor = Color.FromArgb(198, 205, 214);
             downloadLabel.Padding = new Padding(0);
             downloadLabel.TextAlign = ContentAlignment.MiddleLeft;
-            PlaceControl(downloadLabel, 24, contentTop + 592, 712, 24);
+            PlaceControl(downloadLabel, 42, 741, 816, 18);
 
             progressBar.Dock = DockStyle.None;
-            PlaceControl(progressBar, 24, contentTop + 621, 712, 10);
+            PlaceControl(progressBar, 42, 764, 816, 8);
 
             ResumeLayout(false);
         }
