@@ -43,11 +43,13 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
                 Console.WriteLine("  EXD rows patched:     {0}", report.RowsPatched);
                 Console.WriteLine("  String-key rows:      {0}", report.StringKeyRowsPatched);
                 Console.WriteLine("  Row-key rows:         {0}", report.RowKeyRowsPatched);
+                Console.WriteLine("  Protected UI tokens:  {0}", report.ProtectedUiStrings);
                 Console.WriteLine("  Pages without mapping:{0}", report.PagesSkippedNoMapping);
                 Console.WriteLine("  Missing source pages: {0}", report.MissingSourcePages);
                 Console.WriteLine("  Missing target pages: {0}", report.MissingTargetPages);
                 Console.WriteLine("  Unsupported sheets:   {0}", report.UnsupportedSheets);
                 Console.WriteLine("  Font files patched:   {0}", report.FontFilesPatched);
+                Console.WriteLine("  Font files skipped:   {0}", report.FontFilesSkippedByProfile);
                 Console.WriteLine("  Output:               {0}", Path.GetFullPath(options.OutputPath));
                 if (!string.IsNullOrEmpty(report.DiagnosticsPath))
                 {
@@ -105,6 +107,7 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
             Console.WriteLine("  --include-font     Also build 000000 font patch files.");
             Console.WriteLine("  --font-only        Build only 000000 font patch files.");
             Console.WriteLine("  --font-pack-dir    Directory containing TTMPD.mpd and TTMPL.mpl for font patching.");
+            Console.WriteLine("  --font-profile     Font patch profile for diagnostics. Default: full");
             Console.WriteLine("  --allow-korean-font-fallback");
             Console.WriteLine("                     Experimental: copy Korean client font resources if TTMP files are missing.");
             Console.WriteLine("  --base-font-index  Clean global 000000.win32.index to use instead of installed index.");
@@ -196,6 +199,7 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
         public string BaseFontIndexPath;
         public string BaseFontIndex2Path;
         public string FontPackDir;
+        public string FontPatchProfile = FontPatchProfiles.Full;
         public bool IncludeFont;
         public bool FontOnly;
         public bool AllowPatchedGlobal;
@@ -292,6 +296,11 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
                 options.FontPackDir = value.Trim('"');
             }
 
+            if (values.TryGetValue("--font-profile", out value))
+            {
+                options.FontPatchProfile = FontPatchProfiles.Normalize(value.Trim('"'));
+            }
+
             if (LanguageCodes.ToId(options.TargetLanguage) == 0)
             {
                 throw new ArgumentException("Unsupported target language: " + options.TargetLanguage);
@@ -324,11 +333,13 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
         public int RowsPatched;
         public int StringKeyRowsPatched;
         public int RowKeyRowsPatched;
+        public int ProtectedUiStrings;
         public int PagesSkippedNoMapping;
         public int MissingSourcePages;
         public int MissingTargetPages;
         public int UnsupportedSheets;
         public int FontFilesPatched;
+        public int FontFilesSkippedByProfile;
         public string DiagnosticsPath;
         public readonly List<string> Warnings = new List<string>();
     }

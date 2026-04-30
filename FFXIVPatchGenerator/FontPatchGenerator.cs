@@ -120,6 +120,8 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
                 Console.WriteLine("Using TTMP font package: {0}", fontPackage.DirectoryPath);
             }
 
+            Console.WriteLine("Using font profile:      {0}", _options.FontPatchProfile);
+
             string currentGlobalIndex = Path.Combine(globalSqpack, IndexFileName);
             string originalGlobalIndex = Path.Combine(globalSqpack, OrigIndexFileName);
             string baseIndex = ResolveBaseIndex(currentGlobalIndex, originalGlobalIndex);
@@ -181,6 +183,12 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
             {
                 string path = FontPaths[i];
                 ProgressReporter.Report(90 + i * 8 / FontPaths.Length, "폰트 처리 중: " + (i + 1).ToString() + "/" + FontPaths.Length.ToString());
+                if (!ShouldIncludeFontPath(path))
+                {
+                    _report.FontFilesSkippedByProfile++;
+                    continue;
+                }
+
                 if (!mutableIndex.ContainsPath(path))
                 {
                     AddLimitedWarning("Missing global font target: " + path);
@@ -216,6 +224,11 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
                     FontPayload payload = fontPackage.Payloads[i];
                     string path = NormalizeGamePath(payload.FullPath);
                     ProgressReporter.Report(90 + i * 8 / fontPackage.Payloads.Count, "Font patching " + (i + 1).ToString() + "/" + fontPackage.Payloads.Count.ToString());
+                    if (!ShouldIncludeFontPath(path))
+                    {
+                        _report.FontFilesSkippedByProfile++;
+                        continue;
+                    }
 
                     if (!mutableIndex.ContainsPath(path))
                     {
@@ -236,6 +249,58 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
                     _report.FontFilesPatched++;
                 }
             }
+        }
+
+        private bool ShouldIncludeFontPath(string path)
+        {
+            string profile = string.IsNullOrEmpty(_options.FontPatchProfile)
+                ? FontPatchProfiles.Full
+                : _options.FontPatchProfile;
+            if (string.Equals(profile, FontPatchProfiles.Full, StringComparison.OrdinalIgnoreCase))
+            {
+                return true;
+            }
+
+            string normalized = NormalizeGamePath(path).ToLowerInvariant();
+            if (string.Equals(profile, FontPatchProfiles.NoMiedingerMid, StringComparison.OrdinalIgnoreCase))
+            {
+                return normalized.IndexOf("/miedingermid_", StringComparison.OrdinalIgnoreCase) < 0;
+            }
+
+            if (string.Equals(profile, FontPatchProfiles.NoTrumpGothic, StringComparison.OrdinalIgnoreCase))
+            {
+                return normalized.IndexOf("/trumpgothic_", StringComparison.OrdinalIgnoreCase) < 0;
+            }
+
+            if (string.Equals(profile, FontPatchProfiles.NoJupiter, StringComparison.OrdinalIgnoreCase))
+            {
+                return normalized.IndexOf("/jupiter_", StringComparison.OrdinalIgnoreCase) < 0;
+            }
+
+            if (string.Equals(profile, FontPatchProfiles.NoAxis, StringComparison.OrdinalIgnoreCase))
+            {
+                return normalized.IndexOf("/axis_", StringComparison.OrdinalIgnoreCase) < 0 &&
+                       normalized.IndexOf("/krnaxis_", StringComparison.OrdinalIgnoreCase) < 0;
+            }
+
+            if (string.Equals(profile, FontPatchProfiles.UiNumericSafe, StringComparison.OrdinalIgnoreCase))
+            {
+                return normalized.IndexOf("/miedingermid_", StringComparison.OrdinalIgnoreCase) < 0 &&
+                       normalized.IndexOf("/trumpgothic_", StringComparison.OrdinalIgnoreCase) < 0 &&
+                       normalized.IndexOf("/jupiter_", StringComparison.OrdinalIgnoreCase) < 0;
+            }
+
+            if (string.Equals(profile, FontPatchProfiles.FdtOnly, StringComparison.OrdinalIgnoreCase))
+            {
+                return normalized.EndsWith(".fdt", StringComparison.OrdinalIgnoreCase);
+            }
+
+            if (string.Equals(profile, FontPatchProfiles.TexturesOnly, StringComparison.OrdinalIgnoreCase))
+            {
+                return normalized.EndsWith(".tex", StringComparison.OrdinalIgnoreCase);
+            }
+
+            return true;
         }
 
         private FontPatchPackage ResolveFontPatchPackage()
@@ -492,6 +557,39 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
             public string FullPath;
             public int ModOffset;
             public int ModSize;
+        }
+    }
+
+    internal static class FontPatchProfiles
+    {
+        public const string Full = "full";
+        public const string UiNumericSafe = "ui-numeric-safe";
+        public const string NoMiedingerMid = "no-miedingermid";
+        public const string NoTrumpGothic = "no-trumpgothic";
+        public const string NoJupiter = "no-jupiter";
+        public const string NoAxis = "no-axis";
+        public const string FdtOnly = "fdt-only";
+        public const string TexturesOnly = "textures-only";
+
+        public static string Normalize(string value)
+        {
+            string normalized = (value ?? string.Empty).Trim().ToLowerInvariant();
+            switch (normalized)
+            {
+                case Full:
+                case UiNumericSafe:
+                case NoMiedingerMid:
+                case NoTrumpGothic:
+                case NoJupiter:
+                case NoAxis:
+                case FdtOnly:
+                case TexturesOnly:
+                    return normalized;
+                default:
+                    throw new ArgumentException(
+                        "Unsupported font profile: " + value +
+                        ". Supported values: full, ui-numeric-safe, no-miedingermid, no-trumpgothic, no-jupiter, no-axis, fdt-only, textures-only.");
+            }
         }
     }
 }

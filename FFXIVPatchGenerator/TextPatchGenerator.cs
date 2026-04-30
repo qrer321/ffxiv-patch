@@ -438,6 +438,9 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
             }
 
             ExdSourceMaps sourceMaps = ExdStringPatcher.BuildSourceMaps(sourceExds, sourceHeader, allowRowKeyFallback);
+            StringPatchPolicy patchPolicy = IsAddonSheet(sheetName)
+                ? StringPatchPolicy.ProtectAddonUiGlyphs
+                : StringPatchPolicy.Default;
 
             for (int i = 0; i < globalHeader.Pages.Count; i++)
             {
@@ -459,7 +462,9 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
                     sourceHeader,
                     stringColumns,
                     sourceMaps,
-                    allowRowKeyFallback);
+                    allowRowKeyFallback,
+                    patchPolicy);
+                _report.ProtectedUiStrings += patchResult.ProtectedUiStrings;
 
                 if (!patchResult.Changed)
                 {
@@ -472,7 +477,7 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
                         0,
                         0,
                         0,
-                        allowRowKeyFallback ? "row-key fallback allowed" : "row-key fallback not allowed");
+                        BuildPatchNote(allowRowKeyFallback ? "row-key fallback allowed" : "row-key fallback not allowed", patchResult.ProtectedUiStrings));
                     continue;
                 }
 
@@ -491,7 +496,7 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
                     patchResult.RowsPatched,
                     patchResult.StringKeyRows,
                     patchResult.RowKeyRows,
-                    string.Empty);
+                    BuildPatchNote(string.Empty, patchResult.ProtectedUiStrings));
 
                 if (_report.PagesPatched % 100 == 0)
                 {
@@ -608,6 +613,27 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
         {
             return sheetName.IndexOf("CtsMycEntrance", StringComparison.OrdinalIgnoreCase) >= 0 ||
                    sheetName.IndexOf("CtsErkKuganeEntrance", StringComparison.OrdinalIgnoreCase) >= 0;
+        }
+
+        private static bool IsAddonSheet(string sheetName)
+        {
+            return string.Equals(sheetName, "Addon", StringComparison.OrdinalIgnoreCase);
+        }
+
+        private static string BuildPatchNote(string baseNote, int protectedUiStrings)
+        {
+            if (protectedUiStrings <= 0)
+            {
+                return baseNote;
+            }
+
+            string protectedNote = "protected-ui-tokens=" + protectedUiStrings.ToString();
+            if (string.IsNullOrEmpty(baseNote))
+            {
+                return protectedNote;
+            }
+
+            return baseNote + "; " + protectedNote;
         }
 
         private static bool IsRowKeyFallbackAllowed(string sheetName)

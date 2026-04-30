@@ -17,6 +17,7 @@
 - 현재 설정된 경로를 UI에 표시
 - 테스트 빌드 전용 경로 자동 탐색 버튼
 - 테스트 빌드 전용 경로 리셋 버튼
+- 테스트 빌드 전용 폰트 프로필 선택
 
 ### 언어 선택
 
@@ -79,6 +80,7 @@
 - 테스트 빌드에서는 FFXIV 실행 중이어도 테스트 작업 허용
 - 테스트 빌드에서는 실제 글로벌 클라이언트 적용 버튼 차단
 - 테스트 빌드는 `debug-apply` 폴더에만 적용
+- 테스트 빌드에서는 폰트 프로필로 특정 폰트군 제외 패치를 생성해 UI glyph 깨짐 원인을 분리 가능
 - 사전 점검을 통과하지 않으면 실제 전체/폰트 패치 차단
 - 이미 패치된 index/index2가 감지되면 실제 전체/폰트 패치 차단
 - 출력 폴더가 원본 게임 폴더 내부면 제너레이터에서 중단
@@ -101,6 +103,7 @@
 - 테스트 빌드
   - 실제 적용 버튼 숨김
   - 경로 자동 탐색/리셋 버튼 표시
+  - 폰트 프로필 선택 표시
   - 테스트 자동 패치 버튼 표시
   - 실제 글로벌 클라이언트 대신 `debug-apply` 사용
 
@@ -120,6 +123,7 @@
   - 패치한 row 수
   - string-key row 수
   - row-key fallback row 수
+  - 보호한 UI 토큰 수
   - mapping 누락 page 수
   - 원본/대상 page 누락 수
   - 미지원 sheet 수
@@ -135,6 +139,7 @@
 - Subrows variant sheet 스킵
 - string key 기반 row 매핑
 - 일부 allowlist sheet의 row id fallback
+- `Addon` sheet의 짧은 숫자/기호/SeString UI 토큰 보호
 - unsafe sheet 스킵
 - 새 `0a0000.win32.dat1` 생성
 - 수정된 `0a0000.win32.index` 생성
@@ -150,6 +155,15 @@
   - `TTMPD.mpd`
   - `TTMPL.mpl`
 - `--font-pack-dir`로 TTMP 위치 지정
+- `--font-profile`로 진단용 폰트 프로필 선택
+  - `full`
+  - `ui-numeric-safe`
+  - `no-miedingermid`
+  - `no-trumpgothic`
+  - `no-jupiter`
+  - `no-axis`
+  - `fdt-only`
+  - `textures-only`
 - TTMP 누락 시 기본 실패
 - `--allow-korean-font-fallback`으로 한국 서버 폰트 직접 복사 허용
 - 새 `000000.win32.dat1` 생성
@@ -180,6 +194,7 @@
 - `--include-font`: 텍스트와 폰트 동시 생성
 - `--font-only`: 폰트만 생성
 - `--font-pack-dir`: TTMP 패키지 위치 지정
+- `--font-profile`: 진단용 폰트 프로필 선택, 기본 `full`
 - `--base-index`, `--base-index2`: 텍스트 패치용 clean index 지정
 - `--base-font-index`, `--base-font-index2`: 폰트 패치용 clean index 지정
 - `--allow-patched-global`: 이미 패치된 index 사용 허용, 실험용

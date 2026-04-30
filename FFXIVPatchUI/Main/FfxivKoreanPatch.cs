@@ -135,6 +135,8 @@ namespace FFXIVKoreanPatch.Main
         private bool buildFontPatch = true;
         private bool initialPreflightStarted;
         private bool lastPreflightPassed;
+        private Label debugFontProfileLabel;
+        private ComboBox debugFontProfileComboBox;
 
         // Target client version.
         private string targetVersion = string.Empty;
@@ -157,6 +159,7 @@ namespace FFXIVKoreanPatch.Main
             targetLanguageComboBox.Items.Add("일본어 클라이언트 (ja)");
             targetLanguageComboBox.Items.Add("영어 클라이언트 (en)");
             targetLanguageComboBox.SelectedIndex = 0;
+            InitializeDebugFontProfileControls();
 
 #if TEST_BUILD
             Text = patchDisplayName + " - 테스트 빌드";
@@ -185,6 +188,53 @@ namespace FFXIVKoreanPatch.Main
         }
 
         #region Functions
+
+        private void InitializeDebugFontProfileControls()
+        {
+            debugFontProfileLabel = new Label();
+            debugFontProfileLabel.Name = "debugFontProfileLabel";
+            debugFontProfileLabel.Text = "테스트 폰트 프로필";
+            debugFontProfileLabel.AutoSize = false;
+            debugFontProfileLabel.BackColor = Color.Transparent;
+
+            debugFontProfileComboBox = new ComboBox();
+            debugFontProfileComboBox.Name = "debugFontProfileComboBox";
+            debugFontProfileComboBox.DropDownStyle = ComboBoxStyle.DropDownList;
+            debugFontProfileComboBox.Items.Add(new FontProfileItem("전체 폰트", "full"));
+            debugFontProfileComboBox.Items.Add(new FontProfileItem("UI 숫자 보호", "ui-numeric-safe"));
+            debugFontProfileComboBox.Items.Add(new FontProfileItem("MiedingerMid 제외", "no-miedingermid"));
+            debugFontProfileComboBox.Items.Add(new FontProfileItem("TrumpGothic 제외", "no-trumpgothic"));
+            debugFontProfileComboBox.Items.Add(new FontProfileItem("Jupiter 제외", "no-jupiter"));
+            debugFontProfileComboBox.Items.Add(new FontProfileItem("AXIS 제외", "no-axis"));
+            debugFontProfileComboBox.Items.Add(new FontProfileItem("FDT만 적용", "fdt-only"));
+            debugFontProfileComboBox.Items.Add(new FontProfileItem("텍스처만 적용", "textures-only"));
+            debugFontProfileComboBox.SelectedIndex = 0;
+
+#if !TEST_BUILD
+            debugFontProfileLabel.Visible = false;
+            debugFontProfileComboBox.Visible = false;
+#endif
+
+            Controls.Add(debugFontProfileLabel);
+            Controls.Add(debugFontProfileComboBox);
+        }
+
+        private sealed class FontProfileItem
+        {
+            public readonly string DisplayName;
+            public readonly string Value;
+
+            public FontProfileItem(string displayName, string value)
+            {
+                DisplayName = displayName;
+                Value = value;
+            }
+
+            public override string ToString()
+            {
+                return DisplayName;
+            }
+        }
 
         // Grab the background from the form and apply gradient effect.
         private void AdjustBackground()
@@ -417,9 +467,11 @@ namespace FFXIVKoreanPatch.Main
             StyleFieldLabel(globalPathLabel);
             StyleFieldLabel(koreaPathLabel);
             StyleFieldLabel(targetLanguageLabel);
+            StyleFieldLabel(debugFontProfileLabel);
             StyleTextBox(globalPathTextBox);
             StyleTextBox(koreaPathTextBox);
             StyleComboBox(targetLanguageComboBox);
+            StyleComboBox(debugFontProfileComboBox);
 
             Color neutral = Color.FromArgb(42, 50, 61);
             Color neutralBorder = Color.FromArgb(82, 96, 112);
@@ -471,6 +523,8 @@ namespace FFXIVKoreanPatch.Main
             PlaceControl(targetLanguageComboBox, 42, 442, 260, 30);
             PlaceControl(detectPathsButton, 318, 441, 170, 32);
             PlaceControl(resetPathsButton, 500, 441, 132, 32);
+            PlaceControl(debugFontProfileLabel, 646, 418, 212, 20);
+            PlaceControl(debugFontProfileComboBox, 646, 442, 212, 30);
 
             PlaceControl(openReleaseButton, 42, 484, 194, 32);
             PlaceControl(openLogsButton, 248, 484, 184, 32);
@@ -856,6 +910,7 @@ namespace FFXIVKoreanPatch.Main
                 globalPathBrowseButton.Enabled = enabled;
                 koreaPathBrowseButton.Enabled = enabled;
                 targetLanguageComboBox.Enabled = enabled;
+                debugFontProfileComboBox.Enabled = enabled;
                 detectPathsButton.Enabled = enabled;
                 resetPathsButton.Enabled = enabled;
                 openReleaseButton.Enabled = enabled;
@@ -3719,6 +3774,17 @@ namespace FFXIVKoreanPatch.Main
             return files.Distinct(StringComparer.OrdinalIgnoreCase).ToArray();
         }
 
+        private string GetSelectedFontPatchProfile()
+        {
+            if (debugFontProfileComboBox == null)
+            {
+                return "full";
+            }
+
+            FontProfileItem item = debugFontProfileComboBox.SelectedItem as FontProfileItem;
+            return item == null || string.IsNullOrEmpty(item.Value) ? "full" : item.Value;
+        }
+
         private void BuildReleaseWork()
         {
             StringBuilder processOutput = new StringBuilder();
@@ -3782,6 +3848,11 @@ namespace FFXIVKoreanPatch.Main
 
 #if TEST_BUILD
                 arguments += " --allow-patched-global";
+                if (buildFontPatch)
+                {
+                    arguments += " --font-profile " + GetSelectedFontPatchProfile();
+                    logLines.Add("Font profile: " + GetSelectedFontPatchProfile());
+                }
 #endif
                 logLines.Add("FFXIVPatchGenerator: " + patchGeneratorPath);
                 logLines.Add("Arguments: " + arguments);

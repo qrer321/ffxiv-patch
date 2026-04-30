@@ -21,7 +21,7 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
             List<ExcelDataFile> sources = new List<ExcelDataFile>();
             sources.Add(source);
             ExdSourceMaps sourceMaps = BuildSourceMaps(sources, sourceHeader, allowRowKeyFallback);
-            return PatchDefaultVariant(target, targetHeader, sourceHeader, stringColumns, sourceMaps, allowRowKeyFallback);
+            return PatchDefaultVariant(target, targetHeader, sourceHeader, stringColumns, sourceMaps, allowRowKeyFallback, StringPatchPolicy.Default);
         }
 
         public static ExdPatchResult PatchDefaultVariant(
@@ -30,7 +30,8 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
             ExcelHeader sourceHeader,
             List<int> stringColumns,
             ExdSourceMaps sourceMaps,
-            bool allowRowKeyFallback)
+            bool allowRowKeyFallback,
+            StringPatchPolicy patchPolicy)
         {
             if (sourceMaps == null)
             {
@@ -65,7 +66,7 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
                 {
                     try
                     {
-                        rowResult = PatchRow(target, targetHeader, sourceHeader, stringColumns, row, plan.SourceRow);
+                        rowResult = PatchRow(target, targetHeader, sourceHeader, stringColumns, row, plan.SourceRow, patchPolicy);
                     }
                     catch
                     {
@@ -74,6 +75,11 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
                 }
 
                 byte[] rowRecord;
+                if (rowResult != null)
+                {
+                    result.ProtectedUiStrings += rowResult.ProtectedUiStrings;
+                }
+
                 if (rowResult != null && rowResult.Touched)
                 {
                     rowRecord = rowResult.Data;
@@ -321,7 +327,8 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
             ExcelHeader sourceHeader,
             List<int> stringColumns,
             ExcelDataRow targetRow,
-            SourceRowRef sourceRow)
+            SourceRowRef sourceRow,
+            StringPatchPolicy patchPolicy)
         {
             int rowOffset = checked((int)targetRow.Offset);
             if (rowOffset < 0 || rowOffset + 6 > target.Data.Length)
@@ -347,6 +354,7 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
             Buffer.BlockCopy(target.Data, fixedOffset, fixedData, 0, fixedData.Length);
 
             bool touched = false;
+            int protectedUiStrings = 0;
             MemoryStream stringData = new MemoryStream();
             for (int i = 0; i < stringColumns.Count; i++)
             {
@@ -367,10 +375,17 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
                 byte[] selected = original;
                 if (replacement != null && replacement.Length > 0)
                 {
-                    selected = replacement;
-                    if (!BytesEqual(original, replacement))
+                    if (ShouldKeepOriginalForUiGlyph(patchPolicy, original, replacement))
                     {
-                        touched = true;
+                        protectedUiStrings++;
+                    }
+                    else
+                    {
+                        selected = replacement;
+                        if (!BytesEqual(original, replacement))
+                        {
+                            touched = true;
+                        }
                     }
                 }
 
@@ -382,7 +397,7 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
 
             if (!touched)
             {
-                return new RowPatchResult(CopyOriginalRowRecord(target, targetRow), false);
+                return new RowPatchResult(CopyOriginalRowRecord(target, targetRow), false, protectedUiStrings);
             }
 
             byte[] strings = stringData.ToArray();
@@ -406,7 +421,162 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
                 throw new InvalidDataException("Unexpected empty EXD row.");
             }
 
-            return new RowPatchResult(rowOutput.ToArray(), true);
+            return new RowPatchResult(rowOutput.ToArray(), true, protectedUiStrings);
+        }
+
+        private static bool ShouldKeepOriginalForUiGlyph(StringPatchPolicy patchPolicy, byte[] original, byte[] replacement)
+        {
+            if (patchPolicy == null || !patchPolicy.ProtectShortNonKoreanUiTokens)
+            {
+                return false;
+            }
+
+            if (!IsShortNonKoreanUiToken(replacement))
+            {
+                return false;
+            }
+
+            if (ContainsSeStringControl(replacement))
+            {
+                return true;
+            }
+
+            return IsShortNonKoreanUiToken(original);
+        }
+
+        private static bool IsShortNonKoreanUiToken(byte[] bytes)
+        {
+            if (bytes == null || bytes.Length == 0 || ContainsHangul(bytes))
+            {
+                return false;
+            }
+
+            string visibleAscii = ExtractVisibleAscii(bytes).Trim();
+            bool hasSeStringControl = ContainsSeStringControl(bytes);
+            if (visibleAscii.Length == 0)
+            {
+                return hasSeStringControl;
+            }
+
+            // Addon rows also carry compact SeString icon/glyph markers. They are not translations.
+            if (hasSeStringControl && bytes.Length <= 64 && visibleAscii.Length <= 16)
+            {
+                return true;
+            }
+
+            if (visibleAscii.Length > 8)
+            {
+                return false;
+            }
+
+            if (IsAsciiDigitOrSymbolOnly(visibleAscii))
+            {
+                return true;
+            }
+
+            return visibleAscii.Length <= 2 && IsAsciiTokenOnly(visibleAscii);
+        }
+
+        private static bool ContainsHangul(byte[] bytes)
+        {
+            string text = new UTF8Encoding(false, false).GetString(bytes);
+            for (int i = 0; i < text.Length; i++)
+            {
+                char ch = text[i];
+                if ((ch >= '\uac00' && ch <= '\ud7a3') ||
+                    (ch >= '\u1100' && ch <= '\u11ff') ||
+                    (ch >= '\u3130' && ch <= '\u318f'))
+                {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
+        private static string ExtractVisibleAscii(byte[] bytes)
+        {
+            StringBuilder builder = new StringBuilder();
+            for (int i = 0; i < bytes.Length; i++)
+            {
+                byte value = bytes[i];
+                if (value >= 0x20 && value <= 0x7E)
+                {
+                    builder.Append((char)value);
+                }
+            }
+
+            return builder.ToString();
+        }
+
+        private static bool ContainsSeStringControl(byte[] bytes)
+        {
+            for (int i = 0; i < bytes.Length; i++)
+            {
+                if (bytes[i] == 0x02 || bytes[i] == 0x03)
+                {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
+        private static bool IsAsciiDigitOrSymbolOnly(string value)
+        {
+            bool hasDigitOrSymbol = false;
+            for (int i = 0; i < value.Length; i++)
+            {
+                char ch = value[i];
+                if (char.IsWhiteSpace(ch))
+                {
+                    continue;
+                }
+
+                if (ch >= '0' && ch <= '9')
+                {
+                    hasDigitOrSymbol = true;
+                    continue;
+                }
+
+                if (IsAsciiSymbol(ch))
+                {
+                    hasDigitOrSymbol = true;
+                    continue;
+                }
+
+                return false;
+            }
+
+            return hasDigitOrSymbol;
+        }
+
+        private static bool IsAsciiTokenOnly(string value)
+        {
+            for (int i = 0; i < value.Length; i++)
+            {
+                char ch = value[i];
+                if ((ch >= '0' && ch <= '9') ||
+                    (ch >= 'A' && ch <= 'Z') ||
+                    (ch >= 'a' && ch <= 'z') ||
+                    IsAsciiSymbol(ch) ||
+                    char.IsWhiteSpace(ch))
+                {
+                    continue;
+                }
+
+                return false;
+            }
+
+            return true;
+        }
+
+        private static bool IsAsciiSymbol(char ch)
+        {
+            return (ch >= '!' && ch <= '/') ||
+                   (ch >= ':' && ch <= '@') ||
+                   (ch >= '[' && ch <= '`') ||
+                   (ch >= '{' && ch <= '~');
         }
 
         private static bool BytesEqual(byte[] left, byte[] right)
@@ -448,11 +618,13 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
         {
             public readonly byte[] Data;
             public readonly bool Touched;
+            public readonly int ProtectedUiStrings;
 
-            public RowPatchResult(byte[] data, bool touched)
+            public RowPatchResult(byte[] data, bool touched, int protectedUiStrings)
             {
                 Data = data;
                 Touched = touched;
+                ProtectedUiStrings = protectedUiStrings;
             }
         }
 
@@ -470,6 +642,20 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
         public int RowsPatched;
         public int StringKeyRows;
         public int RowKeyRows;
+        public int ProtectedUiStrings;
+    }
+
+    internal sealed class StringPatchPolicy
+    {
+        public static readonly StringPatchPolicy Default = new StringPatchPolicy(false);
+        public static readonly StringPatchPolicy ProtectAddonUiGlyphs = new StringPatchPolicy(true);
+
+        public readonly bool ProtectShortNonKoreanUiTokens;
+
+        private StringPatchPolicy(bool protectShortNonKoreanUiTokens)
+        {
+            ProtectShortNonKoreanUiTokens = protectShortNonKoreanUiTokens;
+        }
     }
 
     internal sealed class ExdSourceMaps
