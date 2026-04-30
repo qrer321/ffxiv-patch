@@ -64,7 +64,7 @@ function Get-SafeTagPart {
 function Get-PreviousTag {
     param([string]$Git)
 
-    $tags = & $Git tag --sort=-creatordate
+    $tags = @(& $Git tag --sort=-creatordate)
     if ($tags -and $tags.Count -gt 0 -and ![string]::IsNullOrWhiteSpace($tags[0])) {
         return $tags[0].Trim()
     }
@@ -78,7 +78,7 @@ function Write-ReleaseNotes {
         [string]$Git,
         [string]$Tag,
         [string]$Title,
-        [string]$ZipName,
+        [string]$ArtifactName,
         [string]$Sha256,
         [string[]]$Files
     )
@@ -95,7 +95,7 @@ function Write-ReleaseNotes {
     [void]$builder.AppendLine()
     [void]$builder.AppendLine("- Tag: ``$Tag``")
     [void]$builder.AppendLine("- Commit: ``$commit``")
-    [void]$builder.AppendLine("- Artifact: ``$ZipName``")
+    [void]$builder.AppendLine("- Artifact: ``$ArtifactName``")
     [void]$builder.AppendLine("- SHA256: ``$Sha256``")
     [void]$builder.AppendLine()
     [void]$builder.AppendLine("## Included Files")
@@ -120,7 +120,7 @@ function Write-ReleaseNotes {
     [void]$builder.AppendLine("## Pre-Publish Checklist")
     [void]$builder.AppendLine()
     [void]$builder.AppendLine("- Confirm the release build completed with 0 warnings and 0 errors.")
-    [void]$builder.AppendLine("- Confirm the release package contains only ``FFXIVKoreanPatch.exe``.")
+    [void]$builder.AppendLine("- Confirm the GitHub Release asset is ``FFXIVKoreanPatch.exe``.")
     [void]$builder.AppendLine("- Smoke test preflight, full patch, font patch, and patch removal flows.")
 
     Set-Content -LiteralPath $Path -Value $builder.ToString() -Encoding UTF8
@@ -196,34 +196,22 @@ try {
     }
 
     New-Item -ItemType Directory -Force -Path $stagingDir | Out-Null
-    $packageDir = Join-Path $stagingDir "package"
-    New-Item -ItemType Directory -Force -Path $packageDir | Out-Null
+    $artifactName = "FFXIVKoreanPatch.exe"
+    $artifactPath = Join-Path $stagingDir $artifactName
+    Copy-Item -LiteralPath (Join-Path $releasePublicDir $artifactName) -Destination $artifactPath -Force
 
-    $filesToPackage = @(
-        Get-Item -LiteralPath (Join-Path $releasePublicDir "FFXIVKoreanPatch.exe")
-    )
-
-    foreach ($file in $filesToPackage) {
-        Copy-Item -LiteralPath $file.FullName -Destination $packageDir -Force
-    }
-
-    $zipName = "FFXIVKoreanPatch-$safeTag.zip"
-    $zipPath = Join-Path $stagingDir $zipName
-    Compress-Archive -Path (Join-Path $packageDir "*") -DestinationPath $zipPath -Force
-
-    $hash = Get-FileHash -LiteralPath $zipPath -Algorithm SHA256
-    $shaPath = Join-Path $stagingDir "$zipName.sha256.txt"
-    Set-Content -LiteralPath $shaPath -Value "$($hash.Hash)  $zipName" -Encoding ASCII
+    $hash = Get-FileHash -LiteralPath $artifactPath -Algorithm SHA256
+    $shaPath = Join-Path $stagingDir "$artifactName.sha256.txt"
+    Set-Content -LiteralPath $shaPath -Value "$($hash.Hash)  $artifactName" -Encoding ASCII
 
     $notesPath = Join-Path $stagingDir "release-notes.md"
-    $packagedNames = $filesToPackage | ForEach-Object { $_.Name }
-    Write-ReleaseNotes -Path $notesPath -Git $git -Tag $TagName -Title $ReleaseTitle -ZipName $zipName -Sha256 $hash.Hash -Files $packagedNames
+    Write-ReleaseNotes -Path $notesPath -Git $git -Tag $TagName -Title $ReleaseTitle -ArtifactName $artifactName -Sha256 $hash.Hash -Files @($artifactName)
 
-    Write-Host "Release package prepared:"
-    Write-Host "  Tag:   $TagName"
-    Write-Host "  Zip:   $zipPath"
-    Write-Host "  SHA:   $shaPath"
-    Write-Host "  Notes: $notesPath"
+    Write-Host "Release asset prepared:"
+    Write-Host "  Tag:      $TagName"
+    Write-Host "  Exe:      $artifactPath"
+    Write-Host "  SHA:      $shaPath"
+    Write-Host "  Notes:    $notesPath"
 
     if (!$Publish) {
         Write-Host ""
@@ -276,7 +264,7 @@ try {
 
     $releaseArgs = @(
         "release", "create", $TagName,
-        $zipPath,
+        $artifactPath,
         $shaPath,
         "--title", $ReleaseTitle,
         "--notes-file", $notesPath

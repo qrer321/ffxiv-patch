@@ -153,7 +153,7 @@ GitHub Release 준비:
 .\Scripts\publish-release.ps1 -TagName v2026.04.30
 ```
 
-기본 실행은 단일 exe가 들어간 zip, SHA256, 릴리즈 노트만 생성합니다. 실제 태그 생성과 GitHub Release 업로드는 다음처럼 `-Publish`를 명시했을 때만 진행합니다.
+기본 실행은 `FFXIVKoreanPatch.exe`, SHA256, 릴리즈 노트만 준비합니다. 실제 태그 생성과 GitHub Release 업로드는 다음처럼 `-Publish`를 명시했을 때만 진행합니다.
 
 ```powershell
 .\Scripts\publish-release.ps1 -TagName v2026.04.30 -Publish

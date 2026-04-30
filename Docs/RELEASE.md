@@ -89,8 +89,8 @@ Release\Test\
 
 - 릴리즈 빌드 실행
 - `Release\Public` 단일 exe 검증
-- `Release\GitHub\<tag>\FFXIVKoreanPatch-<tag>.zip` 생성
-- SHA256 파일 생성
+- `Release\GitHub\<tag>\FFXIVKoreanPatch.exe` 복사
+- exe SHA256 파일 생성
 - `release-notes.md` 생성
 
 작업 트리가 깨끗하지 않으면 기본적으로 중단합니다. 로컬 산출물 형태만 확인하려면 다음처럼 실행할 수 있습니다.
@@ -116,7 +116,7 @@ Release\Test\
 - annotated git tag 생성
 - 태그 push
 - GitHub Release 생성
-- zip과 SHA256 파일 업로드
+- `FFXIVKoreanPatch.exe`와 SHA256 파일 업로드
 
 초안 릴리즈로 만들려면 `-Draft`, 프리릴리즈로 표시하려면 `-Prerelease`를 함께 사용합니다.
 

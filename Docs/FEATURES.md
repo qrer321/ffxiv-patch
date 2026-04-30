@@ -238,8 +238,8 @@
 - 소스 커밋과 바이너리 릴리즈를 분리하는 구조
 - `Release` 폴더는 Git 커밋 대상에서 제외
 - `Scripts\publish-release.ps1`
-- GitHub Release용 zip, SHA256, 릴리즈 노트 생성
-- zip에는 `FFXIVKoreanPatch.exe` 단일 파일만 포함
+- GitHub Release용 exe asset, SHA256, 릴리즈 노트 생성
+- GitHub Release에는 `FFXIVKoreanPatch.exe` 단일 실행 파일을 직접 업로드
 - `-Publish`를 명시했을 때만 태그 생성, 태그 push, GitHub Release 생성
 - 배포 시 로컬 HEAD와 `origin/main` 일치 여부 확인
 
