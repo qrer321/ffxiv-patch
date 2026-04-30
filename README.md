@@ -153,6 +153,18 @@ Release\Test\
 └─ TTMPL.mpl
 ```
 
+GitHub Release 준비:
+
+```powershell
+.\Scripts\publish-release.ps1 -TagName v2026.04.30
+```
+
+기본 실행은 zip, SHA256, 릴리즈 노트만 생성합니다. 실제 태그 생성과 GitHub Release 업로드는 다음처럼 `-Publish`를 명시했을 때만 진행합니다.
+
+```powershell
+.\Scripts\publish-release.ps1 -TagName v2026.04.30 -Publish
+```
+
 ## GitHub 업로드 기준
 
 소스 코드만 저장소에 올립니다.

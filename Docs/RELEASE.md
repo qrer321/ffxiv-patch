@@ -80,3 +80,50 @@ Release\Test\
 - 이미 패치된 index 상태에서는 전체/폰트 패치 버튼이 잠기는지 확인합니다.
 - `한글 패치 제거`와 `백업으로 복구`가 index2까지 복구 대상으로 잡는지 확인합니다.
 - 패치 완료 결과 창에 EXD/RSV/진단 파일 요약이 표시되는지 확인합니다.
+
+## GitHub Release 준비
+
+바이너리 배포 준비는 다음 스크립트로 수행합니다.
+
+```powershell
+.\Scripts\publish-release.ps1 -TagName v2026.04.30
+```
+
+기본 실행은 준비 전용입니다. 다음 작업만 수행하고 GitHub에는 아무것도 만들지 않습니다.
+
+- 릴리즈 빌드 실행
+- `Release\Public` 필수 파일 검증
+- `Release\GitHub\<tag>\FFXIVKoreanPatch-<tag>.zip` 생성
+- SHA256 파일 생성
+- `release-notes.md` 생성
+
+작업 트리가 깨끗하지 않으면 기본적으로 중단합니다. 로컬 산출물 형태만 확인하려면 다음처럼 실행할 수 있습니다.
+
+```powershell
+.\Scripts\publish-release.ps1 -TagName local-check -SkipBuild -AllowDirty -Force
+```
+
+## GitHub Release 배포
+
+실제 배포는 사용자가 명시적으로 `-Publish`를 붙였을 때만 진행합니다.
+
+```powershell
+.\Scripts\publish-release.ps1 -TagName v2026.04.30 -Publish
+```
+
+배포 시 수행하는 작업:
+
+- GitHub CLI 로그인 상태 확인
+- 현재 브랜치가 `main`인지 확인
+- 로컬 HEAD가 `origin/main`과 같은지 확인
+- 같은 태그가 로컬/원격에 없는지 확인
+- annotated git tag 생성
+- 태그 push
+- GitHub Release 생성
+- zip과 SHA256 파일 업로드
+
+초안 릴리즈로 만들려면 `-Draft`, 프리릴리즈로 표시하려면 `-Prerelease`를 함께 사용합니다.
+
+```powershell
+.\Scripts\publish-release.ps1 -TagName v2026.04.30-beta.1 -Publish -Draft -Prerelease
+```

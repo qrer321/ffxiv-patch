@@ -236,6 +236,10 @@
 - `Scripts\publish-github.ps1`
 - 소스 커밋과 바이너리 릴리즈를 분리하는 구조
 - `Release` 폴더는 Git 커밋 대상에서 제외
+- `Scripts\publish-release.ps1`
+- GitHub Release용 zip, SHA256, 릴리즈 노트 생성
+- `-Publish`를 명시했을 때만 태그 생성, 태그 push, GitHub Release 생성
+- 배포 시 로컬 HEAD와 `origin/main` 일치 여부 확인
 
 ## 현재 제한
 

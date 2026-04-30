@@ -54,6 +54,15 @@ $files = @(
     "TTMPL.mpl"
 )
 
+$runningProcesses = Get-Process -ErrorAction SilentlyContinue | Where-Object {
+    $_.ProcessName -eq "FFXIVKoreanPatch" -or $_.ProcessName -eq "FFXIVPatchGenerator"
+}
+
+if ($runningProcesses) {
+    $processSummary = ($runningProcesses | ForEach-Object { "$($_.ProcessName)($($_.Id))" }) -join ", "
+    throw "Release output files may be locked by running processes: $processSummary. Close the app/generator and run the build again."
+}
+
 foreach ($file in $files) {
     $source = Join-Path $uiBin $file
     if (Test-Path $source) {

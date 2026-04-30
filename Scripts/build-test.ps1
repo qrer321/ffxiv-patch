@@ -40,6 +40,15 @@ $mappings = @{
     "TTMPL.mpl" = "TTMPL.mpl"
 }
 
+$runningProcesses = Get-Process -ErrorAction SilentlyContinue | Where-Object {
+    $_.ProcessName -eq "FFXIVKoreanPatch" -or $_.ProcessName -eq "FFXIVKoreanPatch.Test" -or $_.ProcessName -eq "FFXIVPatchGenerator"
+}
+
+if ($runningProcesses) {
+    $processSummary = ($runningProcesses | ForEach-Object { "$($_.ProcessName)($($_.Id))" }) -join ", "
+    throw "Test output files may be locked by running processes: $processSummary. Close the app/generator and run the build again."
+}
+
 foreach ($sourceName in $mappings.Keys) {
     $source = Join-Path $uiBin $sourceName
     if (Test-Path $source) {
