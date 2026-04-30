@@ -1855,6 +1855,41 @@ namespace FFXIVKoreanPatch.Main
             return false;
         }
 
+        private bool TryUnlockPatchAfterRestore(List<string> logLines)
+        {
+            bool hasGlobalClient = HasValidGlobalClient();
+            bool hasKoreaClient = HasValidKoreaClient();
+            bool hasGlobalVersion = RefreshTargetVersion();
+            string koreaVersion = GetKoreaVersion();
+            bool versionsMatch = hasGlobalVersion &&
+                !string.IsNullOrEmpty(koreaVersion) &&
+                string.Equals(targetVersion, koreaVersion, StringComparison.OrdinalIgnoreCase);
+            bool targetAlreadyPatched = hasGlobalClient && HasPatchedTargetIndexes();
+
+            if (hasGlobalClient && hasKoreaClient && versionsMatch && !targetAlreadyPatched)
+            {
+                lastPreflightPassed = true;
+                if (logLines != null)
+                {
+                    logLines.Add("Post-remove unlock: clean indexes verified; next patch can start without another preflight.");
+                }
+
+                return true;
+            }
+
+            lastPreflightPassed = false;
+            if (logLines != null)
+            {
+                logLines.Add(
+                    "Post-remove unlock skipped: globalClient=" + hasGlobalClient +
+                    ", koreaClient=" + hasKoreaClient +
+                    ", versionsMatch=" + versionsMatch +
+                    ", patchedIndex=" + targetAlreadyPatched + ".");
+            }
+
+            return false;
+        }
+
         private bool HasCleanOrigIndexes(string candidateDir)
         {
             foreach (string fileName in restoreFiles)
@@ -4404,6 +4439,7 @@ namespace FFXIVKoreanPatch.Main
                 {
                     logLines.Add("Local restore source: " + restoreSourceDir);
                     logLines.Add("Backup before restore: " + localBackupDir);
+                    bool canPatchImmediately = TryUnlockPatchAfterRestore(logLines);
                     string localRestoreLogPath = WriteOperationLog("remove-local-restore", logLines);
                     UpdateStatusLabel("한글 패치 제거 완료");
                     SetProgressValue(100);
@@ -4416,6 +4452,9 @@ namespace FFXIVKoreanPatch.Main
                         resultDetails.Add(new KeyValuePair<string, string>("복구 전 백업", localBackupDir));
                     }
                     resultDetails.Add(new KeyValuePair<string, string>("복구 파일", string.Join(", ", restoreFiles)));
+                    resultDetails.Add(new KeyValuePair<string, string>(
+                        "다음 패치",
+                        canPatchImmediately ? "사전 점검 없이 바로 실행 가능" : "사전 점검 후 실행 필요"));
 
                     ShowOperationResultDialog(
                         "패치 제거 완료",
