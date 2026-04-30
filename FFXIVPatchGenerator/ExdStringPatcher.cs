@@ -18,13 +18,31 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
             List<int> stringColumns,
             bool allowRowKeyFallback)
         {
-            Dictionary<string, ExcelDataRow> sourceStringKeyRows = BuildStringKeyMap(source, sourceHeader);
-            Dictionary<uint, RowPatchPlan> rowPlans = BuildStringKeyPlans(target, targetHeader, sourceStringKeyRows);
+            List<ExcelDataFile> sources = new List<ExcelDataFile>();
+            sources.Add(source);
+            ExdSourceMaps sourceMaps = BuildSourceMaps(sources, sourceHeader, allowRowKeyFallback);
+            return PatchDefaultVariant(target, targetHeader, sourceHeader, stringColumns, sourceMaps, allowRowKeyFallback);
+        }
+
+        public static ExdPatchResult PatchDefaultVariant(
+            ExcelDataFile target,
+            ExcelHeader targetHeader,
+            ExcelHeader sourceHeader,
+            List<int> stringColumns,
+            ExdSourceMaps sourceMaps,
+            bool allowRowKeyFallback)
+        {
+            if (sourceMaps == null)
+            {
+                sourceMaps = new ExdSourceMaps();
+            }
+
+            Dictionary<uint, RowPatchPlan> rowPlans = BuildStringKeyPlans(target, targetHeader, sourceMaps.StringKeyRows);
             bool usingStringKeyPlans = rowPlans.Count > 0;
 
             if (!usingStringKeyPlans && allowRowKeyFallback)
             {
-                rowPlans = BuildRowKeyPlans(target, source);
+                rowPlans = BuildRowKeyPlans(target, sourceMaps.RowKeyRows);
             }
 
             ExdPatchResult result = new ExdPatchResult();
@@ -47,7 +65,7 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
                 {
                     try
                     {
-                        rowResult = PatchRow(target, source, targetHeader, sourceHeader, stringColumns, row, plan.SourceRow);
+                        rowResult = PatchRow(target, targetHeader, sourceHeader, stringColumns, row, plan.SourceRow);
                     }
                     catch
                     {
@@ -115,12 +133,38 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
             return result;
         }
 
-        private static Dictionary<string, ExcelDataRow> BuildStringKeyMap(ExcelDataFile source, ExcelHeader sourceHeader)
+        public static ExdSourceMaps BuildSourceMaps(
+            List<ExcelDataFile> sources,
+            ExcelHeader sourceHeader,
+            bool includeRowKeyMap)
         {
-            Dictionary<string, ExcelDataRow> map = new Dictionary<string, ExcelDataRow>(StringComparer.Ordinal);
+            ExdSourceMaps maps = new ExdSourceMaps();
+            if (sources == null)
+            {
+                return maps;
+            }
+
+            for (int i = 0; i < sources.Count; i++)
+            {
+                ExcelDataFile source = sources[i];
+                AddStringKeyRows(maps.StringKeyRows, source, sourceHeader);
+                if (includeRowKeyMap)
+                {
+                    AddRowKeyRows(maps.RowKeyRows, source);
+                }
+            }
+
+            return maps;
+        }
+
+        private static void AddStringKeyRows(
+            Dictionary<string, SourceRowRef> map,
+            ExcelDataFile source,
+            ExcelHeader sourceHeader)
+        {
             if (!IsStringKeyHeader(sourceHeader))
             {
-                return map;
+                return;
             }
 
             for (int i = 0; i < source.Rows.Count; i++)
@@ -137,16 +181,26 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
                     continue;
                 }
 
-                map.Add(key, row);
+                map.Add(key, new SourceRowRef(source, row));
             }
+        }
 
-            return map;
+        private static void AddRowKeyRows(Dictionary<uint, SourceRowRef> map, ExcelDataFile source)
+        {
+            for (int i = 0; i < source.Rows.Count; i++)
+            {
+                ExcelDataRow row = source.Rows[i];
+                if (!map.ContainsKey(row.RowId))
+                {
+                    map.Add(row.RowId, new SourceRowRef(source, row));
+                }
+            }
         }
 
         private static Dictionary<uint, RowPatchPlan> BuildStringKeyPlans(
             ExcelDataFile target,
             ExcelHeader targetHeader,
-            Dictionary<string, ExcelDataRow> sourceStringKeyRows)
+            Dictionary<string, SourceRowRef> sourceStringKeyRows)
         {
             Dictionary<uint, RowPatchPlan> plans = new Dictionary<uint, RowPatchPlan>();
             if (sourceStringKeyRows.Count == 0 || !IsStringKeyHeader(targetHeader))
@@ -163,7 +217,7 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
                     continue;
                 }
 
-                ExcelDataRow sourceRow;
+                SourceRowRef sourceRow;
                 if (!StringKeyRegex.IsMatch(key) || !sourceStringKeyRows.TryGetValue(key, out sourceRow))
                 {
                     continue;
@@ -175,13 +229,15 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
             return plans;
         }
 
-        private static Dictionary<uint, RowPatchPlan> BuildRowKeyPlans(ExcelDataFile target, ExcelDataFile source)
+        private static Dictionary<uint, RowPatchPlan> BuildRowKeyPlans(
+            ExcelDataFile target,
+            Dictionary<uint, SourceRowRef> sourceRowKeyRows)
         {
             Dictionary<uint, RowPatchPlan> plans = new Dictionary<uint, RowPatchPlan>();
             for (int i = 0; i < target.Rows.Count; i++)
             {
-                ExcelDataRow sourceRow;
-                if (source.TryGetRow(target.Rows[i].RowId, out sourceRow))
+                SourceRowRef sourceRow;
+                if (sourceRowKeyRows.TryGetValue(target.Rows[i].RowId, out sourceRow))
                 {
                     plans[target.Rows[i].RowId] = new RowPatchPlan(sourceRow, RowPatchMode.RowKey);
                 }
@@ -261,12 +317,11 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
 
         private static RowPatchResult PatchRow(
             ExcelDataFile target,
-            ExcelDataFile source,
             ExcelHeader targetHeader,
             ExcelHeader sourceHeader,
             List<int> stringColumns,
             ExcelDataRow targetRow,
-            ExcelDataRow sourceRow)
+            SourceRowRef sourceRow)
         {
             int rowOffset = checked((int)targetRow.Offset);
             if (rowOffset < 0 || rowOffset + 6 > target.Data.Length)
@@ -308,7 +363,7 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
                     original = new byte[0];
                 }
 
-                byte[] replacement = source.GetStringBytesByColumnOffset(sourceRow, sourceHeader, targetColumn.Offset);
+                byte[] replacement = sourceRow.File.GetStringBytesByColumnOffset(sourceRow.Row, sourceHeader, targetColumn.Offset);
                 byte[] selected = original;
                 if (replacement != null && replacement.Length > 0)
                 {
@@ -379,10 +434,10 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
 
         private sealed class RowPatchPlan
         {
-            public readonly ExcelDataRow SourceRow;
+            public readonly SourceRowRef SourceRow;
             public readonly RowPatchMode Mode;
 
-            public RowPatchPlan(ExcelDataRow sourceRow, RowPatchMode mode)
+            public RowPatchPlan(SourceRowRef sourceRow, RowPatchMode mode)
             {
                 SourceRow = sourceRow;
                 Mode = mode;
@@ -415,5 +470,23 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
         public int RowsPatched;
         public int StringKeyRows;
         public int RowKeyRows;
+    }
+
+    internal sealed class ExdSourceMaps
+    {
+        public readonly Dictionary<string, SourceRowRef> StringKeyRows = new Dictionary<string, SourceRowRef>(StringComparer.Ordinal);
+        public readonly Dictionary<uint, SourceRowRef> RowKeyRows = new Dictionary<uint, SourceRowRef>();
+    }
+
+    internal sealed class SourceRowRef
+    {
+        public readonly ExcelDataFile File;
+        public readonly ExcelDataRow Row;
+
+        public SourceRowRef(ExcelDataFile file, ExcelDataRow row)
+        {
+            File = file;
+            Row = row;
+        }
     }
 }

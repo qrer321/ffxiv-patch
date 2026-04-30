@@ -49,6 +49,10 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
                 Console.WriteLine("  Unsupported sheets:   {0}", report.UnsupportedSheets);
                 Console.WriteLine("  Font files patched:   {0}", report.FontFilesPatched);
                 Console.WriteLine("  Output:               {0}", Path.GetFullPath(options.OutputPath));
+                if (!string.IsNullOrEmpty(report.DiagnosticsPath))
+                {
+                    Console.WriteLine("  Diagnostics:          {0}", report.DiagnosticsPath);
+                }
 
                 if (report.Warnings.Count > 0)
                 {
@@ -325,6 +329,7 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
         public int MissingTargetPages;
         public int UnsupportedSheets;
         public int FontFilesPatched;
+        public string DiagnosticsPath;
         public readonly List<string> Warnings = new List<string>();
     }
 }

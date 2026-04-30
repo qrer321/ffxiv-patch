@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Text;
 using System.Text.RegularExpressions;
 
 namespace FfxivKoreanPatch.FFXIVPatchGenerator
@@ -42,6 +43,9 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
             new Regex("^CompleteJournal.*$", RegexOptions.IgnoreCase | RegexOptions.Compiled),
             new Regex("^Content.*$", RegexOptions.IgnoreCase | RegexOptions.Compiled),
             new Regex("^Craft.*$", RegexOptions.IgnoreCase | RegexOptions.Compiled),
+            // Content-specific dialogue sheets under custom/... usually lack string keys.
+            // On the same game version, Korean/global row ids are expected to line up.
+            new Regex("^custom/.*$", RegexOptions.IgnoreCase | RegexOptions.Compiled),
             new Regex("^CustomTalk$", RegexOptions.IgnoreCase | RegexOptions.Compiled),
             new Regex("^DefaultTalk$", RegexOptions.IgnoreCase | RegexOptions.Compiled),
             new Regex("^Description.*$", RegexOptions.IgnoreCase | RegexOptions.Compiled),
@@ -128,6 +132,8 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
             string outputOrigIndex = Path.Combine(outputDir, OrigIndexFileName);
             string outputOrigIndex2 = Path.Combine(outputDir, OrigIndex2FileName);
             string outputDat1 = Path.Combine(outputDir, Dat1FileName);
+            string diagnosticsPath = Path.Combine(outputDir, "patch-diagnostics.tsv");
+            _report.DiagnosticsPath = diagnosticsPath;
 
             File.Copy(baseIndex, outputOrigIndex, true);
             File.Copy(baseIndex, outputIndex, true);
@@ -147,7 +153,9 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
             using (SqPackIndexFile mutableIndex = new SqPackIndexFile(outputIndex))
             using (SqPackIndex2File mutableIndex2 = new SqPackIndex2File(outputIndex2))
             using (SqPackDatWriter datWriter = new SqPackDatWriter(outputDat1, Path.Combine(globalSqpack, Dat0FileName)))
+            using (StreamWriter diagnostics = new StreamWriter(diagnosticsPath, false, new UTF8Encoding(false)))
             {
+                diagnostics.WriteLine("sheet\tpage\tstatus\trows\tstringKeyRows\trowKeyRows\tnote");
                 mutableIndex.EnsureDataFileCount(2);
                 mutableIndex2.EnsureDataFileCount(2);
 
@@ -170,7 +178,7 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
                     ProgressReporter.Report(
                         5 + (processedSheets - 1) * 85 / totalSheets,
                         "EXD 처리 중: " + sheetName + " (" + processedSheets + "/" + totalSheets + ")");
-                    ProcessSheet(sheetName, globalArchive, koreaArchive, mutableIndex, mutableIndex2, datWriter, targetLanguageId, sourceLanguageId);
+                    ProcessSheet(sheetName, globalArchive, koreaArchive, mutableIndex, mutableIndex2, datWriter, diagnostics, targetLanguageId, sourceLanguageId);
                 }
 
                 mutableIndex.Save();
@@ -346,6 +354,7 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
             SqPackIndexFile mutableIndex,
             SqPackIndex2File mutableIndex2,
             SqPackDatWriter datWriter,
+            StreamWriter diagnostics,
             byte targetLanguageId,
             byte sourceLanguageId)
         {
@@ -356,12 +365,23 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
             if (!globalArchive.TryReadFile(headerPath, out globalHeaderBytes))
             {
                 AddLimitedWarning("Missing global EXH: " + headerPath);
+                WriteDiagnostic(diagnostics, sheetName, "-", "missing-global-exh", 0, 0, 0, headerPath);
                 return;
             }
 
             ExcelHeader globalHeader = ExcelHeader.Parse(globalHeaderBytes);
-            if (!globalHeader.HasLanguage(targetLanguageId))
+            bool targetUsesLanguageSuffix = globalHeader.HasLanguage(targetLanguageId);
+            bool targetUsesNeutralPath = !targetUsesLanguageSuffix && HasAnyPageFile(globalArchive, sheetName, globalHeader, null);
+            if (!targetUsesLanguageSuffix && !targetUsesNeutralPath)
             {
+                WriteDiagnostic(diagnostics, sheetName, "-", "missing-target-language", 0, 0, 0, _options.TargetLanguage);
+                return;
+            }
+
+            List<int> stringColumns = globalHeader.GetStringColumnIndexes();
+            if (stringColumns.Count == 0)
+            {
+                WriteDiagnostic(diagnostics, sheetName, "-", "no-string-columns", 0, 0, 0, string.Empty);
                 return;
             }
 
@@ -369,18 +389,14 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
             {
                 _report.UnsupportedSheets++;
                 AddLimitedWarning("Skipped unsupported EXH variant " + globalHeader.Variant + ": " + sheetName);
-                return;
-            }
-
-            List<int> stringColumns = globalHeader.GetStringColumnIndexes();
-            if (stringColumns.Count == 0)
-            {
+                WriteDiagnostic(diagnostics, sheetName, "-", "unsupported-variant", 0, 0, 0, globalHeader.Variant.ToString());
                 return;
             }
 
             if (IsKnownUnsafeSheet(sheetName))
             {
                 AddLimitedWarning("Skipped known unsafe sheet: " + sheetName);
+                WriteDiagnostic(diagnostics, sheetName, "-", "known-unsafe-skip", 0, 0, 0, string.Empty);
                 return;
             }
 
@@ -398,40 +414,65 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
                 }
             }
 
+            if (sourceHeader.Variant != ExcelVariant.Default)
+            {
+                sourceHeader = globalHeader;
+                WriteDiagnostic(diagnostics, sheetName, "-", "source-header-fallback", 0, 0, 0, "Korean EXH variant was not Default");
+            }
+
+            bool sourceUsesLanguageSuffix = sourceHeader.HasLanguage(sourceLanguageId);
+            bool sourceUsesNeutralPath = !sourceUsesLanguageSuffix && HasAnyPageFile(koreaArchive, sheetName, sourceHeader, null);
+            if (!sourceUsesLanguageSuffix && !sourceUsesNeutralPath)
+            {
+                WriteDiagnostic(diagnostics, sheetName, "-", "missing-source-language", 0, 0, 0, _options.SourceLanguage);
+                return;
+            }
+
+            bool allowRowKeyFallback = IsRowKeyFallbackAllowed(sheetName);
+            List<ExcelDataFile> sourceExds = LoadSourcePages(sheetName, sourceHeader, koreaArchive, diagnostics, sourceUsesLanguageSuffix);
+            if (sourceExds.Count == 0)
+            {
+                _report.MissingSourcePages += globalHeader.Pages.Count;
+                WriteDiagnostic(diagnostics, sheetName, "-", "missing-all-source-pages", 0, 0, 0, _options.SourceLanguage);
+                return;
+            }
+
+            ExdSourceMaps sourceMaps = ExdStringPatcher.BuildSourceMaps(sourceExds, sourceHeader, allowRowKeyFallback);
+
             for (int i = 0; i < globalHeader.Pages.Count; i++)
             {
                 ExcelPageDefinition page = globalHeader.Pages[i];
-                string targetPath = "exd/" + sheetName + "_" + page.StartId.ToString() + "_" + _options.TargetLanguage + ".exd";
-                string sourcePath = "exd/" + sheetName + "_" + page.StartId.ToString() + "_" + _options.SourceLanguage + ".exd";
+                string targetPath = BuildExdPath(sheetName, page.StartId, targetUsesLanguageSuffix ? _options.TargetLanguage : null);
 
                 byte[] targetExdBytes;
                 if (!globalArchive.TryReadFile(targetPath, out targetExdBytes))
                 {
                     _report.MissingTargetPages++;
-                    continue;
-                }
-
-                byte[] sourceExdBytes;
-                if (!koreaArchive.TryReadFile(sourcePath, out sourceExdBytes))
-                {
-                    _report.MissingSourcePages++;
+                    WriteDiagnostic(diagnostics, sheetName, page.StartId.ToString(), "missing-target-page", 0, 0, 0, targetPath);
                     continue;
                 }
 
                 ExcelDataFile targetExd = ExcelDataFile.Parse(targetExdBytes);
-                ExcelDataFile sourceExd = ExcelDataFile.Parse(sourceExdBytes);
-                bool allowRowKeyFallback = IsRowKeyFallbackAllowed(sheetName);
                 ExdPatchResult patchResult = ExdStringPatcher.PatchDefaultVariant(
                     targetExd,
-                    sourceExd,
                     globalHeader,
                     sourceHeader,
                     stringColumns,
+                    sourceMaps,
                     allowRowKeyFallback);
 
                 if (!patchResult.Changed)
                 {
                     _report.PagesSkippedNoMapping++;
+                    WriteDiagnostic(
+                        diagnostics,
+                        sheetName,
+                        page.StartId.ToString(),
+                        "no-mapping",
+                        0,
+                        0,
+                        0,
+                        allowRowKeyFallback ? "row-key fallback allowed" : "row-key fallback not allowed");
                     continue;
                 }
 
@@ -442,12 +483,125 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
                 _report.RowsPatched += patchResult.RowsPatched;
                 _report.StringKeyRowsPatched += patchResult.StringKeyRows;
                 _report.RowKeyRowsPatched += patchResult.RowKeyRows;
+                WriteDiagnostic(
+                    diagnostics,
+                    sheetName,
+                    page.StartId.ToString(),
+                    "patched",
+                    patchResult.RowsPatched,
+                    patchResult.StringKeyRows,
+                    patchResult.RowKeyRows,
+                    string.Empty);
 
                 if (_report.PagesPatched % 100 == 0)
                 {
                     Console.WriteLine("  Patched EXD pages: {0}", _report.PagesPatched);
                 }
             }
+        }
+
+        private List<ExcelDataFile> LoadSourcePages(
+            string sheetName,
+            ExcelHeader sourceHeader,
+            SqPackArchive koreaArchive,
+            StreamWriter diagnostics,
+            bool sourceUsesLanguageSuffix)
+        {
+            List<ExcelDataFile> sourceExds = new List<ExcelDataFile>();
+            for (int i = 0; i < sourceHeader.Pages.Count; i++)
+            {
+                ExcelPageDefinition page = sourceHeader.Pages[i];
+                string sourcePath = BuildExdPath(sheetName, page.StartId, sourceUsesLanguageSuffix ? _options.SourceLanguage : null);
+                byte[] sourceExdBytes;
+                if (!koreaArchive.TryReadFile(sourcePath, out sourceExdBytes))
+                {
+                    _report.MissingSourcePages++;
+                    WriteDiagnostic(diagnostics, sheetName, page.StartId.ToString(), "missing-source-page", 0, 0, 0, sourcePath);
+                    continue;
+                }
+
+                try
+                {
+                    sourceExds.Add(ExcelDataFile.Parse(sourceExdBytes));
+                }
+                catch (Exception exception)
+                {
+                    _report.MissingSourcePages++;
+                    AddLimitedWarning("Invalid Korean EXD: " + sourcePath);
+                    WriteDiagnostic(diagnostics, sheetName, page.StartId.ToString(), "invalid-source-page", 0, 0, 0, exception.Message);
+                }
+            }
+
+            return sourceExds;
+        }
+
+        private static string BuildExdPath(string sheetName, uint startId, string languageCode)
+        {
+            string path = "exd/" + sheetName + "_" + startId.ToString();
+            if (!string.IsNullOrEmpty(languageCode))
+            {
+                path += "_" + languageCode;
+            }
+
+            return path + ".exd";
+        }
+
+        private static bool HasAnyPageFile(
+            SqPackArchive archive,
+            string sheetName,
+            ExcelHeader header,
+            string languageCode)
+        {
+            for (int i = 0; i < header.Pages.Count; i++)
+            {
+                byte[] ignored;
+                if (archive.TryReadFile(BuildExdPath(sheetName, header.Pages[i].StartId, languageCode), out ignored))
+                {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
+        private static void WriteDiagnostic(
+            StreamWriter diagnostics,
+            string sheetName,
+            string page,
+            string status,
+            int rows,
+            int stringKeyRows,
+            int rowKeyRows,
+            string note)
+        {
+            if (diagnostics == null)
+            {
+                return;
+            }
+
+            diagnostics.Write(EscapeTsv(sheetName));
+            diagnostics.Write('\t');
+            diagnostics.Write(EscapeTsv(page));
+            diagnostics.Write('\t');
+            diagnostics.Write(EscapeTsv(status));
+            diagnostics.Write('\t');
+            diagnostics.Write(rows.ToString());
+            diagnostics.Write('\t');
+            diagnostics.Write(stringKeyRows.ToString());
+            diagnostics.Write('\t');
+            diagnostics.Write(rowKeyRows.ToString());
+            diagnostics.Write('\t');
+            diagnostics.WriteLine(EscapeTsv(note));
+        }
+
+        private static string EscapeTsv(string value)
+        {
+            if (string.IsNullOrEmpty(value))
+            {
+                return string.Empty;
+            }
+
+            return value.Replace('\t', ' ').Replace('\r', ' ').Replace('\n', ' ');
         }
 
         private static bool IsKnownUnsafeSheet(string sheetName)
