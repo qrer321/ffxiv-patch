@@ -166,6 +166,8 @@
 - TTMP 패키지 우선 사용
   - `TTMPD.mpd`
   - `TTMPL.mpl`
+- TTMP의 FDT와 texture atlas를 한 세트로 유지
+- FDT glyph 좌표/문자 코드와 다른 클라이언트의 font atlas를 섞지 않음
 - `--font-pack-dir`로 TTMP 위치 지정
 - `--font-profile`로 진단용 폰트 프로필 선택
   - `full`
