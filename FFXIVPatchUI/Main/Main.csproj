@@ -94,19 +94,16 @@
     <Content Include="FFXIV.ico" />
     <Content Include="ffxiv.jpg" />
   </ItemGroup>
+  <ItemGroup>
+    <EmbeddedResource Include="..\..\FFXIVPatchGenerator\bin\Release\FFXIVPatchGenerator.exe" Condition="Exists('..\..\FFXIVPatchGenerator\bin\Release\FFXIVPatchGenerator.exe')">
+      <LogicalName>EmbeddedPayloads.FFXIVPatchGenerator.exe</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="..\..\FFXIVPatchGenerator\bin\Release\TTMPD.mpd" Condition="Exists('..\..\FFXIVPatchGenerator\bin\Release\TTMPD.mpd')">
+      <LogicalName>EmbeddedPayloads.TTMPD.mpd</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="..\..\FFXIVPatchGenerator\bin\Release\TTMPL.mpl" Condition="Exists('..\..\FFXIVPatchGenerator\bin\Release\TTMPL.mpl')">
+      <LogicalName>EmbeddedPayloads.TTMPL.mpl</LogicalName>
+    </EmbeddedResource>
+  </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
-  <Target Name="CopyPatchGenerator" AfterTargets="Build">
-    <PropertyGroup>
-      <PatchGeneratorSourcePath Condition="Exists('..\..\FFXIVPatchGenerator\bin\Release\FFXIVPatchGenerator.exe')">..\..\FFXIVPatchGenerator\bin\Release\FFXIVPatchGenerator.exe</PatchGeneratorSourcePath>
-      <PatchGeneratorSourcePath Condition="Exists('..\..\FFXIVPatchGenerator\bin\$(Configuration)\FFXIVPatchGenerator.exe')">..\..\FFXIVPatchGenerator\bin\$(Configuration)\FFXIVPatchGenerator.exe</PatchGeneratorSourcePath>
-    </PropertyGroup>
-    <ItemGroup>
-      <PatchGeneratorAsset Include="..\..\FFXIVPatchGenerator\bin\Release\TTMPD.mpd" Condition="Exists('..\..\FFXIVPatchGenerator\bin\Release\TTMPD.mpd')" />
-      <PatchGeneratorAsset Include="..\..\FFXIVPatchGenerator\bin\Release\TTMPL.mpl" Condition="Exists('..\..\FFXIVPatchGenerator\bin\Release\TTMPL.mpl')" />
-      <PatchGeneratorAsset Include="..\..\FFXIVPatchGenerator\bin\$(Configuration)\TTMPD.mpd" Condition="Exists('..\..\FFXIVPatchGenerator\bin\$(Configuration)\TTMPD.mpd')" />
-      <PatchGeneratorAsset Include="..\..\FFXIVPatchGenerator\bin\$(Configuration)\TTMPL.mpl" Condition="Exists('..\..\FFXIVPatchGenerator\bin\$(Configuration)\TTMPL.mpl')" />
-    </ItemGroup>
-    <Copy SourceFiles="$(PatchGeneratorSourcePath)" DestinationFolder="$(OutputPath)" SkipUnchangedFiles="true" Condition="'$(PatchGeneratorSourcePath)' != ''" />
-    <Copy SourceFiles="@(PatchGeneratorAsset)" DestinationFolder="$(OutputPath)" SkipUnchangedFiles="true" Condition="'@(PatchGeneratorAsset)' != ''" />
-  </Target>
 </Project>

@@ -34,11 +34,14 @@ New-Item -ItemType Directory -Force -Path $testDir | Out-Null
 $uiBin = Join-Path $repoRoot "FFXIVPatchUI\bin\$Configuration"
 $mappings = @{
     "FFXIVKoreanPatch.exe" = "FFXIVKoreanPatch.Test.exe"
-    "FFXIVKoreanPatch.exe.config" = "FFXIVKoreanPatch.Test.exe.config"
-    "FFXIVPatchGenerator.exe" = "FFXIVPatchGenerator.exe"
-    "TTMPD.mpd" = "TTMPD.mpd"
-    "TTMPL.mpl" = "TTMPL.mpl"
 }
+
+$obsoleteSidecarFiles = @(
+    "FFXIVKoreanPatch.Test.exe.config",
+    "FFXIVPatchGenerator.exe",
+    "TTMPD.mpd",
+    "TTMPL.mpl"
+)
 
 $runningProcesses = Get-Process -ErrorAction SilentlyContinue | Where-Object {
     $_.ProcessName -eq "FFXIVKoreanPatch" -or $_.ProcessName -eq "FFXIVKoreanPatch.Test" -or $_.ProcessName -eq "FFXIVPatchGenerator"
@@ -47,6 +50,13 @@ $runningProcesses = Get-Process -ErrorAction SilentlyContinue | Where-Object {
 if ($runningProcesses) {
     $processSummary = ($runningProcesses | ForEach-Object { "$($_.ProcessName)($($_.Id))" }) -join ", "
     throw "Test output files may be locked by running processes: $processSummary. Close the app/generator and run the build again."
+}
+
+foreach ($obsoleteFile in $obsoleteSidecarFiles) {
+    $obsoletePath = Join-Path $testDir $obsoleteFile
+    if (Test-Path $obsoletePath) {
+        Remove-Item -LiteralPath $obsoletePath -Force
+    }
 }
 
 foreach ($sourceName in $mappings.Keys) {

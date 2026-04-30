@@ -47,7 +47,10 @@ foreach ($legacyFile in $legacyFiles) {
 }
 
 $files = @(
-    "FFXIVKoreanPatch.exe",
+    "FFXIVKoreanPatch.exe"
+)
+
+$obsoleteSidecarFiles = @(
     "FFXIVKoreanPatch.exe.config",
     "FFXIVPatchGenerator.exe",
     "TTMPD.mpd",
@@ -61,6 +64,13 @@ $runningProcesses = Get-Process -ErrorAction SilentlyContinue | Where-Object {
 if ($runningProcesses) {
     $processSummary = ($runningProcesses | ForEach-Object { "$($_.ProcessName)($($_.Id))" }) -join ", "
     throw "Release output files may be locked by running processes: $processSummary. Close the app/generator and run the build again."
+}
+
+foreach ($obsoleteFile in $obsoleteSidecarFiles) {
+    $obsoletePath = Join-Path $releaseDir $obsoleteFile
+    if (Test-Path $obsoletePath) {
+        Remove-Item -LiteralPath $obsoletePath -Force
+    }
 }
 
 foreach ($file in $files) {

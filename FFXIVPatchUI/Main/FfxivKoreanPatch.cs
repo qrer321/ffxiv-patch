@@ -11,6 +11,7 @@ using System.Drawing.Drawing2D;
 using System.Drawing.Imaging;
 using System.IO;
 using System.Linq;
+using System.Reflection;
 using System.Security.Cryptography;
 using System.Text;
 using System.Windows.Forms;
@@ -25,6 +26,11 @@ namespace FFXIVKoreanPatch.Main
 
         // Generator stdout protocol. Progress lines are "prefix + percent|message".
         private const string builderProgressPrefix = "@@FFXIVPATCHGENERATOR_PROGRESS|";
+
+        // Single-exe release payloads embedded into FFXIVKoreanPatch.exe.
+        private const string embeddedGeneratorResourceName = "EmbeddedPayloads.FFXIVPatchGenerator.exe";
+        private const string embeddedTtmpMpdResourceName = "EmbeddedPayloads.TTMPD.mpd";
+        private const string embeddedTtmpMplResourceName = "EmbeddedPayloads.TTMPL.mpl";
 
         // Local backup folder kept outside release output so users can manually restore sqpack files.
         private const string manualRollbackDirName = "manual-sqpack-rollback";
@@ -1387,8 +1393,77 @@ namespace FFXIVKoreanPatch.Main
             return childDir;
         }
 
+        private string GetEmbeddedToolDir()
+        {
+            string versionKey = "unknown";
+            try
+            {
+                versionKey = File.GetLastWriteTimeUtc(Application.ExecutablePath).Ticks.ToString("x");
+            }
+            catch
+            {
+                versionKey = Assembly.GetExecutingAssembly().GetName().Version.ToString();
+            }
+
+            return GetRuntimeDataChildDir(Path.Combine("embedded-tools", versionKey));
+        }
+
+        private string EnsureEmbeddedPatchGeneratorPath()
+        {
+            string toolDir = GetEmbeddedToolDir();
+            string generatorPath = Path.Combine(toolDir, "FFXIVPatchGenerator.exe");
+            bool hasGenerator = ExtractEmbeddedPayload(embeddedGeneratorResourceName, generatorPath);
+            if (!hasGenerator)
+            {
+                return null;
+            }
+
+            ExtractEmbeddedPayload(embeddedTtmpMpdResourceName, Path.Combine(toolDir, "TTMPD.mpd"));
+            ExtractEmbeddedPayload(embeddedTtmpMplResourceName, Path.Combine(toolDir, "TTMPL.mpl"));
+            return generatorPath;
+        }
+
+        private static bool ExtractEmbeddedPayload(string resourceName, string destinationPath)
+        {
+            Assembly assembly = Assembly.GetExecutingAssembly();
+            using (Stream resourceStream = assembly.GetManifestResourceStream(resourceName))
+            {
+                if (resourceStream == null)
+                {
+                    return false;
+                }
+
+                Directory.CreateDirectory(Path.GetDirectoryName(destinationPath));
+                FileInfo destinationInfo = new FileInfo(destinationPath);
+                if (destinationInfo.Exists && destinationInfo.Length == resourceStream.Length)
+                {
+                    return true;
+                }
+
+                string tempPath = destinationPath + ".tmp";
+                using (FileStream outputStream = new FileStream(tempPath, FileMode.Create, FileAccess.Write, FileShare.None))
+                {
+                    resourceStream.CopyTo(outputStream);
+                }
+
+                if (File.Exists(destinationPath))
+                {
+                    File.Delete(destinationPath);
+                }
+
+                File.Move(tempPath, destinationPath);
+                return true;
+            }
+        }
+
         private string FindPatchGeneratorPath()
         {
+            string embeddedGeneratorPath = EnsureEmbeddedPatchGeneratorPath();
+            if (!string.IsNullOrEmpty(embeddedGeneratorPath) && File.Exists(embeddedGeneratorPath))
+            {
+                return embeddedGeneratorPath;
+            }
+
             string[] candidatePaths = new string[]
             {
                 Path.Combine(Application.StartupPath, "FFXIVPatchGenerator.exe"),
@@ -3144,7 +3219,7 @@ namespace FFXIVKoreanPatch.Main
                 if (string.IsNullOrEmpty(patchGeneratorPath))
                 {
                     failures++;
-                    lines.Add("[실패] FFXIVPatchGenerator.exe를 찾을 수 없습니다.");
+                    lines.Add("[실패] 내장 FFXIVPatchGenerator.exe를 추출할 수 없습니다.");
                 }
                 else
                 {
@@ -3163,7 +3238,7 @@ namespace FFXIVKoreanPatch.Main
                     if (string.IsNullOrEmpty(fontPackageDir))
                     {
                         failures++;
-                        lines.Add("[실패] TTMP font package not found. TTMPD.mpd and TTMPL.mpl must be next to FFXIVPatchGenerator.exe for Korean font patching.");
+                        lines.Add("[실패] 내장 TTMP font package를 추출할 수 없습니다. 릴리즈 빌드를 다시 생성해야 합니다.");
                     }
                     else
                     {
@@ -3981,7 +4056,7 @@ namespace FFXIVKoreanPatch.Main
                 string patchGeneratorPath = FindPatchGeneratorPath();
                 if (string.IsNullOrEmpty(patchGeneratorPath))
                 {
-                    throw new FileNotFoundException("FFXIVPatchGenerator.exe를 찾을 수 없어요. FFXIVPatchGenerator를 먼저 빌드하거나 UI 실행 파일과 같은 폴더에 FFXIVPatchGenerator.exe를 넣어주세요.");
+                    throw new FileNotFoundException("내장 FFXIVPatchGenerator.exe를 추출할 수 없어요. 릴리즈 빌드를 다시 생성해주세요.");
                 }
 
                 releaseOutputDir = CreateManagedReleaseDirForRun();

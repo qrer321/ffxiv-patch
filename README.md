@@ -129,12 +129,10 @@ UI 실행 중 생성/관리되는 주요 폴더는 실행 파일이 있는 `Rele
 
 ```text
 Release\Public\
-├─ FFXIVKoreanPatch.exe
-├─ FFXIVKoreanPatch.exe.config
-├─ FFXIVPatchGenerator.exe
-├─ TTMPD.mpd
-└─ TTMPL.mpl
+└─ FFXIVKoreanPatch.exe
 ```
+
+`FFXIVKoreanPatch.exe` 안에는 `FFXIVPatchGenerator.exe`, `TTMPD.mpd`, `TTMPL.mpl`이 내장됩니다. 실행 시 `%LocalAppData%\FFXIVKoreanPatch\embedded-tools` 아래로 자동 추출되어 UI에서 제너레이터와 폰트 패키지를 별도 파일 없이 사용합니다.
 
 테스트 빌드:
 
@@ -146,11 +144,7 @@ Release\Public\
 
 ```text
 Release\Test\
-├─ FFXIVKoreanPatch.Test.exe
-├─ FFXIVKoreanPatch.Test.exe.config
-├─ FFXIVPatchGenerator.exe
-├─ TTMPD.mpd
-└─ TTMPL.mpl
+└─ FFXIVKoreanPatch.Test.exe
 ```
 
 GitHub Release 준비:
@@ -159,7 +153,7 @@ GitHub Release 준비:
 .\Scripts\publish-release.ps1 -TagName v2026.04.30
 ```
 
-기본 실행은 zip, SHA256, 릴리즈 노트만 생성합니다. 실제 태그 생성과 GitHub Release 업로드는 다음처럼 `-Publish`를 명시했을 때만 진행합니다.
+기본 실행은 단일 exe가 들어간 zip, SHA256, 릴리즈 노트만 생성합니다. 실제 태그 생성과 GitHub Release 업로드는 다음처럼 `-Publish`를 명시했을 때만 진행합니다.
 
 ```powershell
 .\Scripts\publish-release.ps1 -TagName v2026.04.30 -Publish
@@ -192,7 +186,7 @@ GitHub Release 준비:
 - `logs\`
 - `*.exe`, `*.dll`, `*.pdb`, `*.zip`
 
-실행 바이너리는 GitHub 소스 커밋이 아니라 GitHub Releases에 `Release\Public` 안의 파일만 업로드하는 방식으로 배포합니다.
+실행 바이너리는 GitHub 소스 커밋이 아니라 GitHub Releases에 `Release\Public\FFXIVKoreanPatch.exe` 단일 파일만 업로드하는 방식으로 배포합니다.
 
 ## 안전장치
 

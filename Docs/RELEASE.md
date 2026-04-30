@@ -16,23 +16,19 @@
 
 - `FFXIVPatchGenerator\build.ps1`로 제너레이터 빌드
 - `FfxivKoreanPatch.sln` Release 구성 빌드
-- UI 출력 폴더에 `FFXIVPatchGenerator.exe` 복사
+- UI exe에 `FFXIVPatchGenerator.exe`와 TTMP 폰트 패키지 내장
 - `Release\Public` 폴더 생성
-- 배포에 필요한 런타임 파일만 복사
+- 배포용 단일 실행 파일 복사
 - 기존 upstream self-updater 파일이 남아 있으면 제거
 
 ## 릴리즈 산출물
 
 ```text
 Release\Public\
-├─ FFXIVKoreanPatch.exe
-├─ FFXIVKoreanPatch.exe.config
-├─ FFXIVPatchGenerator.exe
-├─ TTMPD.mpd
-└─ TTMPL.mpl
+└─ FFXIVKoreanPatch.exe
 ```
 
-`TTMPD.mpd`와 `TTMPL.mpl`은 로컬에 파일이 있을 때만 포함됩니다. 안정적인 폰트 패치를 위해 실제 배포용 릴리즈에는 두 파일이 포함되어야 합니다.
+`FFXIVKoreanPatch.exe` 하나에 `FFXIVPatchGenerator.exe`, `TTMPD.mpd`, `TTMPL.mpl`이 내장됩니다. 실행 시 `%LocalAppData%\FFXIVKoreanPatch\embedded-tools` 아래로 자동 추출해 사용합니다.
 
 ## 포함하지 않는 파일
 
@@ -41,6 +37,10 @@ Release\Public\
 - `FFXIVKoreanPatchUpdater.exe`
 - `FFXIVKoreanPatchUpdater.exe.config`
 - `SHA1Producer.exe`
+- `FFXIVPatchGenerator.exe`
+- `TTMPD.mpd`
+- `TTMPL.mpl`
+- `*.config`
 - `*.pdb`
 - `bin`, `obj`
 - `generated-release`, `restore-baseline`, `backups`, `logs`
@@ -59,11 +59,7 @@ Release\Public\
 
 ```text
 Release\Test\
-├─ FFXIVKoreanPatch.Test.exe
-├─ FFXIVKoreanPatch.Test.exe.config
-├─ FFXIVPatchGenerator.exe
-├─ TTMPD.mpd
-└─ TTMPL.mpl
+└─ FFXIVKoreanPatch.Test.exe
 ```
 
 테스트 빌드는 실제 글로벌 클라이언트에 적용하지 않고 `debug-apply` 폴더에만 파일을 복사합니다.
@@ -72,8 +68,8 @@ Release\Test\
 ## 배포 전 확인
 
 - 릴리즈 빌드가 경고 0개, 오류 0개로 완료되는지 확인합니다.
-- `Release\Public`에 updater 파일이 남아 있지 않은지 확인합니다.
-- `TTMPD.mpd`, `TTMPL.mpl` 포함 여부를 확인합니다.
+- `Release\Public`에 `FFXIVKoreanPatch.exe` 하나만 남아 있는지 확인합니다.
+- 실행 후 내장 제너레이터와 TTMP 폰트 패키지가 자동 추출되는지 확인합니다.
 - 실행 후 사전 점검 창이 자동으로 뜨는지 확인합니다.
 - 실제 패치 버튼이 사전 점검 통과 전에는 잠겨 있는지 확인합니다.
 - 글로벌/한국 서버 버전이 다르면 릴리즈 빌드에서 실제 패치가 잠기는지 확인합니다.
@@ -92,7 +88,7 @@ Release\Test\
 기본 실행은 준비 전용입니다. 다음 작업만 수행하고 GitHub에는 아무것도 만들지 않습니다.
 
 - 릴리즈 빌드 실행
-- `Release\Public` 필수 파일 검증
+- `Release\Public` 단일 exe 검증
 - `Release\GitHub\<tag>\FFXIVKoreanPatch-<tag>.zip` 생성
 - SHA256 파일 생성
 - `release-notes.md` 생성

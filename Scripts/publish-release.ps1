@@ -8,7 +8,6 @@ param(
     [switch]$Prerelease,
     [switch]$SkipBuild,
     [switch]$AllowDirty,
-    [switch]$AllowMissingFontAssets,
     [switch]$Force
 )
 
@@ -121,7 +120,7 @@ function Write-ReleaseNotes {
     [void]$builder.AppendLine("## Pre-Publish Checklist")
     [void]$builder.AppendLine()
     [void]$builder.AppendLine("- Confirm the release build completed with 0 warnings and 0 errors.")
-    [void]$builder.AppendLine("- Confirm ``TTMPD.mpd`` and ``TTMPL.mpl`` are included.")
+    [void]$builder.AppendLine("- Confirm the release package contains only ``FFXIVKoreanPatch.exe``.")
     [void]$builder.AppendLine("- Smoke test preflight, full patch, font patch, and patch removal flows.")
 
     Set-Content -LiteralPath $Path -Value $builder.ToString() -Encoding UTF8
@@ -169,12 +168,9 @@ try {
     }
 
     $requiredFiles = @(
-        "FFXIVKoreanPatch.exe",
-        "FFXIVKoreanPatch.exe.config",
-        "FFXIVPatchGenerator.exe"
+        "FFXIVKoreanPatch.exe"
     )
 
-    $fontFiles = @("TTMPD.mpd", "TTMPL.mpl")
     $missingRequired = @()
     foreach ($file in $requiredFiles) {
         if (!(Test-Path (Join-Path $releasePublicDir $file))) {
@@ -184,17 +180,6 @@ try {
 
     if ($missingRequired.Count -gt 0) {
         throw "Release\Public is missing required files: $($missingRequired -join ', ')"
-    }
-
-    $missingFont = @()
-    foreach ($file in $fontFiles) {
-        if (!(Test-Path (Join-Path $releasePublicDir $file))) {
-            $missingFont += $file
-        }
-    }
-
-    if ($missingFont.Count -gt 0 -and !$AllowMissingFontAssets) {
-        throw "Release\Public is missing font assets: $($missingFont -join ', '). Pass -AllowMissingFontAssets only for non-public diagnostics."
     }
 
     New-Item -ItemType Directory -Force -Path $releaseRoot | Out-Null
@@ -214,9 +199,9 @@ try {
     $packageDir = Join-Path $stagingDir "package"
     New-Item -ItemType Directory -Force -Path $packageDir | Out-Null
 
-    $filesToPackage = Get-ChildItem -LiteralPath $releasePublicDir -File | Where-Object {
-        $_.Extension -notin @(".pdb")
-    }
+    $filesToPackage = @(
+        Get-Item -LiteralPath (Join-Path $releasePublicDir "FFXIVKoreanPatch.exe")
+    )
 
     foreach ($file in $filesToPackage) {
         Copy-Item -LiteralPath $file.FullName -Destination $packageDir -Force
