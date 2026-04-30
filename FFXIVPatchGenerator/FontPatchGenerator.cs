@@ -667,16 +667,19 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
                 int entryOffset = GlyphTableStart + i * GlyphEntrySize;
                 uint charUtf8 = Endian.ReadUInt32LE(output, entryOffset + CharUtf8Offset);
                 ushort currentSjis = ReadUInt16LE(output, entryOffset + CharSjisOffset);
+                ushort baseSjis;
                 ushort targetSjis = GetAsciiSjis(charUtf8);
+                if (baseSjisByUtf8.TryGetValue(charUtf8, out baseSjis) && baseSjis != 0)
+                {
+                    if (targetSjis != 0 || IsPrivateUseUiGlyph(charUtf8))
+                    {
+                        targetSjis = baseSjis;
+                    }
+                }
+
                 if (targetSjis == 0)
                 {
                     continue;
-                }
-
-                ushort baseSjis;
-                if (baseSjisByUtf8.TryGetValue(charUtf8, out baseSjis) && baseSjis != 0)
-                {
-                    targetSjis = baseSjis;
                 }
 
                 if (currentSjis == targetSjis)
@@ -739,6 +742,98 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
             }
 
             return value;
+        }
+
+        private static bool IsPrivateUseUiGlyph(uint charUtf8)
+        {
+            int codePoint;
+            return TryDecodeFdtUtf8(charUtf8, out codePoint) && codePoint >= 0xE000 && codePoint <= 0xF8FF;
+        }
+
+        private static bool TryDecodeFdtUtf8(uint charUtf8, out int codePoint)
+        {
+            codePoint = 0;
+            // FDT stores the UTF-8 byte sequence as an integer-like field, so rebuild the
+            // byte order before checking whether the glyph is in the BMP private-use range.
+            byte[] raw = new byte[]
+            {
+                (byte)(charUtf8 >> 24),
+                (byte)(charUtf8 >> 16),
+                (byte)(charUtf8 >> 8),
+                (byte)charUtf8
+            };
+
+            int start = 0;
+            while (start < raw.Length && raw[start] == 0)
+            {
+                start++;
+            }
+
+            int length = raw.Length - start;
+            if (length <= 0)
+            {
+                return false;
+            }
+
+            byte first = raw[start];
+            if (first < 0x80)
+            {
+                if (length != 1)
+                {
+                    return false;
+                }
+
+                codePoint = first;
+                return true;
+            }
+
+            if ((first & 0xE0) == 0xC0)
+            {
+                if (length != 2 || !IsUtf8Continuation(raw[start + 1]))
+                {
+                    return false;
+                }
+
+                codePoint = ((first & 0x1F) << 6) | (raw[start + 1] & 0x3F);
+                return codePoint >= 0x80;
+            }
+
+            if ((first & 0xF0) == 0xE0)
+            {
+                if (length != 3 || !IsUtf8Continuation(raw[start + 1]) || !IsUtf8Continuation(raw[start + 2]))
+                {
+                    return false;
+                }
+
+                codePoint = ((first & 0x0F) << 12) |
+                            ((raw[start + 1] & 0x3F) << 6) |
+                            (raw[start + 2] & 0x3F);
+                return codePoint >= 0x800 && (codePoint < 0xD800 || codePoint > 0xDFFF);
+            }
+
+            if ((first & 0xF8) == 0xF0)
+            {
+                if (length != 4 ||
+                    !IsUtf8Continuation(raw[start + 1]) ||
+                    !IsUtf8Continuation(raw[start + 2]) ||
+                    !IsUtf8Continuation(raw[start + 3]))
+                {
+                    return false;
+                }
+
+                codePoint = ((first & 0x07) << 18) |
+                            ((raw[start + 1] & 0x3F) << 12) |
+                            ((raw[start + 2] & 0x3F) << 6) |
+                            (raw[start + 3] & 0x3F);
+                return codePoint >= 0x10000 && codePoint <= 0x10FFFF;
+            }
+
+            return false;
+        }
+
+        private static bool IsUtf8Continuation(byte value)
+        {
+            return (value & 0xC0) == 0x80;
         }
 
         private static ushort ReadUInt16LE(byte[] data, int offset)
