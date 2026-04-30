@@ -137,6 +137,7 @@ namespace FFXIVKoreanPatch.Main
         private bool lastPreflightPassed;
         private Label debugFontProfileLabel;
         private ComboBox debugFontProfileComboBox;
+        private CheckBox includeCommandSheetsCheckBox;
 
         // Target client version.
         private string targetVersion = string.Empty;
@@ -160,6 +161,7 @@ namespace FFXIVKoreanPatch.Main
             targetLanguageComboBox.Items.Add("영어 클라이언트 (en)");
             targetLanguageComboBox.SelectedIndex = 0;
             InitializeDebugFontProfileControls();
+            InitializeCommandSheetControls();
 
 #if TEST_BUILD
             Text = patchDisplayName + " - 테스트 빌드";
@@ -217,6 +219,18 @@ namespace FFXIVKoreanPatch.Main
 
             Controls.Add(debugFontProfileLabel);
             Controls.Add(debugFontProfileComboBox);
+        }
+
+        private void InitializeCommandSheetControls()
+        {
+            includeCommandSheetsCheckBox = new CheckBox();
+            includeCommandSheetsCheckBox.Name = "includeCommandSheetsCheckBox";
+            includeCommandSheetsCheckBox.Text = "Command/key text (experimental)";
+            includeCommandSheetsCheckBox.AutoSize = false;
+            includeCommandSheetsCheckBox.Checked = true;
+            includeCommandSheetsCheckBox.BackColor = Color.Transparent;
+            includeCommandSheetsCheckBox.TabStop = false;
+            Controls.Add(includeCommandSheetsCheckBox);
         }
 
         private sealed class FontProfileItem
@@ -399,6 +413,15 @@ namespace FFXIVKoreanPatch.Main
             comboBox.Font = new Font("맑은 고딕", 9F, FontStyle.Regular, GraphicsUnit.Point, 129);
         }
 
+        private void StyleCheckBox(CheckBox checkBox)
+        {
+            checkBox.BackColor = Color.Transparent;
+            checkBox.ForeColor = Color.FromArgb(220, 227, 236);
+            checkBox.Font = new Font("맑은 고딕", 8.5F, FontStyle.Bold, GraphicsUnit.Point, 129);
+            checkBox.Cursor = Cursors.Hand;
+            checkBox.FlatStyle = FlatStyle.Flat;
+        }
+
         private void StyleButton(Button button, Color backColor, Color borderColor, Color hoverColor)
         {
             button.AutoSize = false;
@@ -472,6 +495,7 @@ namespace FFXIVKoreanPatch.Main
             StyleTextBox(koreaPathTextBox);
             StyleComboBox(targetLanguageComboBox);
             StyleComboBox(debugFontProfileComboBox);
+            StyleCheckBox(includeCommandSheetsCheckBox);
 
             Color neutral = Color.FromArgb(42, 50, 61);
             Color neutralBorder = Color.FromArgb(82, 96, 112);
@@ -530,6 +554,7 @@ namespace FFXIVKoreanPatch.Main
             PlaceControl(openLogsButton, 248, 484, 184, 32);
             PlaceControl(cleanupButton, 444, 484, 190, 32);
             PlaceControl(restoreBackupButton, 646, 484, 212, 32);
+            PlaceControl(includeCommandSheetsCheckBox, 42, 526, 320, 24);
 
 #if TEST_BUILD
             PlaceControl(preflightCheckButton, 42, 590, 404, 42);
@@ -910,6 +935,7 @@ namespace FFXIVKoreanPatch.Main
                 globalPathBrowseButton.Enabled = enabled;
                 koreaPathBrowseButton.Enabled = enabled;
                 targetLanguageComboBox.Enabled = enabled;
+                includeCommandSheetsCheckBox.Enabled = enabled;
                 debugFontProfileComboBox.Enabled = enabled;
                 detectPathsButton.Enabled = enabled;
                 resetPathsButton.Enabled = enabled;
@@ -1246,6 +1272,7 @@ namespace FFXIVKoreanPatch.Main
                 globalPathBrowseButton.Enabled = enabled;
                 koreaPathBrowseButton.Enabled = enabled;
                 targetLanguageComboBox.Enabled = enabled;
+                includeCommandSheetsCheckBox.Enabled = enabled;
                 detectPathsButton.Enabled = enabled;
                 resetPathsButton.Enabled = enabled;
                 openReleaseButton.Enabled = enabled;
@@ -3470,6 +3497,7 @@ namespace FFXIVKoreanPatch.Main
                     globalPathBrowseButton.Enabled = true;
                     koreaPathBrowseButton.Enabled = true;
                     targetLanguageComboBox.Enabled = true;
+                    includeCommandSheetsCheckBox.Enabled = true;
                     detectPathsButton.Enabled = true;
                     resetPathsButton.Enabled = true;
                     openReleaseButton.Enabled = true;
@@ -3898,6 +3926,21 @@ namespace FFXIVKoreanPatch.Main
             return item == null || string.IsNullOrEmpty(item.Value) ? "full" : item.Value;
         }
 
+        private bool ShouldIncludeCommandSheets()
+        {
+            if (includeCommandSheetsCheckBox == null)
+            {
+                return false;
+            }
+
+            if (includeCommandSheetsCheckBox.InvokeRequired)
+            {
+                return (bool)includeCommandSheetsCheckBox.Invoke(new Func<bool>(ShouldIncludeCommandSheets));
+            }
+
+            return includeCommandSheetsCheckBox.Checked;
+        }
+
         private void BuildReleaseWork()
         {
             StringBuilder processOutput = new StringBuilder();
@@ -3957,6 +4000,12 @@ namespace FFXIVKoreanPatch.Main
                 if (!buildTextPatch && buildFontPatch)
                 {
                     arguments += " --font-only";
+                }
+
+                if (buildTextPatch && ShouldIncludeCommandSheets())
+                {
+                    arguments += " --include-command-sheets";
+                    logLines.Add("Experimental command/key text sheets: enabled");
                 }
 
                 string patchPolicyPath = FindPatchPolicyPath(patchGeneratorPath);

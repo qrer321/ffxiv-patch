@@ -106,6 +106,8 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
             Console.WriteLine("  --sheet            Limit to one root.exl sheet name for testing.");
             Console.WriteLine("  --policy           Optional JSON patch policy file.");
             Console.WriteLine("  --diagnostic-csv   Export row/column comparison CSV for a sheet.");
+            Console.WriteLine("  --include-command-sheets");
+            Console.WriteLine("                     Experimental: also patch command/key-binding text sheets.");
             Console.WriteLine("  --base-index       Clean global 0a0000.win32.index to use instead of installed index.");
             Console.WriteLine("  --base-index2      Clean global 0a0000.win32.index2 to use instead of installed index2.");
             Console.WriteLine("  --include-font     Also build 000000 font patch files.");
@@ -214,6 +216,7 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
         public bool AllowPatchedGlobal;
         public bool AllowKoreanFontFallback;
         public bool AllowVersionMismatch;
+        public bool IncludeCommandSheets;
 
         public static BuildOptions Parse(string[] args)
         {
@@ -249,6 +252,12 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
                 if (string.Equals(arg, "--allow-version-mismatch", StringComparison.OrdinalIgnoreCase))
                 {
                     options.AllowVersionMismatch = true;
+                    continue;
+                }
+
+                if (string.Equals(arg, "--include-command-sheets", StringComparison.OrdinalIgnoreCase))
+                {
+                    options.IncludeCommandSheets = true;
                     continue;
                 }
 

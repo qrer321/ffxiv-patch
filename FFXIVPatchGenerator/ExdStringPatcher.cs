@@ -42,9 +42,23 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
             Dictionary<uint, RowPatchPlan> rowPlans = BuildStringKeyPlans(target, targetHeader, sourceMaps.StringKeyRows, sourceMaps.RowKeyRows, sheetPolicy);
             bool usingStringKeyPlans = rowPlans.Count > 0;
 
-            if (!usingStringKeyPlans && allowRowKeyFallback)
+            if (allowRowKeyFallback)
             {
-                rowPlans = BuildRowKeyPlans(target, sourceMaps.RowKeyRows, sheetPolicy);
+                Dictionary<uint, RowPatchPlan> rowKeyPlans = BuildRowKeyPlans(target, sourceMaps.RowKeyRows, sheetPolicy);
+                if (!usingStringKeyPlans)
+                {
+                    rowPlans = rowKeyPlans;
+                }
+                else
+                {
+                    foreach (KeyValuePair<uint, RowPatchPlan> rowKeyPlan in rowKeyPlans)
+                    {
+                        if (!rowPlans.ContainsKey(rowKeyPlan.Key))
+                        {
+                            rowPlans.Add(rowKeyPlan.Key, rowKeyPlan.Value);
+                        }
+                    }
+                }
             }
 
             ExdPatchResult result = new ExdPatchResult();
