@@ -73,9 +73,9 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
             }
 
             // Addon row 10952 is the party-list self marker. It is a private glyph
-            // token in the original client, but Korean font replacement can render it
-            // as "=". Use plain ASCII here to avoid touching global font glyph tables.
-            addonPolicy.SetRowColumnRemap(10952, 0, ColumnRemap.Literal("1"));
+            // token in the original client, so keep the target global token and let
+            // the font patch alias U+E0E1..U+E0E8 to boxed marker glyphs.
+            addonPolicy.GlobalTargetRows.Add(10952);
 
             // The data-center selection screen is global-client-only lobby UI.
             // Korean Lobby rows exist for some labels, but this screen uses a font

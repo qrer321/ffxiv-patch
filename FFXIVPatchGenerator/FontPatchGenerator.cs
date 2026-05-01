@@ -329,9 +329,9 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
         {
             // Party-list self marker text is declared as Axis 12 in PartyList.uld,
             // but after Korean TTMP font replacement the actual render route can
-            // resolve through a paired KrnAXIS or lobby FDT. Add the narrow 1-8
-            // aliases to every patched FDT by copying that FDT's own ASCII digits;
-            // this avoids mixing font atlases while covering the runtime fallback.
+            // resolve through a paired KrnAXIS or lobby FDT. Add U+E0E1..E0E8 by
+            // copying that FDT's existing U+E0B1..E0B8 boxed marker glyphs; this
+            // keeps the original boxed look and avoids mixing font atlases.
             if (!NormalizeGamePath(path).EndsWith(".fdt", StringComparison.OrdinalIgnoreCase))
             {
                 return 0;
@@ -376,9 +376,11 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
                 }
             }
 
-            int added = 0;
-            added += AddPartyListSelfMarkerAliasRange(entries, entriesByCodepoint, PartyListSelfMarkerPrimaryStart);
-            added += AddPartyListSelfMarkerAliasRange(entries, entriesByCodepoint, PartyListSelfMarkerLegacyStart);
+            int added = AddPartyListSelfMarkerAliasRange(
+                entries,
+                entriesByCodepoint,
+                PartyListSelfMarkerPrimaryStart,
+                PartyListSelfMarkerLegacyStart);
             if (added == 0)
             {
                 return 0;
@@ -412,23 +414,24 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
         private static int AddPartyListSelfMarkerAliasRange(
             List<byte[]> entries,
             Dictionary<uint, byte[]> entriesByCodepoint,
-            uint aliasStart)
+            uint aliasStart,
+            uint sourceStart)
         {
             int added = 0;
             for (int i = 0; i < PartyListSelfMarkerCount; i++)
             {
-                uint digitCodepoint = (uint)('1' + i);
+                uint sourceCodepoint = sourceStart + (uint)i;
                 uint aliasCodepoint = aliasStart + (uint)i;
-                uint digitValue = PackFdtUtf8Value(digitCodepoint);
+                uint sourceValue = PackFdtUtf8Value(sourceCodepoint);
                 uint aliasValue = PackFdtUtf8Value(aliasCodepoint);
-                byte[] digitEntry;
-                if (!entriesByCodepoint.TryGetValue(digitValue, out digitEntry))
+                byte[] sourceEntry;
+                if (!entriesByCodepoint.TryGetValue(sourceValue, out sourceEntry))
                 {
                     continue;
                 }
 
                 byte[] aliasEntry = new byte[FdtGlyphEntrySize];
-                Buffer.BlockCopy(digitEntry, 0, aliasEntry, 0, FdtGlyphEntrySize);
+                Buffer.BlockCopy(sourceEntry, 0, aliasEntry, 0, FdtGlyphEntrySize);
                 Endian.WriteUInt32LE(aliasEntry, 0, aliasValue);
                 ushort aliasShiftJis;
                 if (TryEncodeShiftJisValue(aliasCodepoint, out aliasShiftJis))
@@ -672,7 +675,8 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
 
             if (string.Equals(profile, FontPatchProfiles.NoTrumpGothic, StringComparison.OrdinalIgnoreCase))
             {
-                return normalized.IndexOf("/trumpgothic_", StringComparison.OrdinalIgnoreCase) < 0;
+                return normalized.IndexOf("/trumpgothic_", StringComparison.OrdinalIgnoreCase) < 0 &&
+                       !normalized.EndsWith("/font3.tex", StringComparison.OrdinalIgnoreCase);
             }
 
             if (string.Equals(profile, FontPatchProfiles.NoJupiter, StringComparison.OrdinalIgnoreCase))
@@ -690,7 +694,8 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
             {
                 return normalized.IndexOf("/miedingermid_", StringComparison.OrdinalIgnoreCase) < 0 &&
                        normalized.IndexOf("/trumpgothic_", StringComparison.OrdinalIgnoreCase) < 0 &&
-                       normalized.IndexOf("/jupiter_", StringComparison.OrdinalIgnoreCase) < 0;
+                       normalized.IndexOf("/jupiter_", StringComparison.OrdinalIgnoreCase) < 0 &&
+                       !normalized.EndsWith("/font3.tex", StringComparison.OrdinalIgnoreCase);
             }
 
             if (string.Equals(profile, FontPatchProfiles.FdtOnly, StringComparison.OrdinalIgnoreCase))
@@ -968,9 +973,9 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
     {
         public const string Full = "full";
         public const string UiNumericSafe = "ui-numeric-safe";
-        public const string Default = Full;
         public const string NoMiedingerMid = "no-miedingermid";
         public const string NoTrumpGothic = "no-trumpgothic";
+        public const string Default = NoTrumpGothic;
         public const string NoJupiter = "no-jupiter";
         public const string NoAxis = "no-axis";
         public const string FdtOnly = "fdt-only";

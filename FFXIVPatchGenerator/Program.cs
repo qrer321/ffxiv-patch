@@ -112,7 +112,7 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
             Console.WriteLine("  --include-font     Also build 000000 font patch files.");
             Console.WriteLine("  --font-only        Build only 000000 font patch files.");
             Console.WriteLine("  --font-pack-dir    Directory containing TTMPD.mpd and TTMPL.mpl for font patching.");
-            Console.WriteLine("  --font-profile     Font patch profile for diagnostics. Default: full");
+            Console.WriteLine("  --font-profile     Font patch profile for diagnostics. Default: no-trumpgothic");
             Console.WriteLine("  --allow-korean-font-fallback");
             Console.WriteLine("                     Experimental: copy Korean client font resources if TTMP files are missing.");
             Console.WriteLine("  --base-font-index  Clean global 000000.win32.index to use instead of installed index.");
