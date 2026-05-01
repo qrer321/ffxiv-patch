@@ -40,12 +40,6 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
         private const uint PartyListSelfMarkerLegacyStart = 0xE0B1u;
         private const int PartyListSelfMarkerCount = 8;
 
-        private static readonly HashSet<string> PartyListSelfMarkerAliasFonts = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
-        {
-            "common/font/AXIS_12.fdt",
-            "common/font/AXIS_12_lobby.fdt"
-        };
-
         // Explicit font resource set used by the global client for in-game and lobby text rendering.
         private static readonly string[] FontPaths = new string[]
         {
@@ -333,7 +327,12 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
 
         private static int AddPartyListSelfMarkerAliases(string path, ref byte[] fdt)
         {
-            if (!PartyListSelfMarkerAliasFonts.Contains(NormalizeGamePath(path)))
+            // Party-list self marker text is declared as Axis 12 in PartyList.uld,
+            // but after Korean TTMP font replacement the actual render route can
+            // resolve through a paired KrnAXIS or lobby FDT. Add the narrow 1-8
+            // aliases to every patched FDT by copying that FDT's own ASCII digits;
+            // this avoids mixing font atlases while covering the runtime fallback.
+            if (!NormalizeGamePath(path).EndsWith(".fdt", StringComparison.OrdinalIgnoreCase))
             {
                 return 0;
             }

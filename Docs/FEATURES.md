@@ -153,13 +153,12 @@
 - `Addon`, `AddonTransient` sheet의 짧은 숫자/기호/SeString UI 토큰 보호
 - `Addon`, `AddonTransient` SeString macro/lookup 구조가 글로벌/한국 row 사이에서 달라질 때 글로벌 payload/lookup 구조와 한국어 literal을 안전 병합
 - 병합이 불가능한 글로벌 전용 UI row는 글로벌 원본 구조를 유지해 깨진 glyph나 `--` 표시 방지
-- 데이터 센터 선택 화면의 `Lobby` row `800`, `802`, `803`, `806`은 한국 서버에 값이 있어 한국어로 반영
-- 한국 서버에 없거나 비어 있는 `Lobby` row `801`, `804`, `805`, `WorldRegionGroup` row `1`~`8`, `WorldPhysicalDC` row `1`~`8`, `WorldDCGroupType` row `1`~`32`, `Addon` row `12510`~`12538`은 대상 글로벌 언어 원문 사용
+- 데이터 센터 선택/이동 화면의 `Lobby` row `800`~`806`, `WorldRegionGroup` row `1`~`8`, `WorldPhysicalDC` row `1`~`8`, `WorldDCGroupType` row `1`~`32`, `Addon` row `12510`~`12538`은 글로벌 전용 로비 UI라서 대상 글로벌 언어 row 사용. `--target-language ja`면 일본어 원본, `en`이면 영어 원본을 사용
 - 데이터센터 화면의 한글 proxy glyph 방식은 FDT/텍스처 atlas 불일치 시 읽을 수 없는 글자로 노출될 수 있어 릴리즈 기본값에서 제외
 - `Addon` row `44`, `45`, `49` 기본 보호로 좁은 UI의 `h/m/s` 시간 단위가 `시간/분/초`로 늘어나 영역을 넘치는 문제 완화
 - `Addon` row `2338`, `6166`은 글로벌 영어 시간 템플릿을 사용해 버프/남은시간 UI의 `시간/분` overflow 완화
 - `Addon` row `10952`는 파티 리스트 본인 표시 glyph가 `=`로 보이는 문제를 피하기 위해 ASCII `1`로 보정
-- 파티 리스트 본인 표시 번호 설정이 1~8로 바뀌는 경우를 고려해 `AXIS_12`/`AXIS_12_lobby`에 본인 번호 PUA glyph `U+E0E1`~`U+E0E8`, `U+E0B1`~`U+E0B8`을 ASCII `1`~`8` glyph로 좁게 alias. FDT UTF-8 key 저장 방식과 Shift-JIS key를 함께 맞춰 기존 폰트 atlas 조합을 깨지 않도록 제한
+- 파티 리스트 본인 표시 번호 설정이 1~8로 바뀌는 경우를 고려해 패치되는 각 FDT에 본인 번호 PUA glyph `U+E0E1`~`U+E0E8`, `U+E0B1`~`U+E0B8`을 해당 FDT의 ASCII `1`~`8` glyph로 좁게 alias. FDT UTF-8 key 저장 방식과 Shift-JIS key를 함께 맞춰 기존 폰트 atlas 조합을 깨지 않도록 제한
 - `patch-policy.json` 기반 sheet/row/column 보존과 row/column remap
 - `patch-diagnostics.tsv` 생성
 - `--diagnostic-csv` 지정 sheet의 row/column 비교 CSV 생성
@@ -181,7 +180,7 @@
   - `TTMPL.mpl`
 - TTMP의 FDT와 texture atlas를 한 세트로 유지
 - FDT glyph 좌표/문자 코드와 다른 클라이언트의 font atlas를 섞지 않음
-- 릴리즈 기본값에서는 전역 FDT glyph alias를 추가하지 않고 TTMP의 FDT/texture 조합을 유지. 예외적으로 파티 리스트 본인 번호 PUA glyph만 `AXIS_12` 계열에 한정해 `1`~`8`로 alias하며, FDT UTF-8 key와 Shift-JIS key를 같이 보정
+- 릴리즈 기본값에서는 광범위한 한글 proxy glyph 병합을 추가하지 않고 TTMP의 FDT/texture 조합을 유지. 예외적으로 파티 리스트 본인 번호 PUA glyph만 각 FDT의 `1`~`8` glyph로 alias하며, FDT UTF-8 key와 Shift-JIS key를 같이 보정
 - `--font-pack-dir`로 TTMP 위치 지정
 - `--font-profile`로 진단용 폰트 프로필 선택
   - `full`
@@ -217,7 +216,7 @@
 - 지역/컨텐츠 입장 시 표시되는 타이틀 이미지처럼 텍스트가 아니라 이미지로 렌더링되는 UI 요소 보정
 - 데이터 센터 선택/이동, 월드/데이터센터 이동 관련 ULD의 텍스트 노드 폰트 슬롯은 원본 글로벌 값을 유지
 - TTMP 패키지가 제공하는 원래 폰트군 조합을 사용해 렌더링하며, `AXIS_20_lobby`처럼 패키지에 없는 크기/로비용 폰트 경로로 잘못 라우팅되는 것을 방지
-- 데이터 센터 선택 화면은 한국 서버에 실제 값이 있는 `Lobby` 안내 row만 한국어로 반영하고, `WorldRegionGroup`, `WorldPhysicalDC`, `WorldDCGroupType`, `Addon` 12510번대 서버/데이터센터 이동 안내 row는 대상 글로벌 언어 원문을 사용해 읽을 수 없는 proxy glyph 노출을 방지
+- `Lobby`, `WorldRegionGroup`, `WorldPhysicalDC`, `WorldDCGroupType`, `Addon` 12510번대 서버/데이터센터 이동 안내 row는 대상 글로벌 언어 row를 사용해 읽을 수 없는 proxy glyph 노출을 방지
 - `--base-ui-index`, `--base-ui-index2`로 clean `060000` index/index2 지정
 - `--skip-ui-texture-fix`로 UI 텍스처 패치 생성 제외
 

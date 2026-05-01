@@ -13,7 +13,7 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
         public static readonly PatchPolicy Empty = new PatchPolicy();
         private static readonly uint[] CompactTimeUnitAddonRows = new uint[] { 44, 45, 49 };
         private static readonly uint[] EnglishCompactDurationAddonRows = new uint[] { 2338, 6166 };
-        private static readonly uint[] GlobalLobbyDataCenterRows = new uint[] { 801, 804, 805 };
+        private static readonly uint[] GlobalLobbyDataCenterRows = new uint[] { 800, 801, 802, 803, 804, 805, 806 };
         private const uint DataCenterTravelAddonFirstRow = 12510;
         private const uint DataCenterTravelAddonLastRow = 12538;
 
@@ -78,10 +78,10 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
             addonPolicy.SetRowColumnRemap(10952, 0, ColumnRemap.Literal("1"));
 
             // The data-center selection screen is global-client-only lobby UI.
-            // Korean rows 800/802/803/806 exist and are now allowed through so the
-            // title, "information" label, and body can be localized. Rows listed
-            // here are empty or missing on the Korean client, so keep the selected
-            // global client language instead.
+            // Korean Lobby rows exist for some labels, but this screen uses a font
+            // route that does not reliably render Korean proxy glyphs in the global
+            // client. Keep the selected global client language instead of producing
+            // unreadable "==" text.
             for (int i = 0; i < GlobalLobbyDataCenterRows.Length; i++)
             {
                 lobbyPolicy.GlobalTargetRows.Add(GlobalLobbyDataCenterRows[i]);

@@ -46,7 +46,7 @@
   - 한섭 `*_ko.exd`의 SeString 바이트를 글로벌 `*_ja.exd` 또는 `*_en.exd`에 반영합니다.
   - `Addon`, `AddonTransient` sheet의 짧은 숫자/기호/UI glyph 토큰은 글로벌 원본을 유지해 파티 리스트 같은 UI 표시가 깨질 가능성을 줄입니다.
   - UI SeString macro/lookup 구조가 글로벌/한국 row 사이에서 달라지는 경우에는 글로벌 payload/lookup 구조와 한국어 literal을 안전하게 병합하고, 불가능한 row는 글로벌 원본 구조를 보존해 데이터 센터 이동 같은 글로벌 전용 UI가 `--` 또는 깨진 glyph로 보이는 문제를 줄입니다.
-  - 데이터 센터 선택 화면은 한국 서버에 값이 있는 로비 제목/안내문만 한국어로 반영하고, 지역/데이터센터 이름처럼 한국 서버에 없는 글로벌 전용 lookup row는 대상 글로벌 언어 원문을 유지합니다.
+  - 데이터 센터 선택/이동 화면은 글로벌 클라이언트 전용 로비 UI라서 한국어 proxy glyph를 사용하지 않고 대상 글로벌 언어 row를 유지합니다. 일본어 클라이언트는 일본어 원본을, 영어 클라이언트는 영어 원본을 사용합니다.
   - 파티 리스트 본인 표시는 `Addon` row 예외와 UI 텍스처 보정으로 처리하고, 일부 버프/남은시간 UI는 별도 내장 예외로 시간 단위 overflow를 완화합니다.
   - 글로벌/한국 서버 `ffxivgame.ver`가 다르면 릴리즈 패치를 차단해 row-id fallback 오매핑 위험을 줄입니다.
   - 선택적으로 `patch-policy.json`을 읽어 특정 sheet/row/column을 보존하거나 row/column 매핑을 보정합니다.
@@ -115,9 +115,9 @@ orig.060000.win32.index
 orig.060000.win32.index2
 ```
 
-`060000` UI 패치는 파티 리스트 본인 번호에 쓰이는 텍스처와 이미지형 UI 리소스를 한국 서버 리소스로 복사합니다. 폰트 패치에서는 파티 리스트 본인 번호가 `=`로 보이는 상황을 줄이기 위해 `AXIS_12` 계열의 본인 번호 PUA glyph만 `1`~`8`로 좁게 alias합니다. `ScreenImage`, `CutScreenImage`, `TerritoryType` 같은 언어별 타이틀 이미지와 일부 이벤트/로딩 이미지를 보정해, 지역 이동이나 던전 진입 시 텍스트가 아니라 이미지로 렌더링되는 요소도 한국어 리소스를 사용하도록 처리합니다. `ScreenImage`의 보조 이미지 ID 컬럼과 `TerritoryType`의 지역 타이틀 이미지 컬럼, 지역 타이틀의 `+2000` 부제 이미지도 함께 검사합니다. `Map` sheet의 지도 텍스처(`ui/map/.../*_m.tex`)도 한국 서버 텍스처와 비교해 다를 때 복사하므로, 지도 이미지 안에 박힌 지역명 표기도 함께 보정합니다.
+`060000` UI 패치는 파티 리스트 본인 번호에 쓰이는 텍스처와 이미지형 UI 리소스를 한국 서버 리소스로 복사합니다. 폰트 패치에서는 파티 리스트 본인 번호가 `=`로 보이는 상황을 줄이기 위해 본인 번호 PUA glyph만 `1`~`8`로 좁게 alias합니다. 각 FDT의 자체 ASCII 숫자 glyph를 복사하므로 서로 다른 폰트 atlas를 섞지 않습니다. `ScreenImage`, `CutScreenImage`, `TerritoryType` 같은 언어별 타이틀 이미지와 일부 이벤트/로딩 이미지를 보정해, 지역 이동이나 던전 진입 시 텍스트가 아니라 이미지로 렌더링되는 요소도 한국어 리소스를 사용하도록 처리합니다. `ScreenImage`의 보조 이미지 ID 컬럼과 `TerritoryType`의 지역 타이틀 이미지 컬럼, 지역 타이틀의 `+2000` 부제 이미지도 함께 검사합니다. `Map` sheet의 지도 텍스처(`ui/map/.../*_m.tex`)도 한국 서버 텍스처와 비교해 다를 때 복사하므로, 지도 이미지 안에 박힌 지역명 표기도 함께 보정합니다.
 
-데이터 센터 선택/이동과 캐릭터 선택의 월드/데이터센터 이동 화면에서 쓰이는 `ui/uld/*.uld` 텍스트 노드는 원본 글로벌 클라이언트의 폰트 슬롯을 유지합니다. 이 화면은 한국 클라이언트에 같은 형태로 존재하지 않는 글로벌 전용 로비 UI이며, 한글 proxy glyph 방식은 FDT/텍스처 atlas가 맞지 않으면 읽을 수 없는 글자로 노출될 수 있어 릴리즈 기본값에서 제외했습니다. 대신 한국 서버에 실제 값이 있는 `Lobby` 안내 row는 한국어로 반영하고, `WorldRegionGroup`, `WorldPhysicalDC`, `WorldDCGroupType`, 데이터센터 이동용 `Addon` row처럼 한국 서버에 없는 lookup 값은 대상 글로벌 언어 원문을 유지합니다.
+데이터 센터 선택/이동과 캐릭터 선택의 월드/데이터센터 이동 화면에서 쓰이는 `ui/uld/*.uld` 텍스트 노드는 원본 글로벌 클라이언트의 폰트 슬롯을 유지합니다. 이 화면은 한국 클라이언트에 같은 형태로 존재하지 않는 글로벌 전용 로비 UI이며, 한글 proxy glyph 방식은 FDT/텍스처 atlas가 맞지 않으면 읽을 수 없는 글자로 노출될 수 있어 릴리즈 기본값에서 제외했습니다. 대신 관련 `Lobby`, `WorldRegionGroup`, `WorldPhysicalDC`, `WorldDCGroupType`, `Addon` row는 대상 글로벌 언어 row를 사용합니다.
 
 `--diagnostic-csv <sheet>`를 사용하면 `diagnostic-csv\` 폴더에 해당 sheet의 row/column 비교 CSV가 추가로 생성됩니다.
 
