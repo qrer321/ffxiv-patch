@@ -12,6 +12,13 @@
   "keep_columns": {
     "ExampleSheet": [0, 4]
   },
+  "global_target_rows": {
+    "Lobby": [800, 801],
+    "Addon": [12510, 12511]
+  },
+  "global_english_rows": {
+    "Addon": [2338, 6166]
+  },
   "remap_keys": {
     "custom/example": {
       "2000": 3000,

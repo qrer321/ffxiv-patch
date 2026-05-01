@@ -204,7 +204,11 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
             new Regex("^Weather$", RegexOptions.IgnoreCase | RegexOptions.Compiled),
             new Regex("^WeddingBgm$", RegexOptions.IgnoreCase | RegexOptions.Compiled),
             new Regex("^WeeklyBingoText$", RegexOptions.IgnoreCase | RegexOptions.Compiled),
+            // Data-center travel UI uses these lookup sheets through Addon SeString macros.
+            // Korean client does not expose the full travel UI, but row ids are stable in matching versions.
+            new Regex("^WorldDCGroupType$", RegexOptions.IgnoreCase | RegexOptions.Compiled),
             new Regex("^WorldPhysicalDC$", RegexOptions.IgnoreCase | RegexOptions.Compiled),
+            new Regex("^WorldRegionGroup$", RegexOptions.IgnoreCase | RegexOptions.Compiled),
             new Regex("^Wks.*$", RegexOptions.IgnoreCase | RegexOptions.Compiled),
             new Regex("^XPvP.*$", RegexOptions.IgnoreCase | RegexOptions.Compiled),
             new Regex("^YardCatalog.*$", RegexOptions.IgnoreCase | RegexOptions.Compiled),
@@ -270,7 +274,6 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
 
             byte targetLanguageId = LanguageCodes.ToId(_options.TargetLanguage);
             byte sourceLanguageId = LanguageCodes.ToId(_options.SourceLanguage);
-
             using (SqPackArchive globalArchive = new SqPackArchive(baseIndex, globalSqpack, "0a0000.win32"))
             using (SqPackArchive koreaArchive = new SqPackArchive(Path.Combine(koreaSqpack, IndexFileName), koreaSqpack, "0a0000.win32"))
             using (SqPackIndexFile mutableIndex = new SqPackIndexFile(outputIndex))
@@ -579,9 +582,13 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
             ExdSourceMaps sourceMaps = ExdStringPatcher.BuildSourceMaps(
                 sourceExds,
                 sourceHeader,
-                allowRowKeyFallback || sheetPolicy.HasSourceRowOverrides || sheetPolicy.HasGlobalEnglishRows);
+                allowRowKeyFallback || sheetPolicy.HasSourceRowOverrides || sheetPolicy.HasGlobalEnglishRows || sheetPolicy.HasGlobalTargetRows);
+            ApplyGlobalTargetSourceRows(sheetName, globalHeader, globalArchive, sheetPolicy, sourceMaps, diagnostics);
             ApplyGlobalEnglishSourceRows(sheetName, globalHeader, globalArchive, sheetPolicy, sourceMaps, diagnostics);
-            StringPatchPolicy stringPatchPolicy = new StringPatchPolicy(IsAddonSheet(sheetName), sheetPolicy);
+            StringPatchPolicy stringPatchPolicy = new StringPatchPolicy(
+                sheetName,
+                IsAddonSheet(sheetName),
+                sheetPolicy);
 
             for (int i = 0; i < globalHeader.Pages.Count; i++)
             {
@@ -651,6 +658,241 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
                     Console.WriteLine("  Patched EXD pages: {0}", _report.PagesPatched);
                 }
             }
+
+            PatchSecondaryLanguageSafetyRows(
+                sheetName,
+                globalHeader,
+                globalArchive,
+                mutableIndex,
+                mutableIndex2,
+                datWriter,
+                diagnostics,
+                targetLanguageId,
+                stringColumns,
+                sheetPolicy);
+        }
+
+        private void PatchSecondaryLanguageSafetyRows(
+            string sheetName,
+            ExcelHeader globalHeader,
+            SqPackArchive globalArchive,
+            SqPackIndexFile mutableIndex,
+            SqPackIndex2File mutableIndex2,
+            SqPackDatWriter datWriter,
+            StreamWriter diagnostics,
+            byte targetLanguageId,
+            List<int> stringColumns,
+            PatchSheetPolicy sheetPolicy)
+        {
+            if (!HasCrossLanguageSafetyRows(sheetPolicy))
+            {
+                return;
+            }
+
+            ExdSourceMaps safetyMaps = BuildGlobalFallbackSafetySourceMaps(sheetName, globalHeader, globalArchive, sheetPolicy, diagnostics);
+            if (safetyMaps.RowKeyRows.Count == 0)
+            {
+                return;
+            }
+
+            StringPatchPolicy stringPatchPolicy = new StringPatchPolicy(
+                sheetName,
+                IsAddonSheet(sheetName),
+                sheetPolicy);
+
+            for (int languageIndex = 0; languageIndex < globalHeader.Languages.Count; languageIndex++)
+            {
+                byte languageId = globalHeader.Languages[languageIndex];
+                if (languageId == targetLanguageId)
+                {
+                    continue;
+                }
+
+                string languageCode = LanguageCodes.ToCode(languageId);
+                if (string.IsNullOrEmpty(languageCode))
+                {
+                    continue;
+                }
+
+                for (int pageIndex = 0; pageIndex < globalHeader.Pages.Count; pageIndex++)
+                {
+                    ExcelPageDefinition page = globalHeader.Pages[pageIndex];
+                    string targetPath = BuildExdPath(sheetName, page.StartId, languageCode);
+
+                    byte[] targetExdBytes;
+                    if (!globalArchive.TryReadFile(targetPath, out targetExdBytes))
+                    {
+                        continue;
+                    }
+
+                    ExcelDataFile targetExd;
+                    try
+                    {
+                        targetExd = ExcelDataFile.Parse(targetExdBytes);
+                    }
+                    catch (Exception exception)
+                    {
+                        WriteDiagnostic(diagnostics, sheetName, page.StartId.ToString(), "invalid-secondary-language-page", 0, 0, 0, 0, 0, languageCode + ": " + exception.Message);
+                        continue;
+                    }
+
+                    ExdPatchResult patchResult = ExdStringPatcher.PatchDefaultVariant(
+                        targetExd,
+                        globalHeader,
+                        globalHeader,
+                        stringColumns,
+                        safetyMaps,
+                        true,
+                        stringPatchPolicy);
+
+                    if (!patchResult.Changed)
+                    {
+                        continue;
+                    }
+
+                    long datOffset = datWriter.WriteStandardFile(patchResult.Data);
+                    mutableIndex.SetFileOffset(targetPath, 1, datOffset);
+                    mutableIndex2.SetFileOffset(targetPath, 1, datOffset);
+                    _report.PagesPatched++;
+                    _report.RowsPatched += patchResult.RowsPatched;
+                    _report.RowKeyRowsPatched += patchResult.RowKeyRows;
+                    _report.ProtectedUiStrings += patchResult.ProtectedUiStrings;
+                    _report.RsvRows += patchResult.RsvRows;
+                    _report.RsvStrings += patchResult.RsvStrings;
+                    WriteDiagnostic(
+                        diagnostics,
+                        sheetName,
+                        page.StartId.ToString(),
+                        "patched-secondary-language",
+                        patchResult.RowsPatched,
+                        patchResult.StringKeyRows,
+                        patchResult.RowKeyRows,
+                        patchResult.RsvRows,
+                        patchResult.RsvStrings,
+                        languageCode);
+                }
+            }
+        }
+
+        private static bool HasCrossLanguageSafetyRows(PatchSheetPolicy sheetPolicy)
+        {
+            if (sheetPolicy.GlobalEnglishRows.Count > 0 || sheetPolicy.GlobalTargetRows.Count > 0)
+            {
+                return true;
+            }
+
+            foreach (Dictionary<uint, ColumnRemap> remapsByRow in sheetPolicy.RowColumnRemaps.Values)
+            {
+                foreach (KeyValuePair<uint, ColumnRemap> remapByRow in remapsByRow)
+                {
+                    if (remapByRow.Value.Mode == ColumnRemapMode.Literal)
+                    {
+                        return true;
+                    }
+                }
+            }
+
+            return false;
+        }
+
+        private ExdSourceMaps BuildGlobalFallbackSafetySourceMaps(
+            string sheetName,
+            ExcelHeader globalHeader,
+            SqPackArchive globalArchive,
+            PatchSheetPolicy sheetPolicy,
+            StreamWriter diagnostics)
+        {
+            ExdSourceMaps maps = new ExdSourceMaps();
+            AddGlobalRowsToSourceMaps(sheetName, globalHeader, globalArchive, _options.TargetLanguage, sheetPolicy.GlobalTargetRows, maps, diagnostics, "global-target-safety");
+            AddGlobalRowsToSourceMaps(sheetName, globalHeader, globalArchive, "en", sheetPolicy.GlobalEnglishRows, maps, diagnostics, "global-english-safety");
+
+            HashSet<uint> literalRows = new HashSet<uint>();
+            foreach (Dictionary<uint, ColumnRemap> remapsByRow in sheetPolicy.RowColumnRemaps.Values)
+            {
+                foreach (KeyValuePair<uint, ColumnRemap> remapByRow in remapsByRow)
+                {
+                    if (remapByRow.Value.Mode == ColumnRemapMode.Literal)
+                    {
+                        literalRows.Add(remapByRow.Key);
+                    }
+                }
+            }
+
+            AddGlobalRowsToSourceMaps(sheetName, globalHeader, globalArchive, _options.TargetLanguage, literalRows, maps, diagnostics, "global-target-literal-safety");
+            return maps;
+        }
+
+        private void AddGlobalRowsToSourceMaps(
+            string sheetName,
+            ExcelHeader globalHeader,
+            SqPackArchive globalArchive,
+            string languageCode,
+            HashSet<uint> rowIds,
+            ExdSourceMaps maps,
+            StreamWriter diagnostics,
+            string diagnosticKind)
+        {
+            if (rowIds == null || rowIds.Count == 0)
+            {
+                return;
+            }
+
+            string effectiveLanguageCode = languageCode;
+            byte languageId = LanguageCodes.ToId(languageCode);
+            if (!globalHeader.HasLanguage(languageId))
+            {
+                if (HasAnyPageFile(globalArchive, sheetName, globalHeader, null))
+                {
+                    effectiveLanguageCode = null;
+                }
+                else
+                {
+                    AddLimitedWarning("Global " + languageCode + " EXD is not available for " + sheetName + ". Global fallback rows were skipped.");
+                    return;
+                }
+            }
+
+            HashSet<uint> pendingRows = new HashSet<uint>(rowIds);
+            int requestedRows = pendingRows.Count;
+            for (int i = 0; i < globalHeader.Pages.Count && pendingRows.Count > 0; i++)
+            {
+                ExcelPageDefinition page = globalHeader.Pages[i];
+                string sourcePath = BuildExdPath(sheetName, page.StartId, effectiveLanguageCode);
+                byte[] sourceExdBytes;
+                if (!globalArchive.TryReadFile(sourcePath, out sourceExdBytes))
+                {
+                    WriteDiagnostic(diagnostics, sheetName, page.StartId.ToString(), "missing-" + diagnosticKind + "-page", 0, 0, 0, 0, 0, sourcePath);
+                    continue;
+                }
+
+                ExcelDataFile sourceFile;
+                try
+                {
+                    sourceFile = ExcelDataFile.Parse(sourceExdBytes);
+                }
+                catch (Exception exception)
+                {
+                    WriteDiagnostic(diagnostics, sheetName, page.StartId.ToString(), "invalid-" + diagnosticKind + "-page", 0, 0, 0, 0, 0, exception.Message);
+                    continue;
+                }
+
+                for (int rowIndex = 0; rowIndex < sourceFile.Rows.Count && pendingRows.Count > 0; rowIndex++)
+                {
+                    ExcelDataRow row = sourceFile.Rows[rowIndex];
+                    if (!pendingRows.Contains(row.RowId))
+                    {
+                        continue;
+                    }
+
+                    maps.RowKeyRows[row.RowId] = new SourceRowRef(sourceFile, row, globalHeader);
+                    pendingRows.Remove(row.RowId);
+                }
+            }
+
+            if (pendingRows.Count == requestedRows)
+            {
+                AddLimitedWarning("Some " + languageCode + " global fallback rows were not found for " + sheetName + ".");
+            }
         }
 
         private List<ExcelDataFile> LoadSourcePages(
@@ -688,6 +930,22 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
             return sourceExds;
         }
 
+        private void ApplyGlobalTargetSourceRows(
+            string sheetName,
+            ExcelHeader globalHeader,
+            SqPackArchive globalArchive,
+            PatchSheetPolicy sheetPolicy,
+            ExdSourceMaps sourceMaps,
+            StreamWriter diagnostics)
+        {
+            if (!sheetPolicy.HasGlobalTargetRows)
+            {
+                return;
+            }
+
+            AddGlobalRowsToSourceMaps(sheetName, globalHeader, globalArchive, _options.TargetLanguage, sheetPolicy.GlobalTargetRows, sourceMaps, diagnostics, "global-target");
+        }
+
         private void ApplyGlobalEnglishSourceRows(
             string sheetName,
             ExcelHeader globalHeader,
@@ -701,54 +959,7 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
                 return;
             }
 
-            byte englishLanguageId = LanguageCodes.ToId("en");
-            if (!globalHeader.HasLanguage(englishLanguageId))
-            {
-                AddLimitedWarning("Global English EXD is not available for " + sheetName + ". Compact UI fallback rows were skipped.");
-                return;
-            }
-
-            HashSet<uint> pendingRows = new HashSet<uint>(sheetPolicy.GlobalEnglishRows);
-            for (int i = 0; i < globalHeader.Pages.Count && pendingRows.Count > 0; i++)
-            {
-                ExcelPageDefinition page = globalHeader.Pages[i];
-                string englishPath = BuildExdPath(sheetName, page.StartId, "en");
-                byte[] englishExdBytes;
-                if (!globalArchive.TryReadFile(englishPath, out englishExdBytes))
-                {
-                    WriteDiagnostic(diagnostics, sheetName, page.StartId.ToString(), "missing-global-english-page", 0, 0, 0, 0, 0, englishPath);
-                    continue;
-                }
-
-                ExcelDataFile englishFile;
-                try
-                {
-                    englishFile = ExcelDataFile.Parse(englishExdBytes);
-                }
-                catch (Exception exception)
-                {
-                    AddLimitedWarning("Invalid global English EXD: " + englishPath);
-                    WriteDiagnostic(diagnostics, sheetName, page.StartId.ToString(), "invalid-global-english-page", 0, 0, 0, 0, 0, exception.Message);
-                    continue;
-                }
-
-                for (int rowIndex = 0; rowIndex < englishFile.Rows.Count && pendingRows.Count > 0; rowIndex++)
-                {
-                    ExcelDataRow row = englishFile.Rows[rowIndex];
-                    if (!pendingRows.Contains(row.RowId))
-                    {
-                        continue;
-                    }
-
-                    sourceMaps.RowKeyRows[row.RowId] = new SourceRowRef(englishFile, row);
-                    pendingRows.Remove(row.RowId);
-                }
-            }
-
-            if (pendingRows.Count > 0)
-            {
-                AddLimitedWarning("Some global English compact UI rows were not found for " + sheetName + ".");
-            }
+            AddGlobalRowsToSourceMaps(sheetName, globalHeader, globalArchive, "en", sheetPolicy.GlobalEnglishRows, sourceMaps, diagnostics, "global-english");
         }
 
         private static string BuildExdPath(string sheetName, uint startId, string languageCode)
@@ -819,7 +1030,8 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
                     {
                         ExcelColumnDefinition column = targetHeader.Columns[stringColumns[columnIndex]];
                         byte[] globalBytes = targetExd.GetStringBytes(targetRow, targetHeader, stringColumns[columnIndex]);
-                        byte[] koreaBytes = sourceRow.File.GetStringBytesByColumnOffset(sourceRow.Row, sourceHeader, column.Offset);
+                        ExcelHeader rowSourceHeader = sourceRow.Header ?? sourceHeader;
+                        byte[] koreaBytes = sourceRow.File.GetStringBytesByColumnOffset(sourceRow.Row, rowSourceHeader, column.Offset);
                         byte[] selectedBytes = koreaBytes;
                         string action = "replace";
                         string note = string.Empty;
@@ -834,7 +1046,7 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
                             ColumnRemap remap = sheetPolicy.GetColumnRemap(targetRow.RowId, column.Offset);
                             if (remap.Mode == ColumnRemapMode.SourceColumn && remap.SourceColumnOffset.HasValue)
                             {
-                                selectedBytes = sourceRow.File.GetStringBytesByColumnOffset(sourceRow.Row, sourceHeader, remap.SourceColumnOffset.Value);
+                                selectedBytes = sourceRow.File.GetStringBytesByColumnOffset(sourceRow.Row, rowSourceHeader, remap.SourceColumnOffset.Value);
                                 note = "source-column=" + remap.SourceColumnOffset.Value.ToString();
                             }
                             else if (remap.Mode == ColumnRemapMode.Literal)
@@ -882,6 +1094,13 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
                 sourceMaps.RowKeyRows.TryGetValue(overrideSourceRowId, out sourceRow))
             {
                 mappingMode = "remap-key";
+                return true;
+            }
+
+            if (sheetPolicy.ShouldUseGlobalFallbackRow(targetRow.RowId) &&
+                sourceMaps.RowKeyRows.TryGetValue(targetRow.RowId, out sourceRow))
+            {
+                mappingMode = sheetPolicy.GlobalTargetRows.Contains(targetRow.RowId) ? "global-target" : "global-english";
                 return true;
             }
 
@@ -1074,7 +1293,8 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
 
         private static bool IsAddonSheet(string sheetName)
         {
-            return string.Equals(sheetName, "Addon", StringComparison.OrdinalIgnoreCase);
+            return string.Equals(sheetName, "Addon", StringComparison.OrdinalIgnoreCase) ||
+                   string.Equals(sheetName, "AddonTransient", StringComparison.OrdinalIgnoreCase);
         }
 
         private static string BuildPatchNote(string baseNote, int protectedUiStrings)

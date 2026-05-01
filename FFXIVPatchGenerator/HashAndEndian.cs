@@ -65,6 +65,11 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
             return (ushort)((data[offset] << 8) | data[offset + 1]);
         }
 
+        public static ushort ReadUInt16LE(byte[] data, int offset)
+        {
+            return (ushort)(data[offset] | (data[offset + 1] << 8));
+        }
+
         public static uint ReadUInt32BE(byte[] data, int offset)
         {
             return ((uint)data[offset] << 24) |
@@ -92,6 +97,12 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
         {
             data[offset] = (byte)(value >> 8);
             data[offset + 1] = (byte)value;
+        }
+
+        public static void WriteUInt16LE(byte[] data, int offset, ushort value)
+        {
+            data[offset] = (byte)value;
+            data[offset + 1] = (byte)(value >> 8);
         }
 
         public static void WriteUInt32BE(byte[] data, int offset, uint value)

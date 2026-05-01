@@ -301,5 +301,28 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
                     return 0;
             }
         }
+
+        public static string ToCode(byte id)
+        {
+            switch (id)
+            {
+                case 1:
+                    return "ja";
+                case 2:
+                    return "en";
+                case 3:
+                    return "de";
+                case 4:
+                    return "fr";
+                case 5:
+                    return "chs";
+                case 6:
+                    return "cht";
+                case 7:
+                    return "ko";
+                default:
+                    return null;
+            }
+        }
     }
 }

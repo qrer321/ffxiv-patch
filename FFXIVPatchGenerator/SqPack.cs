@@ -43,6 +43,31 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
             return data;
         }
 
+        public List<SqPackIndexEntry> GetEntries()
+        {
+            return _index.GetEntries();
+        }
+
+        public bool TryGetStandardFileInfo(SqPackIndexEntry entry, out uint fileType, out uint rawFileSize)
+        {
+            FileStream stream = GetDatStream(entry.DataFileId);
+            lock (stream)
+            {
+                if (entry.Offset < 0 || entry.Offset > stream.Length - 12)
+                {
+                    fileType = 0;
+                    rawFileSize = 0;
+                    return false;
+                }
+
+                BinaryReader reader = new BinaryReader(stream);
+                stream.Position = entry.Offset + 4;
+                fileType = reader.ReadUInt32();
+                rawFileSize = reader.ReadUInt32();
+                return true;
+            }
+        }
+
         public bool TryReadPackedFile(string gamePath, out byte[] data)
         {
             SqPackIndexEntry entry;
@@ -135,7 +160,7 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
             }
         }
 
-        private byte[] ReadFile(SqPackIndexEntry entry)
+        public byte[] ReadFile(SqPackIndexEntry entry)
         {
             FileStream stream = GetDatStream(entry.DataFileId);
             lock (stream)
@@ -298,6 +323,11 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
             return _entries.TryGetValue(hash, out entry);
         }
 
+        public List<SqPackIndexEntry> GetEntries()
+        {
+            return new List<SqPackIndexEntry>(_entries.Values);
+        }
+
         public bool ContainsPath(string gamePath)
         {
             return _entries.ContainsKey(SqPackHash.GetIndexHash(gamePath));
@@ -322,6 +352,33 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
                 throw new FileNotFoundException("Target index entry was not found: " + gamePath);
             }
 
+            SetEntryFileOffset(hash, entry, datId, absoluteOffset);
+        }
+
+        public bool TrySetFileOffset(ulong hash, byte datId, long absoluteOffset)
+        {
+            if (datId > 7)
+            {
+                throw new ArgumentOutOfRangeException("datId");
+            }
+
+            if (absoluteOffset < 0 || (absoluteOffset % 0x80) != 0)
+            {
+                throw new ArgumentException("SqPack file offsets must be 0x80-aligned.");
+            }
+
+            SqPackIndexEntry entry;
+            if (!_entries.TryGetValue(hash, out entry))
+            {
+                return false;
+            }
+
+            SetEntryFileOffset(hash, entry, datId, absoluteOffset);
+            return true;
+        }
+
+        private void SetEntryFileOffset(ulong hash, SqPackIndexEntry entry, byte datId, long absoluteOffset)
+        {
             uint encodedOffset = checked((uint)(absoluteOffset / 8));
             uint flags = (entry.Data & 0x1u) | ((uint)datId << 1);
             uint data = (encodedOffset & 0xFFFFFFF0u) | flags;
@@ -447,6 +504,47 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
             Endian.WriteUInt32LE(_bytes, entry.EntryOffset + 4, data);
             entry.Data = data;
             _entries[hash] = entry;
+        }
+
+        public bool TrySetFileOffsetByLocation(byte oldDatId, long oldAbsoluteOffset, byte newDatId, long newAbsoluteOffset)
+        {
+            if (newDatId > 7)
+            {
+                throw new ArgumentOutOfRangeException("newDatId");
+            }
+
+            if (newAbsoluteOffset < 0 || (newAbsoluteOffset % 0x80) != 0)
+            {
+                throw new ArgumentException("SqPack file offsets must be 0x80-aligned.");
+            }
+
+            bool found = false;
+            SqPackIndex2Entry match = new SqPackIndex2Entry();
+            foreach (SqPackIndex2Entry entry in _entries.Values)
+            {
+                if (entry.DataFileId != oldDatId || entry.Offset != oldAbsoluteOffset)
+                {
+                    continue;
+                }
+
+                match = entry;
+                found = true;
+                break;
+            }
+
+            if (!found)
+            {
+                return false;
+            }
+
+            uint encodedOffset = checked((uint)(newAbsoluteOffset / 8));
+            uint flags = (match.Data & 0x1u) | ((uint)newDatId << 1);
+            uint data = (encodedOffset & 0xFFFFFFF0u) | flags;
+
+            Endian.WriteUInt32LE(_bytes, match.EntryOffset + 4, data);
+            match.Data = data;
+            _entries[match.Hash] = match;
+            return true;
         }
 
         public void EnsureDataFileCount(uint count)

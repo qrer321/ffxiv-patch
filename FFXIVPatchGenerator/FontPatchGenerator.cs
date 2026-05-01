@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Text;
 using System.Text.RegularExpressions;
 
 namespace FfxivKoreanPatch.FFXIVPatchGenerator
@@ -24,30 +25,56 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
         private const string TtmpMpdFileName = "TTMPD.mpd";
         private const string TtmpMplFileName = "TTMPL.mpl";
 
+        // FDT/FontCsv layout used by common/font/*.fdt.
+        // The first glyph key stores the UTF-8 byte sequence as a big-endian integer
+        // value, then the file stores that uint32 little-endian. For U+E0E1
+        // (EE 83 A1), the table value is 0x00EE83A1 and the file bytes are
+        // A1 83 EE 00.
+        // Some Japanese-client UI render paths still consult Shift-JIS glyph keys.
+        private const int FdtHeaderSize = 0x20;
+        private const int FdtFontTableHeaderSize = 0x20;
+        private const int FdtGlyphEntrySize = 0x10;
+        private const int FdtKerningHeaderSize = 0x10;
+        private const int FdtKerningEntrySize = 0x10;
+        private const uint PartyListSelfMarkerPrimaryStart = 0xE0E1u;
+        private const uint PartyListSelfMarkerLegacyStart = 0xE0B1u;
+        private const int PartyListSelfMarkerCount = 8;
+
+        private static readonly HashSet<string> PartyListSelfMarkerAliasFonts = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+        {
+            "common/font/AXIS_12.fdt",
+            "common/font/AXIS_12_lobby.fdt"
+        };
+
         // Explicit font resource set used by the global client for in-game and lobby text rendering.
         private static readonly string[] FontPaths = new string[]
         {
             "common/font/Jupiter_45.fdt",
             "common/font/Jupiter_45_lobby.fdt",
             "common/font/Jupiter_90.fdt",
+            "common/font/Jupiter_90_lobby.fdt",
             "common/font/Jupiter_20_lobby.fdt",
             "common/font/Jupiter_23_lobby.fdt",
             "common/font/Jupiter_23.fdt",
             "common/font/Jupiter_46.fdt",
+            "common/font/Jupiter_46_lobby.fdt",
             "common/font/Jupiter_16_lobby.fdt",
             "common/font/Meidinger_16_lobby.fdt",
             "common/font/Meidinger_20_lobby.fdt",
             "common/font/Meidinger_40.fdt",
+            "common/font/Meidinger_40_lobby.fdt",
             "common/font/MiedingerMid_10_lobby.fdt",
             "common/font/MiedingerMid_12_lobby.fdt",
             "common/font/MiedingerMid_14_lobby.fdt",
             "common/font/MiedingerMid_18_lobby.fdt",
             "common/font/MiedingerMid_36.fdt",
+            "common/font/MiedingerMid_36_lobby.fdt",
             "common/font/TrumpGothic_23.fdt",
             "common/font/TrumpGothic_23_lobby.fdt",
             "common/font/TrumpGothic_34.fdt",
             "common/font/TrumpGothic_34_lobby.fdt",
             "common/font/TrumpGothic_68.fdt",
+            "common/font/TrumpGothic_68_lobby.fdt",
             "common/font/TrumpGothic_184.fdt",
             "common/font/TrumpGothic_184_lobby.fdt",
             "common/font/AXIS_12.fdt",
@@ -57,6 +84,7 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
             "common/font/AXIS_18.fdt",
             "common/font/AXIS_18_lobby.fdt",
             "common/font/AXIS_36.fdt",
+            "common/font/AXIS_36_lobby.fdt",
             "common/font/AXIS_96.fdt",
             "common/font/KrnAXIS_120.fdt",
             "common/font/KrnAXIS_140.fdt",
@@ -209,8 +237,9 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
                     continue;
                 }
 
-                long datOffset = datWriter.WritePackedFile(packedFile);
-
+                int normalized;
+                long datOffset = WriteFontPayload(datWriter, path, packedFile, out normalized);
+                LogFontPayloadAdjustments(path, normalized);
                 mutableIndex.SetFileOffset(path, 1, datOffset);
                 mutableIndex2.SetFileOffset(path, 1, datOffset);
                 _report.FontFilesPatched++;
@@ -245,13 +274,385 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
                     }
 
                     byte[] packedFile = ReadPackedPayload(mpdStream, payload.ModOffset, payload.ModSize, path);
-                    long datOffset = datWriter.WritePackedFile(packedFile);
-
+                    int normalized;
+                    long datOffset = WriteFontPayload(datWriter, path, packedFile, out normalized);
+                    LogFontPayloadAdjustments(path, normalized);
                     mutableIndex.SetFileOffset(path, 1, datOffset);
                     mutableIndex2.SetFileOffset(path, 1, datOffset);
                     _report.FontFilesPatched++;
                 }
             }
+        }
+
+        private long WriteFontPayload(SqPackDatWriter datWriter, string path, byte[] packedFile, out int normalized)
+        {
+            normalized = 0;
+            if (!path.EndsWith(".fdt", StringComparison.OrdinalIgnoreCase))
+            {
+                return datWriter.WritePackedFile(packedFile);
+            }
+
+            byte[] fdt = SqPackArchive.UnpackStandardFile(packedFile);
+            normalized = NormalizeFdtShiftJisValues(fdt);
+            int aliases = AddPartyListSelfMarkerAliases(path, ref fdt);
+            if (normalized == 0 && aliases == 0)
+            {
+                return datWriter.WritePackedFile(packedFile);
+            }
+
+            if (aliases > 0)
+            {
+                Console.WriteLine("  Added party-list self marker glyph aliases: {0} ({1})", aliases, path);
+            }
+
+            return datWriter.WriteStandardFile(fdt);
+        }
+
+        private static void LogFontPayloadAdjustments(string path, int normalized)
+        {
+            if (normalized > 0)
+            {
+                Console.WriteLine("  Normalized FDT Shift-JIS glyph keys: {0} ({1})", normalized, path);
+            }
+        }
+
+        private static int NormalizeFdtShiftJisValues(byte[] fdt)
+        {
+            if (fdt == null || fdt.Length < FdtHeaderSize)
+            {
+                return 0;
+            }
+
+            if (!HasAsciiSignature(fdt, 0, "fcsv0100"))
+            {
+                return 0;
+            }
+
+            return NormalizeFdtGlyphShiftJisValues(fdt) + NormalizeFdtKerningShiftJisValues(fdt);
+        }
+
+        private static int AddPartyListSelfMarkerAliases(string path, ref byte[] fdt)
+        {
+            if (!PartyListSelfMarkerAliasFonts.Contains(NormalizeGamePath(path)))
+            {
+                return 0;
+            }
+
+            if (fdt == null ||
+                fdt.Length < FdtHeaderSize ||
+                !HasAsciiSignature(fdt, 0, "fcsv0100"))
+            {
+                return 0;
+            }
+
+            int fontTableOffset = checked((int)Endian.ReadUInt32LE(fdt, 0x08));
+            int kerningHeaderOffset = checked((int)Endian.ReadUInt32LE(fdt, 0x0C));
+            if (fontTableOffset < FdtHeaderSize ||
+                fontTableOffset > fdt.Length - FdtFontTableHeaderSize ||
+                !HasAsciiSignature(fdt, fontTableOffset, "fthd"))
+            {
+                return 0;
+            }
+
+            uint glyphCount = Endian.ReadUInt32LE(fdt, fontTableOffset + 0x04);
+            int glyphStart = fontTableOffset + FdtFontTableHeaderSize;
+            long glyphBytes = (long)glyphCount * FdtGlyphEntrySize;
+            if (glyphBytes < 0 || glyphStart > fdt.Length || glyphStart + glyphBytes > fdt.Length)
+            {
+                return 0;
+            }
+
+            int glyphEnd = checked(glyphStart + (int)glyphBytes);
+            Dictionary<uint, byte[]> entriesByCodepoint = new Dictionary<uint, byte[]>();
+            List<byte[]> entries = new List<byte[]>((int)glyphCount + PartyListSelfMarkerCount * 2);
+            for (int i = 0; i < glyphCount; i++)
+            {
+                byte[] entry = new byte[FdtGlyphEntrySize];
+                Buffer.BlockCopy(fdt, glyphStart + i * FdtGlyphEntrySize, entry, 0, FdtGlyphEntrySize);
+                uint codepoint = Endian.ReadUInt32LE(entry, 0);
+                entries.Add(entry);
+                if (!entriesByCodepoint.ContainsKey(codepoint))
+                {
+                    entriesByCodepoint.Add(codepoint, entry);
+                }
+            }
+
+            int added = 0;
+            added += AddPartyListSelfMarkerAliasRange(entries, entriesByCodepoint, PartyListSelfMarkerPrimaryStart);
+            added += AddPartyListSelfMarkerAliasRange(entries, entriesByCodepoint, PartyListSelfMarkerLegacyStart);
+            if (added == 0)
+            {
+                return 0;
+            }
+
+            entries.Sort(delegate(byte[] left, byte[] right)
+            {
+                return Endian.ReadUInt32LE(left, 0).CompareTo(Endian.ReadUInt32LE(right, 0));
+            });
+
+            int newGlyphBytes = checked(entries.Count * FdtGlyphEntrySize);
+            int delta = newGlyphBytes - (int)glyphBytes;
+            byte[] rewritten = new byte[checked(fdt.Length + delta)];
+            Buffer.BlockCopy(fdt, 0, rewritten, 0, glyphStart);
+            for (int i = 0; i < entries.Count; i++)
+            {
+                Buffer.BlockCopy(entries[i], 0, rewritten, glyphStart + i * FdtGlyphEntrySize, FdtGlyphEntrySize);
+            }
+
+            Buffer.BlockCopy(fdt, glyphEnd, rewritten, glyphStart + newGlyphBytes, fdt.Length - glyphEnd);
+            Endian.WriteUInt32LE(rewritten, fontTableOffset + 0x04, checked((uint)entries.Count));
+            if (kerningHeaderOffset >= glyphEnd)
+            {
+                Endian.WriteUInt32LE(rewritten, 0x0C, checked((uint)(kerningHeaderOffset + delta)));
+            }
+
+            fdt = rewritten;
+            return added;
+        }
+
+        private static int AddPartyListSelfMarkerAliasRange(
+            List<byte[]> entries,
+            Dictionary<uint, byte[]> entriesByCodepoint,
+            uint aliasStart)
+        {
+            int added = 0;
+            for (int i = 0; i < PartyListSelfMarkerCount; i++)
+            {
+                uint digitCodepoint = (uint)('1' + i);
+                uint aliasCodepoint = aliasStart + (uint)i;
+                uint digitValue = PackFdtUtf8Value(digitCodepoint);
+                uint aliasValue = PackFdtUtf8Value(aliasCodepoint);
+                byte[] digitEntry;
+                if (!entriesByCodepoint.TryGetValue(digitValue, out digitEntry))
+                {
+                    continue;
+                }
+
+                byte[] aliasEntry = new byte[FdtGlyphEntrySize];
+                Buffer.BlockCopy(digitEntry, 0, aliasEntry, 0, FdtGlyphEntrySize);
+                Endian.WriteUInt32LE(aliasEntry, 0, aliasValue);
+                ushort aliasShiftJis;
+                if (TryEncodeShiftJisValue(aliasCodepoint, out aliasShiftJis))
+                {
+                    Endian.WriteUInt16LE(aliasEntry, 4, aliasShiftJis);
+                }
+
+                byte[] existingEntry;
+                if (entriesByCodepoint.TryGetValue(aliasValue, out existingEntry))
+                {
+                    Buffer.BlockCopy(aliasEntry, 0, existingEntry, 0, FdtGlyphEntrySize);
+                }
+                else
+                {
+                    entries.Add(aliasEntry);
+                    entriesByCodepoint.Add(aliasValue, aliasEntry);
+                }
+
+                added++;
+            }
+
+            return added;
+        }
+
+        private static int NormalizeFdtGlyphShiftJisValues(byte[] fdt)
+        {
+            int fontTableOffset = checked((int)Endian.ReadUInt32LE(fdt, 0x08));
+            if (fontTableOffset < FdtHeaderSize ||
+                fontTableOffset > fdt.Length - FdtFontTableHeaderSize ||
+                !HasAsciiSignature(fdt, fontTableOffset, "fthd"))
+            {
+                return 0;
+            }
+
+            uint glyphCount = Endian.ReadUInt32LE(fdt, fontTableOffset + 0x04);
+            int glyphStart = fontTableOffset + FdtFontTableHeaderSize;
+            long glyphBytes = (long)glyphCount * FdtGlyphEntrySize;
+            if (glyphBytes < 0 || glyphStart > fdt.Length || glyphStart + glyphBytes > fdt.Length)
+            {
+                return 0;
+            }
+
+            int changed = 0;
+            for (int i = 0; i < glyphCount; i++)
+            {
+                int offset = glyphStart + i * FdtGlyphEntrySize;
+                uint utf8Value = Endian.ReadUInt32LE(fdt, offset);
+                uint codepoint;
+                ushort shiftJis;
+                if (!TryDecodeFdtUtf8Value(utf8Value, out codepoint) ||
+                    !TryEncodeShiftJisValue(codepoint, out shiftJis))
+                {
+                    continue;
+                }
+
+                ushort current = Endian.ReadUInt16LE(fdt, offset + 4);
+                if (current == shiftJis)
+                {
+                    continue;
+                }
+
+                Endian.WriteUInt16LE(fdt, offset + 4, shiftJis);
+                changed++;
+            }
+
+            return changed;
+        }
+
+        private static int NormalizeFdtKerningShiftJisValues(byte[] fdt)
+        {
+            int kerningHeaderOffset = checked((int)Endian.ReadUInt32LE(fdt, 0x0C));
+            if (kerningHeaderOffset == 0 ||
+                kerningHeaderOffset < FdtHeaderSize ||
+                kerningHeaderOffset > fdt.Length - FdtKerningHeaderSize ||
+                !HasAsciiSignature(fdt, kerningHeaderOffset, "knhd"))
+            {
+                return 0;
+            }
+
+            uint kerningCount = Endian.ReadUInt32LE(fdt, kerningHeaderOffset + 0x04);
+            int kerningStart = kerningHeaderOffset + FdtKerningHeaderSize;
+            long kerningBytes = (long)kerningCount * FdtKerningEntrySize;
+            if (kerningBytes < 0 || kerningStart > fdt.Length || kerningStart + kerningBytes > fdt.Length)
+            {
+                return 0;
+            }
+
+            int changed = 0;
+            for (int i = 0; i < kerningCount; i++)
+            {
+                int offset = kerningStart + i * FdtKerningEntrySize;
+                changed += NormalizeFdtKerningShiftJisValue(fdt, offset, offset + 8);
+                changed += NormalizeFdtKerningShiftJisValue(fdt, offset + 4, offset + 10);
+            }
+
+            return changed;
+        }
+
+        private static int NormalizeFdtKerningShiftJisValue(byte[] fdt, int utf8Offset, int shiftJisOffset)
+        {
+            uint utf8Value = Endian.ReadUInt32LE(fdt, utf8Offset);
+            uint codepoint;
+            ushort shiftJis;
+            if (!TryDecodeFdtUtf8Value(utf8Value, out codepoint) ||
+                !TryEncodeShiftJisValue(codepoint, out shiftJis))
+            {
+                return 0;
+            }
+
+            ushort current = Endian.ReadUInt16LE(fdt, shiftJisOffset);
+            if (current == shiftJis)
+            {
+                return 0;
+            }
+
+            Endian.WriteUInt16LE(fdt, shiftJisOffset, shiftJis);
+            return 1;
+        }
+
+        private static uint PackFdtUtf8Value(uint codepoint)
+        {
+            byte[] bytes = Encoding.UTF8.GetBytes(char.ConvertFromUtf32(checked((int)codepoint)));
+            uint value = 0;
+            for (int i = 0; i < bytes.Length && i < 4; i++)
+            {
+                value = (value << 8) | bytes[i];
+            }
+
+            return value;
+        }
+
+        private static bool TryDecodeFdtUtf8Value(uint value, out uint codepoint)
+        {
+            if ((value & 0xFFFFFF80u) == 0)
+            {
+                codepoint = value & 0x7Fu;
+                return true;
+            }
+
+            if ((value & 0xFFFFE0C0u) == 0x0000C080u)
+            {
+                codepoint = (((value >> 8) & 0x1Fu) << 6) |
+                            (((value >> 0) & 0x3Fu) << 0);
+                return true;
+            }
+
+            if ((value & 0x00F0C0C0u) == 0x00E08080u)
+            {
+                codepoint = (((value >> 16) & 0x0Fu) << 12) |
+                            (((value >> 8) & 0x3Fu) << 6) |
+                            (((value >> 0) & 0x3Fu) << 0);
+                return true;
+            }
+
+            if ((value & 0xF8C0C0C0u) == 0xF0808080u)
+            {
+                codepoint = (((value >> 24) & 0x07u) << 18) |
+                            (((value >> 16) & 0x3Fu) << 12) |
+                            (((value >> 8) & 0x3Fu) << 6) |
+                            (((value >> 0) & 0x3Fu) << 0);
+                return codepoint <= 0x10FFFFu;
+            }
+
+            codepoint = 0;
+            return false;
+        }
+
+        private static bool TryEncodeShiftJisValue(uint codepoint, out ushort shiftJis)
+        {
+            shiftJis = 0;
+            if (codepoint > 0x10FFFFu)
+            {
+                return false;
+            }
+
+            try
+            {
+                string text = char.ConvertFromUtf32(checked((int)codepoint));
+                Encoding encoding = Encoding.GetEncoding(
+                    932,
+                    EncoderFallback.ExceptionFallback,
+                    DecoderFallback.ExceptionFallback);
+                byte[] bytes = encoding.GetBytes(text);
+                if (bytes.Length == 1)
+                {
+                    shiftJis = bytes[0];
+                    return true;
+                }
+
+                if (bytes.Length == 2)
+                {
+                    shiftJis = (ushort)((bytes[0] << 8) | bytes[1]);
+                    return true;
+                }
+            }
+            catch (EncoderFallbackException)
+            {
+                return false;
+            }
+            catch (ArgumentOutOfRangeException)
+            {
+                return false;
+            }
+
+            return false;
+        }
+
+        private static bool HasAsciiSignature(byte[] bytes, int offset, string signature)
+        {
+            if (offset < 0 || offset + signature.Length > bytes.Length)
+            {
+                return false;
+            }
+
+            for (int i = 0; i < signature.Length; i++)
+            {
+                if (bytes[offset + i] != (byte)signature[i])
+                {
+                    return false;
+                }
+            }
+
+            return true;
         }
 
         private bool ShouldIncludeFontPath(string path)
@@ -561,6 +962,7 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
             public int ModOffset;
             public int ModSize;
         }
+
     }
 
     internal static class FontPatchProfiles

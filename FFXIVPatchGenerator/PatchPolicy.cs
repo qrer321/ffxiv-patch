@@ -13,6 +13,9 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
         public static readonly PatchPolicy Empty = new PatchPolicy();
         private static readonly uint[] CompactTimeUnitAddonRows = new uint[] { 44, 45, 49 };
         private static readonly uint[] EnglishCompactDurationAddonRows = new uint[] { 2338, 6166 };
+        private static readonly uint[] GlobalLobbyDataCenterRows = new uint[] { 801, 804, 805 };
+        private const uint DataCenterTravelAddonFirstRow = 12510;
+        private const uint DataCenterTravelAddonLastRow = 12538;
 
         private readonly HashSet<string> _deleteFiles = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         private readonly Dictionary<string, PatchSheetPolicy> _sheets = new Dictionary<string, PatchSheetPolicy>(StringComparer.OrdinalIgnoreCase);
@@ -46,6 +49,8 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
             policy.LoadRowLists(root, "delete_rows", delegate(PatchSheetPolicy sheetPolicy, uint rowId) { sheetPolicy.KeepRows.Add(rowId); });
             policy.LoadColumnLists(root, "keep_columns", delegate(PatchSheetPolicy sheetPolicy, ushort columnOffset) { sheetPolicy.KeepColumns.Add(columnOffset); });
             policy.LoadColumnLists(root, "delete_columns", delegate(PatchSheetPolicy sheetPolicy, ushort columnOffset) { sheetPolicy.KeepColumns.Add(columnOffset); });
+            policy.LoadRowLists(root, "global_english_rows", delegate(PatchSheetPolicy sheetPolicy, uint rowId) { sheetPolicy.GlobalEnglishRows.Add(rowId); });
+            policy.LoadRowLists(root, "global_target_rows", delegate(PatchSheetPolicy sheetPolicy, uint rowId) { sheetPolicy.GlobalTargetRows.Add(rowId); });
             policy.LoadRemapKeys(root);
             policy.LoadRemapColumns(root);
             return policy;
@@ -55,6 +60,10 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
         {
             PatchPolicy policy = new PatchPolicy();
             PatchSheetPolicy addonPolicy = policy.GetOrCreateSheetPolicy("Addon");
+            PatchSheetPolicy lobbyPolicy = policy.GetOrCreateSheetPolicy("Lobby");
+            PatchSheetPolicy worldDcGroupTypePolicy = policy.GetOrCreateSheetPolicy("WorldDCGroupType");
+            PatchSheetPolicy worldPhysicalDcPolicy = policy.GetOrCreateSheetPolicy("WorldPhysicalDC");
+            PatchSheetPolicy worldRegionGroupPolicy = policy.GetOrCreateSheetPolicy("WorldRegionGroup");
 
             // Global Addon rows 44/45/49 are compact h/m/s time-unit labels.
             // Korean "시간/분/초" overflows narrow global UI slots such as icon timers.
@@ -68,12 +77,44 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
             // as "=". Use plain ASCII here to avoid touching global font glyph tables.
             addonPolicy.SetRowColumnRemap(10952, 0, ColumnRemap.Literal("1"));
 
+            // The data-center selection screen is global-client-only lobby UI.
+            // Korean rows 800/802/803/806 exist and are now allowed through so the
+            // title, "information" label, and body can be localized. Rows listed
+            // here are empty or missing on the Korean client, so keep the selected
+            // global client language instead.
+            for (int i = 0; i < GlobalLobbyDataCenterRows.Length; i++)
+            {
+                lobbyPolicy.GlobalTargetRows.Add(GlobalLobbyDataCenterRows[i]);
+            }
+
+            for (uint rowId = DataCenterTravelAddonFirstRow; rowId <= DataCenterTravelAddonLastRow; rowId++)
+            {
+                addonPolicy.GlobalTargetRows.Add(rowId);
+            }
+
             // Some short duration templates embed h/m labels inside SeString branches.
             // Rewriting the Korean bytes in-place would require recalculating SeString
             // branch lengths, so use the global English templates for these rows.
             for (int i = 0; i < EnglishCompactDurationAddonRows.Length; i++)
             {
                 addonPolicy.GlobalEnglishRows.Add(EnglishCompactDurationAddonRows[i]);
+            }
+
+            // Region labels such as Japan/North America are part of the same lobby
+            // flow. Keep the selected global language for these lookup sheets too.
+            for (uint rowId = 1; rowId <= 8; rowId++)
+            {
+                worldRegionGroupPolicy.GlobalTargetRows.Add(rowId);
+            }
+
+            for (uint rowId = 1; rowId <= 32; rowId++)
+            {
+                worldDcGroupTypePolicy.GlobalTargetRows.Add(rowId);
+            }
+
+            for (uint rowId = 1; rowId <= 8; rowId++)
+            {
+                worldPhysicalDcPolicy.GlobalTargetRows.Add(rowId);
             }
 
             return policy;
@@ -395,6 +436,7 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
         public readonly Dictionary<ushort, ColumnRemap> ColumnRemaps = new Dictionary<ushort, ColumnRemap>();
         public readonly Dictionary<ushort, Dictionary<uint, ColumnRemap>> RowColumnRemaps = new Dictionary<ushort, Dictionary<uint, ColumnRemap>>();
         public readonly HashSet<uint> GlobalEnglishRows = new HashSet<uint>();
+        public readonly HashSet<uint> GlobalTargetRows = new HashSet<uint>();
 
         private readonly bool _readOnly;
 
@@ -417,6 +459,11 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
             get { return GlobalEnglishRows.Count > 0; }
         }
 
+        public bool HasGlobalTargetRows
+        {
+            get { return GlobalTargetRows.Count > 0; }
+        }
+
         public bool IsReadOnly
         {
             get { return _readOnly; }
@@ -425,6 +472,11 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
         public bool ShouldKeepRow(uint rowId)
         {
             return KeepRows.Contains(rowId);
+        }
+
+        public bool ShouldUseGlobalFallbackRow(uint rowId)
+        {
+            return GlobalEnglishRows.Contains(rowId) || GlobalTargetRows.Contains(rowId);
         }
 
         public bool ShouldKeepColumn(uint rowId, ushort columnOffset)
