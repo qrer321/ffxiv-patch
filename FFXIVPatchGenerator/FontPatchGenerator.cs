@@ -37,8 +37,21 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
         private const int FdtKerningHeaderSize = 0x10;
         private const int FdtKerningEntrySize = 0x10;
         private const uint PartyListSelfMarkerPrimaryStart = 0xE0E1u;
-        private const uint PartyListSelfMarkerLegacyStart = 0xE0B1u;
         private const int PartyListSelfMarkerCount = 8;
+        private const int FontTextureFormatA4R4G4B4 = 0x1440;
+        private const int FontTextureHeaderSizeOffset = 0x1C;
+        private const int FontGlyphTexturePadding = 1;
+        private const ushort PartyListMarkerDestinationChannel = 3;
+
+        // Party-list self numbers use U+E0E1..U+E0E8. Korean TTMP fonts can miss
+        // those entries, which makes the client fall back to "=" or to the wrong
+        // U+E0B1..U+E0B8 circle-number glyphs. Keep the clean global boxed markers
+        // by transplanting both FDT entries and the small glyph pixels.
+        private static readonly string[] PartyListMarkerFontPaths = new string[]
+        {
+            "common/font/AXIS_12.fdt",
+            "common/font/AXIS_12_lobby.fdt"
+        };
 
         // Explicit font resource set used by the global client for in-game and lobby text rendering.
         private static readonly string[] FontPaths = new string[]
@@ -244,6 +257,7 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
         {
             using (FileStream mpdStream = new FileStream(fontPackage.MpdPath, FileMode.Open, FileAccess.Read, FileShare.ReadWrite))
             {
+                PartyListMarkerPatchPlan partyMarkerPlan = BuildPartyListMarkerPatchPlan(fontPackage, mpdStream, globalArchive);
                 for (int i = 0; i < fontPackage.Payloads.Count; i++)
                 {
                     FontPayload payload = fontPackage.Payloads[i];
@@ -269,7 +283,7 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
 
                     byte[] packedFile = ReadPackedPayload(mpdStream, payload.ModOffset, payload.ModSize, path);
                     int normalized;
-                    long datOffset = WriteFontPayload(datWriter, path, packedFile, out normalized);
+                    long datOffset = WriteFontPayload(datWriter, path, packedFile, partyMarkerPlan, out normalized);
                     LogFontPayloadAdjustments(path, normalized);
                     mutableIndex.SetFileOffset(path, 1, datOffset);
                     mutableIndex2.SetFileOffset(path, 1, datOffset);
@@ -280,7 +294,24 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
 
         private long WriteFontPayload(SqPackDatWriter datWriter, string path, byte[] packedFile, out int normalized)
         {
+            return WriteFontPayload(datWriter, path, packedFile, null, out normalized);
+        }
+
+        private long WriteFontPayload(SqPackDatWriter datWriter, string path, byte[] packedFile, PartyListMarkerPatchPlan partyMarkerPlan, out int normalized)
+        {
             normalized = 0;
+            if (path.EndsWith(".tex", StringComparison.OrdinalIgnoreCase))
+            {
+                int copied = ApplyPartyListMarkerTexturePatch(path, partyMarkerPlan, ref packedFile);
+                if (copied > 0)
+                {
+                    Console.WriteLine("  Restored party-list self marker glyph pixels: {0} ({1})", copied, path);
+                    return datWriter.WriteTextureFile(packedFile);
+                }
+
+                return datWriter.WritePackedFile(packedFile);
+            }
+
             if (!path.EndsWith(".fdt", StringComparison.OrdinalIgnoreCase))
             {
                 return datWriter.WritePackedFile(packedFile);
@@ -288,15 +319,15 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
 
             byte[] fdt = SqPackArchive.UnpackStandardFile(packedFile);
             normalized = NormalizeFdtShiftJisValues(fdt);
-            int aliases = AddPartyListSelfMarkerAliases(path, ref fdt);
-            if (normalized == 0 && aliases == 0)
+            int markers = ApplyPartyListMarkerFdtPatch(path, partyMarkerPlan, ref fdt);
+            if (normalized == 0 && markers == 0)
             {
                 return datWriter.WritePackedFile(packedFile);
             }
 
-            if (aliases > 0)
+            if (markers > 0)
             {
-                Console.WriteLine("  Added party-list self marker glyph aliases: {0} ({1})", aliases, path);
+                Console.WriteLine("  Restored party-list self marker glyph entries: {0} ({1})", markers, path);
             }
 
             return datWriter.WriteStandardFile(fdt);
@@ -325,18 +356,171 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
             return NormalizeFdtGlyphShiftJisValues(fdt) + NormalizeFdtKerningShiftJisValues(fdt);
         }
 
-        private static int AddPartyListSelfMarkerAliases(string path, ref byte[] fdt)
+        private PartyListMarkerPatchPlan BuildPartyListMarkerPatchPlan(FontPatchPackage fontPackage, FileStream mpdStream, SqPackArchive globalArchive)
         {
-            // Party-list self marker text is declared as Axis 12 in PartyList.uld,
-            // but after Korean TTMP font replacement the actual render route can
-            // resolve through a paired KrnAXIS or lobby FDT. Add U+E0E1..E0E8 by
-            // copying that FDT's existing U+E0B1..E0B8 boxed marker glyphs; this
-            // keeps the original boxed look and avoids mixing font atlases.
-            if (!NormalizeGamePath(path).EndsWith(".fdt", StringComparison.OrdinalIgnoreCase))
+            PartyListMarkerPatchPlan plan = new PartyListMarkerPatchPlan();
+            Dictionary<string, FontPayload> payloadsByPath = BuildFontPayloadLookup(fontPackage);
+
+            for (int i = 0; i < PartyListMarkerFontPaths.Length; i++)
+            {
+                string fontPath = PartyListMarkerFontPaths[i];
+                if (!ShouldIncludeFontPath(fontPath))
+                {
+                    continue;
+                }
+
+                string destinationTexturePath = GetPartyListMarkerDestinationTexturePath(fontPath);
+                if (string.IsNullOrEmpty(destinationTexturePath) ||
+                    !ShouldIncludeFontPath(destinationTexturePath) ||
+                    !payloadsByPath.ContainsKey(fontPath) ||
+                    !payloadsByPath.ContainsKey(destinationTexturePath))
+                {
+                    continue;
+                }
+
+                byte[] sourceFdt;
+                if (!globalArchive.TryReadFile(fontPath, out sourceFdt))
+                {
+                    AddLimitedWarning("Missing clean global party marker font source: " + fontPath);
+                    continue;
+                }
+
+                byte[] targetFdt = SqPackArchive.UnpackStandardFile(ReadTtmpPayload(mpdStream, payloadsByPath[fontPath]));
+                byte[] destinationTexture = SqPackArchive.UnpackTextureFile(ReadTtmpPayload(mpdStream, payloadsByPath[destinationTexturePath]));
+                TextureInfo textureInfo;
+                if (!TryReadFontTextureInfo(destinationTexture, out textureInfo))
+                {
+                    AddLimitedWarning("Unsupported party marker texture target: " + destinationTexturePath);
+                    continue;
+                }
+
+                TextureOccupancy occupancy = BuildTextureOccupancy(fontPackage, mpdStream, payloadsByPath, destinationTexturePath, PartyListMarkerDestinationChannel, textureInfo);
+                Dictionary<uint, byte[]> entries = new Dictionary<uint, byte[]>();
+                List<PartyListMarkerTextureCopy> copies = new List<PartyListMarkerTextureCopy>();
+
+                for (int marker = 0; marker < PartyListSelfMarkerCount; marker++)
+                {
+                    uint codepoint = PartyListSelfMarkerPrimaryStart + (uint)marker;
+                    FdtGlyphEntry sourceEntry;
+                    if (!TryGetFdtGlyph(sourceFdt, codepoint, out sourceEntry))
+                    {
+                        AddLimitedWarning("Missing clean global party marker glyph U+" + codepoint.ToString("X4") + " in " + fontPath);
+                        continue;
+                    }
+
+                    string sourceTexturePath = ResolveFontTexturePath(fontPath, sourceEntry.ImageIndex);
+                    if (string.IsNullOrEmpty(sourceTexturePath))
+                    {
+                        AddLimitedWarning("Could not resolve clean party marker source texture for " + fontPath);
+                        continue;
+                    }
+
+                    byte[] packedSourceTexture;
+                    if (!globalArchive.TryReadPackedFile(sourceTexturePath, out packedSourceTexture))
+                    {
+                        AddLimitedWarning("Missing clean global party marker texture source: " + sourceTexturePath);
+                        continue;
+                    }
+
+                    byte[] sourceTexture = SqPackArchive.UnpackTextureFile(packedSourceTexture);
+                    byte[] nibbles = ExtractFontTextureNibbles(sourceTexture, sourceEntry);
+                    ushort destinationX;
+                    ushort destinationY;
+                    if (!occupancy.TryReserve(sourceEntry.Width, sourceEntry.Height, out destinationX, out destinationY))
+                    {
+                        AddLimitedWarning("Could not reserve free party marker glyph space in " + destinationTexturePath);
+                        continue;
+                    }
+
+                    FdtGlyphEntry destinationEntry = sourceEntry;
+                    destinationEntry.ImageIndex = GetTextureImageIndex(destinationTexturePath, PartyListMarkerDestinationChannel);
+                    destinationEntry.X = destinationX;
+                    destinationEntry.Y = destinationY;
+                    byte[] entryBytes = destinationEntry.ToBytes();
+                    entries[PackFdtUtf8Value(codepoint)] = entryBytes;
+
+                    PartyListMarkerTextureCopy copy = new PartyListMarkerTextureCopy();
+                    copy.Entry = destinationEntry;
+                    copy.Nibbles = nibbles;
+                    copies.Add(copy);
+                }
+
+                if (entries.Count == 0)
+                {
+                    continue;
+                }
+
+                plan.FdtEntriesByPath[NormalizeGamePath(fontPath)] = entries;
+                if (!plan.TextureCopiesByPath.ContainsKey(destinationTexturePath))
+                {
+                    plan.TextureCopiesByPath[destinationTexturePath] = new List<PartyListMarkerTextureCopy>();
+                }
+
+                plan.TextureCopiesByPath[destinationTexturePath].AddRange(copies);
+            }
+
+            return plan;
+        }
+
+        private static Dictionary<string, FontPayload> BuildFontPayloadLookup(FontPatchPackage fontPackage)
+        {
+            Dictionary<string, FontPayload> result = new Dictionary<string, FontPayload>(StringComparer.OrdinalIgnoreCase);
+            for (int i = 0; i < fontPackage.Payloads.Count; i++)
+            {
+                FontPayload payload = fontPackage.Payloads[i];
+                string path = NormalizeGamePath(payload.FullPath);
+                if (!result.ContainsKey(path))
+                {
+                    result.Add(path, payload);
+                }
+            }
+
+            return result;
+        }
+
+        private static int ApplyPartyListMarkerFdtPatch(string path, PartyListMarkerPatchPlan plan, ref byte[] fdt)
+        {
+            if (plan == null)
             {
                 return 0;
             }
 
+            Dictionary<uint, byte[]> replacementEntries;
+            if (!plan.FdtEntriesByPath.TryGetValue(NormalizeGamePath(path), out replacementEntries) ||
+                replacementEntries.Count == 0)
+            {
+                return 0;
+            }
+
+            return ReplaceFdtGlyphEntries(ref fdt, replacementEntries);
+        }
+
+        private static int ApplyPartyListMarkerTexturePatch(string path, PartyListMarkerPatchPlan plan, ref byte[] packedFile)
+        {
+            if (plan == null)
+            {
+                return 0;
+            }
+
+            List<PartyListMarkerTextureCopy> copies;
+            if (!plan.TextureCopiesByPath.TryGetValue(NormalizeGamePath(path), out copies) ||
+                copies.Count == 0)
+            {
+                return 0;
+            }
+
+            byte[] texture = SqPackArchive.UnpackTextureFile(packedFile);
+            for (int i = 0; i < copies.Count; i++)
+            {
+                ApplyFontTextureNibbles(texture, copies[i]);
+            }
+
+            packedFile = texture;
+            return copies.Count;
+        }
+
+        private static int ReplaceFdtGlyphEntries(ref byte[] fdt, Dictionary<uint, byte[]> replacementEntries)
+        {
             if (fdt == null ||
                 fdt.Length < FdtHeaderSize ||
                 !HasAsciiSignature(fdt, 0, "fcsv0100"))
@@ -363,7 +547,7 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
 
             int glyphEnd = checked(glyphStart + (int)glyphBytes);
             Dictionary<uint, byte[]> entriesByCodepoint = new Dictionary<uint, byte[]>();
-            List<byte[]> entries = new List<byte[]>((int)glyphCount + PartyListSelfMarkerCount * 2);
+            List<byte[]> entries = new List<byte[]>((int)glyphCount + replacementEntries.Count);
             for (int i = 0; i < glyphCount; i++)
             {
                 byte[] entry = new byte[FdtGlyphEntrySize];
@@ -376,12 +560,29 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
                 }
             }
 
-            int added = AddPartyListSelfMarkerAliasRange(
-                entries,
-                entriesByCodepoint,
-                PartyListSelfMarkerPrimaryStart,
-                PartyListSelfMarkerLegacyStart);
-            if (added == 0)
+            int changed = 0;
+            foreach (KeyValuePair<uint, byte[]> replacement in replacementEntries)
+            {
+                byte[] existingEntry;
+                if (entriesByCodepoint.TryGetValue(replacement.Key, out existingEntry))
+                {
+                    if (!ByteArraysEqual(existingEntry, replacement.Value))
+                    {
+                        Buffer.BlockCopy(replacement.Value, 0, existingEntry, 0, FdtGlyphEntrySize);
+                        changed++;
+                    }
+                }
+                else
+                {
+                    byte[] entry = new byte[FdtGlyphEntrySize];
+                    Buffer.BlockCopy(replacement.Value, 0, entry, 0, FdtGlyphEntrySize);
+                    entries.Add(entry);
+                    entriesByCodepoint.Add(replacement.Key, entry);
+                    changed++;
+                }
+            }
+
+            if (changed == 0)
             {
                 return 0;
             }
@@ -408,52 +609,362 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
             }
 
             fdt = rewritten;
-            return added;
+            return changed;
         }
 
-        private static int AddPartyListSelfMarkerAliasRange(
-            List<byte[]> entries,
-            Dictionary<uint, byte[]> entriesByCodepoint,
-            uint aliasStart,
-            uint sourceStart)
+        private TextureOccupancy BuildTextureOccupancy(
+            FontPatchPackage fontPackage,
+            FileStream mpdStream,
+            Dictionary<string, FontPayload> payloadsByPath,
+            string destinationTexturePath,
+            ushort destinationChannel,
+            TextureInfo textureInfo)
         {
-            int added = 0;
-            for (int i = 0; i < PartyListSelfMarkerCount; i++)
+            TextureOccupancy occupancy = new TextureOccupancy(textureInfo.Width, textureInfo.Height);
+            for (int i = 0; i < fontPackage.Payloads.Count; i++)
             {
-                uint sourceCodepoint = sourceStart + (uint)i;
-                uint aliasCodepoint = aliasStart + (uint)i;
-                uint sourceValue = PackFdtUtf8Value(sourceCodepoint);
-                uint aliasValue = PackFdtUtf8Value(aliasCodepoint);
-                byte[] sourceEntry;
-                if (!entriesByCodepoint.TryGetValue(sourceValue, out sourceEntry))
+                string fdtPath = NormalizeGamePath(fontPackage.Payloads[i].FullPath);
+                if (!fdtPath.EndsWith(".fdt", StringComparison.OrdinalIgnoreCase) ||
+                    !ShouldIncludeFontPath(fdtPath))
                 {
                     continue;
                 }
 
-                byte[] aliasEntry = new byte[FdtGlyphEntrySize];
-                Buffer.BlockCopy(sourceEntry, 0, aliasEntry, 0, FdtGlyphEntrySize);
-                Endian.WriteUInt32LE(aliasEntry, 0, aliasValue);
-                ushort aliasShiftJis;
-                if (TryEncodeShiftJisValue(aliasCodepoint, out aliasShiftJis))
+                FontPayload fdtPayload;
+                if (!payloadsByPath.TryGetValue(fdtPath, out fdtPayload))
                 {
-                    Endian.WriteUInt16LE(aliasEntry, 4, aliasShiftJis);
+                    continue;
                 }
 
-                byte[] existingEntry;
-                if (entriesByCodepoint.TryGetValue(aliasValue, out existingEntry))
+                byte[] fdt;
+                try
                 {
-                    Buffer.BlockCopy(aliasEntry, 0, existingEntry, 0, FdtGlyphEntrySize);
+                    fdt = SqPackArchive.UnpackStandardFile(ReadTtmpPayload(mpdStream, fdtPayload));
                 }
-                else
+                catch (InvalidDataException)
                 {
-                    entries.Add(aliasEntry);
-                    entriesByCodepoint.Add(aliasValue, aliasEntry);
+                    continue;
                 }
 
-                added++;
+                List<FdtGlyphEntry> glyphs = ReadFdtGlyphs(fdt);
+                for (int glyphIndex = 0; glyphIndex < glyphs.Count; glyphIndex++)
+                {
+                    FdtGlyphEntry glyph = glyphs[glyphIndex];
+                    if (GetFontTextureChannel(glyph.ImageIndex) != destinationChannel)
+                    {
+                        continue;
+                    }
+
+                    string glyphTexturePath = ResolveFontTexturePath(fdtPath, glyph.ImageIndex);
+                    if (!string.Equals(glyphTexturePath, destinationTexturePath, StringComparison.OrdinalIgnoreCase))
+                    {
+                        continue;
+                    }
+
+                    occupancy.Mark(glyph.X, glyph.Y, glyph.Width, glyph.Height);
+                }
             }
 
-            return added;
+            return occupancy;
+        }
+
+        private static bool TryGetFdtGlyph(byte[] fdt, uint codepoint, out FdtGlyphEntry entry)
+        {
+            List<FdtGlyphEntry> glyphs = ReadFdtGlyphs(fdt);
+            uint value = PackFdtUtf8Value(codepoint);
+            for (int i = 0; i < glyphs.Count; i++)
+            {
+                if (glyphs[i].Utf8Value == value)
+                {
+                    entry = glyphs[i];
+                    return true;
+                }
+            }
+
+            entry = new FdtGlyphEntry();
+            return false;
+        }
+
+        private static List<FdtGlyphEntry> ReadFdtGlyphs(byte[] fdt)
+        {
+            List<FdtGlyphEntry> result = new List<FdtGlyphEntry>();
+            if (fdt == null ||
+                fdt.Length < FdtHeaderSize ||
+                !HasAsciiSignature(fdt, 0, "fcsv0100"))
+            {
+                return result;
+            }
+
+            int fontTableOffset = checked((int)Endian.ReadUInt32LE(fdt, 0x08));
+            if (fontTableOffset < FdtHeaderSize ||
+                fontTableOffset > fdt.Length - FdtFontTableHeaderSize ||
+                !HasAsciiSignature(fdt, fontTableOffset, "fthd"))
+            {
+                return result;
+            }
+
+            uint glyphCount = Endian.ReadUInt32LE(fdt, fontTableOffset + 0x04);
+            int glyphStart = fontTableOffset + FdtFontTableHeaderSize;
+            long glyphBytes = (long)glyphCount * FdtGlyphEntrySize;
+            if (glyphBytes < 0 || glyphStart > fdt.Length || glyphStart + glyphBytes > fdt.Length)
+            {
+                return result;
+            }
+
+            for (int i = 0; i < glyphCount; i++)
+            {
+                int offset = glyphStart + i * FdtGlyphEntrySize;
+                FdtGlyphEntry entry = new FdtGlyphEntry();
+                entry.Utf8Value = Endian.ReadUInt32LE(fdt, offset);
+                entry.ShiftJisValue = Endian.ReadUInt16LE(fdt, offset + 4);
+                entry.ImageIndex = Endian.ReadUInt16LE(fdt, offset + 6);
+                entry.X = Endian.ReadUInt16LE(fdt, offset + 8);
+                entry.Y = Endian.ReadUInt16LE(fdt, offset + 10);
+                entry.Width = fdt[offset + 12];
+                entry.Height = fdt[offset + 13];
+                entry.OffsetX = unchecked((sbyte)fdt[offset + 14]);
+                entry.OffsetY = unchecked((sbyte)fdt[offset + 15]);
+                result.Add(entry);
+            }
+
+            return result;
+        }
+
+        private static bool TryReadFontTextureInfo(byte[] texture, out TextureInfo info)
+        {
+            info = new TextureInfo();
+            if (texture == null || texture.Length < 0x20)
+            {
+                return false;
+            }
+
+            uint format = Endian.ReadUInt32LE(texture, 0x04);
+            if (format != FontTextureFormatA4R4G4B4)
+            {
+                return false;
+            }
+
+            info.Width = Endian.ReadUInt16LE(texture, 0x08);
+            info.Height = Endian.ReadUInt16LE(texture, 0x0A);
+            info.DataOffset = checked((int)Endian.ReadUInt32LE(texture, FontTextureHeaderSizeOffset));
+            int expectedBytes = checked(info.Width * info.Height * 2);
+            return info.Width > 0 &&
+                   info.Height > 0 &&
+                   info.DataOffset >= 0 &&
+                   info.DataOffset <= texture.Length - expectedBytes;
+        }
+
+        private static byte[] ExtractFontTextureNibbles(byte[] texture, FdtGlyphEntry entry)
+        {
+            TextureInfo info;
+            if (!TryReadFontTextureInfo(texture, out info))
+            {
+                throw new InvalidDataException("Unsupported font texture format.");
+            }
+
+            if (entry.X + entry.Width > info.Width || entry.Y + entry.Height > info.Height)
+            {
+                throw new InvalidDataException("Glyph source rectangle is outside the font texture.");
+            }
+
+            int channel = GetFontTextureChannel(entry.ImageIndex);
+            byte[] result = new byte[checked(entry.Width * entry.Height)];
+            int resultOffset = 0;
+            for (int y = 0; y < entry.Height; y++)
+            {
+                int sourceY = entry.Y + y;
+                for (int x = 0; x < entry.Width; x++)
+                {
+                    int sourceX = entry.X + x;
+                    int pixelOffset = info.DataOffset + (sourceY * info.Width + sourceX) * 2;
+                    result[resultOffset++] = ReadFontTextureNibble(texture, pixelOffset, channel);
+                }
+            }
+
+            return result;
+        }
+
+        private static void ApplyFontTextureNibbles(byte[] texture, PartyListMarkerTextureCopy copy)
+        {
+            TextureInfo info;
+            if (!TryReadFontTextureInfo(texture, out info))
+            {
+                throw new InvalidDataException("Unsupported font texture format.");
+            }
+
+            if (copy.Entry.X + copy.Entry.Width > info.Width ||
+                copy.Entry.Y + copy.Entry.Height > info.Height ||
+                copy.Nibbles == null ||
+                copy.Nibbles.Length != copy.Entry.Width * copy.Entry.Height)
+            {
+                throw new InvalidDataException("Invalid party marker glyph destination.");
+            }
+
+            int channel = GetFontTextureChannel(copy.Entry.ImageIndex);
+            int sourceOffset = 0;
+            for (int y = 0; y < copy.Entry.Height; y++)
+            {
+                int destinationY = copy.Entry.Y + y;
+                for (int x = 0; x < copy.Entry.Width; x++)
+                {
+                    int destinationX = copy.Entry.X + x;
+                    int pixelOffset = info.DataOffset + (destinationY * info.Width + destinationX) * 2;
+                    WriteFontTextureNibble(texture, pixelOffset, channel, copy.Nibbles[sourceOffset++]);
+                }
+            }
+        }
+
+        private static byte ReadFontTextureNibble(byte[] texture, int pixelOffset, int channel)
+        {
+            byte lo = texture[pixelOffset];
+            byte hi = texture[pixelOffset + 1];
+            switch (channel)
+            {
+                case 0:
+                    return (byte)(hi & 0x0F);
+                case 1:
+                    return (byte)((lo >> 4) & 0x0F);
+                case 2:
+                    return (byte)(lo & 0x0F);
+                default:
+                    return (byte)((hi >> 4) & 0x0F);
+            }
+        }
+
+        private static void WriteFontTextureNibble(byte[] texture, int pixelOffset, int channel, byte value)
+        {
+            value = (byte)(value & 0x0F);
+            byte lo = texture[pixelOffset];
+            byte hi = texture[pixelOffset + 1];
+            switch (channel)
+            {
+                case 0:
+                    hi = (byte)((hi & 0xF0) | value);
+                    break;
+                case 1:
+                    lo = (byte)((lo & 0x0F) | (value << 4));
+                    break;
+                case 2:
+                    lo = (byte)((lo & 0xF0) | value);
+                    break;
+                default:
+                    hi = (byte)((hi & 0x0F) | (value << 4));
+                    break;
+            }
+
+            texture[pixelOffset] = lo;
+            texture[pixelOffset + 1] = hi;
+        }
+
+        private static string GetPartyListMarkerDestinationTexturePath(string fdtPath)
+        {
+            string normalized = NormalizeGamePath(fdtPath).ToLowerInvariant();
+            if (normalized.EndsWith("_lobby.fdt", StringComparison.OrdinalIgnoreCase))
+            {
+                return "common/font/font_lobby2.tex";
+            }
+
+            return "common/font/font3.tex";
+        }
+
+        private static ushort GetTextureImageIndex(string texturePath, ushort channel)
+        {
+            int textureIndex = GetTextureIndexFromPath(texturePath);
+            if (textureIndex < 0)
+            {
+                throw new InvalidDataException("Could not resolve texture index: " + texturePath);
+            }
+
+            return checked((ushort)(textureIndex * 4 + channel));
+        }
+
+        private static int GetTextureIndexFromPath(string texturePath)
+        {
+            string normalized = NormalizeGamePath(texturePath).ToLowerInvariant();
+            if (normalized.EndsWith("/font1.tex", StringComparison.OrdinalIgnoreCase) ||
+                normalized.EndsWith("/font_lobby1.tex", StringComparison.OrdinalIgnoreCase) ||
+                normalized.EndsWith("/font_krn_1.tex", StringComparison.OrdinalIgnoreCase))
+            {
+                return 0;
+            }
+
+            if (normalized.EndsWith("/font2.tex", StringComparison.OrdinalIgnoreCase) ||
+                normalized.EndsWith("/font_lobby2.tex", StringComparison.OrdinalIgnoreCase))
+            {
+                return 1;
+            }
+
+            if (normalized.EndsWith("/font3.tex", StringComparison.OrdinalIgnoreCase))
+            {
+                return 2;
+            }
+
+            return -1;
+        }
+
+        private static string ResolveFontTexturePath(string fdtPath, ushort imageIndex)
+        {
+            string normalized = NormalizeGamePath(fdtPath).ToLowerInvariant();
+            int textureIndex = imageIndex / 4;
+            if (normalized.EndsWith("_lobby.fdt", StringComparison.OrdinalIgnoreCase))
+            {
+                if (textureIndex == 0)
+                {
+                    return "common/font/font_lobby1.tex";
+                }
+
+                if (textureIndex == 1)
+                {
+                    return "common/font/font_lobby2.tex";
+                }
+
+                return null;
+            }
+
+            if (Path.GetFileName(normalized).StartsWith("krnaxis_", StringComparison.OrdinalIgnoreCase))
+            {
+                if (textureIndex == 0)
+                {
+                    return "common/font/font_krn_1.tex";
+                }
+
+                return null;
+            }
+
+            switch (textureIndex)
+            {
+                case 0:
+                    return "common/font/font1.tex";
+                case 1:
+                    return "common/font/font2.tex";
+                case 2:
+                    return "common/font/font3.tex";
+                default:
+                    return null;
+            }
+        }
+
+        private static int GetFontTextureChannel(ushort imageIndex)
+        {
+            return imageIndex % 4;
+        }
+
+        private static bool ByteArraysEqual(byte[] left, byte[] right)
+        {
+            if (left == null || right == null || left.Length != right.Length)
+            {
+                return false;
+            }
+
+            for (int i = 0; i < left.Length; i++)
+            {
+                if (left[i] != right[i])
+                {
+                    return false;
+                }
+            }
+
+            return true;
         }
 
         private static int NormalizeFdtGlyphShiftJisValues(byte[] fdt)
@@ -822,6 +1333,11 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
             return path.Replace('\\', '/').Trim();
         }
 
+        private static byte[] ReadTtmpPayload(FileStream mpdStream, FontPayload payload)
+        {
+            return ReadPackedPayload(mpdStream, payload.ModOffset, payload.ModSize, NormalizeGamePath(payload.FullPath));
+        }
+
         private static byte[] ReadPackedPayload(FileStream mpdStream, int offset, int size, string path)
         {
             if (offset < 0 || size <= 0 || offset + (long)size > mpdStream.Length)
@@ -963,6 +1479,145 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
             public string FullPath;
             public int ModOffset;
             public int ModSize;
+        }
+
+        private sealed class PartyListMarkerPatchPlan
+        {
+            public readonly Dictionary<string, Dictionary<uint, byte[]>> FdtEntriesByPath =
+                new Dictionary<string, Dictionary<uint, byte[]>>(StringComparer.OrdinalIgnoreCase);
+
+            public readonly Dictionary<string, List<PartyListMarkerTextureCopy>> TextureCopiesByPath =
+                new Dictionary<string, List<PartyListMarkerTextureCopy>>(StringComparer.OrdinalIgnoreCase);
+        }
+
+        private sealed class PartyListMarkerTextureCopy
+        {
+            public FdtGlyphEntry Entry;
+            public byte[] Nibbles;
+        }
+
+        private struct FdtGlyphEntry
+        {
+            public uint Utf8Value;
+            public ushort ShiftJisValue;
+            public ushort ImageIndex;
+            public ushort X;
+            public ushort Y;
+            public byte Width;
+            public byte Height;
+            public sbyte OffsetX;
+            public sbyte OffsetY;
+
+            public byte[] ToBytes()
+            {
+                byte[] bytes = new byte[FdtGlyphEntrySize];
+                Endian.WriteUInt32LE(bytes, 0, Utf8Value);
+                Endian.WriteUInt16LE(bytes, 4, ShiftJisValue);
+                Endian.WriteUInt16LE(bytes, 6, ImageIndex);
+                Endian.WriteUInt16LE(bytes, 8, X);
+                Endian.WriteUInt16LE(bytes, 10, Y);
+                bytes[12] = Width;
+                bytes[13] = Height;
+                bytes[14] = unchecked((byte)OffsetX);
+                bytes[15] = unchecked((byte)OffsetY);
+                return bytes;
+            }
+        }
+
+        private struct TextureInfo
+        {
+            public int Width;
+            public int Height;
+            public int DataOffset;
+        }
+
+        private sealed class TextureOccupancy
+        {
+            private readonly bool[] _used;
+
+            public TextureOccupancy(int width, int height)
+            {
+                Width = width;
+                Height = height;
+                _used = new bool[checked(width * height)];
+            }
+
+            public int Width { get; private set; }
+
+            public int Height { get; private set; }
+
+            public void Mark(int x, int y, int width, int height)
+            {
+                if (width <= 0 || height <= 0)
+                {
+                    return;
+                }
+
+                int left = Math.Max(0, x - FontGlyphTexturePadding);
+                int top = Math.Max(0, y - FontGlyphTexturePadding);
+                int right = Math.Min(Width, x + width + FontGlyphTexturePadding);
+                int bottom = Math.Min(Height, y + height + FontGlyphTexturePadding);
+                for (int row = top; row < bottom; row++)
+                {
+                    int rowOffset = row * Width;
+                    for (int col = left; col < right; col++)
+                    {
+                        _used[rowOffset + col] = true;
+                    }
+                }
+            }
+
+            public bool TryReserve(int width, int height, out ushort x, out ushort y)
+            {
+                x = 0;
+                y = 0;
+                if (width <= 0 || height <= 0)
+                {
+                    return false;
+                }
+
+                int maxX = Width - width - FontGlyphTexturePadding - 1;
+                int maxY = Height - height - FontGlyphTexturePadding - 1;
+                for (int row = maxY; row >= FontGlyphTexturePadding; row--)
+                {
+                    for (int col = maxX; col >= FontGlyphTexturePadding; col--)
+                    {
+                        if (!IsFree(col - FontGlyphTexturePadding, row - FontGlyphTexturePadding, width + FontGlyphTexturePadding * 2, height + FontGlyphTexturePadding * 2))
+                        {
+                            continue;
+                        }
+
+                        Mark(col, row, width, height);
+                        x = checked((ushort)col);
+                        y = checked((ushort)row);
+                        return true;
+                    }
+                }
+
+                return false;
+            }
+
+            private bool IsFree(int x, int y, int width, int height)
+            {
+                if (x < 0 || y < 0 || width <= 0 || height <= 0 || x + width > Width || y + height > Height)
+                {
+                    return false;
+                }
+
+                for (int row = y; row < y + height; row++)
+                {
+                    int rowOffset = row * Width;
+                    for (int col = x; col < x + width; col++)
+                    {
+                        if (_used[rowOffset + col])
+                        {
+                            return false;
+                        }
+                    }
+                }
+
+                return true;
+            }
         }
 
     }

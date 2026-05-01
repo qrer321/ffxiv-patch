@@ -160,6 +160,90 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
             }
         }
 
+        public static byte[] UnpackTextureFile(byte[] packedFile)
+        {
+            if (packedFile == null || packedFile.Length < 24)
+            {
+                throw new InvalidDataException("Packed SqPack file is too short.");
+            }
+
+            using (MemoryStream stream = new MemoryStream(packedFile, false))
+            using (BinaryReader reader = new BinaryReader(stream))
+            {
+                uint headerSize = reader.ReadUInt32();
+                uint fileType = reader.ReadUInt32();
+                uint rawFileSize = reader.ReadUInt32();
+                reader.ReadUInt32();
+                reader.ReadUInt32();
+                uint blockCount = reader.ReadUInt32();
+
+                if (fileType != 4)
+                {
+                    throw new InvalidDataException("Only texture SqPack files are supported. Type=" + fileType);
+                }
+
+                List<TextureBlockLocator> locators = new List<TextureBlockLocator>();
+                for (int i = 0; i < blockCount; i++)
+                {
+                    TextureBlockLocator locator = new TextureBlockLocator();
+                    locator.FirstBlockOffset = reader.ReadUInt32();
+                    locator.TotalSize = reader.ReadUInt32();
+                    locator.DecompressedSize = reader.ReadUInt32();
+                    locator.FirstSubBlockIndex = reader.ReadUInt32();
+                    locator.SubBlockCount = reader.ReadUInt32();
+                    locators.Add(locator);
+                }
+
+                int subBlockSizeOffset = checked(24 + (int)blockCount * 20);
+                MemoryStream output = new MemoryStream((int)rawFileSize);
+                for (int i = 0; i < locators.Count; i++)
+                {
+                    TextureBlockLocator locator = locators[i];
+                    if (i == 0)
+                    {
+                        if (headerSize > packedFile.Length ||
+                            locator.FirstBlockOffset > packedFile.Length - headerSize)
+                        {
+                            throw new InvalidDataException("Invalid texture header range.");
+                        }
+
+                        stream.Position = headerSize;
+                        CopyBytes(stream, output, locator.FirstBlockOffset);
+                    }
+
+                    int blockOffset = checked((int)headerSize + (int)locator.FirstBlockOffset);
+                    long before = output.Length;
+                    for (int sub = 0; sub < locator.SubBlockCount; sub++)
+                    {
+                        stream.Position = blockOffset;
+                        ReadDataBlock(reader, stream, output);
+
+                        int subBlockSizeIndex = checked((int)locator.FirstSubBlockIndex + sub);
+                        int sizeOffset = checked(subBlockSizeOffset + subBlockSizeIndex * 2);
+                        if (sizeOffset < 0 || sizeOffset > packedFile.Length - 2)
+                        {
+                            throw new InvalidDataException("Invalid texture sub-block size table.");
+                        }
+
+                        blockOffset += Endian.ReadUInt16LE(packedFile, sizeOffset);
+                    }
+
+                    if (output.Length - before != locator.DecompressedSize)
+                    {
+                        throw new InvalidDataException("Unexpected texture block size.");
+                    }
+                }
+
+                byte[] result = output.ToArray();
+                if (result.Length != rawFileSize)
+                {
+                    throw new InvalidDataException("Unexpected decompressed texture size. Expected " + rawFileSize + ", got " + result.Length);
+                }
+
+                return result;
+            }
+        }
+
         public byte[] ReadFile(SqPackIndexEntry entry)
         {
             FileStream stream = GetDatStream(entry.DataFileId);
@@ -254,6 +338,24 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
             }
 
             throw new InvalidDataException("Unknown SqPack block type/size: " + blockTypeOrCompressedSize);
+        }
+
+        private static void CopyBytes(Stream source, Stream destination, uint length)
+        {
+            byte[] buffer = new byte[8192];
+            uint remaining = length;
+            while (remaining > 0)
+            {
+                int requested = (int)Math.Min(buffer.Length, remaining);
+                int read = source.Read(buffer, 0, requested);
+                if (read == 0)
+                {
+                    throw new EndOfStreamException("Could not read texture header bytes.");
+                }
+
+                destination.Write(buffer, 0, read);
+                remaining -= (uint)read;
+            }
         }
 
         private FileStream GetDatStream(byte datId)
@@ -687,6 +789,105 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
             return fileOffset;
         }
 
+        public long WriteTextureFile(byte[] rawTexture)
+        {
+            if (rawTexture == null || rawTexture.Length < 32)
+            {
+                throw new ArgumentException("Raw texture must not be empty.");
+            }
+
+            int textureHeaderSize = checked((int)Endian.ReadUInt32LE(rawTexture, 28));
+            if (textureHeaderSize <= 0 || textureHeaderSize > rawTexture.Length)
+            {
+                throw new InvalidDataException("Invalid raw texture header size.");
+            }
+
+            PadToAlignment(_stream, Alignment);
+            long fileOffset = _stream.Position;
+
+            int textureDataSize = rawTexture.Length - textureHeaderSize;
+            int blockCount = Math.Max(1, (textureDataSize + MaxBlockSize - 1) / MaxBlockSize);
+            int fileHeaderSize = Align(24 + blockCount * 20 + blockCount * 2, Alignment);
+
+            List<PendingBlock> pendingBlocks = new List<PendingBlock>();
+            int rawOffset = textureHeaderSize;
+            int blockDataOffset = 0;
+            for (int i = 0; i < blockCount; i++)
+            {
+                int length = Math.Min(MaxBlockSize, rawTexture.Length - rawOffset);
+                if (length < 0)
+                {
+                    length = 0;
+                }
+
+                byte[] payload = CreatePayload(rawTexture, rawOffset, length);
+                bool compressed = payload.Length < length;
+                int storedSize = Align(16 + payload.Length, Alignment);
+
+                PendingBlock block = new PendingBlock();
+                block.Offset = textureHeaderSize + blockDataOffset;
+                block.Payload = payload;
+                block.RawOffset = rawOffset;
+                block.RawLength = length;
+                block.Compressed = compressed;
+                block.StoredSize = storedSize;
+                pendingBlocks.Add(block);
+
+                rawOffset += length;
+                blockDataOffset += storedSize;
+            }
+
+            BinaryWriter writer = new BinaryWriter(_stream);
+            writer.Write((uint)fileHeaderSize);
+            writer.Write((uint)4);
+            writer.Write((uint)rawTexture.Length);
+            writer.Write((uint)0);
+            writer.Write((uint)((textureHeaderSize + blockDataOffset) / Alignment));
+            writer.Write((uint)blockCount);
+
+            for (int i = 0; i < pendingBlocks.Count; i++)
+            {
+                PendingBlock block = pendingBlocks[i];
+                writer.Write((uint)block.Offset);
+                writer.Write((uint)block.StoredSize);
+                writer.Write((uint)block.RawLength);
+                writer.Write((uint)i);
+                writer.Write((uint)1);
+            }
+
+            for (int i = 0; i < pendingBlocks.Count; i++)
+            {
+                writer.Write((ushort)pendingBlocks[i].StoredSize);
+            }
+
+            PadToPosition(_stream, fileOffset + fileHeaderSize);
+            writer.Write(rawTexture, 0, textureHeaderSize);
+
+            for (int i = 0; i < pendingBlocks.Count; i++)
+            {
+                PendingBlock block = pendingBlocks[i];
+                long blockStart = _stream.Position;
+
+                writer.Write((uint)16);
+                writer.Write((uint)0);
+                writer.Write(block.Compressed ? (uint)block.Payload.Length : DatBlockTypes.Uncompressed);
+                writer.Write((uint)block.RawLength);
+
+                if (block.Compressed)
+                {
+                    writer.Write(block.Payload);
+                }
+                else if (block.RawLength > 0)
+                {
+                    writer.Write(rawTexture, block.RawOffset, block.RawLength);
+                }
+
+                PadToPosition(_stream, blockStart + block.StoredSize);
+            }
+
+            return fileOffset;
+        }
+
         public long WritePackedFile(byte[] packedFile)
         {
             if (packedFile == null || packedFile.Length == 0)
@@ -741,6 +942,24 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
                 // Header field at 0x410 stores the number of data files; raise it so the selected patch dat is accepted.
                 Endian.WriteUInt32LE(header, 0x400 + 0x10, dataFileCount);
                 return header;
+            }
+        }
+
+        private static void CopyBytes(Stream source, Stream destination, uint length)
+        {
+            byte[] buffer = new byte[8192];
+            uint remaining = length;
+            while (remaining > 0)
+            {
+                int requested = (int)Math.Min(buffer.Length, remaining);
+                int read = source.Read(buffer, 0, requested);
+                if (read == 0)
+                {
+                    throw new EndOfStreamException("Could not read texture header bytes.");
+                }
+
+                destination.Write(buffer, 0, read);
+                remaining -= (uint)read;
             }
         }
 
@@ -867,6 +1086,15 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
         public uint Offset;
         public ushort CompressedSize;
         public ushort UncompressedSize;
+    }
+
+    internal struct TextureBlockLocator
+    {
+        public uint FirstBlockOffset;
+        public uint TotalSize;
+        public uint DecompressedSize;
+        public uint FirstSubBlockIndex;
+        public uint SubBlockCount;
     }
 
     internal static class DatBlockTypes

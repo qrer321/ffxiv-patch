@@ -74,7 +74,7 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
 
             // Addon row 10952 is the party-list self marker. It is a private glyph
             // token in the original client, so keep the target global token and let
-            // the font patch alias U+E0E1..U+E0E8 to boxed marker glyphs.
+            // the font patch restore U+E0E1..U+E0E8 from clean global boxed markers.
             addonPolicy.GlobalTargetRows.Add(10952);
 
             // The data-center selection screen is global-client-only lobby UI.

@@ -158,7 +158,7 @@
 - `Addon` row `44`, `45`, `49` 기본 보호로 좁은 UI의 `h/m/s` 시간 단위가 `시간/분/초`로 늘어나 영역을 넘치는 문제 완화
 - `Addon` row `2338`, `6166`은 글로벌 영어 시간 템플릿을 사용해 버프/남은시간 UI의 `시간/분` overflow 완화
 - `Addon` row `10952`는 파티 리스트 본인 표시 glyph가 `=`로 보이는 문제를 피하기 위해 대상 글로벌 언어의 원본 PUA 토큰 유지
-- 파티 리스트 번호 표시 설정이 1~8로 바뀌는 경우를 고려해 패치되는 각 FDT에 일부 번호 PUA glyph를 같은 FDT의 박스형 번호 glyph로 좁게 alias. FDT UTF-8 key 저장 방식과 Shift-JIS key를 함께 맞춰 기존 폰트 atlas 조합을 깨지 않도록 제한
+- 파티 리스트 번호 표시 설정이 1~8로 바뀌는 경우를 고려해 본인 번호 PUA glyph(`U+E0E1`~`U+E0E8`)를 clean global의 속 빈 네모 번호 모양으로 복원. FDT 엔트리와 glyph 픽셀을 함께 이식해 `U+E0B1`~`U+E0B8` 동그라미 번호와 섞이지 않도록 처리
 - `patch-policy.json` 기반 sheet/row/column 보존과 row/column remap
 - `patch-diagnostics.tsv` 생성
 - `--diagnostic-csv` 지정 sheet의 row/column 비교 CSV 생성
@@ -180,7 +180,7 @@
   - `TTMPL.mpl`
 - TTMP의 FDT와 texture atlas를 한 세트로 유지
 - FDT glyph 좌표/문자 코드와 다른 클라이언트의 font atlas를 섞지 않음
-- 릴리즈 기본값에서는 TTMP의 FDT/texture 조합을 한 세트로 유지. 예외적으로 파티 리스트 본인 번호 PUA glyph만 같은 FDT의 박스형 번호 glyph로 alias하며, FDT UTF-8 key와 Shift-JIS key를 같이 보정
+- 릴리즈 기본값에서는 TTMP의 FDT/texture 조합을 한 세트로 유지. 예외적으로 파티 리스트 본인 번호 PUA glyph만 clean global의 `U+E0E1`~`U+E0E8` 모양으로 복원하며, TTMP atlas의 빈 영역을 찾아 해당 glyph 픽셀과 FDT 엔트리를 함께 보정
 - `--font-pack-dir`로 TTMP 위치 지정
 - `--font-profile`로 진단용 폰트 프로필 선택
   - `full`
