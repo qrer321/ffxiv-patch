@@ -158,7 +158,7 @@
 - `Addon` row `44`, `45`, `49` 기본 보호로 좁은 UI의 `h/m/s` 시간 단위가 `시간/분/초`로 늘어나 영역을 넘치는 문제 완화
 - `Addon` row `2338`, `6166`은 글로벌 영어 시간 템플릿을 사용해 버프/남은시간 UI의 `시간/분` overflow 완화
 - `Addon` row `10952`는 파티 리스트 본인 표시 glyph가 `=`로 보이는 문제를 피하기 위해 대상 글로벌 언어의 원본 PUA 토큰 유지
-- 파티 리스트 본인 표시 번호 설정이 1~8로 바뀌는 경우를 고려해 패치되는 각 FDT에 본인 번호 PUA glyph `U+E0E1`~`U+E0E8`을 같은 FDT의 박스형 번호 glyph `U+E0B1`~`U+E0B8`로 좁게 alias. FDT UTF-8 key 저장 방식과 Shift-JIS key를 함께 맞춰 기존 폰트 atlas 조합을 깨지 않도록 제한
+- 파티 리스트 번호 표시 설정이 1~8로 바뀌는 경우를 고려해 패치되는 각 FDT에 일부 번호 PUA glyph를 같은 FDT의 박스형 번호 glyph로 좁게 alias. FDT UTF-8 key 저장 방식과 Shift-JIS key를 함께 맞춰 기존 폰트 atlas 조합을 깨지 않도록 제한
 - `patch-policy.json` 기반 sheet/row/column 보존과 row/column remap
 - `patch-diagnostics.tsv` 생성
 - `--diagnostic-csv` 지정 sheet의 row/column 비교 CSV 생성
@@ -180,7 +180,7 @@
   - `TTMPL.mpl`
 - TTMP의 FDT와 texture atlas를 한 세트로 유지
 - FDT glyph 좌표/문자 코드와 다른 클라이언트의 font atlas를 섞지 않음
-- 릴리즈 기본값에서는 글로벌 로비/데이터센터 제목에 쓰이는 `TrumpGothic` 계열을 보존하고, 광범위한 한글 proxy glyph 병합을 추가하지 않고 TTMP의 FDT/texture 조합을 유지. 예외적으로 파티 리스트 본인 번호 PUA glyph만 같은 FDT의 박스형 번호 glyph로 alias하며, FDT UTF-8 key와 Shift-JIS key를 같이 보정
+- 릴리즈 기본값에서는 TTMP의 FDT/texture 조합을 한 세트로 유지. 예외적으로 파티 리스트 본인 번호 PUA glyph만 같은 FDT의 박스형 번호 glyph로 alias하며, FDT UTF-8 key와 Shift-JIS key를 같이 보정
 - `--font-pack-dir`로 TTMP 위치 지정
 - `--font-profile`로 진단용 폰트 프로필 선택
   - `full`
@@ -214,7 +214,7 @@
 - `Map` sheet의 `ui/map/.../*_m.tex` 지도 텍스처를 한국 서버 텍스처와 비교해, 지도 이미지에 포함된 지역명 표기 보정
 - `DynamicEventScreenImage`, `EventImage`, `TradeScreenImage`, `LoadingImage`는 언어 폴더가 없는 동일 경로 리소스를 비교하고 실제 파일이 다른 경우에만 한국 서버 리소스로 교체
 - 지역/컨텐츠 입장 시 표시되는 타이틀 이미지처럼 텍스트가 아니라 이미지로 렌더링되는 UI 요소 보정
-- 데이터 센터 선택/이동, 월드/데이터센터 이동 관련 ULD의 텍스트 노드 폰트 슬롯은 원본 글로벌 값을 유지
+- 데이터 센터 선택 화면의 `Title_DataCenter.uld`에서 `TrumpGothic` 제목 노드는 `Jupiter` 폰트 슬롯으로 보정해 TTMP 한글 atlas와 글로벌 전용 제목 glyph가 충돌하지 않도록 처리
 - TTMP 패키지가 제공하는 원래 폰트군 조합을 사용해 렌더링하며, `AXIS_20_lobby`처럼 패키지에 없는 크기/로비용 폰트 경로로 잘못 라우팅되는 것을 방지
 - `Lobby`, `WorldRegionGroup`, `WorldPhysicalDC`, `WorldDCGroupType`, `Addon` 12510번대 서버/데이터센터 이동 안내 row는 대상 글로벌 언어 row를 사용해 읽을 수 없는 proxy glyph 노출을 방지
 - `--base-ui-index`, `--base-ui-index2`로 clean `060000` index/index2 지정
@@ -242,7 +242,7 @@
 - `--include-font`: 텍스트와 폰트 동시 생성
 - `--font-only`: 폰트만 생성
 - `--font-pack-dir`: TTMP 패키지 위치 지정
-- `--font-profile`: 진단용 폰트 프로필 선택, 기본 `no-trumpgothic`
+- `--font-profile`: 진단용 폰트 프로필 선택, 기본 `full`
 - `--base-index`, `--base-index2`: 텍스트 패치용 clean index 지정
 - `--base-font-index`, `--base-font-index2`: 폰트 패치용 clean index 지정
 - `--allow-patched-global`: 이미 패치된 index 사용 허용, 실험용

@@ -219,8 +219,8 @@ namespace FFXIVKoreanPatch.Main
             debugFontProfileComboBox = new ComboBox();
             debugFontProfileComboBox.Name = "debugFontProfileComboBox";
             debugFontProfileComboBox.DropDownStyle = ComboBoxStyle.DropDownList;
-            debugFontProfileComboBox.Items.Add(new FontProfileItem("기본 (데이터센터 제목 보호)", "no-trumpgothic"));
-            debugFontProfileComboBox.Items.Add(new FontProfileItem("전체 폰트", "full"));
+            debugFontProfileComboBox.Items.Add(new FontProfileItem("기본", "full"));
+            debugFontProfileComboBox.Items.Add(new FontProfileItem("TrumpGothic 제외", "no-trumpgothic"));
             debugFontProfileComboBox.Items.Add(new FontProfileItem("UI 숫자 보호", "ui-numeric-safe"));
             debugFontProfileComboBox.Items.Add(new FontProfileItem("MiedingerMid 제외", "no-miedingermid"));
             debugFontProfileComboBox.Items.Add(new FontProfileItem("Jupiter 제외", "no-jupiter"));

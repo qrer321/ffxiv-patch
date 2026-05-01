@@ -675,8 +675,7 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
 
             if (string.Equals(profile, FontPatchProfiles.NoTrumpGothic, StringComparison.OrdinalIgnoreCase))
             {
-                return normalized.IndexOf("/trumpgothic_", StringComparison.OrdinalIgnoreCase) < 0 &&
-                       !normalized.EndsWith("/font3.tex", StringComparison.OrdinalIgnoreCase);
+                return normalized.IndexOf("/trumpgothic_", StringComparison.OrdinalIgnoreCase) < 0;
             }
 
             if (string.Equals(profile, FontPatchProfiles.NoJupiter, StringComparison.OrdinalIgnoreCase))
@@ -694,8 +693,7 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
             {
                 return normalized.IndexOf("/miedingermid_", StringComparison.OrdinalIgnoreCase) < 0 &&
                        normalized.IndexOf("/trumpgothic_", StringComparison.OrdinalIgnoreCase) < 0 &&
-                       normalized.IndexOf("/jupiter_", StringComparison.OrdinalIgnoreCase) < 0 &&
-                       !normalized.EndsWith("/font3.tex", StringComparison.OrdinalIgnoreCase);
+                       normalized.IndexOf("/jupiter_", StringComparison.OrdinalIgnoreCase) < 0;
             }
 
             if (string.Equals(profile, FontPatchProfiles.FdtOnly, StringComparison.OrdinalIgnoreCase))
@@ -973,9 +971,9 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
     {
         public const string Full = "full";
         public const string UiNumericSafe = "ui-numeric-safe";
+        public const string Default = Full;
         public const string NoMiedingerMid = "no-miedingermid";
         public const string NoTrumpGothic = "no-trumpgothic";
-        public const string Default = NoTrumpGothic;
         public const string NoJupiter = "no-jupiter";
         public const string NoAxis = "no-axis";
         public const string FdtOnly = "fdt-only";
