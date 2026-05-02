@@ -12,10 +12,16 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
     {
         public static readonly PatchPolicy Empty = new PatchPolicy();
         private static readonly uint[] CompactTimeUnitAddonRows = new uint[] { 44, 45, 49 };
-        private static readonly uint[] EnglishCompactDurationAddonRows = new uint[] { 2338, 6166 };
-        private static readonly uint[] GlobalLobbyDataCenterRows = new uint[] { 800, 801, 802, 803, 804, 805, 806 };
-        private const uint DataCenterTravelAddonFirstRow = 12510;
-        private const uint DataCenterTravelAddonLastRow = 12538;
+        private static readonly uint[] EnglishCompactDurationAddonRows = new uint[] { 876, 2338, 6166 };
+        private static readonly KeyValuePair<uint, string>[] CompactMinutePresetAddonRows = new KeyValuePair<uint, string>[]
+        {
+            new KeyValuePair<uint, string>(8291, "5m"),
+            new KeyValuePair<uint, string>(8292, "10m"),
+            new KeyValuePair<uint, string>(8293, "30m"),
+            new KeyValuePair<uint, string>(8294, "60m")
+        };
+        private static readonly uint[] GlobalLobbyDataCenterRows = new uint[] { 791, 792, 793, 794, 800, 801, 802, 803, 804, 805, 806 };
+        private static readonly uint[] GlobalDataCenterTravelAddonRows = new uint[] { 12514, 12525 };
 
         private readonly HashSet<string> _deleteFiles = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         private readonly Dictionary<string, PatchSheetPolicy> _sheets = new Dictionary<string, PatchSheetPolicy>(StringComparer.OrdinalIgnoreCase);
@@ -73,8 +79,8 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
             }
 
             // Addon row 10952 is the party-list self marker. It is a private glyph
-            // token in the original client, so keep the target global token and let
-            // the font patch restore U+E0E1..U+E0E8 from clean global boxed markers.
+            // token in the Japanese client. Keep the target U+E031 token and let
+            // the font patch copy clean boxed marker pixels into that glyph range.
             addonPolicy.GlobalTargetRows.Add(10952);
 
             // The data-center selection screen is global-client-only lobby UI.
@@ -87,17 +93,37 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
                 lobbyPolicy.GlobalTargetRows.Add(GlobalLobbyDataCenterRows[i]);
             }
 
-            for (uint rowId = DataCenterTravelAddonFirstRow; rowId <= DataCenterTravelAddonLastRow; rowId++)
+            // Most Addon rows in this range are the normal World Visit UI and have
+            // Korean source text. Keep only known global-client-only rows global;
+            // otherwise labels such as "World Visit" stay untranslated.
+            for (int i = 0; i < GlobalDataCenterTravelAddonRows.Length; i++)
             {
-                addonPolicy.GlobalTargetRows.Add(rowId);
+                addonPolicy.GlobalTargetRows.Add(GlobalDataCenterTravelAddonRows[i]);
             }
 
-            // Some short duration templates embed h/m labels inside SeString branches.
-            // Rewriting the Korean bytes in-place would require recalculating SeString
-            // branch lengths, so use the global English templates for these rows.
+            // Global row 12511 is "World Visit", but the Korean row 12511 is empty.
+            // Korean rows 12510/12524/12537 carry the intended "server teleport"
+            // wording, so map the title row to row 12524 instead of leaving it
+            // Japanese.
+            addonPolicy.SourceRowOverrides[12511] = 12524;
+
+            // Some short duration templates embed compact h/m labels or glyphs inside
+            // SeString branches. Rewriting the Korean bytes in-place would require
+            // recalculating SeString branch lengths, so use the global English
+            // templates for these rows.
             for (int i = 0; i < EnglishCompactDurationAddonRows.Length; i++)
             {
                 addonPolicy.GlobalEnglishRows.Add(EnglishCompactDurationAddonRows[i]);
+            }
+
+            // These preset timer labels are used in compact status/buff UI. They
+            // are plain strings, not SeString branch templates, so pin them to the
+            // global h/m style directly instead of leaving Korean "분" in narrow UI.
+            for (int i = 0; i < CompactMinutePresetAddonRows.Length; i++)
+            {
+                KeyValuePair<uint, string> preset = CompactMinutePresetAddonRows[i];
+                addonPolicy.GlobalTargetRows.Add(preset.Key);
+                addonPolicy.SetRowColumnRemap(preset.Key, 0, ColumnRemap.Literal(preset.Value));
             }
 
             // Region labels such as Japan/North America are part of the same lobby

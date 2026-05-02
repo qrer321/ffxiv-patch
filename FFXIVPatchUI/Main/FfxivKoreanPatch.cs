@@ -1577,6 +1577,83 @@ namespace FFXIVKoreanPatch.Main
             return Path.Combine(releaseOutputDir, "debug-apply", "game");
         }
 
+        private string GetRestoreBaselineOrigPath(string baselineDir, string fileName)
+        {
+            if (string.IsNullOrEmpty(baselineDir))
+            {
+                return null;
+            }
+
+            string path = Path.Combine(baselineDir, "orig." + fileName);
+            return File.Exists(path) ? path : null;
+        }
+
+        private static bool HasAnyPatchFile(IEnumerable<string> selectedPatchFiles, IEnumerable<string> candidatePatchFiles)
+        {
+            return selectedPatchFiles.Any(fileName => candidatePatchFiles.Contains(fileName, StringComparer.OrdinalIgnoreCase));
+        }
+
+        private void AppendCleanBaseIndexArguments(
+            ref string arguments,
+            string baselineDir,
+            IEnumerable<string> selectedPatchFiles,
+            IList<string> logLines)
+        {
+            string[] selected = selectedPatchFiles.Distinct(StringComparer.OrdinalIgnoreCase).ToArray();
+            bool needsText = HasAnyPatchFile(selected, textPatchFiles);
+            bool needsFont = HasAnyPatchFile(selected, fontPatchFiles);
+            bool needsUi = HasAnyPatchFile(selected, uiPatchFiles);
+
+            if (!needsText && !needsFont && !needsUi)
+            {
+                return;
+            }
+
+            if (string.IsNullOrEmpty(baselineDir))
+            {
+#if !TEST_BUILD
+                throw new InvalidOperationException(
+                    "Clean restore-baseline indexes were not found. Run preflight or remove the existing patch first, then try again.");
+#else
+                logLines.Add("Clean base index arguments: skipped because restore-baseline is not available.");
+                return;
+#endif
+            }
+
+            AppendCleanBaseIndexArgumentPair(ref arguments, logLines, needsText, baselineDir, "0a0000.win32.index", "--base-index", "--base-index2");
+            AppendCleanBaseIndexArgumentPair(ref arguments, logLines, needsFont, baselineDir, "000000.win32.index", "--base-font-index", "--base-font-index2");
+            AppendCleanBaseIndexArgumentPair(ref arguments, logLines, needsUi, baselineDir, "060000.win32.index", "--base-ui-index", "--base-ui-index2");
+        }
+
+        private void AppendCleanBaseIndexArgumentPair(
+            ref string arguments,
+            IList<string> logLines,
+            bool enabled,
+            string baselineDir,
+            string indexFileName,
+            string indexArgument,
+            string index2Argument)
+        {
+            if (!enabled)
+            {
+                return;
+            }
+
+            string indexPath = GetRestoreBaselineOrigPath(baselineDir, indexFileName);
+            string index2Path = GetRestoreBaselineOrigPath(baselineDir, indexFileName + "2");
+            if (string.IsNullOrEmpty(indexPath) || string.IsNullOrEmpty(index2Path))
+            {
+                throw new FileNotFoundException(
+                    "Clean restore-baseline index pair is missing.",
+                    string.IsNullOrEmpty(indexPath) ? Path.Combine(baselineDir, "orig." + indexFileName) : Path.Combine(baselineDir, "orig." + indexFileName + "2"));
+            }
+
+            arguments += " " + indexArgument + " " + QuoteArgument(indexPath);
+            arguments += " " + index2Argument + " " + QuoteArgument(index2Path);
+            logLines.Add("Clean base index: " + indexPath);
+            logLines.Add("Clean base index2: " + index2Path);
+        }
+
         private bool TryHandleBuilderProgress(string line)
         {
             if (string.IsNullOrEmpty(line) || !line.StartsWith(builderProgressPrefix, StringComparison.Ordinal))
@@ -4247,6 +4324,8 @@ namespace FFXIVKoreanPatch.Main
                     arguments += " --policy " + QuoteArgument(patchPolicyPath);
                     logLines.Add("Patch policy: " + patchPolicyPath);
                 }
+
+                AppendCleanBaseIndexArguments(ref arguments, baselineDir, selectedPatchFiles, logLines);
 
 #if TEST_BUILD
                 arguments += " --allow-patched-global";
