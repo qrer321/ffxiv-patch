@@ -48,6 +48,7 @@
   - UI SeString macro/lookup 구조가 글로벌/한국 row 사이에서 달라지는 경우에는 글로벌 payload/lookup 구조와 한국어 literal을 안전하게 병합하고, 불가능한 row는 글로벌 원본 구조를 보존해 데이터 센터 이동 같은 글로벌 전용 UI가 `--` 또는 깨진 glyph로 보이는 문제를 줄입니다.
   - 데이터 센터 선택/이동 화면은 글로벌 클라이언트 전용 로비 UI라서 한국어 proxy glyph를 사용하지 않고 대상 글로벌 언어 row를 유지합니다. 일본어 클라이언트는 일본어 원본을, 영어 클라이언트는 영어 원본을 사용합니다.
   - 파티 리스트 본인 표시는 `Addon` row 예외와 UI 텍스처 보정으로 처리하고, 일부 버프/남은시간 UI는 별도 내장 예외로 시간 단위 overflow를 완화합니다.
+  - 퀘스트 중 일반 채팅으로 특정 문구를 입력해야 하는 `quest/*`의 `TEXT_*_SAY_*` row는 UI 전체 패치에서 백틱 문자 `` ` `` 로 익명화해 한국어 입력 문제를 줄입니다.
   - 글로벌/한국 서버 `ffxivgame.ver`가 다르면 릴리즈 패치를 차단해 row-id fallback 오매핑 위험을 줄입니다.
   - 선택적으로 `patch-policy.json`을 읽어 특정 sheet/row/column을 보존하거나 row/column 매핑을 보정합니다.
   - `patch-diagnostics.tsv`와 선택형 CSV 진단 파일을 생성해 매핑 실패, RSV 잔존, Subrows 스킵 상태를 확인할 수 있습니다.

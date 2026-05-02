@@ -46,6 +46,8 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
                 Console.WriteLine("  Protected UI tokens:  {0}", report.ProtectedUiStrings);
                 Console.WriteLine("  RSV rows:             {0}", report.RsvRows);
                 Console.WriteLine("  RSV strings:          {0}", report.RsvStrings);
+                Console.WriteLine("  Say quest phrases:    {0}", report.QuestChatPhrasesAnonymized);
+                Console.WriteLine("  Say quest rows:       {0}", report.QuestChatRowsAnonymized);
                 Console.WriteLine("  Pages without mapping:{0}", report.PagesSkippedNoMapping);
                 Console.WriteLine("  Missing source pages: {0}", report.MissingSourcePages);
                 Console.WriteLine("  Missing target pages: {0}", report.MissingTargetPages);
@@ -106,6 +108,8 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
             Console.WriteLine("  --source-language  Korean source language slot. Default: ko");
             Console.WriteLine("  --sheet            Limit to one root.exl sheet name for testing.");
             Console.WriteLine("  --policy           Optional JSON patch policy file.");
+            Console.WriteLine("  --anonymize-quest-chat-phrases");
+            Console.WriteLine("                     Replace quest /say input phrases with short ASCII tokens.");
             Console.WriteLine("  --diagnostic-csv   Export row/column comparison CSV for a sheet.");
             Console.WriteLine("  --base-index       Clean global 0a0000.win32.index to use instead of installed index.");
             Console.WriteLine("  --base-index2      Clean global 0a0000.win32.index2 to use instead of installed index2.");
@@ -228,6 +232,7 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
         public bool AllowVersionMismatch;
         public bool SkipUiTextureFix;
         public bool IncludeCommandSheets = true;
+        public bool AnonymizeQuestChatPhrases;
 
         public bool ShouldBuildUiTextureFix
         {
@@ -268,6 +273,12 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
                 if (string.Equals(arg, "--allow-version-mismatch", StringComparison.OrdinalIgnoreCase))
                 {
                     options.AllowVersionMismatch = true;
+                    continue;
+                }
+
+                if (string.Equals(arg, "--anonymize-quest-chat-phrases", StringComparison.OrdinalIgnoreCase))
+                {
+                    options.AnonymizeQuestChatPhrases = true;
                     continue;
                 }
 
@@ -398,6 +409,8 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
         public int ProtectedUiStrings;
         public int RsvRows;
         public int RsvStrings;
+        public int QuestChatPhrasesAnonymized;
+        public int QuestChatRowsAnonymized;
         public int PagesSkippedNoMapping;
         public int MissingSourcePages;
         public int MissingTargetPages;

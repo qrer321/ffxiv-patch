@@ -83,6 +83,7 @@ UI가 release 폴더를 적용할 때는 별도로 `manifest.json`을 생성해 
 - `Addon` row `44`, `45`, `49`는 기본 내장 정책으로 글로벌 원본을 유지합니다. 이 row들은 글로벌 클라이언트에서 `h`, `m`, `s`처럼 좁은 영역용 시간 단위로 쓰이며, 한국어 `시간`, `분`, `초`로 바뀌면 핫바/아이콘 타이머 같은 UI에서 텍스트가 영역 밖으로 넘칠 수 있습니다.
 - `Addon` row `876`, `2338`, `6166`은 SeString 내부 길이값을 깨지 않도록 글로벌 영어 템플릿을 사용합니다. 버프/남은시간 UI에서 `시간`, `분`이 좁은 영역 밖으로 나가는 문제를 줄이기 위한 예외입니다.
 - `Addon` row `10952`는 파티 리스트 본인 표시 glyph가 한글 폰트 적용 후 `=`로 보이는 문제를 피하기 위해 대상 글로벌 언어의 원본 PUA 토큰을 유지합니다. 또한 본인 표시 번호를 1~8로 바꾸는 설정을 고려해 패치되는 각 FDT에는 본인 번호 전용 PUA glyph `U+E0E1`~`U+E0E8`을 같은 FDT의 박스형 번호 glyph `U+E0B1`~`U+E0B8` 좌표로 alias합니다.
+- `--anonymize-quest-chat-phrases`를 사용하면 `quest/*` sheet의 `TEXT_*_SAY_*` 입력 문구를 백틱 문자 `` ` `` 로 익명화합니다. 일반 채팅으로 한국어 주문/문구를 직접 입력해야 하는 퀘스트에서 입력 문제를 줄이기 위한 옵션이며, UI 전체 패치에서는 자동으로 켜집니다.
 - 데이터센터 화면의 한글 proxy glyph 방식은 FDT/텍스처 atlas 불일치 시 읽을 수 없는 글자로 노출될 수 있어 릴리즈 기본값에서 제외했습니다.
 - `ExcelVariant.Default` sheet만 처리합니다.
 - `ExcelVariant.Subrows` sheet는 아직 스킵하고 `patch-diagnostics.tsv`에 `unsupported-subrows`로 기록합니다.
@@ -177,6 +178,7 @@ UI 텍스처 패치는 `060000` UI 패키지를 대상으로 하며 새 `060000.
                                 한국 서버 기반 패치에서는 ko를 사용합니다.
 --sheet <name>                  테스트용 단일 sheet 제한
 --policy <file>                 JSON 패치 정책 파일
+--anonymize-quest-chat-phrases  quest/* 채팅 입력 문구를 백틱 문자로 익명화
 --diagnostic-csv <sheet>        지정 sheet의 row/column 비교 CSV 출력
 --base-index <file>             clean 0a0000.win32.index 지정
 --base-index2 <file>            clean 0a0000.win32.index2 지정

@@ -130,6 +130,7 @@
   - row-key fallback row 수
   - 보호한 UI 토큰 수
   - RSV 포함 row/string 수
+  - 익명화한 say quest 문구/row 수
   - mapping 누락 page 수
   - 원본/대상 page 누락 수
   - 미지원 sheet 수
@@ -159,6 +160,8 @@
 - `Addon` row `2338`, `6166`은 글로벌 영어 시간 템플릿을 사용해 버프/남은시간 UI의 `시간/분` overflow 완화
 - `Addon` row `10952`는 파티 리스트 본인 표시 glyph가 `=`로 보이는 문제를 피하기 위해 대상 글로벌 언어의 원본 PUA 토큰 유지
 - 파티 리스트 번호 표시 설정이 1~8로 바뀌는 경우를 고려해 본인 번호 PUA glyph(`U+E0E1`~`U+E0E8`)를 clean global의 속 빈 네모 번호 모양으로 복원. FDT 엔트리와 glyph 픽셀을 함께 이식해 `U+E0B1`~`U+E0B8` 동그라미 번호와 섞이지 않도록 처리
+- `--anonymize-quest-chat-phrases`로 `quest/*` sheet의 `TEXT_*_SAY_*` 입력 문구를 백틱 문자 `` ` `` 로 익명화
+- UI 전체 패치/테스트 자동 패치는 텍스트 패치 생성 시 퀘스트 채팅 문구 익명화를 자동 활성화
 - `patch-policy.json` 기반 sheet/row/column 보존과 row/column remap
 - `patch-diagnostics.tsv` 생성
 - `--diagnostic-csv` 지정 sheet의 row/column 비교 CSV 생성

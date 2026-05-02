@@ -11,6 +11,8 @@ namespace FfxivKoreanPatch.PatchRouteVerifier
     {
         private const string TextPrefix = "0a0000.win32";
         private const string FontPrefix = "000000.win32";
+        private const string UiPrefix = "060000.win32";
+        private const string DataCenterTitleUldPath = "ui/uld/Title_DataCenter.uld";
         private const string Font1TexturePath = "common/font/font1.tex";
         private const string Font2TexturePath = "common/font/font2.tex";
         private const string Font3TexturePath = "common/font/font3.tex";
@@ -29,6 +31,8 @@ namespace FfxivKoreanPatch.PatchRouteVerifier
         private const int FdtHeaderSize = 0x20;
         private const int FdtFontTableHeaderSize = 0x20;
         private const int FdtGlyphEntrySize = 0x10;
+        private const byte UldTrumpGothicFontId = 3;
+        private const byte UldJupiterFontId = 4;
         private const uint UncompressedBlock = 32000;
 
         private static int Main(string[] args)
@@ -83,7 +87,9 @@ namespace FfxivKoreanPatch.PatchRouteVerifier
             private readonly string _language;
             private readonly CompositeArchive _patchedText;
             private readonly CompositeArchive _patchedFont;
+            private readonly CompositeArchive _patchedUi;
             private readonly CompositeArchive _cleanFont;
+            private readonly CompositeArchive _cleanUi;
             private readonly Dictionary<string, byte[]> _textureCache = new Dictionary<string, byte[]>(StringComparer.OrdinalIgnoreCase);
 
             public bool Failed { get; private set; }
@@ -105,18 +111,30 @@ namespace FfxivKoreanPatch.PatchRouteVerifier
                     patchedSqpack,
                     globalSqpack,
                     FontPrefix);
+                _patchedUi = new CompositeArchive(
+                    Path.Combine(patchedSqpack, UiPrefix + ".index"),
+                    patchedSqpack,
+                    globalSqpack,
+                    UiPrefix);
                 _cleanFont = new CompositeArchive(
                     Path.Combine(output, "orig." + FontPrefix + ".index"),
                     globalSqpack,
                     globalSqpack,
                     FontPrefix);
+                _cleanUi = new CompositeArchive(
+                    Path.Combine(output, "orig." + UiPrefix + ".index"),
+                    globalSqpack,
+                    globalSqpack,
+                    UiPrefix);
             }
 
             public void Run()
             {
                 using (_patchedText)
                 using (_patchedFont)
+                using (_patchedUi)
                 using (_cleanFont)
+                using (_cleanUi)
                 {
                     Console.WriteLine("Patch route verification");
                     Console.WriteLine("  output: {0}", _output);
@@ -125,6 +143,8 @@ namespace FfxivKoreanPatch.PatchRouteVerifier
                     Console.WriteLine();
 
                     VerifyDataCenterRows();
+                    VerifyDataCenterRowsAllGlobalLanguageSlots();
+                    VerifyDataCenterTitleUldRoute();
                     VerifyCompactTimeRows();
                     VerifyWorldVisitRows();
                     VerifyDataCenterTitleGlyphs();
@@ -166,6 +186,160 @@ namespace FfxivKoreanPatch.PatchRouteVerifier
                 ExpectText("WorldDCGroupType", 11, "Dynamis");
                 ExpectText("WorldDCGroupType", 12, "Shadow");
                 ExpectText("WorldDCGroupType", 13, "NA Cloud DC (Beta)");
+            }
+
+            private void VerifyDataCenterRowsAllGlobalLanguageSlots()
+            {
+                Console.WriteLine("[EXD] Data center labels in all global language slots");
+                string[] languages = { "ja", "en", "de", "fr" };
+
+                DataCenterLabelExpectation[] expectations =
+                {
+                    new DataCenterLabelExpectation("Lobby", 791, "Japan Data Center"),
+                    new DataCenterLabelExpectation("Lobby", 792, "North America Data Center"),
+                    new DataCenterLabelExpectation("Lobby", 793, "Europe Data Center"),
+                    new DataCenterLabelExpectation("Lobby", 794, "Oceania Data Center"),
+                    new DataCenterLabelExpectation("WorldRegionGroup", 1, "Japan"),
+                    new DataCenterLabelExpectation("WorldRegionGroup", 2, "North America"),
+                    new DataCenterLabelExpectation("WorldRegionGroup", 3, "Europe"),
+                    new DataCenterLabelExpectation("WorldRegionGroup", 4, "Oceania"),
+                    new DataCenterLabelExpectation("WorldRegionGroup", 5, "China"),
+                    new DataCenterLabelExpectation("WorldRegionGroup", 6, "Korea"),
+                    new DataCenterLabelExpectation("WorldRegionGroup", 7, "NA Cloud"),
+                    new DataCenterLabelExpectation("WorldRegionGroup", 8, "Traditional Chinese regions"),
+                    new DataCenterLabelExpectation("WorldPhysicalDC", 1, "Japan"),
+                    new DataCenterLabelExpectation("WorldPhysicalDC", 2, "North America"),
+                    new DataCenterLabelExpectation("WorldPhysicalDC", 3, "Europe"),
+                    new DataCenterLabelExpectation("WorldPhysicalDC", 4, "Oceania"),
+                    new DataCenterLabelExpectation("WorldPhysicalDC", 5, "NA Cloud Data Center (Beta)"),
+                    new DataCenterLabelExpectation("WorldDCGroupType", 1, "Elemental"),
+                    new DataCenterLabelExpectation("WorldDCGroupType", 2, "Gaia"),
+                    new DataCenterLabelExpectation("WorldDCGroupType", 3, "Mana"),
+                    new DataCenterLabelExpectation("WorldDCGroupType", 4, "Aether"),
+                    new DataCenterLabelExpectation("WorldDCGroupType", 5, "Primal"),
+                    new DataCenterLabelExpectation("WorldDCGroupType", 6, "Chaos"),
+                    new DataCenterLabelExpectation("WorldDCGroupType", 7, "Light"),
+                    new DataCenterLabelExpectation("WorldDCGroupType", 8, "Crystal"),
+                    new DataCenterLabelExpectation("WorldDCGroupType", 9, "Materia"),
+                    new DataCenterLabelExpectation("WorldDCGroupType", 10, "Meteor"),
+                    new DataCenterLabelExpectation("WorldDCGroupType", 11, "Dynamis"),
+                    new DataCenterLabelExpectation("WorldDCGroupType", 12, "Shadow"),
+                    new DataCenterLabelExpectation("WorldDCGroupType", 13, "NA Cloud DC (Beta)")
+                };
+
+                for (int i = 0; i < expectations.Length; i++)
+                {
+                    for (int languageIndex = 0; languageIndex < languages.Length; languageIndex++)
+                    {
+                        ExpectDataCenterLabel(expectations[i], languages[languageIndex]);
+                    }
+                }
+            }
+
+            private void VerifyDataCenterTitleUldRoute()
+            {
+                Console.WriteLine("[ULD/FDT] Data center title render route");
+                byte[] cleanUld = _cleanUi.ReadFile(DataCenterTitleUldPath);
+                byte[] patchedUld = _patchedUi.ReadFile(DataCenterTitleUldPath);
+                List<UldTextNodeFont> cleanFonts = GetUldTextNodeFonts(cleanUld);
+                Dictionary<int, UldTextNodeFont> patchedByOffset = GetUldTextNodeFontsByOffset(patchedUld);
+
+                int patchedTrumpGothicCount = 0;
+                int patchedJupiterCount = 0;
+                foreach (UldTextNodeFont patchedNode in patchedByOffset.Values)
+                {
+                    if (patchedNode.FontId == UldTrumpGothicFontId)
+                    {
+                        patchedTrumpGothicCount++;
+                    }
+
+                    if (patchedNode.FontId == UldJupiterFontId)
+                    {
+                        patchedJupiterCount++;
+                    }
+                }
+
+                if (patchedTrumpGothicCount == 0 && patchedJupiterCount >= 6)
+                {
+                    Pass("{0} text node fonts patched: TrumpGothic={1}, Jupiter={2}", DataCenterTitleUldPath, patchedTrumpGothicCount, patchedJupiterCount);
+                }
+                else
+                {
+                    Fail("{0} text node fonts unexpected: TrumpGothic={1}, Jupiter={2}", DataCenterTitleUldPath, patchedTrumpGothicCount, patchedJupiterCount);
+                }
+
+                HashSet<string> routedFontPaths = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+                for (int i = 0; i < cleanFonts.Count; i++)
+                {
+                    UldTextNodeFont cleanNode = cleanFonts[i];
+                    UldTextNodeFont patchedNode;
+                    if (!patchedByOffset.TryGetValue(cleanNode.NodeOffset, out patchedNode))
+                    {
+                        Fail("{0} missing patched text node at 0x{1:X}", DataCenterTitleUldPath, cleanNode.NodeOffset);
+                        continue;
+                    }
+
+                    if (cleanNode.FontId == UldTrumpGothicFontId && patchedNode.FontId != UldJupiterFontId)
+                    {
+                        Fail("{0} node 0x{1:X} expected font {2}, actual {3}", DataCenterTitleUldPath, cleanNode.NodeOffset, UldJupiterFontId, patchedNode.FontId);
+                    }
+                    else if (cleanNode.FontId == UldTrumpGothicFontId)
+                    {
+                        string resolvedFont = ResolveUldFontPath(patchedNode.FontId, patchedNode.FontSize, true);
+                        if (resolvedFont == null)
+                        {
+                            Fail(
+                                "{0} node 0x{1:X} font {2}->{3} size={4} has no verifier font mapping",
+                                DataCenterTitleUldPath,
+                                cleanNode.NodeOffset,
+                                cleanNode.FontId,
+                                patchedNode.FontId,
+                                patchedNode.FontSize);
+                        }
+                        else
+                        {
+                            routedFontPaths.Add(resolvedFont);
+                            Pass(
+                                "{0} node 0x{1:X} font {2}/{3}->{4}/{5} routes to {6}",
+                                DataCenterTitleUldPath,
+                                cleanNode.NodeOffset,
+                                cleanNode.FontId,
+                                cleanNode.FontSize,
+                                patchedNode.FontId,
+                                patchedNode.FontSize,
+                                resolvedFont);
+                        }
+                    }
+                }
+
+                string[] labels =
+                {
+                    "NORTH AMERICA DATA CENTER",
+                    "EUROPE DATA CENTER",
+                    "JAPAN DATA CENTER",
+                    "OCEANIA DATA CENTER",
+                    "Elemental",
+                    "Gaia",
+                    "Mana",
+                    "Meteor",
+                    "Aether",
+                    "Crystal",
+                    "Dynamis",
+                    "Primal",
+                    "Chaos",
+                    "Light",
+                    "Materia"
+                };
+
+                if (routedFontPaths.Count == 0)
+                {
+                    Fail("{0} did not route any data-center title node to a verifiable font", DataCenterTitleUldPath);
+                }
+
+                foreach (string routedFontPath in routedFontPaths)
+                {
+                    VerifyLabelGlyphsEqualClean(routedFontPath, labels);
+                }
             }
 
             private void VerifyCompactTimeRows()
@@ -430,6 +604,89 @@ namespace FfxivKoreanPatch.PatchRouteVerifier
                 }
 
                 Fail("{0}#{1} still contains [{2}], actual [{3}]", sheet, rowId, unexpected, Escape(actual));
+            }
+
+            private void ExpectDataCenterLabel(DataCenterLabelExpectation expectation, string language)
+            {
+                List<string> columns = GetStringColumns(_patchedText, expectation.Sheet, expectation.RowId, language);
+                bool found = false;
+                bool fallback = false;
+                for (int i = 0; i < columns.Count; i++)
+                {
+                    if (string.Equals(columns[i], expectation.Expected, StringComparison.Ordinal))
+                    {
+                        found = true;
+                    }
+
+                    if (LooksLikeMissingGlyphFallback(columns[i]))
+                    {
+                        fallback = true;
+                    }
+                }
+
+                if (found && !fallback)
+                {
+                    Pass("{0}#{1}/{2} contains [{3}]", expectation.Sheet, expectation.RowId, language, expectation.Expected);
+                    return;
+                }
+
+                Fail(
+                    "{0}#{1}/{2} expected [{3}], columns [{4}]",
+                    expectation.Sheet,
+                    expectation.RowId,
+                    language,
+                    expectation.Expected,
+                    string.Join("] [", columns.ToArray()));
+            }
+
+            private void VerifyLabelGlyphsEqualClean(string fdtPath, string[] labels)
+            {
+                HashSet<uint> codepoints = new HashSet<uint>();
+                for (int labelIndex = 0; labelIndex < labels.Length; labelIndex++)
+                {
+                    string label = labels[labelIndex];
+                    for (int charIndex = 0; charIndex < label.Length; charIndex++)
+                    {
+                        char ch = label[charIndex];
+                        if (!char.IsWhiteSpace(ch))
+                        {
+                            codepoints.Add(ch);
+                        }
+                    }
+                }
+
+                foreach (uint codepoint in codepoints)
+                {
+                    ExpectGlyphEqual(_cleanFont, fdtPath, codepoint, _patchedFont, fdtPath, codepoint);
+                    ExpectGlyphNotEqualToFallback(fdtPath, codepoint, '-');
+                    ExpectGlyphNotEqualToFallback(fdtPath, codepoint, '=');
+                }
+            }
+
+            private void ExpectGlyphNotEqualToFallback(string fdtPath, uint codepoint, uint fallbackCodepoint)
+            {
+                if (codepoint == fallbackCodepoint)
+                {
+                    return;
+                }
+
+                try
+                {
+                    GlyphCanvas glyph = RenderGlyph(_patchedFont, fdtPath, codepoint);
+                    GlyphCanvas fallback = RenderGlyph(_patchedFont, fdtPath, fallbackCodepoint);
+                    long score = Diff(glyph.Alpha, fallback.Alpha);
+                    if (score != 0 && glyph.VisiblePixels > 0)
+                    {
+                        Pass("{0} U+{1:X4} is not fallback U+{2:X4}", fdtPath, codepoint, fallbackCodepoint);
+                        return;
+                    }
+
+                    Fail("{0} U+{1:X4} matches fallback U+{2:X4}", fdtPath, codepoint, fallbackCodepoint);
+                }
+                catch (Exception ex)
+                {
+                    Fail("{0} U+{1:X4} fallback comparison error: {2}", fdtPath, codepoint, ex.Message);
+                }
             }
 
             private void ExpectBytes(string label, byte[] actual, byte[] expected)
@@ -824,6 +1081,48 @@ namespace FfxivKoreanPatch.PatchRouteVerifier
             return Encoding.UTF8.GetString(GetFirstStringBytes(archive, sheet, rowId, language));
         }
 
+        private static List<string> GetStringColumns(CompositeArchive archive, string sheet, uint rowId, string language)
+        {
+            ExcelHeader header = ExcelHeader.Parse(archive.ReadFile("exd/" + sheet + ".exh"));
+            byte languageId = LanguageToId(language);
+            bool hasLanguageSuffix = header.HasLanguage(languageId);
+            ExcelDataFile file = null;
+
+            for (int i = 0; i < header.Pages.Count; i++)
+            {
+                ExcelPageDefinition page = header.Pages[i];
+                if (rowId < page.StartId || rowId >= page.StartId + page.RowCount)
+                {
+                    continue;
+                }
+
+                string exdPath = "exd/" + sheet + "_" + page.StartId + (hasLanguageSuffix ? "_" + language : string.Empty) + ".exd";
+                file = ExcelDataFile.Parse(archive.ReadFile(exdPath));
+                break;
+            }
+
+            if (file == null)
+            {
+                throw new InvalidDataException(sheet + "#" + rowId + " is outside all pages");
+            }
+
+            ExcelDataRow row;
+            if (!file.TryGetRow(rowId, out row))
+            {
+                throw new InvalidDataException(sheet + "#" + rowId + " was not found");
+            }
+
+            List<string> values = new List<string>();
+            List<int> stringColumns = header.GetStringColumnIndexes();
+            for (int i = 0; i < stringColumns.Count; i++)
+            {
+                byte[] bytes = file.GetStringBytes(row, header, stringColumns[i]) ?? new byte[0];
+                values.Add(Encoding.UTF8.GetString(bytes));
+            }
+
+            return values;
+        }
+
         private static byte[] GetFirstStringBytes(CompositeArchive archive, string sheet, uint rowId, string language)
         {
             ExcelHeader header = ExcelHeader.Parse(archive.ReadFile("exd/" + sheet + ".exh"));
@@ -863,6 +1162,265 @@ namespace FfxivKoreanPatch.PatchRouteVerifier
             }
 
             return file.GetStringBytes(row, header, stringColumns[0]) ?? new byte[0];
+        }
+
+        private static bool LooksLikeMissingGlyphFallback(string value)
+        {
+            if (string.IsNullOrWhiteSpace(value))
+            {
+                return false;
+            }
+
+            int visible = 0;
+            int fallback = 0;
+            for (int i = 0; i < value.Length; i++)
+            {
+                char ch = value[i];
+                if (char.IsWhiteSpace(ch) || char.IsControl(ch))
+                {
+                    continue;
+                }
+
+                visible++;
+                if (ch == '-' || ch == '=' || ch == '\uFF0D' || ch == '\u30FC')
+                {
+                    fallback++;
+                }
+            }
+
+            return visible > 0 && visible == fallback;
+        }
+
+        private static List<UldTextNodeFont> GetUldTextNodeFonts(byte[] uld)
+        {
+            List<UldTextNodeFont> results = new List<UldTextNodeFont>();
+            if (!HasRange(uld, 0, 16) || !HasAsciiMagic(uld, 0, "uldh"))
+            {
+                return results;
+            }
+
+            WalkUldAtkTextNodes(uld, Endian.ReadUInt32LE(uld, 8), true, results);
+            WalkUldAtkTextNodes(uld, Endian.ReadUInt32LE(uld, 12), false, results);
+            return results;
+        }
+
+        private static string ResolveUldFontPath(byte fontId, byte fontSize, bool lobby)
+        {
+            string suffix = lobby ? "_lobby.fdt" : ".fdt";
+            switch (fontId)
+            {
+                case UldTrumpGothicFontId:
+                    switch (fontSize)
+                    {
+                        case 23:
+                        case 34:
+                        case 68:
+                        case 184:
+                            return "common/font/TrumpGothic_" + fontSize.ToString() + suffix;
+                    }
+
+                    return null;
+
+                case UldJupiterFontId:
+                    switch (fontSize)
+                    {
+                        case 16:
+                        case 20:
+                        case 23:
+                        case 45:
+                        case 46:
+                        case 90:
+                            return "common/font/Jupiter_" + fontSize.ToString() + suffix;
+                    }
+
+                    return null;
+
+                default:
+                    return null;
+            }
+        }
+
+        private static Dictionary<int, UldTextNodeFont> GetUldTextNodeFontsByOffset(byte[] uld)
+        {
+            List<UldTextNodeFont> fonts = GetUldTextNodeFonts(uld);
+            Dictionary<int, UldTextNodeFont> byOffset = new Dictionary<int, UldTextNodeFont>();
+            for (int i = 0; i < fonts.Count; i++)
+            {
+                byOffset[fonts[i].NodeOffset] = fonts[i];
+            }
+
+            return byOffset;
+        }
+
+        private static void WalkUldAtkTextNodes(byte[] uld, uint atkOffsetValue, bool patchComponents, List<UldTextNodeFont> results)
+        {
+            if (atkOffsetValue == 0 || atkOffsetValue > int.MaxValue)
+            {
+                return;
+            }
+
+            int atkOffset = (int)atkOffsetValue;
+            if (!HasRange(uld, atkOffset, 36) || !HasAsciiMagic(uld, atkOffset, "atkh"))
+            {
+                return;
+            }
+
+            if (patchComponents)
+            {
+                WalkUldComponentTextNodes(uld, atkOffset, results);
+            }
+            else
+            {
+                WalkUldWidgetTextNodes(uld, atkOffset, results);
+            }
+        }
+
+        private static void WalkUldComponentTextNodes(byte[] uld, int atkOffset, List<UldTextNodeFont> results)
+        {
+            uint componentListRelativeOffset = Endian.ReadUInt32LE(uld, atkOffset + 16);
+            if (componentListRelativeOffset == 0 || componentListRelativeOffset > int.MaxValue)
+            {
+                return;
+            }
+
+            int componentListOffset = atkOffset + (int)componentListRelativeOffset;
+            if (!HasRange(uld, componentListOffset, 16) || !HasAsciiMagic(uld, componentListOffset, "cohd"))
+            {
+                return;
+            }
+
+            uint componentCount = Endian.ReadUInt32LE(uld, componentListOffset + 8);
+            int entryOffset = componentListOffset + 16;
+            for (uint i = 0; i < componentCount && HasRange(uld, entryOffset, 16); i++)
+            {
+                uint nodeCount = Endian.ReadUInt32LE(uld, entryOffset + 8);
+                ushort componentSize = Endian.ReadUInt16LE(uld, entryOffset + 12);
+                ushort nodeOffset = Endian.ReadUInt16LE(uld, entryOffset + 14);
+                int nodeStart = entryOffset + nodeOffset;
+                if (nodeOffset < 16 || !HasRange(uld, nodeStart, 28))
+                {
+                    nodeStart = entryOffset + 16;
+                }
+
+                int cursor = nodeStart;
+                for (uint nodeIndex = 0; nodeIndex < nodeCount && HasRange(uld, cursor, 28); nodeIndex++)
+                {
+                    int nodeSize = Endian.ReadUInt16LE(uld, cursor + 24);
+                    AddUldTextNodeFont(uld, cursor, results);
+                    if (nodeSize <= 0)
+                    {
+                        break;
+                    }
+
+                    cursor += nodeSize;
+                }
+
+                if (componentSize == 0)
+                {
+                    entryOffset = cursor;
+                }
+                else
+                {
+                    entryOffset += componentSize;
+                }
+            }
+        }
+
+        private static void WalkUldWidgetTextNodes(byte[] uld, int atkOffset, List<UldTextNodeFont> results)
+        {
+            uint widgetRelativeOffset = Endian.ReadUInt32LE(uld, atkOffset + 24);
+            if (widgetRelativeOffset == 0 || widgetRelativeOffset > int.MaxValue)
+            {
+                return;
+            }
+
+            int widgetOffset = atkOffset + (int)widgetRelativeOffset;
+            if (!HasRange(uld, widgetOffset, 16) || !HasAsciiMagic(uld, widgetOffset, "wdhd"))
+            {
+                return;
+            }
+
+            uint widgetCount = Endian.ReadUInt32LE(uld, widgetOffset + 8);
+            int cursor = widgetOffset + 16;
+            for (uint i = 0; i < widgetCount && HasRange(uld, cursor, 16); i++)
+            {
+                uint nodeCount = Endian.ReadUInt16LE(uld, cursor + 12);
+                cursor += 16;
+                for (uint nodeIndex = 0; nodeIndex < nodeCount && HasRange(uld, cursor, 28); nodeIndex++)
+                {
+                    int nodeSize = Endian.ReadUInt16LE(uld, cursor + 24);
+                    AddUldTextNodeFont(uld, cursor, results);
+                    if (nodeSize <= 0)
+                    {
+                        break;
+                    }
+
+                    cursor += nodeSize;
+                }
+            }
+        }
+
+        private static void AddUldTextNodeFont(byte[] uld, int nodeOffset, List<UldTextNodeFont> results)
+        {
+            const int NodeTypeOffset = 20;
+            const int NodeSizeOffset = 24;
+            const int NodeHeaderSize = 88;
+            const int TextExtraMinSize = 24;
+            const int TextFontOffsetInExtra = 10;
+            const int TextFontSizeOffsetInExtra = 11;
+
+            if (!HasRange(uld, nodeOffset, NodeHeaderSize + TextExtraMinSize))
+            {
+                return;
+            }
+
+            int nodeType = unchecked((int)Endian.ReadUInt32LE(uld, nodeOffset + NodeTypeOffset));
+            int nodeSize = Endian.ReadUInt16LE(uld, nodeOffset + NodeSizeOffset);
+            if (nodeType != 3 || nodeSize < NodeHeaderSize + TextExtraMinSize)
+            {
+                return;
+            }
+
+            int fontOffset = nodeOffset + NodeHeaderSize + TextFontOffsetInExtra;
+            if (!HasRange(uld, fontOffset, 1))
+            {
+                return;
+            }
+
+            int fontSizeOffset = nodeOffset + NodeHeaderSize + TextFontSizeOffsetInExtra;
+            results.Add(new UldTextNodeFont
+            {
+                NodeOffset = nodeOffset,
+                NodeSize = nodeSize,
+                FontId = uld[fontOffset],
+                FontSize = uld[fontSizeOffset]
+            });
+        }
+
+        private static bool HasRange(byte[] data, int offset, int length)
+        {
+            return data != null &&
+                   offset >= 0 &&
+                   length >= 0 &&
+                   offset <= data.Length - length;
+        }
+
+        private static bool HasAsciiMagic(byte[] data, int offset, string magic)
+        {
+            if (string.IsNullOrEmpty(magic) || !HasRange(data, offset, magic.Length))
+            {
+                return false;
+            }
+
+            for (int i = 0; i < magic.Length; i++)
+            {
+                if (data[offset + i] != (byte)magic[i])
+                {
+                    return false;
+                }
+            }
+
+            return true;
         }
 
         private static byte LanguageToId(string language)
@@ -1150,6 +1708,28 @@ namespace FfxivKoreanPatch.PatchRouteVerifier
         {
             public byte[] Alpha;
             public int VisiblePixels;
+        }
+
+        private struct UldTextNodeFont
+        {
+            public int NodeOffset;
+            public int NodeSize;
+            public byte FontId;
+            public byte FontSize;
+        }
+
+        private sealed class DataCenterLabelExpectation
+        {
+            public readonly string Sheet;
+            public readonly uint RowId;
+            public readonly string Expected;
+
+            public DataCenterLabelExpectation(string sheet, uint rowId, string expected)
+            {
+                Sheet = sheet;
+                RowId = rowId;
+                Expected = expected;
+            }
         }
     }
 }

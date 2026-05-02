@@ -1752,6 +1752,8 @@ namespace FFXIVKoreanPatch.Main
                 { "Protected UI tokens", "보호된 UI glyph" },
                 { "RSV rows", "RSV 포함 행" },
                 { "RSV strings", "RSV 포함 문자열" },
+                { "Say quest phrases", "say quest 입력 문구" },
+                { "Say quest rows", "say quest 보정 행" },
                 { "Pages without mapping", "매핑 없음 페이지" },
                 { "Unsupported sheets", "미지원 시트" },
                 { "Font files patched", "폰트 패치 파일" },
@@ -4316,6 +4318,11 @@ namespace FFXIVKoreanPatch.Main
                 if (!buildTextPatch && buildFontPatch)
                 {
                     arguments += " --font-only";
+                }
+                else if (buildTextPatch)
+                {
+                    arguments += " --anonymize-quest-chat-phrases";
+                    logLines.Add("Say quest chat phrase anonymization: enabled");
                 }
 
                 string patchPolicyPath = FindPatchPolicyPath(patchGeneratorPath);

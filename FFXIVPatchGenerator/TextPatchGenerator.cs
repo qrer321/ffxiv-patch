@@ -613,6 +613,7 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
                     sourceMaps,
                     allowRowKeyFallback,
                     stringPatchPolicy);
+                string anonymizeNote = ApplyQuestChatPhraseAnonymization(sheetName, globalHeader, ref patchResult);
                 _report.ProtectedUiStrings += patchResult.ProtectedUiStrings;
                 _report.RsvRows += patchResult.RsvRows;
                 _report.RsvStrings += patchResult.RsvStrings;
@@ -630,7 +631,7 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
                         0,
                         patchResult.RsvRows,
                         patchResult.RsvStrings,
-                        BuildPatchNote(allowRowKeyFallback ? "row-key fallback allowed" : "row-key fallback not allowed", patchResult.ProtectedUiStrings));
+                        BuildPatchNote(JoinPatchNotes(allowRowKeyFallback ? "row-key fallback allowed" : "row-key fallback not allowed", anonymizeNote), patchResult.ProtectedUiStrings));
                     continue;
                 }
 
@@ -651,7 +652,7 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
                     patchResult.RowKeyRows,
                     patchResult.RsvRows,
                     patchResult.RsvStrings,
-                    BuildPatchNote(string.Empty, patchResult.ProtectedUiStrings));
+                    BuildPatchNote(anonymizeNote, patchResult.ProtectedUiStrings));
 
                 if (_report.PagesPatched % 100 == 0)
                 {
@@ -772,6 +773,37 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
                         languageCode);
                 }
             }
+        }
+
+        private string ApplyQuestChatPhraseAnonymization(string sheetName, ExcelHeader header, ref ExdPatchResult patchResult)
+        {
+            if (!_options.AnonymizeQuestChatPhrases || patchResult == null || patchResult.Data == null)
+            {
+                return string.Empty;
+            }
+
+            QuestChatAnonymizeResult anonymizeResult = QuestChatPhraseAnonymizer.Apply(
+                sheetName,
+                header,
+                ExcelDataFile.Parse(patchResult.Data));
+            if (!anonymizeResult.Changed)
+            {
+                return string.Empty;
+            }
+
+            patchResult.Data = anonymizeResult.Data;
+            if (!patchResult.Changed)
+            {
+                patchResult.Changed = true;
+                patchResult.RowsPatched = anonymizeResult.RowsChanged;
+            }
+
+            _report.QuestChatPhrasesAnonymized += anonymizeResult.PhrasesChanged;
+            _report.QuestChatRowsAnonymized += anonymizeResult.RowsChanged;
+            return "say-quest-anonymized phrases=" + anonymizeResult.PhrasesChanged.ToString() +
+                   ", rows=" + anonymizeResult.RowsChanged.ToString() +
+                   ", prompts=" + anonymizeResult.PromptRowsChanged.ToString() +
+                   ", inputs=" + anonymizeResult.PhraseRowsChanged.ToString();
         }
 
         private static bool HasCrossLanguageSafetyRows(PatchSheetPolicy sheetPolicy)
@@ -1311,6 +1343,21 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
             }
 
             return baseNote + "; " + protectedNote;
+        }
+
+        private static string JoinPatchNotes(string first, string second)
+        {
+            if (string.IsNullOrEmpty(first))
+            {
+                return second ?? string.Empty;
+            }
+
+            if (string.IsNullOrEmpty(second))
+            {
+                return first;
+            }
+
+            return first + "; " + second;
         }
 
         private bool IsRowKeyFallbackAllowed(string sheetName)
