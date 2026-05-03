@@ -13,6 +13,7 @@ namespace FfxivKoreanPatch.PatchRouteVerifier
         private const string FontPrefix = "000000.win32";
         private const string UiPrefix = "060000.win32";
         private const string DataCenterTitleUldPath = "ui/uld/Title_DataCenter.uld";
+        private const string DataCenterWorldmapUldPath = "ui/uld/Title_Worldmap.uld";
         private const string Font1TexturePath = "common/font/font1.tex";
         private const string Font2TexturePath = "common/font/font2.tex";
         private const string Font3TexturePath = "common/font/font3.tex";
@@ -94,7 +95,32 @@ namespace FfxivKoreanPatch.PatchRouteVerifier
         private const int GlyphDumpScale = 4;
         private const byte UldTrumpGothicFontId = 3;
         private const byte UldJupiterFontId = 4;
+        private const byte UldAxisFontId = 0;
         private const uint UncompressedBlock = 32000;
+        private static readonly string[] DataCenterWorldmapLabels = new string[]
+        {
+            "DATA CENTER SELECT",
+            "INFORMATION",
+            "JAPAN DATA CENTER",
+            "NORTH AMERICA DATA CENTER",
+            "EUROPE DATA CENTER",
+            "OCEANIA DATA CENTER",
+            "Japan",
+            "North America",
+            "Europe",
+            "Oceania",
+            "Elemental",
+            "Gaia",
+            "Mana",
+            "Meteor",
+            "Aether",
+            "Crystal",
+            "Dynamis",
+            "Primal",
+            "Chaos",
+            "Light",
+            "Materia"
+        };
 
         private static int Main(string[] args)
         {
@@ -227,6 +253,7 @@ namespace FfxivKoreanPatch.PatchRouteVerifier
                     VerifyDataCenterRows();
                     VerifyDataCenterRowsAllGlobalLanguageSlots();
                     VerifyDataCenterTitleUldRoute();
+                    VerifyDataCenterWorldmapUldRoute();
                     VerifyCompactTimeRows();
                     VerifyWorldVisitRows();
                     VerifyDataCenterTitleGlyphs();
@@ -249,6 +276,9 @@ namespace FfxivKoreanPatch.PatchRouteVerifier
                 ExpectText("Lobby", 792, "North America Data Center");
                 ExpectText("Lobby", 793, "Europe Data Center");
                 ExpectText("Lobby", 794, "Oceania Data Center");
+                ExpectText("Lobby", 800, "DATA CENTER SELECT");
+                ExpectText("Lobby", 802, "Data Center");
+                ExpectText("Lobby", 803, "INFORMATION");
                 ExpectText("WorldRegionGroup", 1, "Japan");
                 ExpectText("WorldRegionGroup", 2, "North America");
                 ExpectText("WorldRegionGroup", 3, "Europe");
@@ -353,6 +383,16 @@ namespace FfxivKoreanPatch.PatchRouteVerifier
                 }
 
                 HashSet<string> routedFontPaths = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+                HashSet<string> allTextNodeFontPaths = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+                foreach (UldTextNodeFont patchedNode in patchedByOffset.Values)
+                {
+                    string resolvedFont = ResolveUldFontPath(patchedNode.FontId, patchedNode.FontSize, true);
+                    if (resolvedFont != null)
+                    {
+                        allTextNodeFontPaths.Add(resolvedFont);
+                    }
+                }
+
                 for (int i = 0; i < cleanFonts.Count; i++)
                 {
                     UldTextNodeFont cleanNode = cleanFonts[i];
@@ -424,6 +464,88 @@ namespace FfxivKoreanPatch.PatchRouteVerifier
                 {
                     VerifyLabelGlyphsEqualClean(routedFontPath, labels);
                 }
+
+                if (allTextNodeFontPaths.Count == 0)
+                {
+                    Fail("{0} did not expose any verifiable text-node font", DataCenterTitleUldPath);
+                }
+
+                foreach (string fontPath in allTextNodeFontPaths)
+                {
+                    VerifyLabelGlyphsEqualClean(fontPath, labels);
+                    DumpLabelPreview("data-center-title", fontPath, labels);
+                }
+            }
+
+            private void VerifyDataCenterWorldmapUldRoute()
+            {
+                Console.WriteLine("[ULD/FDT] Data center world map render route");
+                byte[] cleanUld = _cleanUi.ReadFile(DataCenterWorldmapUldPath);
+                byte[] patchedUld = _patchedUi.ReadFile(DataCenterWorldmapUldPath);
+                List<UldTextNodeFont> cleanFonts = GetUldTextNodeFonts(cleanUld);
+                Dictionary<int, UldTextNodeFont> patchedByOffset = GetUldTextNodeFontsByOffset(patchedUld);
+
+                if (cleanFonts.Count == 0)
+                {
+                    Fail("{0} clean ULD did not expose text-node fonts", DataCenterWorldmapUldPath);
+                    return;
+                }
+
+                HashSet<string> routedFontPaths = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+                for (int i = 0; i < cleanFonts.Count; i++)
+                {
+                    UldTextNodeFont cleanNode = cleanFonts[i];
+                    UldTextNodeFont patchedNode;
+                    if (!patchedByOffset.TryGetValue(cleanNode.NodeOffset, out patchedNode))
+                    {
+                        Fail("{0} missing patched text node at 0x{1:X}", DataCenterWorldmapUldPath, cleanNode.NodeOffset);
+                        continue;
+                    }
+
+                    if (patchedNode.FontId != UldAxisFontId)
+                    {
+                        Fail(
+                            "{0} node 0x{1:X} expected AXIS font id {2}, actual {3}",
+                            DataCenterWorldmapUldPath,
+                            cleanNode.NodeOffset,
+                            UldAxisFontId,
+                            patchedNode.FontId);
+                        continue;
+                    }
+
+                    string resolvedFont = ResolveUldFontPath(patchedNode.FontId, patchedNode.FontSize, true);
+                    if (resolvedFont == null)
+                    {
+                        Fail(
+                            "{0} node 0x{1:X} font {2}/{3} has no verifier font mapping",
+                            DataCenterWorldmapUldPath,
+                            cleanNode.NodeOffset,
+                            patchedNode.FontId,
+                            patchedNode.FontSize);
+                        continue;
+                    }
+
+                    routedFontPaths.Add(resolvedFont);
+                    Pass(
+                        "{0} node 0x{1:X} font {2}/{3} routes to {4}",
+                        DataCenterWorldmapUldPath,
+                        cleanNode.NodeOffset,
+                        patchedNode.FontId,
+                        patchedNode.FontSize,
+                        resolvedFont);
+                }
+
+                if (routedFontPaths.Count == 0)
+                {
+                    Fail("{0} did not route any data-center world-map node to a verifiable font", DataCenterWorldmapUldPath);
+                    return;
+                }
+
+                foreach (string fontPath in routedFontPaths)
+                {
+                    VerifyLabelGlyphsEqualClean(fontPath, DataCenterWorldmapLabels);
+                    DumpLabelPreview("data-center-worldmap", fontPath, DataCenterWorldmapLabels);
+                }
             }
 
             private void VerifyCompactTimeRows()
@@ -467,9 +589,19 @@ namespace FfxivKoreanPatch.PatchRouteVerifier
                     "common/font/AXIS_14_lobby.fdt",
                     "common/font/AXIS_18_lobby.fdt",
                     "common/font/AXIS_36_lobby.fdt",
+                    "common/font/Jupiter_16_lobby.fdt",
+                    "common/font/Jupiter_20_lobby.fdt",
+                    "common/font/Jupiter_23_lobby.fdt",
                     "common/font/Jupiter_45_lobby.fdt",
+                    "common/font/Jupiter_46_lobby.fdt",
                     "common/font/Jupiter_90_lobby.fdt",
+                    "common/font/Meidinger_16_lobby.fdt",
+                    "common/font/Meidinger_20_lobby.fdt",
                     "common/font/Meidinger_40_lobby.fdt",
+                    "common/font/MiedingerMid_10_lobby.fdt",
+                    "common/font/MiedingerMid_12_lobby.fdt",
+                    "common/font/MiedingerMid_14_lobby.fdt",
+                    "common/font/MiedingerMid_18_lobby.fdt",
                     "common/font/MiedingerMid_36_lobby.fdt",
                     "common/font/TrumpGothic_23_lobby.fdt",
                     "common/font/TrumpGothic_34_lobby.fdt",
@@ -1189,6 +1321,86 @@ namespace FfxivKoreanPatch.PatchRouteVerifier
                     }
 
                     bitmap.Save(path, System.Drawing.Imaging.ImageFormat.Png);
+                }
+            }
+
+            private void DumpLabelPreview(string group, string fontPath, string[] labels)
+            {
+                if (string.IsNullOrWhiteSpace(_glyphDumpDir))
+                {
+                    return;
+                }
+
+                try
+                {
+                    List<GlyphCanvas?[]> rows = new List<GlyphCanvas?[]>();
+                    int maxGlyphs = 0;
+                    for (int labelIndex = 0; labelIndex < labels.Length; labelIndex++)
+                    {
+                        string label = labels[labelIndex];
+                        List<GlyphCanvas?> glyphs = new List<GlyphCanvas?>();
+                        for (int charIndex = 0; charIndex < label.Length; charIndex++)
+                        {
+                            char ch = label[charIndex];
+                            if (char.IsWhiteSpace(ch))
+                            {
+                                glyphs.Add(null);
+                                continue;
+                            }
+
+                            glyphs.Add(RenderGlyph(_patchedFont, fontPath, ch));
+                        }
+
+                        if (glyphs.Count > maxGlyphs)
+                        {
+                            maxGlyphs = glyphs.Count;
+                        }
+
+                        rows.Add(glyphs.ToArray());
+                    }
+
+                    if (rows.Count == 0 || maxGlyphs == 0)
+                    {
+                        return;
+                    }
+
+                    const int scale = 1;
+                    const int spacing = 2;
+                    const int rowSpacing = 8;
+                    int cellSize = GlyphCanvasSize * scale;
+                    int width = Math.Max(1, maxGlyphs * (cellSize + spacing) + 8);
+                    int height = Math.Max(1, rows.Count * (cellSize + rowSpacing) + 8);
+                    using (System.Drawing.Bitmap bitmap = new System.Drawing.Bitmap(width, height, System.Drawing.Imaging.PixelFormat.Format32bppArgb))
+                    {
+                        using (System.Drawing.Graphics graphics = System.Drawing.Graphics.FromImage(bitmap))
+                        {
+                            graphics.Clear(System.Drawing.Color.Black);
+                        }
+
+                        for (int row = 0; row < rows.Count; row++)
+                        {
+                            GlyphCanvas?[] glyphs = rows[row];
+                            int originY = 4 + row * (cellSize + rowSpacing);
+                            int originX = 4;
+                            for (int i = 0; i < glyphs.Length; i++)
+                            {
+                                GlyphCanvas? glyph = glyphs[i];
+                                if (glyph.HasValue)
+                                {
+                                    DrawGlyphToBitmap(bitmap, glyph.Value, originX, originY, scale);
+                                }
+
+                                originX += cellSize + spacing;
+                            }
+                        }
+
+                        string fileName = group + "_" + SanitizeFileName(fontPath) + "_preview.png";
+                        bitmap.Save(Path.Combine(_glyphDumpDir, fileName), System.Drawing.Imaging.ImageFormat.Png);
+                    }
+                }
+                catch (Exception ex)
+                {
+                    Warn("{0} {1} preview dump error: {2}", group, fontPath, ex.Message);
                 }
             }
 
@@ -2000,6 +2212,21 @@ namespace FfxivKoreanPatch.PatchRouteVerifier
             string suffix = lobby ? "_lobby.fdt" : ".fdt";
             switch (fontId)
             {
+                case UldAxisFontId:
+                    switch (fontSize)
+                    {
+                        case 12:
+                        case 14:
+                        case 18:
+                        case 36:
+                        case 96:
+                            return "common/font/AXIS_" + fontSize.ToString() + suffix;
+                        case 34:
+                            return "common/font/AXIS_36" + suffix;
+                    }
+
+                    return null;
+
                 case UldTrumpGothicFontId:
                     switch (fontSize)
                     {
