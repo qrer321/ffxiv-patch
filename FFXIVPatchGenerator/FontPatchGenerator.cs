@@ -42,6 +42,8 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
         private const uint PartyListSelfMarkerLegacyStart = 0xE0B1u;
         private const uint HangulFirst = 0xAC00u;
         private const uint HangulLast = 0xD7A3u;
+        private const uint DialogueByeonCodepoint = 0xBCC0u;
+        private const string DialogueGlyphArtifactSourcePath = "common/font/KrnAXIS_180.fdt";
         private const string LobbyHangulAliasSourcePath = "common/font/AXIS_12_lobby.fdt";
         private const string LobbyHangulAliasTargetPath = "common/font/AXIS_14_lobby.fdt";
         private const string Font1TexturePath = "common/font/font1.tex";
@@ -263,7 +265,7 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
                 }
 
                 int normalized;
-                long datOffset = WriteFontPayload(datWriter, path, packedFile, null, null, null, null, out normalized);
+                long datOffset = WriteFontPayload(datWriter, path, packedFile, null, null, null, null, null, out normalized);
                 LogFontPayloadAdjustments(path, normalized);
                 mutableIndex.SetFileOffset(path, 1, datOffset);
                 mutableIndex2.SetFileOffset(path, 1, datOffset);
@@ -277,6 +279,7 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
             {
                 LobbyHangulRepairContext lobbyHangulRepair = TryCreateLobbyHangulRepairContext(fontPackage, mpdStream);
                 FontGlyphRepairContext glyphRepair = TryCreateFontGlyphRepairContext(fontPackage, mpdStream);
+                TargetedGlyphRepairContext dialogueGlyphRepair = TryCreateDialogueGlyphArtifactRepairContext(fontPackage, mpdStream);
                 ProtectedHangulGlyphContext protectedHangulGlyphs = TryCreateProtectedHangulGlyphContext(fontPackage, mpdStream);
                 Dictionary<string, List<FontTexturePatch>> texturePatches = new Dictionary<string, List<FontTexturePatch>>(StringComparer.OrdinalIgnoreCase);
                 for (int i = 0; i < fontPackage.Payloads.Count; i++)
@@ -322,7 +325,7 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
                     }
                     else
                     {
-                        datOffset = WriteFontPayload(datWriter, path, packedFile, lobbyHangulRepair, glyphRepair, globalArchive, texturePatches, out normalized);
+                        datOffset = WriteFontPayload(datWriter, path, packedFile, lobbyHangulRepair, dialogueGlyphRepair, glyphRepair, globalArchive, texturePatches, out normalized);
                     }
 
                     LogFontPayloadAdjustments(path, normalized);
@@ -377,6 +380,7 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
             string path,
             byte[] packedFile,
             LobbyHangulRepairContext lobbyHangulRepair,
+            TargetedGlyphRepairContext dialogueGlyphRepair,
             FontGlyphRepairContext glyphRepair,
             SqPackArchive globalArchive,
             Dictionary<string, List<FontTexturePatch>> texturePatches,
@@ -392,12 +396,13 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
             normalized = NormalizeFdtShiftJisValues(fdt);
             int aliases = AddPartyListSelfMarkerAliases(path, ref fdt);
             int lobbyHangulAliases = ReplaceBlankLobbyHangulGlyphsFromAxis12(path, fdt, lobbyHangulRepair);
+            int dialogueGlyphFixes = ApplyDialogueGlyphArtifactFix(path, fdt, dialogueGlyphRepair, glyphRepair, texturePatches);
             int partyShapeFixes = ApplyPartyListSelfMarkerCleanShapes(path, fdt, glyphRepair, globalArchive, texturePatches);
             int cleanAsciiFixes = ApplyCleanAsciiGlyphShapes(path, fdt, globalArchive, texturePatches);
             // FDT edits are written as standard files when key normalization,
             // targeted Hangul repair, party marker allocation, or ASCII/numeric
             // glyph repair changed the render contract for the file.
-            if (normalized == 0 && aliases == 0 && lobbyHangulAliases == 0 && partyShapeFixes == 0 && cleanAsciiFixes == 0)
+            if (normalized == 0 && aliases == 0 && lobbyHangulAliases == 0 && dialogueGlyphFixes == 0 && partyShapeFixes == 0 && cleanAsciiFixes == 0)
             {
                 return datWriter.WritePackedFile(packedFile);
             }
@@ -410,6 +415,11 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
             if (lobbyHangulAliases > 0)
             {
                 Console.WriteLine("  Remapped blank lobby Hangul glyphs to AXIS_12 atlas cells: {0} ({1})", lobbyHangulAliases, path);
+            }
+
+            if (dialogueGlyphFixes > 0)
+            {
+                Console.WriteLine("  Queued dialogue Hangul glyph artifact fixes: {0} ({1})", dialogueGlyphFixes, path);
             }
 
             if (partyShapeFixes > 0)
@@ -647,6 +657,91 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
             }
 
             return entries;
+        }
+
+        private int ApplyDialogueGlyphArtifactFix(
+            string path,
+            byte[] targetFdt,
+            TargetedGlyphRepairContext repair,
+            FontGlyphRepairContext glyphRepair,
+            Dictionary<string, List<FontTexturePatch>> texturePatches)
+        {
+            if (!ShouldPatchDialogueGlyphArtifactFont(path) ||
+                repair == null ||
+                glyphRepair == null ||
+                texturePatches == null ||
+                targetFdt == null)
+            {
+                return 0;
+            }
+
+            int fontTableOffset;
+            uint glyphCount;
+            int glyphStart;
+            if (!TryGetFdtGlyphTable(targetFdt, out fontTableOffset, out glyphCount, out glyphStart))
+            {
+                return 0;
+            }
+
+            TargetedGlyphSource source;
+            if (!repair.TryGet(DialogueByeonCodepoint, out source))
+            {
+                return 0;
+            }
+
+            uint utf8Value = PackFdtUtf8Value(DialogueByeonCodepoint);
+            int targetOffset;
+            if (!TryFindGlyphEntryOffset(targetFdt, glyphStart, glyphCount, utf8Value, out targetOffset))
+            {
+                return 0;
+            }
+
+            string normalizedPath = NormalizeGamePath(path);
+            FdtGlyphEntry targetEntry = ReadFdtGlyphEntry(targetFdt, targetOffset);
+            string targetTexturePath = ResolveFontTexturePath(normalizedPath, targetEntry.ImageIndex);
+            if (targetTexturePath == null || !ShouldIncludeFontPath(targetTexturePath))
+            {
+                return 0;
+            }
+
+            AllocatedFontGlyphCell allocatedCell;
+            if (!glyphRepair.TryAllocate(targetTexturePath, source.Width, source.Height, out allocatedCell))
+            {
+                return 0;
+            }
+
+            FontTexturePatch patch = new FontTexturePatch();
+            patch.TargetX = allocatedCell.X;
+            patch.TargetY = allocatedCell.Y;
+            patch.TargetChannel = allocatedCell.Channel;
+            patch.ClearWidth = source.Width;
+            patch.ClearHeight = source.Height;
+            patch.SourceWidth = source.Width;
+            patch.SourceHeight = source.Height;
+            patch.SourceAlpha = source.Alpha;
+            patch.SourceFdtPath = source.SourceFdtPath;
+            patch.SourceCodepoint = source.Codepoint;
+            AddTexturePatch(texturePatches, targetTexturePath, patch);
+
+            Endian.WriteUInt16LE(targetFdt, targetOffset + 6, checked((ushort)allocatedCell.ImageIndex));
+            Endian.WriteUInt16LE(targetFdt, targetOffset + 8, checked((ushort)allocatedCell.X));
+            Endian.WriteUInt16LE(targetFdt, targetOffset + 10, checked((ushort)allocatedCell.Y));
+            targetFdt[targetOffset + 12] = checked((byte)source.Width);
+            targetFdt[targetOffset + 13] = checked((byte)source.Height);
+            targetFdt[targetOffset + 14] = unchecked((byte)source.OffsetX);
+            targetFdt[targetOffset + 15] = unchecked((byte)source.OffsetY);
+            return 1;
+        }
+
+        private static bool ShouldPatchDialogueGlyphArtifactFont(string path)
+        {
+            string normalized = NormalizeGamePath(path);
+            // The TTMP source has a stray lower-circle fragment in U+BCC0 on these
+            // dialogue-sized render paths. Repoint only this glyph to a clean
+            // KrnAXIS_180 cell instead of changing broad font families.
+            return string.Equals(normalized, "common/font/AXIS_18.fdt", StringComparison.OrdinalIgnoreCase) ||
+                   string.Equals(normalized, "common/font/MiedingerMid_18.fdt", StringComparison.OrdinalIgnoreCase) ||
+                   string.Equals(normalized, "common/font/TrumpGothic_184.fdt", StringComparison.OrdinalIgnoreCase);
         }
 
         private static bool TryGetFdtGlyphTable(byte[] fdt, out int fontTableOffset, out uint glyphCount, out int glyphStart)
@@ -1698,6 +1793,48 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
             return context;
         }
 
+        private static TargetedGlyphRepairContext TryCreateDialogueGlyphArtifactRepairContext(FontPatchPackage fontPackage, FileStream mpdStream)
+        {
+            byte[] sourceFdt = TryLoadTtmpStandardPayload(fontPackage, mpdStream, DialogueGlyphArtifactSourcePath);
+            if (sourceFdt == null)
+            {
+                return null;
+            }
+
+            Dictionary<uint, byte[]> sourceEntries = ReadGlyphEntriesByUtf8Value(sourceFdt);
+            uint utf8Value = PackFdtUtf8Value(DialogueByeonCodepoint);
+            byte[] sourceEntryBytes;
+            if (!sourceEntries.TryGetValue(utf8Value, out sourceEntryBytes))
+            {
+                return null;
+            }
+
+            FdtGlyphEntry sourceEntry = ReadFdtGlyphEntry(sourceEntryBytes, 0);
+            string sourceTexturePath = ResolveFontTexturePath(DialogueGlyphArtifactSourcePath, sourceEntry.ImageIndex);
+            if (sourceTexturePath == null)
+            {
+                return null;
+            }
+
+            byte[] sourceTexture = TryLoadTtmpTexturePayload(fontPackage, mpdStream, sourceTexturePath);
+            if (sourceTexture == null)
+            {
+                return null;
+            }
+
+            TargetedGlyphRepairContext context = new TargetedGlyphRepairContext();
+            TargetedGlyphSource source = new TargetedGlyphSource();
+            source.Codepoint = DialogueByeonCodepoint;
+            source.SourceFdtPath = DialogueGlyphArtifactSourcePath;
+            source.Width = sourceEntry.Width;
+            source.Height = sourceEntry.Height;
+            source.OffsetX = sourceEntry.OffsetX;
+            source.OffsetY = sourceEntry.OffsetY;
+            source.Alpha = ExtractFontTextureAlpha(sourceTexture, sourceEntry);
+            context.Add(source);
+            return context;
+        }
+
         private static FontGlyphRepairContext TryCreateFontGlyphRepairContext(FontPatchPackage fontPackage, FileStream mpdStream)
         {
             if (fontPackage == null || mpdStream == null)
@@ -2475,6 +2612,33 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
 
                 return true;
             }
+        }
+
+        private sealed class TargetedGlyphRepairContext
+        {
+            private readonly Dictionary<uint, TargetedGlyphSource> _sources =
+                new Dictionary<uint, TargetedGlyphSource>();
+
+            public void Add(TargetedGlyphSource source)
+            {
+                _sources[source.Codepoint] = source;
+            }
+
+            public bool TryGet(uint codepoint, out TargetedGlyphSource source)
+            {
+                return _sources.TryGetValue(codepoint, out source);
+            }
+        }
+
+        private sealed class TargetedGlyphSource
+        {
+            public uint Codepoint;
+            public string SourceFdtPath;
+            public int Width;
+            public int Height;
+            public sbyte OffsetX;
+            public sbyte OffsetY;
+            public byte[] Alpha;
         }
 
         private sealed class FontGlyphRepairContext

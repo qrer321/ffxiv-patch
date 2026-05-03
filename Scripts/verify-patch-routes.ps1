@@ -9,6 +9,10 @@ param(
 
     [string]$TargetLanguage = "ja",
 
+    [string]$GlyphDumpDir,
+
+    [switch]$NoGlyphDump,
+
     [string]$Configuration = "Release"
 )
 
@@ -30,6 +34,12 @@ if ($LASTEXITCODE -ne 0) {
 $arguments = @("--output", $Output, "--global", $Global, "--target-language", $TargetLanguage)
 if (![string]::IsNullOrWhiteSpace($AppliedGame)) {
     $arguments += @("--applied-game", $AppliedGame)
+}
+if (![string]::IsNullOrWhiteSpace($GlyphDumpDir)) {
+    $arguments += @("--glyph-dump-dir", $GlyphDumpDir)
+}
+if ($NoGlyphDump) {
+    $arguments += "--no-glyph-dump"
 }
 
 & $toolExe @arguments

@@ -122,6 +122,8 @@ orig.060000.win32.index2
 
 `--diagnostic-csv <sheet>`를 사용하면 `diagnostic-csv\` 폴더에 해당 sheet의 row/column 비교 CSV가 추가로 생성됩니다.
 
+패치 경로 검증은 `Scripts\verify-patch-routes.ps1`로 실행할 수 있습니다. 기본적으로 로비/대사 문장에 쓰이는 한글 glyph를 `patch-route-glyph-dumps\`에 PNG와 `glyph-report.tsv`로 덤프하므로, `변`처럼 특정 글자에 잔픽셀이 겹치는 문제를 게임 실행 전에 확인할 수 있습니다. 덤프 위치는 `-GlyphDumpDir`로 바꾸고, 필요 없으면 `-NoGlyphDump`를 사용합니다.
+
 UI 실행 중 생성/관리되는 주요 폴더는 실행 파일이 있는 `Release` 폴더가 아니라 사용자별 영구 데이터 폴더에 저장됩니다.
 기본 위치는 `%LocalAppData%\FFXIVKoreanPatch`입니다.
 

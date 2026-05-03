@@ -166,6 +166,9 @@
 - `patch-diagnostics.tsv` 생성
 - `--diagnostic-csv` 지정 sheet의 row/column 비교 CSV 생성
 - `_rsv_` 토큰이 남은 row/string 수 집계
+- `Scripts\verify-patch-routes.ps1`로 release 폴더 후검증
+  - 데이터센터 row, 좁은 시간 단위, 숫자 glyph, 파티 리스트 본인 번호 glyph 확인
+  - 로비/대사 문장 한글 glyph를 PNG와 `glyph-report.tsv`로 덤프해 특정 글자의 atlas 잔픽셀/겹침 여부 확인
 - unsafe sheet 스킵
 - 새 `0a0000.win32.dat1` 생성
 - 수정된 `0a0000.win32.index` 생성
