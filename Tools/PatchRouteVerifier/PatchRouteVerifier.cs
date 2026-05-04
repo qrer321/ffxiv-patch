@@ -95,6 +95,7 @@ namespace FfxivKoreanPatch.PatchRouteVerifier
         private const int GlyphDumpScale = 4;
         private const byte UldTrumpGothicFontId = 3;
         private const byte UldJupiterFontId = 4;
+        private const byte UldMiedingerMedFontId = 1;
         private const byte UldAxisFontId = 0;
         private const uint UncompressedBlock = 32000;
         private static readonly string[] DataCenterWorldmapLabels = new string[]
@@ -479,16 +480,26 @@ namespace FfxivKoreanPatch.PatchRouteVerifier
 
             private void VerifyDataCenterWorldmapUldRoute()
             {
-                Console.WriteLine("[ULD/FDT] Data center world map render route");
+                Console.WriteLine("[ULD/FDT] Data center world map font preservation");
                 byte[] cleanUld = _cleanUi.ReadFile(DataCenterWorldmapUldPath);
                 byte[] patchedUld = _patchedUi.ReadFile(DataCenterWorldmapUldPath);
                 List<UldTextNodeFont> cleanFonts = GetUldTextNodeFonts(cleanUld);
+                List<UldTextNodeFont> patchedFonts = GetUldTextNodeFonts(patchedUld);
                 Dictionary<int, UldTextNodeFont> patchedByOffset = GetUldTextNodeFontsByOffset(patchedUld);
 
                 if (cleanFonts.Count == 0)
                 {
                     Fail("{0} clean ULD did not expose text-node fonts", DataCenterWorldmapUldPath);
                     return;
+                }
+
+                if (cleanFonts.Count != patchedFonts.Count)
+                {
+                    Fail(
+                        "{0} text-node count changed: clean={1}, patched={2}",
+                        DataCenterWorldmapUldPath,
+                        cleanFonts.Count,
+                        patchedFonts.Count);
                 }
 
                 HashSet<string> routedFontPaths = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
@@ -502,14 +513,16 @@ namespace FfxivKoreanPatch.PatchRouteVerifier
                         continue;
                     }
 
-                    if (patchedNode.FontId != UldAxisFontId)
+                    if (patchedNode.FontId != cleanNode.FontId || patchedNode.FontSize != cleanNode.FontSize)
                     {
                         Fail(
-                            "{0} node 0x{1:X} expected AXIS font id {2}, actual {3}",
+                            "{0} node 0x{1:X} font changed: clean={2}/{3}, patched={4}/{5}",
                             DataCenterWorldmapUldPath,
                             cleanNode.NodeOffset,
-                            UldAxisFontId,
-                            patchedNode.FontId);
+                            cleanNode.FontId,
+                            cleanNode.FontSize,
+                            patchedNode.FontId,
+                            patchedNode.FontSize);
                         continue;
                     }
 
@@ -527,7 +540,7 @@ namespace FfxivKoreanPatch.PatchRouteVerifier
 
                     routedFontPaths.Add(resolvedFont);
                     Pass(
-                        "{0} node 0x{1:X} font {2}/{3} routes to {4}",
+                        "{0} node 0x{1:X} preserves font {2}/{3} routes to {4}",
                         DataCenterWorldmapUldPath,
                         cleanNode.NodeOffset,
                         patchedNode.FontId,
@@ -2227,6 +2240,19 @@ namespace FfxivKoreanPatch.PatchRouteVerifier
 
                     return null;
 
+                case UldMiedingerMedFontId:
+                    switch (fontSize)
+                    {
+                        case 10:
+                        case 12:
+                        case 14:
+                        case 18:
+                        case 36:
+                            return "common/font/MiedingerMid_" + fontSize.ToString() + suffix;
+                    }
+
+                    return null;
+
                 case UldTrumpGothicFontId:
                     switch (fontSize)
                     {
@@ -2242,6 +2268,10 @@ namespace FfxivKoreanPatch.PatchRouteVerifier
                 case UldJupiterFontId:
                     switch (fontSize)
                     {
+                        case 12:
+                            return "common/font/Jupiter_16" + suffix;
+                        case 18:
+                            return "common/font/Jupiter_20" + suffix;
                         case 16:
                         case 20:
                         case 23:

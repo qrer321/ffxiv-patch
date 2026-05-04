@@ -18,8 +18,6 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
         private const string OrigIndex2FileName = "orig.060000.win32.index2";
         private const string PartyListTargetBaseTexPath = "ui/uld/PartyListTargetBase.tex";
         private const string DataCenterTitleUldPath = "ui/uld/Title_DataCenter.uld";
-        private const string DataCenterWorldmapUldPath = "ui/uld/Title_Worldmap.uld";
-        private const byte UldAxisFontId = 0;
         private const byte UldTrumpGothicFontId = 3;
         private const byte UldJupiterFontId = 4;
         // ScreenImage.Lang marks image IDs that are stored under language folders such as ui/icon/120000/ja.
@@ -143,11 +141,6 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
                     PartyListTargetBaseTexPath,
                     "Korean PartyList target texture");
                 patched += PatchDataCenterTitleFonts(
-                    globalUiArchive,
-                    mutableIndex,
-                    mutableIndex2,
-                    datWriter);
-                patched += PatchDataCenterWorldmapFonts(
                     globalUiArchive,
                     mutableIndex,
                     mutableIndex2,
@@ -295,41 +288,6 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
             return 1;
         }
 
-        private int PatchDataCenterWorldmapFonts(
-            SqPackArchive globalUiArchive,
-            SqPackIndexFile mutableIndex,
-            SqPackIndex2File mutableIndex2,
-            SqPackDatWriter datWriter)
-        {
-            // Title_Worldmap drives the DATA CENTER SELECT region map. Its text
-            // nodes must stay on AXIS; other lobby font slots can render region
-            // headings as fallback dashes in the Japanese global client.
-            byte[] uld;
-            if (!globalUiArchive.TryReadFile(DataCenterWorldmapUldPath, out uld))
-            {
-                _report.Warnings.Add("Data center world map ULD was not found. Font slot normalization was skipped.");
-                return 0;
-            }
-
-            int textNodeCount;
-            int changedNodes = ForceUldTextFontSlots(uld, UldAxisFontId, out textNodeCount);
-            if (textNodeCount == 0)
-            {
-                _report.Warnings.Add("Data center world map ULD did not expose text nodes.");
-                return 0;
-            }
-
-            long offset = datWriter.WriteStandardFile(uld);
-            mutableIndex.SetFileOffset(DataCenterWorldmapUldPath, PatchDatId, offset);
-            mutableIndex2.SetFileOffset(DataCenterWorldmapUldPath, PatchDatId, offset);
-            Console.WriteLine(
-                "UI ULD patched: {0} (AXIS text nodes={1}, normalized={2})",
-                DataCenterWorldmapUldPath,
-                textNodeCount,
-                changedNodes);
-            return 1;
-        }
-
         private static int PatchUldTextFontSlots(byte[] uld, byte sourceFontId, byte targetFontId)
         {
             if (uld == null || uld.Length < 16 || !HasAsciiMagic(uld, 0, "uldh"))
@@ -342,22 +300,6 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
             uint widgetAtkOffset = Endian.ReadUInt32LE(uld, 12);
             changed += PatchUldAtkTextFontSlots(uld, componentAtkOffset, true, sourceFontId, targetFontId);
             changed += PatchUldAtkTextFontSlots(uld, widgetAtkOffset, false, sourceFontId, targetFontId);
-            return changed;
-        }
-
-        private static int ForceUldTextFontSlots(byte[] uld, byte targetFontId, out int textNodeCount)
-        {
-            textNodeCount = 0;
-            if (uld == null || uld.Length < 16 || !HasAsciiMagic(uld, 0, "uldh"))
-            {
-                return 0;
-            }
-
-            int changed = 0;
-            uint componentAtkOffset = Endian.ReadUInt32LE(uld, 8);
-            uint widgetAtkOffset = Endian.ReadUInt32LE(uld, 12);
-            changed += ForceUldAtkTextFontSlots(uld, componentAtkOffset, true, targetFontId, ref textNodeCount);
-            changed += ForceUldAtkTextFontSlots(uld, widgetAtkOffset, false, targetFontId, ref textNodeCount);
             return changed;
         }
 
@@ -377,24 +319,6 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
             return patchComponents
                 ? PatchUldComponentTextFontSlots(uld, atkOffset, sourceFontId, targetFontId)
                 : PatchUldWidgetTextFontSlots(uld, atkOffset, sourceFontId, targetFontId);
-        }
-
-        private static int ForceUldAtkTextFontSlots(byte[] uld, uint atkOffsetValue, bool patchComponents, byte targetFontId, ref int textNodeCount)
-        {
-            if (atkOffsetValue == 0 || atkOffsetValue > int.MaxValue)
-            {
-                return 0;
-            }
-
-            int atkOffset = (int)atkOffsetValue;
-            if (!HasRange(uld, atkOffset, 36) || !HasAsciiMagic(uld, atkOffset, "atkh"))
-            {
-                return 0;
-            }
-
-            return patchComponents
-                ? ForceUldComponentTextFontSlots(uld, atkOffset, targetFontId, ref textNodeCount)
-                : ForceUldWidgetTextFontSlots(uld, atkOffset, targetFontId, ref textNodeCount);
         }
 
         private static int PatchUldComponentTextFontSlots(byte[] uld, int atkOffset, byte sourceFontId, byte targetFontId)
@@ -430,60 +354,6 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
                 {
                     int nodeSize = Endian.ReadUInt16LE(uld, cursor + 24);
                     changed += PatchUldTextNodeFontSlot(uld, cursor, sourceFontId, targetFontId);
-                    if (nodeSize <= 0)
-                    {
-                        break;
-                    }
-
-                    cursor += nodeSize;
-                }
-
-                if (componentSize == 0)
-                {
-                    entryOffset = cursor;
-                }
-                else
-                {
-                    entryOffset += componentSize;
-                }
-            }
-
-            return changed;
-        }
-
-        private static int ForceUldComponentTextFontSlots(byte[] uld, int atkOffset, byte targetFontId, ref int textNodeCount)
-        {
-            uint componentListRelativeOffset = Endian.ReadUInt32LE(uld, atkOffset + 16);
-            if (componentListRelativeOffset == 0 || componentListRelativeOffset > int.MaxValue)
-            {
-                return 0;
-            }
-
-            int componentListOffset = atkOffset + (int)componentListRelativeOffset;
-            if (!HasRange(uld, componentListOffset, 16) || !HasAsciiMagic(uld, componentListOffset, "cohd"))
-            {
-                return 0;
-            }
-
-            uint componentCount = Endian.ReadUInt32LE(uld, componentListOffset + 8);
-            int entryOffset = componentListOffset + 16;
-            int changed = 0;
-            for (uint i = 0; i < componentCount && HasRange(uld, entryOffset, 16); i++)
-            {
-                uint nodeCount = Endian.ReadUInt32LE(uld, entryOffset + 8);
-                ushort componentSize = Endian.ReadUInt16LE(uld, entryOffset + 12);
-                ushort nodeOffset = Endian.ReadUInt16LE(uld, entryOffset + 14);
-                int nodeStart = entryOffset + nodeOffset;
-                if (nodeOffset < 16 || !HasRange(uld, nodeStart, 28))
-                {
-                    nodeStart = entryOffset + 16;
-                }
-
-                int cursor = nodeStart;
-                for (uint nodeIndex = 0; nodeIndex < nodeCount && HasRange(uld, cursor, 28); nodeIndex++)
-                {
-                    int nodeSize = Endian.ReadUInt16LE(uld, cursor + 24);
-                    changed += ForceUldTextNodeFontSlot(uld, cursor, targetFontId, ref textNodeCount);
                     if (nodeSize <= 0)
                     {
                         break;
@@ -542,43 +412,6 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
             return changed;
         }
 
-        private static int ForceUldWidgetTextFontSlots(byte[] uld, int atkOffset, byte targetFontId, ref int textNodeCount)
-        {
-            uint widgetRelativeOffset = Endian.ReadUInt32LE(uld, atkOffset + 24);
-            if (widgetRelativeOffset == 0 || widgetRelativeOffset > int.MaxValue)
-            {
-                return 0;
-            }
-
-            int widgetOffset = atkOffset + (int)widgetRelativeOffset;
-            if (!HasRange(uld, widgetOffset, 16) || !HasAsciiMagic(uld, widgetOffset, "wdhd"))
-            {
-                return 0;
-            }
-
-            uint widgetCount = Endian.ReadUInt32LE(uld, widgetOffset + 8);
-            int cursor = widgetOffset + 16;
-            int changed = 0;
-            for (uint i = 0; i < widgetCount && HasRange(uld, cursor, 16); i++)
-            {
-                uint nodeCount = Endian.ReadUInt16LE(uld, cursor + 12);
-                cursor += 16;
-                for (uint nodeIndex = 0; nodeIndex < nodeCount && HasRange(uld, cursor, 28); nodeIndex++)
-                {
-                    int nodeSize = Endian.ReadUInt16LE(uld, cursor + 24);
-                    changed += ForceUldTextNodeFontSlot(uld, cursor, targetFontId, ref textNodeCount);
-                    if (nodeSize <= 0)
-                    {
-                        break;
-                    }
-
-                    cursor += nodeSize;
-                }
-            }
-
-            return changed;
-        }
-
         private static int PatchUldTextNodeFontSlot(byte[] uld, int nodeOffset, byte sourceFontId, byte targetFontId)
         {
             const int NodeTypeOffset = 20;
@@ -601,42 +434,6 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
 
             int fontOffset = nodeOffset + NodeHeaderSize + TextFontOffsetInExtra;
             if (!HasRange(uld, fontOffset, 1) || uld[fontOffset] != sourceFontId)
-            {
-                return 0;
-            }
-
-            uld[fontOffset] = targetFontId;
-            return 1;
-        }
-
-        private static int ForceUldTextNodeFontSlot(byte[] uld, int nodeOffset, byte targetFontId, ref int textNodeCount)
-        {
-            const int NodeTypeOffset = 20;
-            const int NodeSizeOffset = 24;
-            const int NodeHeaderSize = 88;
-            const int TextExtraMinSize = 24;
-            const int TextFontOffsetInExtra = 10;
-
-            if (!HasRange(uld, nodeOffset, NodeHeaderSize + TextExtraMinSize))
-            {
-                return 0;
-            }
-
-            int nodeType = unchecked((int)Endian.ReadUInt32LE(uld, nodeOffset + NodeTypeOffset));
-            int nodeSize = Endian.ReadUInt16LE(uld, nodeOffset + NodeSizeOffset);
-            if (nodeType != 3 || nodeSize < NodeHeaderSize + TextExtraMinSize)
-            {
-                return 0;
-            }
-
-            int fontOffset = nodeOffset + NodeHeaderSize + TextFontOffsetInExtra;
-            if (!HasRange(uld, fontOffset, 1))
-            {
-                return 0;
-            }
-
-            textNodeCount++;
-            if (uld[fontOffset] == targetFontId)
             {
                 return 0;
             }
