@@ -280,6 +280,14 @@ namespace FfxivKoreanPatch.PatchRouteVerifier
                 ExpectText("Lobby", 800, "DATA CENTER SELECT");
                 ExpectText("Lobby", 802, "Data Center");
                 ExpectText("Lobby", 803, "INFORMATION");
+                ExpectTextContains("Lobby", 806, "Japan");
+                ExpectTextContains("Lobby", 806, "North America");
+                ExpectTextContains("Lobby", 806, "Europe");
+                ExpectTextContains("Lobby", 806, "Oceania");
+                ExpectTextNotContains("Lobby", 806, "日本");
+                ExpectTextNotContains("Lobby", 806, "北米");
+                ExpectTextNotContains("Lobby", 806, "欧州");
+                ExpectTextNotContains("Lobby", 806, "オセアニア");
                 ExpectText("WorldRegionGroup", 1, "Japan");
                 ExpectText("WorldRegionGroup", 2, "North America");
                 ExpectText("WorldRegionGroup", 3, "Europe");
@@ -314,6 +322,10 @@ namespace FfxivKoreanPatch.PatchRouteVerifier
                     new DataCenterLabelExpectation("Lobby", 792, "North America Data Center"),
                     new DataCenterLabelExpectation("Lobby", 793, "Europe Data Center"),
                     new DataCenterLabelExpectation("Lobby", 794, "Oceania Data Center"),
+                    new DataCenterLabelExpectation("Lobby", 806, "Japan", true),
+                    new DataCenterLabelExpectation("Lobby", 806, "North America", true),
+                    new DataCenterLabelExpectation("Lobby", 806, "Europe", true),
+                    new DataCenterLabelExpectation("Lobby", 806, "Oceania", true),
                     new DataCenterLabelExpectation("WorldRegionGroup", 1, "Japan"),
                     new DataCenterLabelExpectation("WorldRegionGroup", 2, "North America"),
                     new DataCenterLabelExpectation("WorldRegionGroup", 3, "Europe"),
@@ -1609,7 +1621,9 @@ namespace FfxivKoreanPatch.PatchRouteVerifier
                 bool fallback = false;
                 for (int i = 0; i < columns.Count; i++)
                 {
-                    if (string.Equals(columns[i], expectation.Expected, StringComparison.Ordinal))
+                    if (expectation.AllowSubstring
+                        ? columns[i].IndexOf(expectation.Expected, StringComparison.Ordinal) >= 0
+                        : string.Equals(columns[i], expectation.Expected, StringComparison.Ordinal))
                     {
                         found = true;
                     }
@@ -2783,12 +2797,14 @@ namespace FfxivKoreanPatch.PatchRouteVerifier
             public readonly string Sheet;
             public readonly uint RowId;
             public readonly string Expected;
+            public readonly bool AllowSubstring;
 
-            public DataCenterLabelExpectation(string sheet, uint rowId, string expected)
+            public DataCenterLabelExpectation(string sheet, uint rowId, string expected, bool allowSubstring = false)
             {
                 Sheet = sheet;
                 RowId = rowId;
                 Expected = expected;
+                AllowSubstring = allowSubstring;
             }
         }
     }

@@ -20,7 +20,8 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
             new KeyValuePair<uint, string>(8293, "30m"),
             new KeyValuePair<uint, string>(8294, "60m")
         };
-        private static readonly uint[] GlobalLobbyDataCenterRows = new uint[] { 791, 792, 793, 794, 800, 801, 802, 803, 804, 805, 806 };
+        private static readonly uint[] GlobalLobbyDataCenterRows = new uint[] { 791, 792, 793, 794, 800, 801, 802, 803, 804, 805 };
+        private static readonly uint[] GlobalEnglishLobbyDataCenterRows = new uint[] { 806 };
         private static readonly uint[] GlobalDataCenterTravelAddonRows = new uint[] { 12514, 12525 };
 
         private readonly HashSet<string> _deleteFiles = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
@@ -91,6 +92,16 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
             for (int i = 0; i < GlobalLobbyDataCenterRows.Length; i++)
             {
                 lobbyPolicy.GlobalTargetRows.Add(GlobalLobbyDataCenterRows[i]);
+            }
+
+            // Lobby#806 embeds the selectable region labels inside SeString
+            // payloads. The Japanese row carries 日本/北米/欧州/オセアニア, which
+            // can fall back to dash/equal glyphs after the Korean font atlas patch.
+            // Use the English global row for this one data-center-only row so the
+            // region labels stay ASCII without changing the ULD font route.
+            for (int i = 0; i < GlobalEnglishLobbyDataCenterRows.Length; i++)
+            {
+                lobbyPolicy.GlobalEnglishRows.Add(GlobalEnglishLobbyDataCenterRows[i]);
             }
 
             // Most Addon rows in this range are the normal World Visit UI and have
