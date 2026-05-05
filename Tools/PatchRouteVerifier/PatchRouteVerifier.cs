@@ -59,6 +59,15 @@ namespace FfxivKoreanPatch.PatchRouteVerifier
             "common/font/TrumpGothic_68_lobby.fdt",
             "common/font/TrumpGothic_184_lobby.fdt"
         };
+        private static readonly string[,] Derived4kLobbyFontPairs = new string[,]
+        {
+            { "common/font/AXIS_36_lobby.fdt", "common/font/AXIS_36.fdt" },
+            { "common/font/Jupiter_46_lobby.fdt", "common/font/Jupiter_46.fdt" },
+            { "common/font/Jupiter_90_lobby.fdt", "common/font/Jupiter_90.fdt" },
+            { "common/font/Meidinger_40_lobby.fdt", "common/font/Meidinger_40.fdt" },
+            { "common/font/MiedingerMid_36_lobby.fdt", "common/font/MiedingerMid_36.fdt" },
+            { "common/font/TrumpGothic_68_lobby.fdt", "common/font/TrumpGothic_68.fdt" }
+        };
         private static readonly string[] DialoguePhraseFontPaths = new string[]
         {
             "common/font/AXIS_12.fdt",
@@ -258,6 +267,7 @@ namespace FfxivKoreanPatch.PatchRouteVerifier
                     VerifyCompactTimeRows();
                     VerifyWorldVisitRows();
                     VerifyDataCenterTitleGlyphs();
+                    Verify4kLobbyFontDerivations();
                     VerifyNumericGlyphs();
                     VerifyProtectedHangulGlyphs();
                     VerifyPartyListSelfMarker();
@@ -644,6 +654,60 @@ namespace FfxivKoreanPatch.PatchRouteVerifier
                     for (int c = 0; c < codepoints.Length; c++)
                     {
                         ExpectGlyphEqualIfSourceExists(_cleanFont, fonts[f], codepoints[c], _patchedFont, fonts[f], codepoints[c]);
+                    }
+                }
+            }
+
+            private void Verify4kLobbyFontDerivations()
+            {
+                Console.WriteLine("[FDT] 4K lobby font derivations");
+                uint[] latinCodepoints = new uint[] { 'A', 'a', '0', '1' };
+                uint[] hangulCodepoints = CollectCodepoints(new string[]
+                {
+                    "\uCE90\uB9AD\uD130 \uC815\uBCF4 \uBCC0\uACBD",
+                    "\uB370\uC774\uD130 \uC13C\uD130",
+                    "\uB85C\uC2A4\uAC00\uB974",
+                    "\uAC00\uC774\uC544"
+                });
+
+                for (int i = 0; i < Derived4kLobbyFontPairs.GetLength(0); i++)
+                {
+                    string targetFontPath = Derived4kLobbyFontPairs[i, 0];
+                    string sourceFontPath = Derived4kLobbyFontPairs[i, 1];
+
+                    for (int latinIndex = 0; latinIndex < latinCodepoints.Length; latinIndex++)
+                    {
+                        ExpectGlyphEqualIfSourceExists(_cleanFont, targetFontPath, latinCodepoints[latinIndex], _patchedFont, targetFontPath, latinCodepoints[latinIndex]);
+                    }
+
+                    byte[] sourceFdt;
+                    try
+                    {
+                        sourceFdt = _patchedFont.ReadFile(sourceFontPath);
+                    }
+                    catch (Exception ex)
+                    {
+                        Warn("{0} could not be read for 4K lobby derivation check: {1}", sourceFontPath, ex.Message);
+                        continue;
+                    }
+
+                    bool checkedHangul = false;
+                    for (int codepointIndex = 0; codepointIndex < hangulCodepoints.Length; codepointIndex++)
+                    {
+                        uint codepoint = hangulCodepoints[codepointIndex];
+                        FdtGlyphEntry ignored;
+                        if (!TryFindGlyph(sourceFdt, codepoint, out ignored))
+                        {
+                            continue;
+                        }
+
+                        checkedHangul = true;
+                        ExpectGlyphVisibleAtLeast(_patchedFont, targetFontPath, codepoint, 10);
+                    }
+
+                    if (!checkedHangul)
+                    {
+                        Pass("{0} has no sampled Hangul glyphs; ASCII route validated for {1}", sourceFontPath, targetFontPath);
                     }
                 }
             }
