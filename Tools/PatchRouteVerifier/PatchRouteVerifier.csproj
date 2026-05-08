@@ -39,6 +39,7 @@
   <ItemGroup>
     <Compile Include="ArchiveAccess.cs" />
     <Compile Include="CliOptions.cs" />
+    <Compile Include="DataCenterVerificationData.cs" />
     <Compile Include="DataCenterVerification.cs" />
     <Compile Include="ExcelTextAccess.cs" />
     <Compile Include="ExdScenarioVerification.cs" />
