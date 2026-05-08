@@ -24,8 +24,9 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
         private const uint MkdSupportJobFirstRow = 0;
         private const uint MkdSupportJobLastPlayableRow = 15;
         private const ushort MkdSupportJobFullNameColumnOffset = 0;
+        private const ushort MkdSupportJobShortNameColumnOffset = 4;
         private const ushort MkdSupportJobEnglishFullNameColumnOffset = 16;
-        private static readonly uint[] GlobalLobbyDataCenterRows = new uint[] { 791, 792, 793, 794, 800, 801, 802, 803, 804, 805, 806, 812, 813, 814, 815, 816 };
+        private static readonly uint[] GlobalLobbyDataCenterRows = new uint[] { 791, 792, 793, 794, 800, 801, 802, 803, 804, 805, 806, 808, 809, 810, 811, 812, 813, 814, 815, 816 };
         private static readonly uint[] GlobalDataCenterTravelAddonRows = new uint[] { 12514, 12525 };
 
         private readonly HashSet<string> _deleteFiles = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
@@ -140,14 +141,19 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
             }
 
             // Occult Crescent HUDs consume MkdSupportJob name columns in multiple
-            // places. Only column 0 is the main phantom job route that must stay
-            // global; support-job columns such as 4 and 12 remain translated.
+            // places. Columns 0 and 4 are the full/short main phantom-job labels
+            // used by HUD variants; descriptive/support-action text remains
+            // translated.
             for (uint rowId = MkdSupportJobFirstRow; rowId <= MkdSupportJobLastPlayableRow; rowId++)
             {
                 mkdSupportJobPolicy.SetRowColumnRemap(
                     rowId,
                     MkdSupportJobFullNameColumnOffset,
                     ColumnRemap.SourceColumn(MkdSupportJobEnglishFullNameColumnOffset));
+                mkdSupportJobPolicy.SetRowColumnRemap(
+                    rowId,
+                    MkdSupportJobShortNameColumnOffset,
+                    ColumnRemap.KeepGlobal);
             }
 
             // Region labels such as Japan/North America are part of the same lobby
