@@ -42,6 +42,7 @@
     <Compile Include="DataCenterVerification.cs" />
     <Compile Include="ExdScenarioVerification.cs" />
     <Compile Include="FontGlyphRendering.cs" />
+    <Compile Include="GlyphDiagnostics.cs" />
     <Compile Include="PatchRouteVerifier.cs" />
     <Compile Include="PhraseLayoutVerification.cs" />
     <Compile Include="UldFontRoutes.cs" />
