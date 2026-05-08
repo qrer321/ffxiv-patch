@@ -43,6 +43,7 @@
     <Compile Include="ExcelTextAccess.cs" />
     <Compile Include="ExdScenarioVerification.cs" />
     <Compile Include="FontGlyphRendering.cs" />
+    <Compile Include="FontRouteVerification.cs" />
     <Compile Include="GlyphDiagnostics.cs" />
     <Compile Include="PatchRouteVerifier.cs" />
     <Compile Include="PhraseLayoutVerification.cs" />
