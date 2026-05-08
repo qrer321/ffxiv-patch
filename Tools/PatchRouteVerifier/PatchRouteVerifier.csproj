@@ -56,6 +56,7 @@
     <Compile Include="GlyphDumpFormatting.cs" />
     <Compile Include="GlyphDumpOutput.cs" />
     <Compile Include="PatchRouteVerifier.cs" />
+    <Compile Include="PhraseLayoutVerificationData.cs" />
     <Compile Include="PhraseLayoutVerification.cs" />
     <Compile Include="UldFontRoutes.cs" />
     <Compile Include="VerifierAssertions.cs" />
