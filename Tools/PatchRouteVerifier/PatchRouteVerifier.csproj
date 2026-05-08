@@ -40,6 +40,7 @@
     <Compile Include="ArchiveAccess.cs" />
     <Compile Include="CliOptions.cs" />
     <Compile Include="DataCenterVerification.cs" />
+    <Compile Include="ExcelTextAccess.cs" />
     <Compile Include="ExdScenarioVerification.cs" />
     <Compile Include="FontGlyphRendering.cs" />
     <Compile Include="GlyphDiagnostics.cs" />
