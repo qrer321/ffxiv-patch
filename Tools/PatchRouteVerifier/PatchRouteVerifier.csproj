@@ -43,6 +43,7 @@
     <Compile Include="ExdScenarioVerification.cs" />
     <Compile Include="FontGlyphRendering.cs" />
     <Compile Include="PatchRouteVerifier.cs" />
+    <Compile Include="PhraseLayoutVerification.cs" />
     <Compile Include="UldFontRoutes.cs" />
     <Compile Include="..\..\FFXIVPatchGenerator\SqPack.cs">
       <Link>Generator\SqPack.cs</Link>
