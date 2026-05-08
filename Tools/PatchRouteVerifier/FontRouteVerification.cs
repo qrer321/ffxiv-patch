@@ -10,39 +10,20 @@ namespace FfxivKoreanPatch.PatchRouteVerifier
             private void VerifyDataCenterTitleGlyphs()
             {
                 Console.WriteLine("[FDT] Data center title ASCII glyphs");
-                string[] sameFontChecks =
-                {
-                    "common/font/AXIS_12.fdt",
-                    "common/font/AXIS_14.fdt",
-                    "common/font/AXIS_18.fdt",
-                    "common/font/AXIS_36.fdt",
-                    "common/font/AXIS_96.fdt",
-                    "common/font/AXIS_12_lobby.fdt",
-                    "common/font/AXIS_14_lobby.fdt",
-                    "common/font/AXIS_18_lobby.fdt",
-                    "common/font/AXIS_36_lobby.fdt"
-                };
                 uint[] codepoints = CreateAsciiCodepoints();
-                for (int f = 0; f < sameFontChecks.Length; f++)
+                for (int f = 0; f < DataCenterTitleSameFontChecks.Length; f++)
                 {
                     for (int c = 0; c < codepoints.Length; c++)
                     {
-                        ExpectGlyphEqualIfSourceExists(_cleanFont, sameFontChecks[f], codepoints[c], _patchedFont, sameFontChecks[f], codepoints[c]);
+                        ExpectGlyphEqualIfSourceExists(_cleanFont, DataCenterTitleSameFontChecks[f], codepoints[c], _patchedFont, DataCenterTitleSameFontChecks[f], codepoints[c]);
                     }
                 }
 
-                string[,] krnFontChecks =
-                {
-                    { "common/font/AXIS_12.fdt", "common/font/KrnAXIS_120.fdt" },
-                    { "common/font/AXIS_14.fdt", "common/font/KrnAXIS_140.fdt" },
-                    { "common/font/AXIS_18.fdt", "common/font/KrnAXIS_180.fdt" },
-                    { "common/font/AXIS_36.fdt", "common/font/KrnAXIS_360.fdt" }
-                };
-                for (int f = 0; f < krnFontChecks.GetLength(0); f++)
+                for (int f = 0; f < DataCenterTitleKoreanFontChecks.GetLength(0); f++)
                 {
                     for (int c = 0; c < codepoints.Length; c++)
                     {
-                        ExpectGlyphEqualIfSourceExists(_cleanFont, krnFontChecks[f, 0], codepoints[c], _patchedFont, krnFontChecks[f, 1], codepoints[c]);
+                        ExpectGlyphEqualIfSourceExists(_cleanFont, DataCenterTitleKoreanFontChecks[f, 0], codepoints[c], _patchedFont, DataCenterTitleKoreanFontChecks[f, 1], codepoints[c]);
                     }
                 }
             }
@@ -198,24 +179,13 @@ namespace FfxivKoreanPatch.PatchRouteVerifier
             private static string ResolveCleanAsciiReferenceFontPath(string targetFontPath)
             {
                 string normalized = targetFontPath.Replace('\\', '/');
-                if (normalized.IndexOf("/KrnAXIS_120.fdt", StringComparison.OrdinalIgnoreCase) >= 0)
+                for (int i = 0; i < CleanAsciiReferenceRoutes.Length; i++)
                 {
-                    return "common/font/AXIS_12.fdt";
-                }
-
-                if (normalized.IndexOf("/KrnAXIS_140.fdt", StringComparison.OrdinalIgnoreCase) >= 0)
-                {
-                    return "common/font/AXIS_14.fdt";
-                }
-
-                if (normalized.IndexOf("/KrnAXIS_180.fdt", StringComparison.OrdinalIgnoreCase) >= 0)
-                {
-                    return "common/font/AXIS_18.fdt";
-                }
-
-                if (normalized.IndexOf("/KrnAXIS_360.fdt", StringComparison.OrdinalIgnoreCase) >= 0)
-                {
-                    return "common/font/AXIS_36.fdt";
+                    CleanAsciiReferenceRoute route = CleanAsciiReferenceRoutes[i];
+                    if (normalized.IndexOf(route.TargetSuffix, StringComparison.OrdinalIgnoreCase) >= 0)
+                    {
+                        return route.SourceFontPath;
+                    }
                 }
 
                 return normalized;
