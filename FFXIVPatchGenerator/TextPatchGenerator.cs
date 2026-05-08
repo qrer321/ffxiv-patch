@@ -1319,8 +1319,7 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
 
         private static bool IsKnownUnsafeSheet(string sheetName)
         {
-            return sheetName.IndexOf("CtsMycEntrance", StringComparison.OrdinalIgnoreCase) >= 0 ||
-                   sheetName.IndexOf("CtsErkKuganeEntrance", StringComparison.OrdinalIgnoreCase) >= 0;
+            return sheetName.IndexOf("CtsErkKuganeEntrance", StringComparison.OrdinalIgnoreCase) >= 0;
         }
 
         private static bool IsAddonSheet(string sheetName)

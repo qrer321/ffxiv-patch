@@ -20,8 +20,8 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
             new KeyValuePair<uint, string>(8293, "30m"),
             new KeyValuePair<uint, string>(8294, "60m")
         };
-        private static readonly uint[] GlobalLobbyDataCenterRows = new uint[] { 791, 792, 793, 794, 800, 801, 802, 803, 804, 805 };
-        private static readonly uint[] GlobalEnglishLobbyDataCenterRows = new uint[] { 806 };
+        private const uint ConfigShareAddonTitleRow = 17301;
+        private static readonly uint[] GlobalLobbyDataCenterRows = new uint[] { 791, 792, 793, 794, 800, 801, 802, 803, 804, 805, 806 };
         private static readonly uint[] GlobalDataCenterTravelAddonRows = new uint[] { 12514, 12525 };
 
         private readonly HashSet<string> _deleteFiles = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
@@ -85,23 +85,12 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
             addonPolicy.GlobalTargetRows.Add(10952);
 
             // The data-center selection screen is global-client-only lobby UI.
-            // Korean Lobby rows exist for some labels, but this screen uses a font
-            // route that does not reliably render Korean proxy glyphs in the global
-            // client. Keep the selected global client language instead of producing
-            // unreadable "==" text.
+            // Keep the selected global client language so labels such as
+            // INFORMATION and region messages do not fall back through Korean
+            // proxy glyphs in this font route.
             for (int i = 0; i < GlobalLobbyDataCenterRows.Length; i++)
             {
                 lobbyPolicy.GlobalTargetRows.Add(GlobalLobbyDataCenterRows[i]);
-            }
-
-            // Lobby#806 embeds the selectable region labels inside SeString
-            // payloads. The Japanese row carries 日本/北米/欧州/オセアニア, which
-            // can fall back to dash/equal glyphs after the Korean font atlas patch.
-            // Use the English global row for this one data-center-only row so the
-            // region labels stay ASCII without changing the ULD font route.
-            for (int i = 0; i < GlobalEnglishLobbyDataCenterRows.Length; i++)
-            {
-                lobbyPolicy.GlobalEnglishRows.Add(GlobalEnglishLobbyDataCenterRows[i]);
             }
 
             // Most Addon rows in this range are the normal World Visit UI and have
@@ -136,6 +125,11 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
                 addonPolicy.GlobalTargetRows.Add(preset.Key);
                 addonPolicy.SetRowColumnRemap(preset.Key, 0, ColumnRemap.Literal(preset.Value));
             }
+
+            // The Configuration Sharing window title lives in Addon, not
+            // MainCommand. The Korean row is blank, so pin it to the same Korean
+            // title used by Addon#17300.
+            addonPolicy.SetRowColumnRemap(ConfigShareAddonTitleRow, 0, ColumnRemap.Literal("\uC124\uC815 \uACF5\uC720"));
 
             // Region labels such as Japan/North America are part of the same lobby
             // flow. Keep the selected global language for these lookup sheets too.
