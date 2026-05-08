@@ -41,6 +41,7 @@
     <Compile Include="CliOptions.cs" />
     <Compile Include="DataCenterVerification.cs" />
     <Compile Include="ExdScenarioVerification.cs" />
+    <Compile Include="FontGlyphRendering.cs" />
     <Compile Include="PatchRouteVerifier.cs" />
     <Compile Include="UldFontRoutes.cs" />
     <Compile Include="..\..\FFXIVPatchGenerator\SqPack.cs">
