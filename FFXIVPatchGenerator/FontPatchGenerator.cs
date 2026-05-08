@@ -854,6 +854,7 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
             int dialogueGlyphFixes = ApplyDialogueGlyphArtifactFix(path, fdt, dialogueGlyphRepair, glyphRepair, texturePatches);
             int partyShapeFixes = ApplyPartyListSelfMarkerCleanShapes(path, ref fdt, glyphRepair, globalArchive, texturePatches);
             int cleanAsciiFixes = ApplyCleanAsciiGlyphShapes(path, fdt, glyphRepair, globalArchive, texturePatches);
+            int cleanAsciiKerningFixes = ApplyCleanAsciiKerning(path, ref fdt, globalArchive);
             // FDT edits are written as standard files when key normalization,
             // targeted Hangul repair, party marker allocation, or ASCII/numeric
             // glyph repair changed the render contract for the file.
@@ -864,6 +865,7 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
                 dialogueGlyphFixes == 0 &&
                 partyShapeFixes == 0 &&
                 cleanAsciiFixes == 0 &&
+                cleanAsciiKerningFixes == 0 &&
                 originalPackedFile != null)
             {
                 return datWriter.WritePackedFile(originalPackedFile);
@@ -892,6 +894,11 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
             if (cleanAsciiFixes > 0)
             {
                 Console.WriteLine("  Queued clean ASCII/numeric glyph cells: {0} ({1})", cleanAsciiFixes, path);
+            }
+
+            if (cleanAsciiKerningFixes > 0)
+            {
+                Console.WriteLine("  Restored clean ASCII kerning pairs: {0} ({1})", cleanAsciiKerningFixes, path);
             }
 
             return datWriter.WriteStandardFile(fdt);
@@ -1655,6 +1662,191 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
             }
 
             return changed;
+        }
+
+        private int ApplyCleanAsciiKerning(string path, ref byte[] targetFdt, SqPackArchive globalArchive)
+        {
+            if (!ShouldRepairCleanAsciiFont(path) ||
+                globalArchive == null ||
+                targetFdt == null)
+            {
+                return 0;
+            }
+
+            string normalizedPath = NormalizeGamePath(path);
+            string sourceFdtPath = ResolveCleanAsciiSourceFdtPath(normalizedPath);
+            byte[] sourceFdt;
+            try
+            {
+                sourceFdt = globalArchive.ReadFile(sourceFdtPath);
+            }
+            catch (IOException)
+            {
+                return 0;
+            }
+            catch (InvalidDataException)
+            {
+                return 0;
+            }
+
+            return ReplaceAsciiKerningEntries(ref targetFdt, sourceFdt);
+        }
+
+        private static int ReplaceAsciiKerningEntries(ref byte[] targetFdt, byte[] sourceFdt)
+        {
+            int targetHeaderOffset;
+            int targetStart;
+            int targetCount;
+            if (!TryGetFdtKerningTable(targetFdt, out targetHeaderOffset, out targetStart, out targetCount))
+            {
+                return 0;
+            }
+
+            int sourceHeaderOffset;
+            int sourceStart;
+            int sourceCount;
+            Dictionary<string, byte[]> sourceAsciiEntries = new Dictionary<string, byte[]>(StringComparer.Ordinal);
+            if (TryGetFdtKerningTable(sourceFdt, out sourceHeaderOffset, out sourceStart, out sourceCount))
+            {
+                for (int i = 0; i < sourceCount; i++)
+                {
+                    int offset = sourceStart + i * FdtKerningEntrySize;
+                    uint left = Endian.ReadUInt32LE(sourceFdt, offset);
+                    uint right = Endian.ReadUInt32LE(sourceFdt, offset + 4);
+                    if (!IsAsciiKerningKey(left) || !IsAsciiKerningKey(right))
+                    {
+                        continue;
+                    }
+
+                    byte[] entry = new byte[FdtKerningEntrySize];
+                    Buffer.BlockCopy(sourceFdt, offset, entry, 0, FdtKerningEntrySize);
+                    sourceAsciiEntries[BuildKerningKey(left, right)] = entry;
+                }
+            }
+
+            List<byte[]> entries = new List<byte[]>(targetCount + sourceAsciiEntries.Count);
+            int changed = 0;
+            for (int i = 0; i < targetCount; i++)
+            {
+                int offset = targetStart + i * FdtKerningEntrySize;
+                uint left = Endian.ReadUInt32LE(targetFdt, offset);
+                uint right = Endian.ReadUInt32LE(targetFdt, offset + 4);
+                if (IsAsciiKerningKey(left) && IsAsciiKerningKey(right))
+                {
+                    changed++;
+                    continue;
+                }
+
+                byte[] entry = new byte[FdtKerningEntrySize];
+                Buffer.BlockCopy(targetFdt, offset, entry, 0, FdtKerningEntrySize);
+                entries.Add(entry);
+            }
+
+            foreach (byte[] sourceEntry in sourceAsciiEntries.Values)
+            {
+                byte[] entry = new byte[FdtKerningEntrySize];
+                Buffer.BlockCopy(sourceEntry, 0, entry, 0, FdtKerningEntrySize);
+                entries.Add(entry);
+            }
+
+            entries.Sort(CompareKerningEntries);
+            int targetEnd = checked(targetStart + targetCount * FdtKerningEntrySize);
+            if (changed == sourceAsciiEntries.Count &&
+                targetCount == entries.Count &&
+                KerningEntriesMatch(targetFdt, targetStart, entries))
+            {
+                return 0;
+            }
+
+            int newKerningBytes = checked(entries.Count * FdtKerningEntrySize);
+            int oldKerningBytes = checked(targetCount * FdtKerningEntrySize);
+            int delta = newKerningBytes - oldKerningBytes;
+            byte[] rewritten = new byte[checked(targetFdt.Length + delta)];
+            Buffer.BlockCopy(targetFdt, 0, rewritten, 0, targetStart);
+            for (int i = 0; i < entries.Count; i++)
+            {
+                Buffer.BlockCopy(entries[i], 0, rewritten, targetStart + i * FdtKerningEntrySize, FdtKerningEntrySize);
+            }
+
+            Buffer.BlockCopy(targetFdt, targetEnd, rewritten, targetStart + newKerningBytes, targetFdt.Length - targetEnd);
+            Endian.WriteUInt32LE(rewritten, targetHeaderOffset + 0x04, checked((uint)entries.Count));
+            targetFdt = rewritten;
+            return Math.Max(changed, sourceAsciiEntries.Count);
+        }
+
+        private static bool TryGetFdtKerningTable(byte[] fdt, out int headerOffset, out int entryStart, out int entryCount)
+        {
+            headerOffset = 0;
+            entryStart = 0;
+            entryCount = 0;
+            if (fdt == null || fdt.Length < FdtHeaderSize)
+            {
+                return false;
+            }
+
+            uint rawHeaderOffset = Endian.ReadUInt32LE(fdt, 0x0C);
+            if (rawHeaderOffset == 0 ||
+                rawHeaderOffset > int.MaxValue ||
+                rawHeaderOffset < FdtHeaderSize ||
+                rawHeaderOffset > fdt.Length - FdtKerningHeaderSize)
+            {
+                return false;
+            }
+
+            headerOffset = checked((int)rawHeaderOffset);
+            if (!HasAsciiSignature(fdt, headerOffset, "knhd"))
+            {
+                return false;
+            }
+
+            uint rawCount = Endian.ReadUInt32LE(fdt, headerOffset + 0x04);
+            if (rawCount > int.MaxValue)
+            {
+                return false;
+            }
+
+            entryCount = checked((int)rawCount);
+            entryStart = headerOffset + FdtKerningHeaderSize;
+            long entryBytes = (long)entryCount * FdtKerningEntrySize;
+            return entryBytes >= 0 && entryStart <= fdt.Length && entryStart + entryBytes <= fdt.Length;
+        }
+
+        private static int CompareKerningEntries(byte[] left, byte[] right)
+        {
+            int compare = Endian.ReadUInt32LE(left, 0).CompareTo(Endian.ReadUInt32LE(right, 0));
+            if (compare != 0)
+            {
+                return compare;
+            }
+
+            return Endian.ReadUInt32LE(left, 4).CompareTo(Endian.ReadUInt32LE(right, 4));
+        }
+
+        private static bool KerningEntriesMatch(byte[] fdt, int entryStart, List<byte[]> entries)
+        {
+            for (int i = 0; i < entries.Count; i++)
+            {
+                int offset = entryStart + i * FdtKerningEntrySize;
+                for (int b = 0; b < FdtKerningEntrySize; b++)
+                {
+                    if (fdt[offset + b] != entries[i][b])
+                    {
+                        return false;
+                    }
+                }
+            }
+
+            return true;
+        }
+
+        private static bool IsAsciiKerningKey(uint value)
+        {
+            return value >= 0x20 && value <= 0x7E;
+        }
+
+        private static string BuildKerningKey(uint left, uint right)
+        {
+            return left.ToString("X2") + ":" + right.ToString("X2");
         }
 
         private static bool ShouldRepairCleanAsciiFont(string path)
@@ -2621,7 +2813,7 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
             {
                 FontTexturePatch protectedPatch = protectedPatches[i];
                 bool overlapsAnyPatch = false;
-                bool overlapsCriticalNumericPatch = false;
+                bool overlapsCriticalAsciiPatch = false;
                 for (int pendingIndex = 0; pendingIndex < originalPendingCount; pendingIndex++)
                 {
                     FontTexturePatch pendingPatch = pendingPatches[pendingIndex];
@@ -2631,14 +2823,14 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
                     }
 
                     overlapsAnyPatch = true;
-                    if (IsCriticalNumericTexturePatch(pendingPatch))
+                    if (IsCriticalAsciiTexturePatch(pendingPatch))
                     {
-                        overlapsCriticalNumericPatch = true;
+                        overlapsCriticalAsciiPatch = true;
                         break;
                     }
                 }
 
-                if (overlapsAnyPatch && !overlapsCriticalNumericPatch)
+                if (overlapsAnyPatch && !overlapsCriticalAsciiPatch)
                 {
                     pendingPatches.Add(protectedPatch);
                     appended++;
@@ -2665,11 +2857,11 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
                    leftBottom > right.TargetY;
         }
 
-        private static bool IsCriticalNumericTexturePatch(FontTexturePatch patch)
+        private static bool IsCriticalAsciiTexturePatch(FontTexturePatch patch)
         {
             return patch != null &&
-                   patch.SourceCodepoint >= '0' &&
-                   patch.SourceCodepoint <= '9';
+                   patch.SourceCodepoint >= 0x20 &&
+                   patch.SourceCodepoint <= 0x7E;
         }
 
         private static void AddFontAtlasAllocator(FontGlyphRepairContext context, FontPatchPackage fontPackage, FileStream mpdStream, string texturePath)

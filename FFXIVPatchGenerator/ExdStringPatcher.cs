@@ -457,7 +457,8 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
                         replacement = columnRemap.LiteralBytes;
                     }
 
-                    if (replacement != null && replacement.Length > 0)
+                    if (replacement != null &&
+                        (replacement.Length > 0 || sheetPolicy.ShouldUseGlobalFallbackRow(targetRow.RowId)))
                     {
                         if (!sheetPolicy.ShouldUseGlobalFallbackRow(targetRow.RowId) &&
                             ShouldKeepOriginalForUiStructure(patchPolicy, original, replacement))

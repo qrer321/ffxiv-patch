@@ -26,7 +26,7 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
         private const ushort MkdSupportJobFullNameColumnOffset = 0;
         private const ushort MkdSupportJobShortNameColumnOffset = 4;
         private const ushort MkdSupportJobEnglishFullNameColumnOffset = 16;
-        private static readonly uint[] GlobalLobbyDataCenterRows = new uint[] { 791, 792, 793, 794, 800, 801, 802, 803, 804, 805, 806 };
+        private static readonly uint[] GlobalLobbyDataCenterRows = new uint[] { 791, 792, 793, 794, 800, 801, 802, 803, 804, 805, 806, 812, 813, 814, 815, 816 };
         private static readonly uint[] GlobalDataCenterTravelAddonRows = new uint[] { 12514, 12525 };
 
         private readonly HashSet<string> _deleteFiles = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
