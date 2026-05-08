@@ -68,6 +68,7 @@
     <Compile Include="UldFontRoutes.cs" />
     <Compile Include="VerifierAssertions.cs" />
     <Compile Include="VerifierGlyphAssertions.cs" />
+    <Compile Include="VerifierTextAssertions.cs" />
     <Compile Include="VerifierUtilities.cs" />
     <Compile Include="VerificationData.cs" />
     <Compile Include="..\..\FFXIVPatchGenerator\SqPack.cs">
