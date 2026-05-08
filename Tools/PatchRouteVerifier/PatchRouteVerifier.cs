@@ -116,8 +116,11 @@ namespace FfxivKoreanPatch.PatchRouteVerifier
         private const int FdtHeaderSize = 0x20;
         private const int FdtFontTableHeaderSize = 0x20;
         private const int FdtGlyphEntrySize = 0x10;
+        private const int FdtKerningHeaderSize = 0x10;
+        private const int FdtKerningEntrySize = 0x10;
         private const int GlyphCanvasSize = 96;
         private const int GlyphDumpScale = 4;
+        private const int ProtectedHangulMinimumVisiblePixels = 300;
         private const byte UldTrumpGothicFontId = 3;
         private const byte UldJupiterFontId = 4;
         private const byte UldMiedingerMedFontId = 1;
@@ -127,10 +130,21 @@ namespace FfxivKoreanPatch.PatchRouteVerifier
         {
             "DATA CENTER SELECT",
             "INFORMATION",
+            "Data Center Selection",
+            "Information",
             "JAPAN DATA CENTER",
             "NORTH AMERICA DATA CENTER",
             "EUROPE DATA CENTER",
             "OCEANIA DATA CENTER",
+            "Japan Data Center",
+            "North America Data Center",
+            "Europe Data Center",
+            "Oceania Data Center",
+            "Japanese Data Centers",
+            "North American Data Centers",
+            "European Data Centers",
+            "Oceanian Data Center",
+            "NA Cloud Data Center (Beta)",
             "Japan",
             "North America",
             "Europe",
@@ -305,6 +319,7 @@ namespace FfxivKoreanPatch.PatchRouteVerifier
                     VerifyBozjaEntranceRows();
                     VerifyOccultCrescentSupportJobRows();
                     VerifyDataCenterTitleGlyphs();
+                    VerifyCleanAsciiFontRoutes();
                     VerifyHighScaleAsciiPhraseLayouts();
                     Verify4kLobbyFontDerivations();
                     Verify4kLobbyPhraseLayouts();
@@ -328,6 +343,7 @@ namespace FfxivKoreanPatch.PatchRouteVerifier
                 ExpectText("Lobby", 793, GetLobbyDataCenterLabel("Europe"));
                 ExpectText("Lobby", 794, GetLobbyDataCenterLabel("Oceania"));
                 ExpectText("Lobby", 800, IsEnglishTargetLanguage() ? "Data Center Selection" : "DATA CENTER SELECT");
+                ExpectText("Lobby", 801, GetLobbyDataCenterPrompt());
                 ExpectText("Lobby", 802, "Data Center");
                 ExpectText("Lobby", 803, IsEnglishTargetLanguage() ? "Information" : "INFORMATION");
                 ExpectTextContains("Lobby", 806, GetLobbyInformationBodySubstring());
@@ -363,6 +379,11 @@ namespace FfxivKoreanPatch.PatchRouteVerifier
                 ExpectText("WorldDCGroupType", 11, "Dynamis");
                 ExpectText("WorldDCGroupType", 12, "Shadow");
                 ExpectText("WorldDCGroupType", 13, "NA Cloud DC (Beta)");
+                ExpectText("Lobby", 812, GetLobbyRegionDataCenterLabel("Japan"));
+                ExpectText("Lobby", 813, GetLobbyRegionDataCenterLabel("North America"));
+                ExpectText("Lobby", 814, GetLobbyRegionDataCenterLabel("Europe"));
+                ExpectText("Lobby", 815, GetLobbyRegionDataCenterLabel("Oceania"));
+                ExpectText("Lobby", 816, "NA Cloud Data Center (Beta)");
             }
 
             private void VerifyDataCenterRowsAllGlobalLanguageSlots()
@@ -376,7 +397,16 @@ namespace FfxivKoreanPatch.PatchRouteVerifier
                     new DataCenterLabelExpectation("Lobby", 792, GetLobbyDataCenterLabel("North America")),
                     new DataCenterLabelExpectation("Lobby", 793, GetLobbyDataCenterLabel("Europe")),
                     new DataCenterLabelExpectation("Lobby", 794, GetLobbyDataCenterLabel("Oceania")),
+                    new DataCenterLabelExpectation("Lobby", 800, IsEnglishTargetLanguage() ? "Data Center Selection" : "DATA CENTER SELECT"),
+                    new DataCenterLabelExpectation("Lobby", 801, GetLobbyDataCenterPrompt()),
+                    new DataCenterLabelExpectation("Lobby", 802, "Data Center"),
+                    new DataCenterLabelExpectation("Lobby", 803, IsEnglishTargetLanguage() ? "Information" : "INFORMATION"),
                     new DataCenterLabelExpectation("Lobby", 806, GetLobbyInformationBodySubstring(), true),
+                    new DataCenterLabelExpectation("Lobby", 812, GetLobbyRegionDataCenterLabel("Japan")),
+                    new DataCenterLabelExpectation("Lobby", 813, GetLobbyRegionDataCenterLabel("North America")),
+                    new DataCenterLabelExpectation("Lobby", 814, GetLobbyRegionDataCenterLabel("Europe")),
+                    new DataCenterLabelExpectation("Lobby", 815, GetLobbyRegionDataCenterLabel("Oceania")),
+                    new DataCenterLabelExpectation("Lobby", 816, "NA Cloud Data Center (Beta)"),
                     new DataCenterLabelExpectation("WorldRegionGroup", 1, "Japan"),
                     new DataCenterLabelExpectation("WorldRegionGroup", 2, "North America"),
                     new DataCenterLabelExpectation("WorldRegionGroup", 3, "Europe"),
@@ -429,6 +459,16 @@ namespace FfxivKoreanPatch.PatchRouteVerifier
                 return "\u30D5\u30A1\u30A4\u30CA\u30EB\u30D5\u30A1\u30F3\u30BF\u30B8\u30FCXIV";
             }
 
+            private string GetLobbyDataCenterPrompt()
+            {
+                if (IsEnglishTargetLanguage())
+                {
+                    return string.Empty;
+                }
+
+                return "\u63A5\u7D9A\u3059\u308B\u30C7\u30FC\u30BF\u30BB\u30F3\u30BF\u30FC\u3092\u9078\u629E";
+            }
+
             private string GetLobbyDataCenterLabel(string region)
             {
                 if (!IsEnglishTargetLanguage())
@@ -458,6 +498,37 @@ namespace FfxivKoreanPatch.PatchRouteVerifier
 
                 return region + " Data Center";
             }
+
+            private string GetLobbyRegionDataCenterLabel(string region)
+            {
+                if (!IsEnglishTargetLanguage())
+                {
+                    return region + " Data Center";
+                }
+
+                if (string.Equals(region, "Japan", StringComparison.Ordinal))
+                {
+                    return "Japanese Data Centers";
+                }
+
+                if (string.Equals(region, "North America", StringComparison.Ordinal))
+                {
+                    return "North American Data Centers";
+                }
+
+                if (string.Equals(region, "Europe", StringComparison.Ordinal))
+                {
+                    return "European Data Centers";
+                }
+
+                if (string.Equals(region, "Oceania", StringComparison.Ordinal))
+                {
+                    return "Oceanian Data Center";
+                }
+
+                return region + " Data Center";
+            }
+
 
             private void VerifyDataCenterTitleUldRoute()
             {
@@ -746,6 +817,180 @@ namespace FfxivKoreanPatch.PatchRouteVerifier
                 }
             }
 
+            private void VerifyCleanAsciiFontRoutes()
+            {
+                Console.WriteLine("[FDT] Clean ASCII glyph and kerning routes");
+                HashSet<string> checkedTargets = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+                for (int i = 0; i < LobbyPhraseFontPaths.Length; i++)
+                {
+                    string targetFontPath = LobbyPhraseFontPaths[i];
+                    if (checkedTargets.Add(targetFontPath))
+                    {
+                        VerifyCleanAsciiFontRoute(ResolveCleanAsciiReferenceFontPath(targetFontPath), targetFontPath);
+                    }
+                }
+
+                for (int i = 0; i < DialoguePhraseFontPaths.Length; i++)
+                {
+                    string targetFontPath = DialoguePhraseFontPaths[i];
+                    if (checkedTargets.Add(targetFontPath))
+                    {
+                        VerifyCleanAsciiFontRoute(ResolveCleanAsciiReferenceFontPath(targetFontPath), targetFontPath);
+                    }
+                }
+            }
+
+            private void VerifyCleanAsciiFontRoute(string sourceFontPath, string targetFontPath)
+            {
+                try
+                {
+                    byte[] sourceFdt = _cleanFont.ReadFile(sourceFontPath);
+                    byte[] targetFdt = _patchedFont.ReadFile(targetFontPath);
+                    uint[] codepoints = CreateAsciiCodepoints();
+                    int checkedGlyphs = 0;
+                    bool ok = true;
+
+                    for (int i = 0; i < codepoints.Length; i++)
+                    {
+                        uint codepoint = codepoints[i];
+                        FdtGlyphEntry sourceGlyph;
+                        if (!TryFindGlyph(sourceFdt, codepoint, out sourceGlyph))
+                        {
+                            continue;
+                        }
+
+                        FdtGlyphEntry targetGlyph;
+                        if (!TryFindGlyph(targetFdt, codepoint, out targetGlyph))
+                        {
+                            Fail("{0} clean ASCII route missing U+{1:X4} from {2}", targetFontPath, codepoint, sourceFontPath);
+                            ok = false;
+                            continue;
+                        }
+
+                        if (!GlyphSpacingMetricsMatch(sourceGlyph, targetGlyph))
+                        {
+                            Fail(
+                                "{0} U+{1:X4} spacing differs from {2}: target={3}, clean={4}",
+                                targetFontPath,
+                                codepoint,
+                                sourceFontPath,
+                                FormatGlyphSpacing(targetGlyph),
+                                FormatGlyphSpacing(sourceGlyph));
+                            ok = false;
+                            continue;
+                        }
+
+                        GlyphCanvas sourceCanvas = RenderGlyph(_cleanFont, sourceFontPath, codepoint);
+                        GlyphCanvas targetCanvas = RenderGlyph(_patchedFont, targetFontPath, codepoint);
+                        long score = Diff(sourceCanvas.Alpha, targetCanvas.Alpha);
+                        if (score != 0)
+                        {
+                            Fail(
+                                "{0} U+{1:X4} pixels differ from {2}: score={3}, visible={4}/{5}",
+                                targetFontPath,
+                                codepoint,
+                                sourceFontPath,
+                                score,
+                                sourceCanvas.VisiblePixels,
+                                targetCanvas.VisiblePixels);
+                            ok = false;
+                            continue;
+                        }
+
+                        checkedGlyphs++;
+                    }
+
+                    int checkedKerning = VerifyCleanAsciiKerningRoute(sourceFdt, targetFdt, sourceFontPath, targetFontPath, ref ok);
+                    if (ok && checkedGlyphs > 0)
+                    {
+                        Pass("{0} clean ASCII route matches {1}: glyphs={2}, kerning={3}", targetFontPath, sourceFontPath, checkedGlyphs, checkedKerning);
+                    }
+                    else if (ok)
+                    {
+                        Warn("{0} clean ASCII route had no source glyphs in {1}", targetFontPath, sourceFontPath);
+                    }
+                }
+                catch (Exception ex)
+                {
+                    Fail("{0} clean ASCII route check error: {1}", targetFontPath, ex.Message);
+                }
+            }
+
+            private int VerifyCleanAsciiKerningRoute(
+                byte[] sourceFdt,
+                byte[] targetFdt,
+                string sourceFontPath,
+                string targetFontPath,
+                ref bool ok)
+            {
+                Dictionary<string, byte[]> sourceKerning = ReadAsciiKerningEntries(sourceFdt);
+                Dictionary<string, byte[]> targetKerning = ReadAsciiKerningEntries(targetFdt);
+                int checkedPairs = 0;
+
+                foreach (KeyValuePair<string, byte[]> sourcePair in sourceKerning)
+                {
+                    byte[] targetEntry;
+                    if (!targetKerning.TryGetValue(sourcePair.Key, out targetEntry))
+                    {
+                        Fail("{0} missing ASCII kerning pair {1} from {2}", targetFontPath, sourcePair.Key, sourceFontPath);
+                        ok = false;
+                        continue;
+                    }
+
+                    if (!BytesEqual(sourcePair.Value, targetEntry))
+                    {
+                        Fail(
+                            "{0} ASCII kerning pair {1} differs from {2}: target={3}, clean={4}",
+                            targetFontPath,
+                            sourcePair.Key,
+                            sourceFontPath,
+                            ToHex(targetEntry),
+                            ToHex(sourcePair.Value));
+                        ok = false;
+                        continue;
+                    }
+
+                    checkedPairs++;
+                }
+
+                foreach (string targetKey in targetKerning.Keys)
+                {
+                    if (!sourceKerning.ContainsKey(targetKey))
+                    {
+                        Fail("{0} has extra ASCII kerning pair {1} not present in {2}", targetFontPath, targetKey, sourceFontPath);
+                        ok = false;
+                    }
+                }
+
+                return checkedPairs;
+            }
+
+            private static string ResolveCleanAsciiReferenceFontPath(string targetFontPath)
+            {
+                string normalized = targetFontPath.Replace('\\', '/');
+                if (normalized.IndexOf("/KrnAXIS_120.fdt", StringComparison.OrdinalIgnoreCase) >= 0)
+                {
+                    return "common/font/AXIS_12.fdt";
+                }
+
+                if (normalized.IndexOf("/KrnAXIS_140.fdt", StringComparison.OrdinalIgnoreCase) >= 0)
+                {
+                    return "common/font/AXIS_14.fdt";
+                }
+
+                if (normalized.IndexOf("/KrnAXIS_180.fdt", StringComparison.OrdinalIgnoreCase) >= 0)
+                {
+                    return "common/font/AXIS_18.fdt";
+                }
+
+                if (normalized.IndexOf("/KrnAXIS_360.fdt", StringComparison.OrdinalIgnoreCase) >= 0)
+                {
+                    return "common/font/AXIS_36.fdt";
+                }
+
+                return normalized;
+            }
+
             private static uint[] CreateAsciiCodepoints()
             {
                 uint[] codepoints = new uint[0x7E - 0x21 + 1];
@@ -762,10 +1007,17 @@ namespace FfxivKoreanPatch.PatchRouteVerifier
                 Console.WriteLine("[FDT] High-scale ASCII phrase metrics");
                 string[,] fontPairs =
                 {
+                    { "common/font/AXIS_12.fdt", "common/font/AXIS_12.fdt" },
+                    { "common/font/AXIS_14.fdt", "common/font/AXIS_14.fdt" },
                     { "common/font/AXIS_18.fdt", "common/font/AXIS_18.fdt" },
                     { "common/font/AXIS_36.fdt", "common/font/AXIS_36.fdt" },
+                    { "common/font/AXIS_96.fdt", "common/font/AXIS_96.fdt" },
+                    { "common/font/AXIS_12.fdt", "common/font/KrnAXIS_120.fdt" },
+                    { "common/font/AXIS_14.fdt", "common/font/KrnAXIS_140.fdt" },
                     { "common/font/AXIS_18.fdt", "common/font/KrnAXIS_180.fdt" },
                     { "common/font/AXIS_36.fdt", "common/font/KrnAXIS_360.fdt" },
+                    { "common/font/AXIS_12_lobby.fdt", "common/font/AXIS_12_lobby.fdt" },
+                    { "common/font/AXIS_14_lobby.fdt", "common/font/AXIS_14_lobby.fdt" },
                     { "common/font/AXIS_18_lobby.fdt", "common/font/AXIS_18_lobby.fdt" },
                     { "common/font/AXIS_36_lobby.fdt", "common/font/AXIS_36_lobby.fdt" }
                 };
@@ -830,25 +1082,16 @@ namespace FfxivKoreanPatch.PatchRouteVerifier
                             return;
                         }
 
-                        if (sourceGlyph.Width != targetGlyph.Width ||
-                            sourceGlyph.Height != targetGlyph.Height ||
-                            sourceGlyph.OffsetX != targetGlyph.OffsetX ||
-                            sourceGlyph.OffsetY != targetGlyph.OffsetY)
+                        if (!GlyphSpacingMetricsMatch(sourceGlyph, targetGlyph))
                         {
                             Fail(
-                                "{0} phrase [{1}] U+{2:X4} metrics differ from {3}: {4}x{5}+{6}/{7} vs {8}x{9}+{10}/{11}",
+                                "{0} phrase [{1}] U+{2:X4} metrics differ from {3}: target={4}, clean={5}",
                                 targetFontPath,
                                 Escape(phrase),
                                 codepoint,
                                 sourceFontPath,
-                                targetGlyph.Width,
-                                targetGlyph.Height,
-                                targetGlyph.OffsetX,
-                                targetGlyph.OffsetY,
-                                sourceGlyph.Width,
-                                sourceGlyph.Height,
-                                sourceGlyph.OffsetX,
-                                sourceGlyph.OffsetY);
+                                FormatGlyphSpacing(targetGlyph),
+                                FormatGlyphSpacing(sourceGlyph));
                             return;
                         }
 
@@ -1132,7 +1375,9 @@ namespace FfxivKoreanPatch.PatchRouteVerifier
                 {
                     for (int c = 0; c < codepoints.Length; c++)
                     {
-                        ExpectGlyphVisibleAtLeast(_patchedFont, fonts[f], codepoints[c], 350);
+                        ExpectGlyphVisibleAtLeast(_patchedFont, fonts[f], codepoints[c], ProtectedHangulMinimumVisiblePixels);
+                        ExpectGlyphNotEqualToFallback(fonts[f], codepoints[c], '-');
+                        ExpectGlyphNotEqualToFallback(fonts[f], codepoints[c], '=');
                     }
                 }
             }
@@ -2068,6 +2313,8 @@ namespace FfxivKoreanPatch.PatchRouteVerifier
                 List<string> columns = GetStringColumns(_patchedText, expectation.Sheet, expectation.RowId, language);
                 bool found = false;
                 bool fallback = false;
+                bool hangul = false;
+                bool unexpectedNonEmpty = false;
                 for (int i = 0; i < columns.Count; i++)
                 {
                     if (expectation.AllowSubstring
@@ -2081,20 +2328,33 @@ namespace FfxivKoreanPatch.PatchRouteVerifier
                     {
                         fallback = true;
                     }
+
+                    if (ContainsHangul(columns[i]))
+                    {
+                        hangul = true;
+                    }
+
+                    if (!expectation.AllowSubstring && columns[i].Length > 0 && !string.Equals(columns[i], expectation.Expected, StringComparison.Ordinal))
+                    {
+                        unexpectedNonEmpty = true;
+                    }
                 }
 
-                if (found && !fallback)
+                if (found && !fallback && !hangul && !unexpectedNonEmpty)
                 {
                     Pass("{0}#{1}/{2} contains [{3}]", expectation.Sheet, expectation.RowId, language, expectation.Expected);
                     return;
                 }
 
                 Fail(
-                    "{0}#{1}/{2} expected [{3}], columns [{4}]",
+                    "{0}#{1}/{2} expected [{3}], fallback={4}, hangul={5}, unexpected={6}, columns [{7}]",
                     expectation.Sheet,
                     expectation.RowId,
                     language,
                     expectation.Expected,
+                    fallback,
+                    hangul,
+                    unexpectedNonEmpty,
                     string.Join("] [", columns.ToArray()));
             }
 
@@ -2192,21 +2452,24 @@ namespace FfxivKoreanPatch.PatchRouteVerifier
                     GlyphCanvas source = RenderGlyph(sourceArchive, sourceFdtPath, sourceCodepoint);
                     GlyphCanvas target = RenderGlyph(targetArchive, targetFdtPath, targetCodepoint);
                     long score = Diff(source.Alpha, target.Alpha);
-                    if (score == 0 && source.VisiblePixels > 0 && target.VisiblePixels > 0)
+                    bool spacingMatch = GlyphSpacingMetricsMatch(source.Glyph, target.Glyph);
+                    if (score == 0 && spacingMatch && source.VisiblePixels > 0 && target.VisiblePixels > 0)
                     {
                         Pass("{0} U+{1:X4} -> {2} U+{3:X4}", sourceFdtPath, sourceCodepoint, targetFdtPath, targetCodepoint);
                         return;
                     }
 
                     Fail(
-                        "{0} U+{1:X4} -> {2} U+{3:X4} mismatch score={4} visible={5}/{6}",
+                        "{0} U+{1:X4} -> {2} U+{3:X4} mismatch score={4} visible={5}/{6}, target={7}, clean={8}",
                         sourceFdtPath,
                         sourceCodepoint,
                         targetFdtPath,
                         targetCodepoint,
                         score,
                         source.VisiblePixels,
-                        target.VisiblePixels);
+                        target.VisiblePixels,
+                        FormatGlyphSpacing(target.Glyph),
+                        FormatGlyphSpacing(source.Glyph));
                 }
                 catch (Exception ex)
                 {
@@ -2724,6 +2987,29 @@ namespace FfxivKoreanPatch.PatchRouteVerifier
             return visible > 0 && visible == fallback;
         }
 
+        private static bool ContainsHangul(string value)
+        {
+            if (string.IsNullOrEmpty(value))
+            {
+                return false;
+            }
+
+            for (int i = 0; i < value.Length; i++)
+            {
+                char ch = value[i];
+                if ((ch >= '\uAC00' && ch <= '\uD7A3') ||
+                    (ch >= '\u1100' && ch <= '\u11FF') ||
+                    (ch >= '\u3130' && ch <= '\u318F') ||
+                    (ch >= '\uA960' && ch <= '\uA97F') ||
+                    (ch >= '\uD7B0' && ch <= '\uD7FF'))
+                {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
         private static List<UldTextNodeFont> GetUldTextNodeFonts(byte[] uld)
         {
             List<UldTextNodeFont> results = new List<UldTextNodeFont>();
@@ -3005,6 +3291,99 @@ namespace FfxivKoreanPatch.PatchRouteVerifier
             }
         }
 
+        private static bool GlyphSpacingMetricsMatch(FdtGlyphEntry sourceGlyph, FdtGlyphEntry targetGlyph)
+        {
+            return sourceGlyph.ShiftJisValue == targetGlyph.ShiftJisValue &&
+                   sourceGlyph.Width == targetGlyph.Width &&
+                   sourceGlyph.Height == targetGlyph.Height &&
+                   sourceGlyph.OffsetX == targetGlyph.OffsetX &&
+                   sourceGlyph.OffsetY == targetGlyph.OffsetY;
+        }
+
+        private static string FormatGlyphSpacing(FdtGlyphEntry glyph)
+        {
+            return "sjis=0x" + glyph.ShiftJisValue.ToString("X4") +
+                ", size=" + glyph.Width.ToString() + "x" + glyph.Height.ToString() +
+                ", offset=" + glyph.OffsetX.ToString() + "/" + glyph.OffsetY.ToString();
+        }
+
+        private static Dictionary<string, byte[]> ReadAsciiKerningEntries(byte[] fdt)
+        {
+            Dictionary<string, byte[]> entries = new Dictionary<string, byte[]>(StringComparer.Ordinal);
+            if (fdt == null || fdt.Length < FdtHeaderSize)
+            {
+                return entries;
+            }
+
+            uint headerOffset = Endian.ReadUInt32LE(fdt, 0x0C);
+            if (headerOffset == 0 ||
+                headerOffset > int.MaxValue ||
+                headerOffset < FdtHeaderSize ||
+                headerOffset > fdt.Length - FdtKerningHeaderSize)
+            {
+                return entries;
+            }
+
+            int kerningHeaderOffset = checked((int)headerOffset);
+            if (!HasAsciiMagic(fdt, kerningHeaderOffset, "knhd"))
+            {
+                return entries;
+            }
+
+            uint kerningCount = Endian.ReadUInt32LE(fdt, kerningHeaderOffset + 0x04);
+            int kerningStart = kerningHeaderOffset + FdtKerningHeaderSize;
+            long kerningBytes = (long)kerningCount * FdtKerningEntrySize;
+            if (kerningBytes < 0 || kerningStart > fdt.Length || kerningStart + kerningBytes > fdt.Length)
+            {
+                return entries;
+            }
+
+            for (int i = 0; i < kerningCount; i++)
+            {
+                int offset = kerningStart + i * FdtKerningEntrySize;
+                uint left = Endian.ReadUInt32LE(fdt, offset);
+                uint right = Endian.ReadUInt32LE(fdt, offset + 4);
+                if (!IsAsciiKerningKey(left) || !IsAsciiKerningKey(right))
+                {
+                    continue;
+                }
+
+                byte[] entry = new byte[FdtKerningEntrySize];
+                Buffer.BlockCopy(fdt, offset, entry, 0, FdtKerningEntrySize);
+                entries[left.ToString("X2") + ":" + right.ToString("X2")] = entry;
+            }
+
+            return entries;
+        }
+
+        private static bool IsAsciiKerningKey(uint value)
+        {
+            return value >= 0x20 && value <= 0x7E;
+        }
+
+        private static bool BytesEqual(byte[] left, byte[] right)
+        {
+            if (ReferenceEquals(left, right))
+            {
+                return true;
+            }
+
+            if (left == null || right == null || left.Length != right.Length)
+            {
+                return false;
+            }
+
+            for (int i = 0; i < left.Length; i++)
+            {
+                if (left[i] != right[i])
+                {
+                    return false;
+                }
+            }
+
+            return true;
+        }
+
         private static bool TryFindGlyph(byte[] fdt, uint codepoint, out FdtGlyphEntry glyph)
         {
             int fontTableOffset;
@@ -3024,6 +3403,7 @@ namespace FfxivKoreanPatch.PatchRouteVerifier
                 {
                     glyph = new FdtGlyphEntry
                     {
+                        ShiftJisValue = Endian.ReadUInt16LE(fdt, offset + 4),
                         ImageIndex = Endian.ReadUInt16LE(fdt, offset + 6),
                         X = Endian.ReadUInt16LE(fdt, offset + 8),
                         Y = Endian.ReadUInt16LE(fdt, offset + 10),
@@ -3253,6 +3633,7 @@ namespace FfxivKoreanPatch.PatchRouteVerifier
 
         private struct FdtGlyphEntry
         {
+            public ushort ShiftJisValue;
             public ushort ImageIndex;
             public ushort X;
             public ushort Y;
