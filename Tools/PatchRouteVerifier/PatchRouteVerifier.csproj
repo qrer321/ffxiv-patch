@@ -42,6 +42,7 @@
     <Compile Include="DataCenterVerification.cs" />
     <Compile Include="ExcelTextAccess.cs" />
     <Compile Include="ExdScenarioVerification.cs" />
+    <Compile Include="FontGuardVerification.cs" />
     <Compile Include="FontGlyphRendering.cs" />
     <Compile Include="FontRouteVerification.cs" />
     <Compile Include="GlyphDiagnostics.cs" />
