@@ -163,22 +163,22 @@ namespace FfxivKoreanPatch.PatchRouteVerifier
         };
         private static readonly MkdSupportJobExpectation[] MkdSupportJobExpectations = new MkdSupportJobExpectation[]
         {
-            new MkdSupportJobExpectation(0, "Phantom Freelancer", "Ph. Freelancer"),
-            new MkdSupportJobExpectation(1, "Phantom Knight", "Ph. Knight"),
-            new MkdSupportJobExpectation(2, "Phantom Berserker", "Ph. Berserker"),
-            new MkdSupportJobExpectation(3, "Phantom Monk", "Ph. Monk"),
-            new MkdSupportJobExpectation(4, "Phantom Ranger", "Ph. Ranger"),
-            new MkdSupportJobExpectation(5, "Phantom Samurai", "Ph. Samurai"),
-            new MkdSupportJobExpectation(6, "Phantom Bard", "Ph. Bard"),
-            new MkdSupportJobExpectation(7, "Phantom Geomancer", "Ph. Geomancer"),
-            new MkdSupportJobExpectation(8, "Phantom Time Mage", "Ph. Time Mage"),
-            new MkdSupportJobExpectation(9, "Phantom Cannoneer", "Ph. Cannoneer"),
-            new MkdSupportJobExpectation(10, "Phantom Chemist", "Ph. Chemist"),
-            new MkdSupportJobExpectation(11, "Phantom Oracle", "Ph. Oracle"),
-            new MkdSupportJobExpectation(12, "Phantom Thief", "Ph. Thief"),
-            new MkdSupportJobExpectation(13, "Phantom Mystic Knight", "Ph. Mystic Knight"),
-            new MkdSupportJobExpectation(14, "Phantom Gladiator", "Ph. Gladiator"),
-            new MkdSupportJobExpectation(15, "Phantom Dancer", "Ph. Dancer")
+            new MkdSupportJobExpectation(0, "Phantom Freelancer", "Ph. Freelancer", "서포트 자유직"),
+            new MkdSupportJobExpectation(1, "Phantom Knight", "Ph. Knight", "서포트 나이트"),
+            new MkdSupportJobExpectation(2, "Phantom Berserker", "Ph. Berserker", "서포트 버서커"),
+            new MkdSupportJobExpectation(3, "Phantom Monk", "Ph. Monk", "서포트 몽크"),
+            new MkdSupportJobExpectation(4, "Phantom Ranger", "Ph. Ranger", "서포트 사냥꾼"),
+            new MkdSupportJobExpectation(5, "Phantom Samurai", "Ph. Samurai", "서포트 사무라이"),
+            new MkdSupportJobExpectation(6, "Phantom Bard", "Ph. Bard", "서포트 음유시인"),
+            new MkdSupportJobExpectation(7, "Phantom Geomancer", "Ph. Geomancer", "서포트 풍수사"),
+            new MkdSupportJobExpectation(8, "Phantom Time Mage", "Ph. Time Mage", "서포트 시마도사"),
+            new MkdSupportJobExpectation(9, "Phantom Cannoneer", "Ph. Cannoneer", "서포트 포격사"),
+            new MkdSupportJobExpectation(10, "Phantom Chemist", "Ph. Chemist", "서포트 약사"),
+            new MkdSupportJobExpectation(11, "Phantom Oracle", "Ph. Oracle", "서포트 예언사"),
+            new MkdSupportJobExpectation(12, "Phantom Thief", "Ph. Thief", "서포트 도적"),
+            new MkdSupportJobExpectation(13, "Phantom Mystic Knight", "Ph. Mystic Knight", "서포트 마법검사"),
+            new MkdSupportJobExpectation(14, "Phantom Gladiator", "Ph. Gladiator", "서포트 검투사"),
+            new MkdSupportJobExpectation(15, "Phantom Dancer", "Ph. Dancer", "서포트 무도가")
         };
 
         private static int Main(string[] args)
@@ -733,6 +733,9 @@ namespace FfxivKoreanPatch.PatchRouteVerifier
                 Console.WriteLine("[EXD] Configuration Sharing labels");
                 ExpectText("Addon", 17300, "\uC124\uC815 \uACF5\uC720");
                 ExpectText("Addon", 17301, "\uC124\uC815 \uACF5\uC720");
+                ExpectAnyTextColumnNotContains("Addon", 17300, "\u30B3\u30F3\u30D5\u30A3\u30B0\u30B7\u30A7\u30A2");
+                ExpectAnyTextColumnNotContains("Addon", 17300, "\u30B3\u30F3\u30C6\u30F3\u30C4\u30B7\u30A7\u30A2");
+                ExpectAnyTextColumnNotContains("Addon", 17300, "Configuration Sharing");
                 ExpectTextNotContains("Addon", 17301, "\u30B3\u30F3\u30D5\u30A3\u30B0\u30B7\u30A7\u30A2");
                 ExpectTextNotContains("Addon", 17301, "\u30B3\u30F3\u30C6\u30F3\u30C4\u30B7\u30A7\u30A2");
                 ExpectTextNotContains("Addon", 17301, "Configuration Sharing");
@@ -769,10 +772,10 @@ namespace FfxivKoreanPatch.PatchRouteVerifier
                 {
                     MkdSupportJobExpectation expectation = MkdSupportJobExpectations[i];
                     ExpectTextColumn("MkdSupportJob", expectation.RowId, 0, expectation.FullName);
-                    ExpectTextColumn("MkdSupportJob", expectation.RowId, 4, expectation.ShortName);
+                    ExpectTextColumn("MkdSupportJob", expectation.RowId, 4, expectation.SupportName);
                     ExpectTextColumn("MkdSupportJob", expectation.RowId, 16, expectation.FullName);
                     ExpectTextColumnNotContains("MkdSupportJob", expectation.RowId, 0, "\uC11C\uD3EC\uD2B8");
-                    ExpectTextColumnNotContains("MkdSupportJob", expectation.RowId, 4, "\uC11C\uD3EC\uD2B8");
+                    ExpectTextColumnNotContains("MkdSupportJob", expectation.RowId, 4, expectation.ShortName);
                     ExpectTextColumnContains("MkdSupportJob", expectation.RowId, 12, "\uC11C\uD3EC\uD2B8");
                 }
             }
@@ -3697,12 +3700,14 @@ namespace FfxivKoreanPatch.PatchRouteVerifier
             public readonly uint RowId;
             public readonly string FullName;
             public readonly string ShortName;
+            public readonly string SupportName;
 
-            public MkdSupportJobExpectation(uint rowId, string fullName, string shortName)
+            public MkdSupportJobExpectation(uint rowId, string fullName, string shortName, string supportName)
             {
                 RowId = rowId;
                 FullName = fullName;
                 ShortName = shortName;
+                SupportName = supportName;
             }
         }
     }
