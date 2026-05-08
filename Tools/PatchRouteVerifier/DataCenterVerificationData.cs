@@ -5,7 +5,14 @@ namespace FfxivKoreanPatch.PatchRouteVerifier
     internal static partial class PatchRouteVerifier
     {
         private static readonly string[] DataCenterGlobalLanguages = new string[] { "ja", "en", "de", "fr" };
-        private static readonly string[] DataCenterRegions = new string[] { "Japan", "North America", "Europe", "Oceania" };
+        private static readonly DataCenterRegionLabel[] DataCenterRegionLabels = new DataCenterRegionLabel[]
+        {
+            new DataCenterRegionLabel("Japan", "Japanese Data Center", "Japanese Data Centers"),
+            new DataCenterRegionLabel("North America", "North American Data Center", "North American Data Centers"),
+            new DataCenterRegionLabel("Europe", "European Data Center", "European Data Centers"),
+            new DataCenterRegionLabel("Oceania", "Oceanian Data Center", "Oceanian Data Center")
+        };
+        private static readonly string[] DataCenterRegions = CreateDataCenterRegions();
         private static readonly string[] WorldRegionGroupLabels = new string[]
         {
             "Japan",
@@ -56,18 +63,35 @@ namespace FfxivKoreanPatch.PatchRouteVerifier
                 labels.Add(DataCenterRegions[i] + " Data Center");
             }
 
-            labels.Add("Japanese Data Center");
-            labels.Add("North American Data Center");
-            labels.Add("European Data Center");
-            labels.Add("Oceanian Data Center");
-            labels.Add("Japanese Data Centers");
-            labels.Add("North American Data Centers");
-            labels.Add("European Data Centers");
+            for (int i = 0; i < DataCenterRegionLabels.Length; i++)
+            {
+                labels.Add(DataCenterRegionLabels[i].Singular);
+            }
+
+            for (int i = 0; i < DataCenterRegionLabels.Length; i++)
+            {
+                if (!string.Equals(DataCenterRegionLabels[i].Plural, DataCenterRegionLabels[i].Singular, System.StringComparison.Ordinal))
+                {
+                    labels.Add(DataCenterRegionLabels[i].Plural);
+                }
+            }
+
             labels.Add("NA Cloud Data Center (Beta)");
             AddLabels(labels, WorldRegionGroupLabels);
             AddLabels(labels, WorldPhysicalDcLabels);
             AddLabels(labels, WorldDcGroupTypeLabels);
             return labels.ToArray();
+        }
+
+        private static string[] CreateDataCenterRegions()
+        {
+            string[] regions = new string[DataCenterRegionLabels.Length];
+            for (int i = 0; i < DataCenterRegionLabels.Length; i++)
+            {
+                regions[i] = DataCenterRegionLabels[i].Region;
+            }
+
+            return regions;
         }
 
         private static void AddLabels(List<string> target, string[] labels)
@@ -91,6 +115,20 @@ namespace FfxivKoreanPatch.PatchRouteVerifier
                 RowId = rowId;
                 Expected = expected;
                 AllowSubstring = allowSubstring;
+            }
+        }
+
+        private sealed class DataCenterRegionLabel
+        {
+            public readonly string Region;
+            public readonly string Singular;
+            public readonly string Plural;
+
+            public DataCenterRegionLabel(string region, string singular, string plural)
+            {
+                Region = region;
+                Singular = singular;
+                Plural = plural;
             }
         }
     }

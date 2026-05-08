@@ -146,27 +146,7 @@ namespace FfxivKoreanPatch.PatchRouteVerifier
                     return region + " Data Center";
                 }
 
-                if (string.Equals(region, "Japan", StringComparison.Ordinal))
-                {
-                    return "Japanese Data Center";
-                }
-
-                if (string.Equals(region, "North America", StringComparison.Ordinal))
-                {
-                    return "North American Data Center";
-                }
-
-                if (string.Equals(region, "Europe", StringComparison.Ordinal))
-                {
-                    return "European Data Center";
-                }
-
-                if (string.Equals(region, "Oceania", StringComparison.Ordinal))
-                {
-                    return "Oceanian Data Center";
-                }
-
-                return region + " Data Center";
+                return GetEnglishDataCenterRegionLabel(region, false);
             }
 
             private string GetLobbyRegionDataCenterLabel(string region)
@@ -176,24 +156,17 @@ namespace FfxivKoreanPatch.PatchRouteVerifier
                     return region + " Data Center";
                 }
 
-                if (string.Equals(region, "Japan", StringComparison.Ordinal))
-                {
-                    return "Japanese Data Centers";
-                }
+                return GetEnglishDataCenterRegionLabel(region, true);
+            }
 
-                if (string.Equals(region, "North America", StringComparison.Ordinal))
+            private static string GetEnglishDataCenterRegionLabel(string region, bool plural)
+            {
+                for (int i = 0; i < DataCenterRegionLabels.Length; i++)
                 {
-                    return "North American Data Centers";
-                }
-
-                if (string.Equals(region, "Europe", StringComparison.Ordinal))
-                {
-                    return "European Data Centers";
-                }
-
-                if (string.Equals(region, "Oceania", StringComparison.Ordinal))
-                {
-                    return "Oceanian Data Center";
+                    if (string.Equals(region, DataCenterRegionLabels[i].Region, StringComparison.Ordinal))
+                    {
+                        return plural ? DataCenterRegionLabels[i].Plural : DataCenterRegionLabels[i].Singular;
+                    }
                 }
 
                 return region + " Data Center";
