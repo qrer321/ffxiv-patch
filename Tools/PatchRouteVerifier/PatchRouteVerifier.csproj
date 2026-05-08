@@ -38,6 +38,7 @@
   </ItemGroup>
   <ItemGroup>
     <Compile Include="DataCenterVerification.cs" />
+    <Compile Include="ExdScenarioVerification.cs" />
     <Compile Include="PatchRouteVerifier.cs" />
     <Compile Include="..\..\FFXIVPatchGenerator\SqPack.cs">
       <Link>Generator\SqPack.cs</Link>
