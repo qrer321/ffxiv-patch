@@ -85,6 +85,20 @@ namespace FfxivKoreanPatch.PatchRouteVerifier
             return true;
         }
 
+        private static uint ReadCodepoint(string value, ref int index)
+        {
+            if (char.IsHighSurrogate(value[index]) &&
+                index + 1 < value.Length &&
+                char.IsLowSurrogate(value[index + 1]))
+            {
+                uint codepoint = (uint)char.ConvertToUtf32(value[index], value[index + 1]);
+                index++;
+                return codepoint;
+            }
+
+            return value[index];
+        }
+
         private static string Escape(string value)
         {
             return (value ?? string.Empty).Replace("\r", "\\r").Replace("\n", "\\n").Replace("\t", "\\t");
