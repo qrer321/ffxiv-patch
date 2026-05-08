@@ -102,8 +102,9 @@ UI가 release 폴더를 적용할 때는 별도로 `manifest.json`을 생성해 
 
 - `delete_files`: sheet 전체 스킵
 - `row_key_fallback_files`: string key가 없는 sheet의 row-id fallback 허용. `*`, `?` wildcard를 사용할 수 있습니다.
-- `keep_rows`, `delete_rows`: 특정 row를 글로벌 원본으로 유지
-- `keep_columns`, `delete_columns`: 특정 문자열 column을 글로벌 원본으로 유지
+- `preserve_global_rows`: 특정 row를 글로벌 원본으로 유지
+- `preserve_global_columns`: 특정 문자열 column을 글로벌 원본으로 유지
+- `keep_rows`, `delete_rows`, `keep_columns`, `delete_columns`: 이전 정책 파일 호환용 alias
 - `global_target_rows`: 특정 row를 대상 글로벌 언어 원본으로 유지. `--target-language ja`면 일본어 row, `en`이면 영어 row를 사용합니다.
 - `global_english_rows`: 특정 row를 글로벌 영어 원본으로 유지
 - `remap_keys`: 대상 row id가 참조할 한국 서버 source row id 지정

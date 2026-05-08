@@ -133,41 +133,79 @@ namespace FfxivKoreanPatch.PatchRouteVerifier
         private const byte UldMiedingerMedFontId = 1;
         private const byte UldAxisFontId = 0;
         private const uint UncompressedBlock = 32000;
-        private static readonly string[] DataCenterWorldmapLabels = new string[]
+        private static readonly string[] DataCenterGlobalLanguages = new string[] { "ja", "en", "de", "fr" };
+        private static readonly string[] DataCenterRegions = new string[] { "Japan", "North America", "Europe", "Oceania" };
+        private static readonly string[] WorldRegionGroupLabels = new string[]
         {
-            "DATA CENTER SELECT",
-            "INFORMATION",
-            "Data Center Selection",
-            "Information",
-            "JAPAN DATA CENTER",
-            "NORTH AMERICA DATA CENTER",
-            "EUROPE DATA CENTER",
-            "OCEANIA DATA CENTER",
-            "Japan Data Center",
-            "North America Data Center",
-            "Europe Data Center",
-            "Oceania Data Center",
-            "Japanese Data Centers",
-            "North American Data Centers",
-            "European Data Centers",
-            "Oceanian Data Center",
-            "NA Cloud Data Center (Beta)",
             "Japan",
             "North America",
             "Europe",
             "Oceania",
+            "China",
+            "Korea",
+            "NA Cloud",
+            "Traditional Chinese regions"
+        };
+        private static readonly string[] WorldPhysicalDcLabels = new string[]
+        {
+            "Japan",
+            "North America",
+            "Europe",
+            "Oceania",
+            "NA Cloud Data Center (Beta)"
+        };
+        private static readonly string[] WorldDcGroupTypeLabels = new string[]
+        {
             "Elemental",
             "Gaia",
             "Mana",
-            "Meteor",
             "Aether",
-            "Crystal",
-            "Dynamis",
             "Primal",
             "Chaos",
             "Light",
-            "Materia"
+            "Crystal",
+            "Materia",
+            "Meteor",
+            "Dynamis",
+            "Shadow",
+            "NA Cloud DC (Beta)"
         };
+        private static readonly string[] DataCenterWorldmapLabels = CreateDataCenterGlyphLabels();
+
+        private static string[] CreateDataCenterGlyphLabels()
+        {
+            List<string> labels = new List<string>();
+            labels.Add("DATA CENTER SELECT");
+            labels.Add("INFORMATION");
+            labels.Add("Data Center Selection");
+            labels.Add("Information");
+            for (int i = 0; i < DataCenterRegions.Length; i++)
+            {
+                labels.Add(DataCenterRegions[i].ToUpperInvariant() + " DATA CENTER");
+                labels.Add(DataCenterRegions[i] + " Data Center");
+            }
+
+            labels.Add("Japanese Data Center");
+            labels.Add("North American Data Center");
+            labels.Add("European Data Center");
+            labels.Add("Oceanian Data Center");
+            labels.Add("Japanese Data Centers");
+            labels.Add("North American Data Centers");
+            labels.Add("European Data Centers");
+            labels.Add("NA Cloud Data Center (Beta)");
+            AddLabels(labels, WorldRegionGroupLabels);
+            AddLabels(labels, WorldPhysicalDcLabels);
+            AddLabels(labels, WorldDcGroupTypeLabels);
+            return labels.ToArray();
+        }
+
+        private static void AddLabels(List<string> target, string[] labels)
+        {
+            for (int i = 0; i < labels.Length; i++)
+            {
+                target.Add(labels[i]);
+            }
+        }
         private static int Main(string[] args)
         {
             try
@@ -326,15 +364,12 @@ namespace FfxivKoreanPatch.PatchRouteVerifier
             private void VerifyDataCenterRows()
             {
                 Console.WriteLine("[EXD] Data center selection labels");
-                ExpectText("Lobby", 791, GetLobbyDataCenterLabel("Japan"));
-                ExpectText("Lobby", 792, GetLobbyDataCenterLabel("North America"));
-                ExpectText("Lobby", 793, GetLobbyDataCenterLabel("Europe"));
-                ExpectText("Lobby", 794, GetLobbyDataCenterLabel("Oceania"));
-                ExpectText("Lobby", 800, IsEnglishTargetLanguage() ? "Data Center Selection" : "DATA CENTER SELECT");
-                ExpectText("Lobby", 801, GetLobbyDataCenterPrompt());
-                ExpectText("Lobby", 802, "Data Center");
-                ExpectText("Lobby", 803, IsEnglishTargetLanguage() ? "Information" : "INFORMATION");
-                ExpectTextContains("Lobby", 806, GetLobbyInformationBodySubstring());
+                DataCenterLabelExpectation[] expectations = CreateDataCenterLabelExpectations();
+                for (int i = 0; i < expectations.Length; i++)
+                {
+                    ExpectPrimaryDataCenterLabel(expectations[i]);
+                }
+
                 if (IsEnglishTargetLanguage())
                 {
                     ExpectTextContains("Lobby", 806, "Japan");
@@ -346,98 +381,71 @@ namespace FfxivKoreanPatch.PatchRouteVerifier
                 {
                     ExpectTextNotContains("Lobby", 806, "FINAL FANTASY XIV requires connecting");
                 }
-                ExpectTextContains("Lobby", 808, GetLobbyDataCenterConnectingSubstring());
-                ExpectTextContains("Lobby", 809, GetLobbyCharacterListSubstring());
-                ExpectText("Lobby", 810, IsEnglishTargetLanguage() ? "Proceed" : "OK");
-                ExpectText("Lobby", 811, IsEnglishTargetLanguage() ? "Cancel" : "\u30AD\u30E3\u30F3\u30BB\u30EB");
-                ExpectText("WorldRegionGroup", 1, "Japan");
-                ExpectText("WorldRegionGroup", 2, "North America");
-                ExpectText("WorldRegionGroup", 3, "Europe");
-                ExpectText("WorldRegionGroup", 4, "Oceania");
-                ExpectText("WorldPhysicalDC", 1, "Japan");
-                ExpectText("WorldPhysicalDC", 2, "North America");
-                ExpectText("WorldPhysicalDC", 3, "Europe");
-                ExpectText("WorldPhysicalDC", 4, "Oceania");
-                ExpectText("WorldDCGroupType", 1, "Elemental");
-                ExpectText("WorldDCGroupType", 2, "Gaia");
-                ExpectText("WorldDCGroupType", 3, "Mana");
-                ExpectText("WorldDCGroupType", 4, "Aether");
-                ExpectText("WorldDCGroupType", 5, "Primal");
-                ExpectText("WorldDCGroupType", 6, "Chaos");
-                ExpectText("WorldDCGroupType", 7, "Light");
-                ExpectText("WorldDCGroupType", 8, "Crystal");
-                ExpectText("WorldDCGroupType", 9, "Materia");
-                ExpectText("WorldDCGroupType", 10, "Meteor");
-                ExpectText("WorldDCGroupType", 11, "Dynamis");
-                ExpectText("WorldDCGroupType", 12, "Shadow");
-                ExpectText("WorldDCGroupType", 13, "NA Cloud DC (Beta)");
-                ExpectText("Lobby", 812, GetLobbyRegionDataCenterLabel("Japan"));
-                ExpectText("Lobby", 813, GetLobbyRegionDataCenterLabel("North America"));
-                ExpectText("Lobby", 814, GetLobbyRegionDataCenterLabel("Europe"));
-                ExpectText("Lobby", 815, GetLobbyRegionDataCenterLabel("Oceania"));
-                ExpectText("Lobby", 816, "NA Cloud Data Center (Beta)");
             }
 
             private void VerifyDataCenterRowsAllGlobalLanguageSlots()
             {
                 Console.WriteLine("[EXD] Data center labels in all global language slots");
-                string[] languages = { "ja", "en", "de", "fr" };
-
-                DataCenterLabelExpectation[] expectations =
-                {
-                    new DataCenterLabelExpectation("Lobby", 791, GetLobbyDataCenterLabel("Japan")),
-                    new DataCenterLabelExpectation("Lobby", 792, GetLobbyDataCenterLabel("North America")),
-                    new DataCenterLabelExpectation("Lobby", 793, GetLobbyDataCenterLabel("Europe")),
-                    new DataCenterLabelExpectation("Lobby", 794, GetLobbyDataCenterLabel("Oceania")),
-                    new DataCenterLabelExpectation("Lobby", 800, IsEnglishTargetLanguage() ? "Data Center Selection" : "DATA CENTER SELECT"),
-                    new DataCenterLabelExpectation("Lobby", 801, GetLobbyDataCenterPrompt()),
-                    new DataCenterLabelExpectation("Lobby", 802, "Data Center"),
-                    new DataCenterLabelExpectation("Lobby", 803, IsEnglishTargetLanguage() ? "Information" : "INFORMATION"),
-                    new DataCenterLabelExpectation("Lobby", 806, GetLobbyInformationBodySubstring(), true),
-                    new DataCenterLabelExpectation("Lobby", 808, GetLobbyDataCenterConnectingSubstring(), true),
-                    new DataCenterLabelExpectation("Lobby", 809, GetLobbyCharacterListSubstring(), true),
-                    new DataCenterLabelExpectation("Lobby", 810, IsEnglishTargetLanguage() ? "Proceed" : "OK"),
-                    new DataCenterLabelExpectation("Lobby", 811, IsEnglishTargetLanguage() ? "Cancel" : "\u30AD\u30E3\u30F3\u30BB\u30EB"),
-                    new DataCenterLabelExpectation("Lobby", 812, GetLobbyRegionDataCenterLabel("Japan")),
-                    new DataCenterLabelExpectation("Lobby", 813, GetLobbyRegionDataCenterLabel("North America")),
-                    new DataCenterLabelExpectation("Lobby", 814, GetLobbyRegionDataCenterLabel("Europe")),
-                    new DataCenterLabelExpectation("Lobby", 815, GetLobbyRegionDataCenterLabel("Oceania")),
-                    new DataCenterLabelExpectation("Lobby", 816, "NA Cloud Data Center (Beta)"),
-                    new DataCenterLabelExpectation("WorldRegionGroup", 1, "Japan"),
-                    new DataCenterLabelExpectation("WorldRegionGroup", 2, "North America"),
-                    new DataCenterLabelExpectation("WorldRegionGroup", 3, "Europe"),
-                    new DataCenterLabelExpectation("WorldRegionGroup", 4, "Oceania"),
-                    new DataCenterLabelExpectation("WorldRegionGroup", 5, "China"),
-                    new DataCenterLabelExpectation("WorldRegionGroup", 6, "Korea"),
-                    new DataCenterLabelExpectation("WorldRegionGroup", 7, "NA Cloud"),
-                    new DataCenterLabelExpectation("WorldRegionGroup", 8, "Traditional Chinese regions"),
-                    new DataCenterLabelExpectation("WorldPhysicalDC", 1, "Japan"),
-                    new DataCenterLabelExpectation("WorldPhysicalDC", 2, "North America"),
-                    new DataCenterLabelExpectation("WorldPhysicalDC", 3, "Europe"),
-                    new DataCenterLabelExpectation("WorldPhysicalDC", 4, "Oceania"),
-                    new DataCenterLabelExpectation("WorldPhysicalDC", 5, "NA Cloud Data Center (Beta)"),
-                    new DataCenterLabelExpectation("WorldDCGroupType", 1, "Elemental"),
-                    new DataCenterLabelExpectation("WorldDCGroupType", 2, "Gaia"),
-                    new DataCenterLabelExpectation("WorldDCGroupType", 3, "Mana"),
-                    new DataCenterLabelExpectation("WorldDCGroupType", 4, "Aether"),
-                    new DataCenterLabelExpectation("WorldDCGroupType", 5, "Primal"),
-                    new DataCenterLabelExpectation("WorldDCGroupType", 6, "Chaos"),
-                    new DataCenterLabelExpectation("WorldDCGroupType", 7, "Light"),
-                    new DataCenterLabelExpectation("WorldDCGroupType", 8, "Crystal"),
-                    new DataCenterLabelExpectation("WorldDCGroupType", 9, "Materia"),
-                    new DataCenterLabelExpectation("WorldDCGroupType", 10, "Meteor"),
-                    new DataCenterLabelExpectation("WorldDCGroupType", 11, "Dynamis"),
-                    new DataCenterLabelExpectation("WorldDCGroupType", 12, "Shadow"),
-                    new DataCenterLabelExpectation("WorldDCGroupType", 13, "NA Cloud DC (Beta)")
-                };
+                DataCenterLabelExpectation[] expectations = CreateDataCenterLabelExpectations();
 
                 for (int i = 0; i < expectations.Length; i++)
                 {
-                    for (int languageIndex = 0; languageIndex < languages.Length; languageIndex++)
+                    for (int languageIndex = 0; languageIndex < DataCenterGlobalLanguages.Length; languageIndex++)
                     {
-                        ExpectDataCenterLabel(expectations[i], languages[languageIndex]);
+                        ExpectDataCenterLabel(expectations[i], DataCenterGlobalLanguages[languageIndex]);
                     }
                 }
+            }
+
+            private DataCenterLabelExpectation[] CreateDataCenterLabelExpectations()
+            {
+                List<DataCenterLabelExpectation> expectations = new List<DataCenterLabelExpectation>();
+                AddLobbyRegionLabels(expectations, 791, false);
+                expectations.Add(new DataCenterLabelExpectation("Lobby", 800, IsEnglishTargetLanguage() ? "Data Center Selection" : "DATA CENTER SELECT"));
+                expectations.Add(new DataCenterLabelExpectation("Lobby", 801, GetLobbyDataCenterPrompt()));
+                expectations.Add(new DataCenterLabelExpectation("Lobby", 802, "Data Center"));
+                expectations.Add(new DataCenterLabelExpectation("Lobby", 803, IsEnglishTargetLanguage() ? "Information" : "INFORMATION"));
+                expectations.Add(new DataCenterLabelExpectation("Lobby", 806, GetLobbyInformationBodySubstring(), true));
+                expectations.Add(new DataCenterLabelExpectation("Lobby", 808, GetLobbyDataCenterConnectingSubstring(), true));
+                expectations.Add(new DataCenterLabelExpectation("Lobby", 809, GetLobbyCharacterListSubstring(), true));
+                expectations.Add(new DataCenterLabelExpectation("Lobby", 810, IsEnglishTargetLanguage() ? "Proceed" : "OK"));
+                expectations.Add(new DataCenterLabelExpectation("Lobby", 811, IsEnglishTargetLanguage() ? "Cancel" : "\u30AD\u30E3\u30F3\u30BB\u30EB"));
+                AddLobbyRegionLabels(expectations, 812, true);
+                expectations.Add(new DataCenterLabelExpectation("Lobby", 816, "NA Cloud Data Center (Beta)"));
+                AddOneBasedLabelExpectations(expectations, "WorldRegionGroup", WorldRegionGroupLabels);
+                AddOneBasedLabelExpectations(expectations, "WorldPhysicalDC", WorldPhysicalDcLabels);
+                AddOneBasedLabelExpectations(expectations, "WorldDCGroupType", WorldDcGroupTypeLabels);
+                return expectations.ToArray();
+            }
+
+            private void AddLobbyRegionLabels(List<DataCenterLabelExpectation> expectations, uint firstRowId, bool regionalHeading)
+            {
+                for (int i = 0; i < DataCenterRegions.Length; i++)
+                {
+                    string expected = regionalHeading
+                        ? GetLobbyRegionDataCenterLabel(DataCenterRegions[i])
+                        : GetLobbyDataCenterLabel(DataCenterRegions[i]);
+                    expectations.Add(new DataCenterLabelExpectation("Lobby", firstRowId + (uint)i, expected));
+                }
+            }
+
+            private static void AddOneBasedLabelExpectations(List<DataCenterLabelExpectation> expectations, string sheet, string[] labels)
+            {
+                for (int i = 0; i < labels.Length; i++)
+                {
+                    expectations.Add(new DataCenterLabelExpectation(sheet, (uint)(i + 1), labels[i]));
+                }
+            }
+
+            private void ExpectPrimaryDataCenterLabel(DataCenterLabelExpectation expectation)
+            {
+                if (expectation.AllowSubstring)
+                {
+                    ExpectTextContains(expectation.Sheet, expectation.RowId, expectation.Expected);
+                    return;
+                }
+
+                ExpectText(expectation.Sheet, expectation.RowId, expectation.Expected);
             }
 
             private bool IsEnglishTargetLanguage()
@@ -548,99 +556,26 @@ namespace FfxivKoreanPatch.PatchRouteVerifier
 
             private void VerifyDataCenterTitleUldRoute()
             {
-                Console.WriteLine("[ULD/FDT] Data center title font preservation");
-                byte[] cleanUld = _cleanUi.ReadFile(DataCenterTitleUldPath);
-                byte[] patchedUld = _patchedUi.ReadFile(DataCenterTitleUldPath);
-                List<UldTextNodeFont> cleanFonts = GetUldTextNodeFonts(cleanUld);
-                List<UldTextNodeFont> patchedFonts = GetUldTextNodeFonts(patchedUld);
-                Dictionary<int, UldTextNodeFont> patchedByOffset = GetUldTextNodeFontsByOffset(patchedUld);
-
-                if (cleanFonts.Count == 0)
-                {
-                    Fail("{0} clean ULD did not expose text-node fonts", DataCenterTitleUldPath);
-                    return;
-                }
-
-                if (cleanFonts.Count != patchedFonts.Count)
-                {
-                    Fail(
-                        "{0} text-node count changed: clean={1}, patched={2}",
-                        DataCenterTitleUldPath,
-                        cleanFonts.Count,
-                        patchedFonts.Count);
-                }
-
-                HashSet<string> routedFontPaths = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-                for (int i = 0; i < cleanFonts.Count; i++)
-                {
-                    UldTextNodeFont cleanNode = cleanFonts[i];
-                    UldTextNodeFont patchedNode;
-                    if (!patchedByOffset.TryGetValue(cleanNode.NodeOffset, out patchedNode))
-                    {
-                        Fail("{0} missing patched text node at 0x{1:X}", DataCenterTitleUldPath, cleanNode.NodeOffset);
-                        continue;
-                    }
-
-                    if (patchedNode.FontId != cleanNode.FontId || patchedNode.FontSize != cleanNode.FontSize)
-                    {
-                        Fail(
-                            "{0} node 0x{1:X} font changed: clean={2}/{3}, patched={4}/{5}",
-                            DataCenterTitleUldPath,
-                            cleanNode.NodeOffset,
-                            cleanNode.FontId,
-                            cleanNode.FontSize,
-                            patchedNode.FontId,
-                            patchedNode.FontSize);
-                        continue;
-                    }
-
-                    string resolvedFont = ResolveUldFontPath(patchedNode.FontId, patchedNode.FontSize, true);
-                    if (resolvedFont == null)
-                    {
-                        Fail(
-                            "{0} node 0x{1:X} font {2}/{3} has no verifier font mapping",
-                            DataCenterTitleUldPath,
-                            cleanNode.NodeOffset,
-                            patchedNode.FontId,
-                            patchedNode.FontSize);
-                        continue;
-                    }
-
-                    routedFontPaths.Add(resolvedFont);
-                    Pass(
-                        "{0} node 0x{1:X} preserves font {2}/{3} routes to {4}",
-                        DataCenterTitleUldPath,
-                        cleanNode.NodeOffset,
-                        patchedNode.FontId,
-                        patchedNode.FontSize,
-                        resolvedFont);
-                }
-
-                if (routedFontPaths.Count == 0)
-                {
-                    Fail("{0} did not route any data-center title node to a verifiable font", DataCenterTitleUldPath);
-                    return;
-                }
-
-                foreach (string fontPath in routedFontPaths)
-                {
-                    VerifyLabelGlyphsEqualClean(fontPath, DataCenterWorldmapLabels);
-                    DumpLabelPreview("data-center-title", fontPath, DataCenterWorldmapLabels);
-                }
+                VerifyUldFontPreservation(DataCenterTitleUldPath, "data-center title", "data-center-title");
             }
 
             private void VerifyDataCenterWorldmapUldRoute()
             {
-                Console.WriteLine("[ULD/FDT] Data center world map font preservation");
-                byte[] cleanUld = _cleanUi.ReadFile(DataCenterWorldmapUldPath);
-                byte[] patchedUld = _patchedUi.ReadFile(DataCenterWorldmapUldPath);
+                VerifyUldFontPreservation(DataCenterWorldmapUldPath, "data-center world map", "data-center-worldmap");
+            }
+
+            private void VerifyUldFontPreservation(string uldPath, string label, string dumpGroup)
+            {
+                Console.WriteLine("[ULD/FDT] {0} font preservation", label);
+                byte[] cleanUld = _cleanUi.ReadFile(uldPath);
+                byte[] patchedUld = _patchedUi.ReadFile(uldPath);
                 List<UldTextNodeFont> cleanFonts = GetUldTextNodeFonts(cleanUld);
                 List<UldTextNodeFont> patchedFonts = GetUldTextNodeFonts(patchedUld);
                 Dictionary<int, UldTextNodeFont> patchedByOffset = GetUldTextNodeFontsByOffset(patchedUld);
 
                 if (cleanFonts.Count == 0)
                 {
-                    Fail("{0} clean ULD did not expose text-node fonts", DataCenterWorldmapUldPath);
+                    Fail("{0} clean ULD did not expose text-node fonts", uldPath);
                     return;
                 }
 
@@ -648,7 +583,7 @@ namespace FfxivKoreanPatch.PatchRouteVerifier
                 {
                     Fail(
                         "{0} text-node count changed: clean={1}, patched={2}",
-                        DataCenterWorldmapUldPath,
+                        uldPath,
                         cleanFonts.Count,
                         patchedFonts.Count);
                 }
@@ -660,7 +595,7 @@ namespace FfxivKoreanPatch.PatchRouteVerifier
                     UldTextNodeFont patchedNode;
                     if (!patchedByOffset.TryGetValue(cleanNode.NodeOffset, out patchedNode))
                     {
-                        Fail("{0} missing patched text node at 0x{1:X}", DataCenterWorldmapUldPath, cleanNode.NodeOffset);
+                        Fail("{0} missing patched text node at 0x{1:X}", uldPath, cleanNode.NodeOffset);
                         continue;
                     }
 
@@ -668,7 +603,7 @@ namespace FfxivKoreanPatch.PatchRouteVerifier
                     {
                         Fail(
                             "{0} node 0x{1:X} font changed: clean={2}/{3}, patched={4}/{5}",
-                            DataCenterWorldmapUldPath,
+                            uldPath,
                             cleanNode.NodeOffset,
                             cleanNode.FontId,
                             cleanNode.FontSize,
@@ -682,7 +617,7 @@ namespace FfxivKoreanPatch.PatchRouteVerifier
                     {
                         Fail(
                             "{0} node 0x{1:X} font {2}/{3} has no verifier font mapping",
-                            DataCenterWorldmapUldPath,
+                            uldPath,
                             cleanNode.NodeOffset,
                             patchedNode.FontId,
                             patchedNode.FontSize);
@@ -692,7 +627,7 @@ namespace FfxivKoreanPatch.PatchRouteVerifier
                     routedFontPaths.Add(resolvedFont);
                     Pass(
                         "{0} node 0x{1:X} preserves font {2}/{3} routes to {4}",
-                        DataCenterWorldmapUldPath,
+                        uldPath,
                         cleanNode.NodeOffset,
                         patchedNode.FontId,
                         patchedNode.FontSize,
@@ -701,14 +636,14 @@ namespace FfxivKoreanPatch.PatchRouteVerifier
 
                 if (routedFontPaths.Count == 0)
                 {
-                    Fail("{0} did not route any data-center world-map node to a verifiable font", DataCenterWorldmapUldPath);
+                    Fail("{0} did not route any {1} node to a verifiable font", uldPath, label);
                     return;
                 }
 
                 foreach (string fontPath in routedFontPaths)
                 {
                     VerifyLabelGlyphsEqualClean(fontPath, DataCenterWorldmapLabels);
-                    DumpLabelPreview("data-center-worldmap", fontPath, DataCenterWorldmapLabels);
+                    DumpLabelPreview(dumpGroup, fontPath, DataCenterWorldmapLabels);
                 }
             }
 

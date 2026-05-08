@@ -5,11 +5,11 @@
   "row_key_fallback_files": [
     "custom/example*"
   ],
-  "keep_rows": {
+  "preserve_global_rows": {
     "ExampleSheet": [1000, 1001],
     "Addon": [44, 45, 49]
   },
-  "keep_columns": {
+  "preserve_global_columns": {
     "ExampleSheet": [0, 4]
   },
   "global_target_rows": {
