@@ -60,6 +60,7 @@
     <Compile Include="GlyphDiagnostics.cs" />
     <Compile Include="GlyphDumpFormatting.cs" />
     <Compile Include="GlyphDumpOutput.cs" />
+    <Compile Include="GlyphSheetDumpOutput.cs" />
     <Compile Include="LobbyGlyphDiagnostics.cs" />
     <Compile Include="PatchRouteVerifier.cs" />
     <Compile Include="PhraseLayoutMeasurement.cs" />
