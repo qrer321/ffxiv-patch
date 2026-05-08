@@ -37,6 +37,7 @@
     <PackageReference Include="Microsoft.NETFramework.ReferenceAssemblies.net48" Version="1.0.3" PrivateAssets="all" />
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="DataCenterVerification.cs" />
     <Compile Include="PatchRouteVerifier.cs" />
     <Compile Include="..\..\FFXIVPatchGenerator\SqPack.cs">
       <Link>Generator\SqPack.cs</Link>
