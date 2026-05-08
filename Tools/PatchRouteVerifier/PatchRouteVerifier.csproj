@@ -42,6 +42,7 @@
     <Compile Include="DataCenterFontVerification.cs" />
     <Compile Include="DataCenterVerificationData.cs" />
     <Compile Include="DataCenterVerification.cs" />
+    <Compile Include="DialogueGlyphDiagnostics.cs" />
     <Compile Include="ExcelTextAccess.cs" />
     <Compile Include="ExdScenarioVerification.cs" />
     <Compile Include="FdtGlyphParsing.cs" />
@@ -56,6 +57,7 @@
     <Compile Include="GlyphDiagnostics.cs" />
     <Compile Include="GlyphDumpFormatting.cs" />
     <Compile Include="GlyphDumpOutput.cs" />
+    <Compile Include="LobbyGlyphDiagnostics.cs" />
     <Compile Include="PatchRouteVerifier.cs" />
     <Compile Include="PhraseLayoutMeasurement.cs" />
     <Compile Include="PhraseLayoutVerificationData.cs" />
