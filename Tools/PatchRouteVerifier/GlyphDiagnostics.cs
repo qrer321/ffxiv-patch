@@ -12,15 +12,7 @@ namespace FfxivKoreanPatch.PatchRouteVerifier
             private void VerifyLobbyPhraseGlyphDiagnostics()
             {
                 Console.WriteLine("[FDT] Lobby phrase glyph diagnostics");
-                uint[] codepoints = CollectCodepoints(new string[]
-                {
-                    // "character information change" lobby text and previously broken lobby words.
-                    "\uCE90\uB9AD\uD130 \uC815\uBCF4\uB97C \uBCC0\uACBD\uD558\uAE30 \uC704\uD574",
-                    "\uB85C\uC2A4\uAC00\uB974",
-                    "\uB85C\uC2A4\uD2B8",
-                    "\uB2C8\uBA54\uC774\uC544",
-                    "\uADF8\uB9BC\uC790"
-                });
+                uint[] codepoints = CollectCodepoints(LobbyDiagnosticPhrases);
 
                 for (int i = 0; i < codepoints.Length; i++)
                 {
@@ -33,13 +25,7 @@ namespace FfxivKoreanPatch.PatchRouteVerifier
             private void VerifyDialoguePhraseGlyphDiagnostics()
             {
                 Console.WriteLine("[FDT] Dialogue phrase glyph diagnostics");
-                uint[] codepoints = CollectCodepoints(new string[]
-                {
-                    "\uD1A0\uB974\uB2F9 7\uC138\uCC9C\uB144\uC758 \uC545\uC5F0\uC744 \uB04A\uAE30 \uC704\uD55C \uC77C\uC774\uB2E4",
-                    "\uC9C4\uC815\uD55C \uBCC0\uD601\uC744 \uC704\uD574\uC11C\uB77C\uBA74",
-                    "\uBAB8\uC5D0 \uD76C\uC0DD\uB4E4\uC774 \uC5B4\uC5D0 \uB5A0\uC624\uB974\uB9AC",
-                    "\uD0D0\uC0AC\uB300 \uD638\uC704\uB300\uC6D0"
-                });
+                uint[] codepoints = CollectCodepoints(DialogueDiagnosticPhrases);
 
                 for (int i = 0; i < codepoints.Length; i++)
                 {
