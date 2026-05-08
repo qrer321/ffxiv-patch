@@ -6,11 +6,6 @@ namespace FfxivKoreanPatch.PatchRouteVerifier
 {
     internal static partial class PatchRouteVerifier
     {
-        private const byte UldTrumpGothicFontId = 3;
-        private const byte UldJupiterFontId = 4;
-        private const byte UldMiedingerMedFontId = 1;
-        private const byte UldAxisFontId = 0;
-
         private static List<UldTextNodeFont> GetUldTextNodeFonts(byte[] uld)
         {
             List<UldTextNodeFont> results = new List<UldTextNodeFont>();
@@ -22,74 +17,6 @@ namespace FfxivKoreanPatch.PatchRouteVerifier
             WalkUldAtkTextNodes(uld, Endian.ReadUInt32LE(uld, 8), true, results);
             WalkUldAtkTextNodes(uld, Endian.ReadUInt32LE(uld, 12), false, results);
             return results;
-        }
-
-        private static string ResolveUldFontPath(byte fontId, byte fontSize, bool lobby)
-        {
-            string suffix = lobby ? "_lobby.fdt" : ".fdt";
-            switch (fontId)
-            {
-                case UldAxisFontId:
-                    switch (fontSize)
-                    {
-                        case 12:
-                        case 14:
-                        case 18:
-                        case 36:
-                        case 96:
-                            return "common/font/AXIS_" + fontSize.ToString() + suffix;
-                        case 34:
-                            return "common/font/AXIS_36" + suffix;
-                    }
-
-                    return null;
-
-                case UldMiedingerMedFontId:
-                    switch (fontSize)
-                    {
-                        case 10:
-                        case 12:
-                        case 14:
-                        case 18:
-                        case 36:
-                            return "common/font/MiedingerMid_" + fontSize.ToString() + suffix;
-                    }
-
-                    return null;
-
-                case UldTrumpGothicFontId:
-                    switch (fontSize)
-                    {
-                        case 23:
-                        case 34:
-                        case 68:
-                        case 184:
-                            return "common/font/TrumpGothic_" + fontSize.ToString() + suffix;
-                    }
-
-                    return null;
-
-                case UldJupiterFontId:
-                    switch (fontSize)
-                    {
-                        case 12:
-                            return "common/font/Jupiter_16" + suffix;
-                        case 18:
-                            return "common/font/Jupiter_20" + suffix;
-                        case 16:
-                        case 20:
-                        case 23:
-                        case 45:
-                        case 46:
-                        case 90:
-                            return "common/font/Jupiter_" + fontSize.ToString() + suffix;
-                    }
-
-                    return null;
-
-                default:
-                    return null;
-            }
         }
 
         private static Dictionary<int, UldTextNodeFont> GetUldTextNodeFontsByOffset(byte[] uld)

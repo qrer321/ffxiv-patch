@@ -62,6 +62,7 @@
     <Compile Include="PhraseLayoutMeasurement.cs" />
     <Compile Include="PhraseLayoutVerificationData.cs" />
     <Compile Include="PhraseLayoutVerification.cs" />
+    <Compile Include="UldFontPathResolver.cs" />
     <Compile Include="UldFontRoutes.cs" />
     <Compile Include="VerifierAssertions.cs" />
     <Compile Include="VerifierGlyphAssertions.cs" />
