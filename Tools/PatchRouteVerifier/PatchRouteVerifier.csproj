@@ -47,6 +47,7 @@
     <Compile Include="FontGlyphRendering.cs" />
     <Compile Include="FontRouteVerification.cs" />
     <Compile Include="FontTextureDecoding.cs" />
+    <Compile Include="FontTextureRouting.cs" />
     <Compile Include="GlyphAnalysis.cs" />
     <Compile Include="GlyphBitmapWriter.cs" />
     <Compile Include="GlyphDiagnostics.cs" />
