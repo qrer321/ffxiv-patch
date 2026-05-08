@@ -1877,11 +1877,10 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
 
                 if (!ShouldIncludeFontPath(targetTexturePath))
                 {
-                    // font3.tex is intentionally preserved in the default profile.
-                    // If a Korean TTMP FDT points ASCII/numeric glyphs into font3,
-                    // move them to an allocated clean cell when possible. This
-                    // avoids writing ASCII pixels over Korean cells in shared
-                    // atlases while keeping font3 untouched.
+                    // Diagnostic profiles can exclude a texture while still
+                    // patching FDTs that point to it. Move ASCII/numeric glyphs
+                    // to an included clean cell when possible so the excluded
+                    // atlas remains untouched.
                     if (ShouldIncludeFontPath(sourceTexturePath) && sourceEntry.Width > 0 && sourceEntry.Height > 0)
                     {
                         byte[] sourceTexture;
@@ -2679,16 +2678,6 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
             if (string.Equals(profile, FontPatchProfiles.NoMiedingerMid, StringComparison.OrdinalIgnoreCase))
             {
                 return normalized.IndexOf("/miedingermid_", StringComparison.OrdinalIgnoreCase) < 0;
-            }
-
-            if (string.Equals(profile, FontPatchProfiles.NoTrumpGothic, StringComparison.OrdinalIgnoreCase))
-            {
-                // The Korean FDTs for high-scale Jupiter/TrumpGothic route some
-                // Hangul through the larger font3 atlas. Skipping that texture
-                // leaves those glyphs pointing outside the clean global atlas.
-                // ASCII/numeric cells are restored from the clean global font by
-                // the repair pass, so the texture must stay in the patch set.
-                return true;
             }
 
             if (string.Equals(profile, FontPatchProfiles.NoJupiter, StringComparison.OrdinalIgnoreCase))
@@ -4041,7 +4030,7 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
         public const string UiNumericSafe = "ui-numeric-safe";
         public const string NoMiedingerMid = "no-miedingermid";
         public const string NoTrumpGothic = "no-trumpgothic";
-        public const string Default = NoTrumpGothic;
+        public const string Default = Full;
         public const string NoJupiter = "no-jupiter";
         public const string NoAxis = "no-axis";
         public const string FdtOnly = "fdt-only";
@@ -4055,16 +4044,17 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
                 case Full:
                 case UiNumericSafe:
                 case NoMiedingerMid:
-                case NoTrumpGothic:
                 case NoJupiter:
                 case NoAxis:
                 case FdtOnly:
                 case TexturesOnly:
                     return normalized;
+                case NoTrumpGothic:
+                    return Full;
                 default:
                     throw new ArgumentException(
                         "Unsupported font profile: " + value +
-                        ". Supported values: full, ui-numeric-safe, no-miedingermid, no-trumpgothic, no-jupiter, no-axis, fdt-only, textures-only.");
+                        ". Supported values: full, ui-numeric-safe, no-miedingermid, no-trumpgothic(alias of full), no-jupiter, no-axis, fdt-only, textures-only.");
             }
         }
     }

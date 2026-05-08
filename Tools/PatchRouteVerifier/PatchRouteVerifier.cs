@@ -122,6 +122,12 @@ namespace FfxivKoreanPatch.PatchRouteVerifier
         private const int GlyphCanvasSize = 96;
         private const int GlyphDumpScale = 4;
         private const int ProtectedHangulMinimumVisiblePixels = 300;
+        private const uint MkdSupportJobFirstRow = 0;
+        private const uint MkdSupportJobLastPlayableRow = 15;
+        private const ushort MkdSupportJobFullNameColumnOffset = 0;
+        private const ushort MkdSupportJobShortNameColumnOffset = 4;
+        private const ushort MkdSupportJobSupportTextColumnOffset = 12;
+        private const ushort MkdSupportJobEnglishFullNameColumnOffset = 16;
         private const byte UldTrumpGothicFontId = 3;
         private const byte UldJupiterFontId = 4;
         private const byte UldMiedingerMedFontId = 1;
@@ -162,26 +168,6 @@ namespace FfxivKoreanPatch.PatchRouteVerifier
             "Light",
             "Materia"
         };
-        private static readonly MkdSupportJobExpectation[] MkdSupportJobExpectations = new MkdSupportJobExpectation[]
-        {
-            new MkdSupportJobExpectation(0, "Phantom Freelancer", "Ph. Freelancer", "서포트 자유직"),
-            new MkdSupportJobExpectation(1, "Phantom Knight", "Ph. Knight", "서포트 나이트"),
-            new MkdSupportJobExpectation(2, "Phantom Berserker", "Ph. Berserker", "서포트 버서커"),
-            new MkdSupportJobExpectation(3, "Phantom Monk", "Ph. Monk", "서포트 몽크"),
-            new MkdSupportJobExpectation(4, "Phantom Ranger", "Ph. Ranger", "서포트 사냥꾼"),
-            new MkdSupportJobExpectation(5, "Phantom Samurai", "Ph. Samurai", "서포트 사무라이"),
-            new MkdSupportJobExpectation(6, "Phantom Bard", "Ph. Bard", "서포트 음유시인"),
-            new MkdSupportJobExpectation(7, "Phantom Geomancer", "Ph. Geomancer", "서포트 풍수사"),
-            new MkdSupportJobExpectation(8, "Phantom Time Mage", "Ph. Time Mage", "서포트 시마도사"),
-            new MkdSupportJobExpectation(9, "Phantom Cannoneer", "Ph. Cannoneer", "서포트 포격사"),
-            new MkdSupportJobExpectation(10, "Phantom Chemist", "Ph. Chemist", "서포트 약사"),
-            new MkdSupportJobExpectation(11, "Phantom Oracle", "Ph. Oracle", "서포트 예언사"),
-            new MkdSupportJobExpectation(12, "Phantom Thief", "Ph. Thief", "서포트 도적"),
-            new MkdSupportJobExpectation(13, "Phantom Mystic Knight", "Ph. Mystic Knight", "서포트 마법검사"),
-            new MkdSupportJobExpectation(14, "Phantom Gladiator", "Ph. Gladiator", "서포트 검투사"),
-            new MkdSupportJobExpectation(15, "Phantom Dancer", "Ph. Dancer", "서포트 무도가")
-        };
-
         private static int Main(string[] args)
         {
             try
@@ -798,15 +784,19 @@ namespace FfxivKoreanPatch.PatchRouteVerifier
             private void VerifyOccultCrescentSupportJobRows()
             {
                 Console.WriteLine("[EXD] Occult Crescent phantom/support job labels");
-                for (int i = 0; i < MkdSupportJobExpectations.Length; i++)
+                for (uint rowId = MkdSupportJobFirstRow; rowId <= MkdSupportJobLastPlayableRow; rowId++)
                 {
-                    MkdSupportJobExpectation expectation = MkdSupportJobExpectations[i];
-                    ExpectTextColumn("MkdSupportJob", expectation.RowId, 0, expectation.FullName);
-                    ExpectTextColumn("MkdSupportJob", expectation.RowId, 4, expectation.ShortName);
-                    ExpectTextColumn("MkdSupportJob", expectation.RowId, 16, expectation.FullName);
-                    ExpectTextColumnNotContains("MkdSupportJob", expectation.RowId, 0, "\uC11C\uD3EC\uD2B8");
-                    ExpectTextColumnNotContains("MkdSupportJob", expectation.RowId, 4, "\uC11C\uD3EC\uD2B8");
-                    ExpectTextColumnContains("MkdSupportJob", expectation.RowId, 12, "\uC11C\uD3EC\uD2B8");
+                    string fullName = GetStringColumnByOffset(_patchedText, "MkdSupportJob", rowId, _language, MkdSupportJobFullNameColumnOffset);
+                    string shortName = GetStringColumnByOffset(_patchedText, "MkdSupportJob", rowId, _language, MkdSupportJobShortNameColumnOffset);
+                    string supportText = GetStringColumnByOffset(_patchedText, "MkdSupportJob", rowId, _language, MkdSupportJobSupportTextColumnOffset);
+                    string englishFullName = GetStringColumnByOffset(_patchedText, "MkdSupportJob", rowId, _language, MkdSupportJobEnglishFullNameColumnOffset);
+
+                    ExpectEqual("MkdSupportJob#" + rowId.ToString() + "@0 mirrors English full name column", fullName, englishFullName);
+                    ExpectStartsWith("MkdSupportJob#" + rowId.ToString() + "@0", fullName, "Phantom ");
+                    ExpectStartsWith("MkdSupportJob#" + rowId.ToString() + "@4", shortName, "Ph.");
+                    ExpectNotContains("MkdSupportJob#" + rowId.ToString() + "@0", fullName, "\uC11C\uD3EC\uD2B8");
+                    ExpectNotContains("MkdSupportJob#" + rowId.ToString() + "@4", shortName, "\uC11C\uD3EC\uD2B8");
+                    ExpectContains("MkdSupportJob#" + rowId.ToString() + "@12", supportText, "\uC11C\uD3EC\uD2B8");
                 }
             }
 
@@ -1309,145 +1299,60 @@ namespace FfxivKoreanPatch.PatchRouteVerifier
 
             private void VerifyNoPhraseOverlap(string fontPath, string phrase)
             {
-                try
+                PhraseLayoutResult layout;
+                string error;
+                if (!TryMeasurePhraseLayout(_patchedFont, fontPath, phrase, true, out layout, out error))
                 {
-                    byte[] fdt = _patchedFont.ReadFile(fontPath);
-                    int cursor = 0;
-                    int overlap = 0;
-                    int glyphs = 0;
-                    HashSet<long> occupiedPixels = new HashSet<long>();
+                    Fail("{0} phrase [{1}] layout error: {2}", fontPath, Escape(phrase), error);
+                    return;
+                }
 
-                    for (int i = 0; i < phrase.Length; i++)
+                if (layout.OverlapPixels > 0)
+                {
+                    PhraseLayoutResult cleanLayout;
+                    string cleanError;
+                    if (IsAsciiPhrase(phrase) &&
+                        TryMeasurePhraseLayout(_cleanFont, fontPath, phrase, false, out cleanLayout, out cleanError) &&
+                        layout.OverlapPixels <= cleanLayout.OverlapPixels)
                     {
-                        uint codepoint;
-                        if (char.IsHighSurrogate(phrase[i]) && i + 1 < phrase.Length && char.IsLowSurrogate(phrase[i + 1]))
-                        {
-                            codepoint = (uint)char.ConvertToUtf32(phrase[i], phrase[i + 1]);
-                            i++;
-                        }
-                        else
-                        {
-                            codepoint = phrase[i];
-                        }
-
-                        if (codepoint <= 0x20)
-                        {
-                            cursor += 8;
-                            continue;
-                        }
-
-                        FdtGlyphEntry glyph;
-                        if (!TryFindGlyph(fdt, codepoint, out glyph))
-                        {
-                            Fail("{0} cannot render phrase [{1}], missing U+{2:X4}", fontPath, Escape(phrase), codepoint);
-                            return;
-                        }
-
-                        GlyphCanvas canvas = RenderGlyph(_patchedFont, fontPath, codepoint);
-                        int minimumVisiblePixels = IsHangulCodepoint(codepoint) ? 10 : 1;
-                        if (canvas.VisiblePixels < minimumVisiblePixels)
-                        {
-                            Fail("{0} phrase [{1}] U+{2:X4} visible={3}, expected at least {4}", fontPath, Escape(phrase), codepoint, canvas.VisiblePixels, minimumVisiblePixels);
-                            return;
-                        }
-
-                        if (IsHangulCodepoint(codepoint) &&
-                            (GlyphMatchesFallback(fontPath, canvas, codepoint, '-') ||
-                             GlyphMatchesFallback(fontPath, canvas, codepoint, '=')))
-                        {
-                            Fail("{0} phrase [{1}] U+{2:X4} matches fallback glyph", fontPath, Escape(phrase), codepoint);
-                            return;
-                        }
-
-                        byte[] alpha = canvas.Alpha;
-                        for (int y = 0; y < GlyphCanvasSize; y++)
-                        {
-                            int rowOffset = y * GlyphCanvasSize;
-                            for (int x = 0; x < GlyphCanvasSize; x++)
-                            {
-                                if (alpha[rowOffset + x] == 0)
-                                {
-                                    continue;
-                                }
-
-                                int pixelX = cursor + x - 32;
-                                int pixelY = y - 32;
-                                long key = ((long)pixelY << 32) ^ (uint)pixelX;
-                                if (!occupiedPixels.Add(key))
-                                {
-                                    overlap++;
-                                }
-                            }
-                        }
-
-                        cursor += Math.Max(1, glyph.Width + glyph.OffsetX);
-                        glyphs++;
-                    }
-
-                    if (overlap > 0)
-                    {
-                        int cleanOverlap;
-                        int cleanGlyphs;
-                        int cleanWidth;
-                        string cleanError;
-                        if (IsAsciiPhrase(phrase) &&
-                            TryMeasurePhrasePixelOverlap(_cleanFont, fontPath, phrase, out cleanOverlap, out cleanGlyphs, out cleanWidth, out cleanError) &&
-                            overlap <= cleanOverlap)
-                        {
-                            Pass(
-                                "{0} phrase [{1}] layout glyphs={2}, width={3}, overlap={4} matches clean baseline={5}",
-                                fontPath,
-                                Escape(phrase),
-                                glyphs,
-                                cursor,
-                                overlap,
-                                cleanOverlap);
-                            return;
-                        }
-
-                        Fail("{0} phrase [{1}] has overlap pixels={2}", fontPath, Escape(phrase), overlap);
+                        Pass(
+                            "{0} phrase [{1}] layout glyphs={2}, width={3}, overlap={4} matches clean baseline={5}",
+                            fontPath,
+                            Escape(phrase),
+                            layout.Glyphs,
+                            layout.Width,
+                            layout.OverlapPixels,
+                            cleanLayout.OverlapPixels);
                         return;
                     }
 
-                    Pass("{0} phrase [{1}] layout glyphs={2}, width={3}", fontPath, Escape(phrase), glyphs, cursor);
+                    Fail("{0} phrase [{1}] has overlap pixels={2}", fontPath, Escape(phrase), layout.OverlapPixels);
+                    return;
                 }
-                catch (Exception ex)
-                {
-                    Fail("{0} phrase [{1}] layout error: {2}", fontPath, Escape(phrase), ex.Message);
-                }
+
+                Pass("{0} phrase [{1}] layout glyphs={2}, width={3}", fontPath, Escape(phrase), layout.Glyphs, layout.Width);
             }
 
-            private bool TryMeasurePhrasePixelOverlap(
+            private bool TryMeasurePhraseLayout(
                 CompositeArchive archive,
                 string fontPath,
                 string phrase,
-                out int overlap,
-                out int glyphs,
-                out int width,
+                bool validateGlyphShape,
+                out PhraseLayoutResult result,
                 out string error)
             {
-                overlap = 0;
-                glyphs = 0;
-                width = 0;
+                result = new PhraseLayoutResult();
                 error = null;
-
                 try
                 {
                     byte[] fdt = archive.ReadFile(fontPath);
                     HashSet<long> occupiedPixels = new HashSet<long>();
                     int cursor = 0;
+                    int glyphs = 0;
+                    int overlap = 0;
                     for (int i = 0; i < phrase.Length; i++)
                     {
-                        uint codepoint;
-                        if (char.IsHighSurrogate(phrase[i]) && i + 1 < phrase.Length && char.IsLowSurrogate(phrase[i + 1]))
-                        {
-                            codepoint = (uint)char.ConvertToUtf32(phrase[i], phrase[i + 1]);
-                            i++;
-                        }
-                        else
-                        {
-                            codepoint = phrase[i];
-                        }
+                        uint codepoint = ReadCodepoint(phrase, ref i);
 
                         if (codepoint <= 0x20)
                         {
@@ -1463,32 +1368,37 @@ namespace FfxivKoreanPatch.PatchRouteVerifier
                         }
 
                         GlyphCanvas canvas = RenderGlyph(archive, fontPath, codepoint);
-                        byte[] alpha = canvas.Alpha;
-                        for (int y = 0; y < GlyphCanvasSize; y++)
+                        if (validateGlyphShape)
                         {
-                            int rowOffset = y * GlyphCanvasSize;
-                            for (int x = 0; x < GlyphCanvasSize; x++)
+                            int minimumVisiblePixels = IsHangulCodepoint(codepoint) ? 10 : 1;
+                            if (canvas.VisiblePixels < minimumVisiblePixels)
                             {
-                                if (alpha[rowOffset + x] == 0)
-                                {
-                                    continue;
-                                }
+                                error = string.Format(
+                                    CultureInfo.InvariantCulture,
+                                    "U+{0:X4} visible={1}, expected at least {2}",
+                                    codepoint,
+                                    canvas.VisiblePixels,
+                                    minimumVisiblePixels);
+                                return false;
+                            }
 
-                                int pixelX = cursor + x - 32;
-                                int pixelY = y - 32;
-                                long key = ((long)pixelY << 32) ^ (uint)pixelX;
-                                if (!occupiedPixels.Add(key))
-                                {
-                                    overlap++;
-                                }
+                            if (IsHangulCodepoint(codepoint) &&
+                                (GlyphMatchesFallback(fontPath, canvas, codepoint, '-') ||
+                                 GlyphMatchesFallback(fontPath, canvas, codepoint, '=')))
+                            {
+                                error = "U+" + codepoint.ToString("X4") + " matches fallback glyph";
+                                return false;
                             }
                         }
 
+                        overlap += AddGlyphPixelsToLayout(occupiedPixels, cursor, canvas.Alpha);
                         cursor += Math.Max(1, glyph.Width + glyph.OffsetX);
                         glyphs++;
                     }
 
-                    width = cursor;
+                    result.Glyphs = glyphs;
+                    result.Width = cursor;
+                    result.OverlapPixels = overlap;
                     return true;
                 }
                 catch (Exception ex)
@@ -1496,6 +1406,46 @@ namespace FfxivKoreanPatch.PatchRouteVerifier
                     error = ex.Message;
                     return false;
                 }
+            }
+
+            private static int AddGlyphPixelsToLayout(HashSet<long> occupiedPixels, int cursor, byte[] alpha)
+            {
+                int overlap = 0;
+                for (int y = 0; y < GlyphCanvasSize; y++)
+                {
+                    int rowOffset = y * GlyphCanvasSize;
+                    for (int x = 0; x < GlyphCanvasSize; x++)
+                    {
+                        if (alpha[rowOffset + x] == 0)
+                        {
+                            continue;
+                        }
+
+                        int pixelX = cursor + x - 32;
+                        int pixelY = y - 32;
+                        long key = ((long)pixelY << 32) ^ (uint)pixelX;
+                        if (!occupiedPixels.Add(key))
+                        {
+                            overlap++;
+                        }
+                    }
+                }
+
+                return overlap;
+            }
+
+            private static uint ReadCodepoint(string value, ref int index)
+            {
+                if (char.IsHighSurrogate(value[index]) &&
+                    index + 1 < value.Length &&
+                    char.IsLowSurrogate(value[index + 1]))
+                {
+                    uint codepoint = (uint)char.ConvertToUtf32(value[index], value[index + 1]);
+                    index++;
+                    return codepoint;
+                }
+
+                return value[index];
             }
 
             private static bool IsAsciiPhrase(string phrase)
@@ -2402,6 +2352,50 @@ namespace FfxivKoreanPatch.PatchRouteVerifier
             private static string EscapeTsv(string value)
             {
                 return (value ?? string.Empty).Replace("\t", " ").Replace("\r", "\\r").Replace("\n", "\\n");
+            }
+
+            private void ExpectEqual(string label, string actual, string expected)
+            {
+                if (string.Equals(actual, expected, StringComparison.Ordinal))
+                {
+                    Pass("{0} = {1}", label, Escape(actual));
+                    return;
+                }
+
+                Fail("{0} expected [{1}], actual [{2}]", label, Escape(expected), Escape(actual));
+            }
+
+            private void ExpectStartsWith(string label, string actual, string expectedPrefix)
+            {
+                if ((actual ?? string.Empty).StartsWith(expectedPrefix, StringComparison.Ordinal))
+                {
+                    Pass("{0} starts with {1}", label, expectedPrefix);
+                    return;
+                }
+
+                Fail("{0} does not start with [{1}], actual [{2}]", label, expectedPrefix, Escape(actual));
+            }
+
+            private void ExpectContains(string label, string actual, string expected)
+            {
+                if ((actual ?? string.Empty).IndexOf(expected, StringComparison.Ordinal) >= 0)
+                {
+                    Pass("{0} contains {1}", label, expected);
+                    return;
+                }
+
+                Fail("{0} does not contain [{1}], actual [{2}]", label, expected, Escape(actual));
+            }
+
+            private void ExpectNotContains(string label, string actual, string unexpected)
+            {
+                if ((actual ?? string.Empty).IndexOf(unexpected, StringComparison.Ordinal) < 0)
+                {
+                    Pass("{0} does not contain {1}", label, unexpected);
+                    return;
+                }
+
+                Fail("{0} still contains [{1}], actual [{2}]", label, unexpected, Escape(actual));
             }
 
             private void ExpectText(string sheet, uint rowId, string expected)
@@ -3889,6 +3883,13 @@ namespace FfxivKoreanPatch.PatchRouteVerifier
             public string TexturePath;
         }
 
+        private struct PhraseLayoutResult
+        {
+            public int Glyphs;
+            public int Width;
+            public int OverlapPixels;
+        }
+
         private struct GlyphStats
         {
             public int ComponentCount;
@@ -3923,20 +3924,5 @@ namespace FfxivKoreanPatch.PatchRouteVerifier
             }
         }
 
-        private sealed class MkdSupportJobExpectation
-        {
-            public readonly uint RowId;
-            public readonly string FullName;
-            public readonly string ShortName;
-            public readonly string SupportName;
-
-            public MkdSupportJobExpectation(uint rowId, string fullName, string shortName, string supportName)
-            {
-                RowId = rowId;
-                FullName = fullName;
-                ShortName = shortName;
-                SupportName = supportName;
-            }
-        }
     }
 }

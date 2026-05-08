@@ -26,7 +26,12 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
         private const ushort MkdSupportJobFullNameColumnOffset = 0;
         private const ushort MkdSupportJobShortNameColumnOffset = 4;
         private const ushort MkdSupportJobEnglishFullNameColumnOffset = 16;
-        private static readonly uint[] GlobalLobbyDataCenterRows = new uint[] { 791, 792, 793, 794, 800, 801, 802, 803, 804, 805, 806, 808, 809, 810, 811, 812, 813, 814, 815, 816 };
+        private static readonly RowRange[] GlobalLobbyDataCenterRowRanges = new RowRange[]
+        {
+            new RowRange(791, 794),
+            new RowRange(800, 806),
+            new RowRange(808, 816)
+        };
         private static readonly uint[] GlobalDataCenterTravelAddonRows = new uint[] { 12514, 12525 };
 
         private readonly HashSet<string> _deleteFiles = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
@@ -58,9 +63,9 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
             policy.LoadDeleteFiles(root);
             policy.LoadPatternList(root, "row_key_fallback_files", policy._rowKeyFallbackFiles);
             policy.LoadRowLists(root, "keep_rows", delegate(PatchSheetPolicy sheetPolicy, uint rowId) { sheetPolicy.KeepRows.Add(rowId); });
-            policy.LoadRowLists(root, "delete_rows", delegate(PatchSheetPolicy sheetPolicy, uint rowId) { sheetPolicy.KeepRows.Add(rowId); });
+            policy.LoadRowLists(root, "delete_rows", delegate(PatchSheetPolicy sheetPolicy, uint rowId) { sheetPolicy.KeepRows.Add(rowId); }); // legacy alias: delete from patch output, keep global source row
             policy.LoadColumnLists(root, "keep_columns", delegate(PatchSheetPolicy sheetPolicy, ushort columnOffset) { sheetPolicy.KeepColumns.Add(columnOffset); });
-            policy.LoadColumnLists(root, "delete_columns", delegate(PatchSheetPolicy sheetPolicy, ushort columnOffset) { sheetPolicy.KeepColumns.Add(columnOffset); });
+            policy.LoadColumnLists(root, "delete_columns", delegate(PatchSheetPolicy sheetPolicy, ushort columnOffset) { sheetPolicy.KeepColumns.Add(columnOffset); }); // legacy alias: delete from patch output, keep global source column
             policy.LoadRowLists(root, "global_english_rows", delegate(PatchSheetPolicy sheetPolicy, uint rowId) { sheetPolicy.GlobalEnglishRows.Add(rowId); });
             policy.LoadRowLists(root, "global_target_rows", delegate(PatchSheetPolicy sheetPolicy, uint rowId) { sheetPolicy.GlobalTargetRows.Add(rowId); });
             policy.LoadRemapKeys(root);
@@ -94,10 +99,7 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
             // Keep the selected global client language so labels such as
             // INFORMATION and region messages do not fall back through Korean
             // proxy glyphs in this font route.
-            for (int i = 0; i < GlobalLobbyDataCenterRows.Length; i++)
-            {
-                lobbyPolicy.GlobalTargetRows.Add(GlobalLobbyDataCenterRows[i]);
-            }
+            AddRows(lobbyPolicy.GlobalTargetRows, GlobalLobbyDataCenterRowRanges);
 
             // Most Addon rows in this range are the normal World Visit UI and have
             // Korean source text. Keep only known global-client-only rows global;
@@ -174,6 +176,22 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
             }
 
             return policy;
+        }
+
+        private static void AddRows(HashSet<uint> target, RowRange[] ranges)
+        {
+            for (int i = 0; i < ranges.Length; i++)
+            {
+                RowRange range = ranges[i];
+                for (uint rowId = range.First; rowId <= range.Last; rowId++)
+                {
+                    target.Add(rowId);
+                    if (rowId == uint.MaxValue)
+                    {
+                        break;
+                    }
+                }
+            }
         }
 
         public bool ShouldSkipSheet(string sheetName)
@@ -479,6 +497,23 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
         {
             string pattern = "^" + Regex.Escape(key).Replace("\\*", ".*").Replace("\\?", ".") + "$";
             return new Regex(pattern, RegexOptions.IgnoreCase | RegexOptions.Compiled);
+        }
+    }
+
+    internal struct RowRange
+    {
+        public readonly uint First;
+        public readonly uint Last;
+
+        public RowRange(uint first, uint last)
+        {
+            if (last < first)
+            {
+                throw new ArgumentOutOfRangeException("last", "Range end must be greater than or equal to range start.");
+            }
+
+            First = first;
+            Last = last;
         }
     }
 
