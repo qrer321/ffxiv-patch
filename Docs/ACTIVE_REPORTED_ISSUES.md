@@ -27,6 +27,11 @@
   - 검증 보강: `MkdSupportJob` playable row 전체의 메인 full/short column과 support 설명 column을 확인한다.
   - 수정 방향: 특정 Knight만 예외 처리하지 않고, column 역할 기준으로 매핑한다.
 
+- [ ] Follow-up: 기존 한글 폰트와 달라져 보이는 glyph 대응 어색함
+  - 지금 수정 대상은 아니다.
+  - 후속 검증 방향: 한글 glyph가 기존 Korean TTMP source font/atlas와 다른 계열로 대체된 route를 찾는다.
+  - 수정 방향: fallback/clean ASCII 복구가 한글 glyph source를 바꾸지 않도록 route별 glyph provenance를 확인한다.
+
 ## Verification Rule
 
 - 재보고된 항목은 먼저 verifier가 실패하도록 만든다.
