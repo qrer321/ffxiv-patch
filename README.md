@@ -118,7 +118,7 @@ orig.060000.win32.index2
 
 `060000` UI 패치는 파티 리스트 본인 번호에 쓰이는 텍스처와 이미지형 UI 리소스를 한국 서버 리소스로 복사합니다. 폰트 패치에서는 파티 리스트 본인 번호 PUA glyph(`U+E0E1`~`U+E0E8`)를 clean global의 속 빈 네모 번호 모양으로 복원하고, 해당 픽셀만 TTMP 폰트 atlas의 빈 영역에 이식합니다. `ScreenImage`, `CutScreenImage`, `TerritoryType` 같은 언어별 타이틀 이미지와 일부 이벤트/로딩 이미지를 보정해, 지역 이동이나 던전 진입 시 텍스트가 아니라 이미지로 렌더링되는 요소도 한국어 리소스를 사용하도록 처리합니다. `ScreenImage`의 보조 이미지 ID 컬럼과 `TerritoryType`의 지역 타이틀 이미지 컬럼, 지역 타이틀의 `+2000` 부제 이미지도 함께 검사합니다. `Map` sheet의 지도 텍스처(`ui/map/.../*_m.tex`)도 한국 서버 텍스처와 비교해 다를 때 복사하므로, 지도 이미지 안에 박힌 지역명 표기도 함께 보정합니다.
 
-데이터 센터 선택/이동과 캐릭터 선택의 월드/데이터센터 이동 화면은 한국 클라이언트에 같은 형태로 존재하지 않는 글로벌 전용 로비 UI입니다. 관련 `Lobby`, `WorldRegionGroup`, `WorldPhysicalDC`, `WorldDCGroupType`, `Addon` row는 대상 글로벌 언어 row를 사용합니다. `Title_DataCenter.uld`의 `TrumpGothic` 제목 노드는 `Jupiter` 폰트 슬롯으로 보정해, TTMP 한글 atlas를 원본 atlas와 섞지 않으면서 지역명 제목이 `--`처럼 보이는 문제를 피합니다.
+데이터 센터 선택/이동과 캐릭터 선택의 월드/데이터센터 이동 화면은 한국 클라이언트에 같은 형태로 존재하지 않는 글로벌 전용 로비 UI입니다. 관련 `Lobby`, `WorldRegionGroup`, `WorldPhysicalDC`, `WorldDCGroupType`, `Addon` row는 대상 글로벌 언어 row를 사용합니다. `Title_DataCenter.uld`와 `Title_Worldmap.uld`의 폰트 슬롯은 clean global 그대로 유지하고, 데이터센터 라벨에 쓰이는 ASCII glyph와 metrics가 clean font와 일치하는지 검증합니다.
 
 `--diagnostic-csv <sheet>`를 사용하면 `diagnostic-csv\` 폴더에 해당 sheet의 row/column 비교 CSV가 추가로 생성됩니다.
 

@@ -2,6 +2,9 @@
 
 이 문서는 현재 코드 기준으로 UI, 제너레이터, 빌드/배포 스크립트에 구현된 기능을 정리합니다.
 
+프로젝트 전체 구조와 작업 목적은 [PROJECT_OVERVIEW.md](PROJECT_OVERVIEW.md)를 참고하세요.
+현재 안 되는 내용과 추가 작업 목록은 [KNOWN_ISSUES.md](KNOWN_ISSUES.md)에 별도로 정리합니다.
+
 ## UI 기능
 
 ### 경로 관리
@@ -220,7 +223,7 @@
 - `Map` sheet의 `ui/map/.../*_m.tex` 지도 텍스처를 한국 서버 텍스처와 비교해, 지도 이미지에 포함된 지역명 표기 보정
 - `DynamicEventScreenImage`, `EventImage`, `TradeScreenImage`, `LoadingImage`는 언어 폴더가 없는 동일 경로 리소스를 비교하고 실제 파일이 다른 경우에만 한국 서버 리소스로 교체
 - 지역/컨텐츠 입장 시 표시되는 타이틀 이미지처럼 텍스트가 아니라 이미지로 렌더링되는 UI 요소 보정
-- 데이터 센터 선택 화면의 `Title_DataCenter.uld`에서 `TrumpGothic` 제목 노드는 `Jupiter` 폰트 슬롯으로 보정해 TTMP 한글 atlas와 글로벌 전용 제목 glyph가 충돌하지 않도록 처리
+- 데이터 센터 선택 화면의 `Title_DataCenter.uld`와 `Title_Worldmap.uld`는 clean global 폰트 슬롯을 그대로 유지하고, 데이터센터 라벨에 쓰이는 ASCII glyph와 metrics가 clean font와 일치하는지 검증
 - TTMP 패키지가 제공하는 원래 폰트군 조합을 사용해 렌더링하며, `AXIS_20_lobby`처럼 패키지에 없는 크기/로비용 폰트 경로로 잘못 라우팅되는 것을 방지
 - `Lobby`, `WorldRegionGroup`, `WorldPhysicalDC`, `WorldDCGroupType`, `Addon` 12510번대 서버/데이터센터 이동 안내 row는 대상 글로벌 언어 row를 사용해 읽을 수 없는 proxy glyph 노출을 방지
 - `--base-ui-index`, `--base-ui-index2`로 clean `060000` index/index2 지정
@@ -293,3 +296,4 @@
 - 폰트 패치 실사용은 TTMP 패키지 포함을 전제로 합니다.
 - clean index 또는 복구용 original index가 없으면 이미 패치된 글로벌 index를 배포용 base로 쓰지 않습니다.
 - `--allow-patched-global`, `--allow-korean-font-fallback`, `--allow-version-mismatch`는 실험/진단용입니다.
+- 150%/200%/300% UI 스케일, 데이터 센터 group 표시, 보즈야 입장 안내, 크레센트 레벨 glyph 등은 아직 추가 작업이 필요합니다. 상세 내용은 [KNOWN_ISSUES.md](KNOWN_ISSUES.md)를 참고하세요.
