@@ -147,6 +147,25 @@ namespace FfxivKoreanPatch.PatchRouteVerifier
             "Light",
             "Materia"
         };
+        private static readonly MkdSupportJobExpectation[] MkdSupportJobExpectations = new MkdSupportJobExpectation[]
+        {
+            new MkdSupportJobExpectation(0, "Phantom Freelancer", "Ph. Freelancer"),
+            new MkdSupportJobExpectation(1, "Phantom Knight", "Ph. Knight"),
+            new MkdSupportJobExpectation(2, "Phantom Berserker", "Ph. Berserker"),
+            new MkdSupportJobExpectation(3, "Phantom Monk", "Ph. Monk"),
+            new MkdSupportJobExpectation(4, "Phantom Ranger", "Ph. Ranger"),
+            new MkdSupportJobExpectation(5, "Phantom Samurai", "Ph. Samurai"),
+            new MkdSupportJobExpectation(6, "Phantom Bard", "Ph. Bard"),
+            new MkdSupportJobExpectation(7, "Phantom Geomancer", "Ph. Geomancer"),
+            new MkdSupportJobExpectation(8, "Phantom Time Mage", "Ph. Time Mage"),
+            new MkdSupportJobExpectation(9, "Phantom Cannoneer", "Ph. Cannoneer"),
+            new MkdSupportJobExpectation(10, "Phantom Chemist", "Ph. Chemist"),
+            new MkdSupportJobExpectation(11, "Phantom Oracle", "Ph. Oracle"),
+            new MkdSupportJobExpectation(12, "Phantom Thief", "Ph. Thief"),
+            new MkdSupportJobExpectation(13, "Phantom Mystic Knight", "Ph. Mystic Knight"),
+            new MkdSupportJobExpectation(14, "Phantom Gladiator", "Ph. Gladiator"),
+            new MkdSupportJobExpectation(15, "Phantom Dancer", "Ph. Dancer")
+        };
 
         private static int Main(string[] args)
         {
@@ -284,6 +303,7 @@ namespace FfxivKoreanPatch.PatchRouteVerifier
                     VerifyWorldVisitRows();
                     VerifyConfigurationSharingRows();
                     VerifyBozjaEntranceRows();
+                    VerifyOccultCrescentSupportJobRows();
                     VerifyDataCenterTitleGlyphs();
                     VerifyHighScaleAsciiPhraseLayouts();
                     Verify4kLobbyFontDerivations();
@@ -669,6 +689,21 @@ namespace FfxivKoreanPatch.PatchRouteVerifier
                 ExpectAnyTextColumnContains("custom/007/ctsmycentrancehard_00706", 5, "초고를 읽어");
                 ExpectAnyTextColumnNotContains("custom/007/ctsmycentrancehard_00706", 1, "突入する");
                 ExpectAnyTextColumnNotContains("custom/007/ctsmycentrancehard_00706", 3, "話を聞く");
+            }
+
+            private void VerifyOccultCrescentSupportJobRows()
+            {
+                Console.WriteLine("[EXD] Occult Crescent phantom/support job labels");
+                for (int i = 0; i < MkdSupportJobExpectations.Length; i++)
+                {
+                    MkdSupportJobExpectation expectation = MkdSupportJobExpectations[i];
+                    ExpectTextColumn("MkdSupportJob", expectation.RowId, 0, expectation.FullName);
+                    ExpectTextColumn("MkdSupportJob", expectation.RowId, 4, expectation.ShortName);
+                    ExpectTextColumn("MkdSupportJob", expectation.RowId, 16, expectation.FullName);
+                    ExpectTextColumnNotContains("MkdSupportJob", expectation.RowId, 0, "\uC11C\uD3EC\uD2B8");
+                    ExpectTextColumnNotContains("MkdSupportJob", expectation.RowId, 4, "\uC11C\uD3EC\uD2B8");
+                    ExpectTextColumnContains("MkdSupportJob", expectation.RowId, 12, "\uC11C\uD3EC\uD2B8");
+                }
             }
 
             private void VerifyDataCenterTitleGlyphs()
@@ -1962,6 +1997,42 @@ namespace FfxivKoreanPatch.PatchRouteVerifier
                 Fail("{0}#{1} still contains [{2}], actual [{3}]", sheet, rowId, unexpected, Escape(actual));
             }
 
+            private void ExpectTextColumn(string sheet, uint rowId, ushort columnOffset, string expected)
+            {
+                string actual = GetStringColumnByOffset(_patchedText, sheet, rowId, _language, columnOffset);
+                if (string.Equals(actual, expected, StringComparison.Ordinal))
+                {
+                    Pass("{0}#{1}@{2} = {3}", sheet, rowId, columnOffset, expected);
+                    return;
+                }
+
+                Fail("{0}#{1}@{2} expected [{3}], actual [{4}]", sheet, rowId, columnOffset, expected, Escape(actual));
+            }
+
+            private void ExpectTextColumnContains(string sheet, uint rowId, ushort columnOffset, string expected)
+            {
+                string actual = GetStringColumnByOffset(_patchedText, sheet, rowId, _language, columnOffset);
+                if (actual.IndexOf(expected, StringComparison.Ordinal) >= 0)
+                {
+                    Pass("{0}#{1}@{2} contains {3}", sheet, rowId, columnOffset, expected);
+                    return;
+                }
+
+                Fail("{0}#{1}@{2} does not contain [{3}], actual [{4}]", sheet, rowId, columnOffset, expected, Escape(actual));
+            }
+
+            private void ExpectTextColumnNotContains(string sheet, uint rowId, ushort columnOffset, string unexpected)
+            {
+                string actual = GetStringColumnByOffset(_patchedText, sheet, rowId, _language, columnOffset);
+                if (actual.IndexOf(unexpected, StringComparison.Ordinal) < 0)
+                {
+                    Pass("{0}#{1}@{2} does not contain {3}", sheet, rowId, columnOffset, unexpected);
+                    return;
+                }
+
+                Fail("{0}#{1}@{2} still contains [{3}], actual [{4}]", sheet, rowId, columnOffset, unexpected, Escape(actual));
+            }
+
             private void ExpectAnyTextColumnContains(string sheet, uint rowId, string expected)
             {
                 List<string> columns = GetStringColumns(_patchedText, sheet, rowId, _language);
@@ -2543,6 +2614,46 @@ namespace FfxivKoreanPatch.PatchRouteVerifier
             }
 
             return values;
+        }
+
+        private static string GetStringColumnByOffset(CompositeArchive archive, string sheet, uint rowId, string language, ushort columnOffset)
+        {
+            ExcelHeader header = ExcelHeader.Parse(archive.ReadFile("exd/" + sheet + ".exh"));
+            byte languageId = LanguageToId(language);
+            bool hasLanguageSuffix = header.HasLanguage(languageId);
+            ExcelDataFile file = null;
+
+            for (int i = 0; i < header.Pages.Count; i++)
+            {
+                ExcelPageDefinition page = header.Pages[i];
+                if (rowId < page.StartId || rowId >= page.StartId + page.RowCount)
+                {
+                    continue;
+                }
+
+                string exdPath = "exd/" + sheet + "_" + page.StartId + (hasLanguageSuffix ? "_" + language : string.Empty) + ".exd";
+                file = ExcelDataFile.Parse(archive.ReadFile(exdPath));
+                break;
+            }
+
+            if (file == null)
+            {
+                throw new InvalidDataException(sheet + "#" + rowId + " is outside all pages");
+            }
+
+            ExcelDataRow row;
+            if (!file.TryGetRow(rowId, out row))
+            {
+                throw new InvalidDataException(sheet + "#" + rowId + " was not found");
+            }
+
+            byte[] bytes = file.GetStringBytesByColumnOffset(row, header, columnOffset);
+            if (bytes == null)
+            {
+                throw new InvalidDataException(sheet + "#" + rowId + " does not have string column offset " + columnOffset.ToString());
+            }
+
+            return Encoding.UTF8.GetString(bytes);
         }
 
         private static byte[] GetFirstStringBytes(CompositeArchive archive, string sheet, uint rowId, string language)
@@ -3197,6 +3308,20 @@ namespace FfxivKoreanPatch.PatchRouteVerifier
                 RowId = rowId;
                 Expected = expected;
                 AllowSubstring = allowSubstring;
+            }
+        }
+
+        private sealed class MkdSupportJobExpectation
+        {
+            public readonly uint RowId;
+            public readonly string FullName;
+            public readonly string ShortName;
+
+            public MkdSupportJobExpectation(uint rowId, string fullName, string shortName)
+            {
+                RowId = rowId;
+                FullName = fullName;
+                ShortName = shortName;
             }
         }
     }

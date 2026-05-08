@@ -21,6 +21,11 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
             new KeyValuePair<uint, string>(8294, "60m")
         };
         private const uint ConfigShareAddonTitleRow = 17301;
+        private const uint MkdSupportJobFirstRow = 0;
+        private const uint MkdSupportJobLastPlayableRow = 15;
+        private const ushort MkdSupportJobFullNameColumnOffset = 0;
+        private const ushort MkdSupportJobShortNameColumnOffset = 4;
+        private const ushort MkdSupportJobEnglishFullNameColumnOffset = 16;
         private static readonly uint[] GlobalLobbyDataCenterRows = new uint[] { 791, 792, 793, 794, 800, 801, 802, 803, 804, 805, 806 };
         private static readonly uint[] GlobalDataCenterTravelAddonRows = new uint[] { 12514, 12525 };
 
@@ -68,6 +73,7 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
             PatchPolicy policy = new PatchPolicy();
             PatchSheetPolicy addonPolicy = policy.GetOrCreateSheetPolicy("Addon");
             PatchSheetPolicy lobbyPolicy = policy.GetOrCreateSheetPolicy("Lobby");
+            PatchSheetPolicy mkdSupportJobPolicy = policy.GetOrCreateSheetPolicy("MkdSupportJob");
             PatchSheetPolicy worldDcGroupTypePolicy = policy.GetOrCreateSheetPolicy("WorldDCGroupType");
             PatchSheetPolicy worldPhysicalDcPolicy = policy.GetOrCreateSheetPolicy("WorldPhysicalDC");
             PatchSheetPolicy worldRegionGroupPolicy = policy.GetOrCreateSheetPolicy("WorldRegionGroup");
@@ -130,6 +136,23 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
             // MainCommand. The Korean row is blank, so pin it to the same Korean
             // title used by Addon#17300.
             addonPolicy.SetRowColumnRemap(ConfigShareAddonTitleRow, 0, ColumnRemap.Literal("\uC124\uC815 \uACF5\uC720"));
+
+            // Occult Crescent HUDs consume MkdSupportJob name columns in multiple
+            // places. Korean source columns 0/4 are support-job labels, which can
+            // make a main phantom job render as "support knight". Keep every
+            // playable row's main names on the phantom/global route while leaving
+            // descriptions and support-action text translated.
+            for (uint rowId = MkdSupportJobFirstRow; rowId <= MkdSupportJobLastPlayableRow; rowId++)
+            {
+                mkdSupportJobPolicy.SetRowColumnRemap(
+                    rowId,
+                    MkdSupportJobFullNameColumnOffset,
+                    ColumnRemap.SourceColumn(MkdSupportJobEnglishFullNameColumnOffset));
+                mkdSupportJobPolicy.SetRowColumnRemap(
+                    rowId,
+                    MkdSupportJobShortNameColumnOffset,
+                    ColumnRemap.KeepGlobal);
+            }
 
             // Region labels such as Japan/North America are part of the same lobby
             // flow. Keep the selected global language for these lookup sheets too.
