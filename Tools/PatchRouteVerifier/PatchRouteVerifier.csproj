@@ -48,6 +48,7 @@
     <Compile Include="GlyphAnalysis.cs" />
     <Compile Include="GlyphBitmapWriter.cs" />
     <Compile Include="GlyphDiagnostics.cs" />
+    <Compile Include="GlyphDumpFormatting.cs" />
     <Compile Include="GlyphDumpOutput.cs" />
     <Compile Include="PatchRouteVerifier.cs" />
     <Compile Include="PhraseLayoutVerification.cs" />
