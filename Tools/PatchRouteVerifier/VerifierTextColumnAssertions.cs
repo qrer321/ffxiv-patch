@@ -9,14 +9,19 @@ namespace FfxivKoreanPatch.PatchRouteVerifier
         {
             private void ExpectTextColumn(string sheet, uint rowId, ushort columnOffset, string expected)
             {
-                string actual = GetStringColumnByOffset(_patchedText, sheet, rowId, _language, columnOffset);
+                ExpectTextColumn(sheet, rowId, columnOffset, expected, _language);
+            }
+
+            private void ExpectTextColumn(string sheet, uint rowId, ushort columnOffset, string expected, string language)
+            {
+                string actual = GetStringColumnByOffset(_patchedText, sheet, rowId, language, columnOffset);
                 if (string.Equals(actual, expected, StringComparison.Ordinal))
                 {
-                    Pass("{0}#{1}@{2} = {3}", sheet, rowId, columnOffset, expected);
+                    Pass("{0}#{1}@{2}/{3} = {4}", sheet, rowId, columnOffset, language, expected);
                     return;
                 }
 
-                Fail("{0}#{1}@{2} expected [{3}], actual [{4}]", sheet, rowId, columnOffset, expected, Escape(actual));
+                Fail("{0}#{1}@{2}/{3} expected [{4}], actual [{5}]", sheet, rowId, columnOffset, language, expected, Escape(actual));
             }
 
             private void ExpectTextColumnContains(string sheet, uint rowId, ushort columnOffset, string expected)

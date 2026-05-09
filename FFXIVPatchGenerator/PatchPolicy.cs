@@ -20,10 +20,18 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
             new KeyValuePair<uint, string>(8293, "30m"),
             new KeyValuePair<uint, string>(8294, "60m")
         };
-        private static readonly uint[] ConfigShareAddonTitleRows = new uint[] { 17300, 17301 };
         private const uint ConfigShareMainCommandRow = 99;
         private const string ConfigShareKoreanTitle = "\uC124\uC815 \uACF5\uC720";
         private const string ConfigShareKoreanMainCommandDescription = "\uB2E8\uCD95\uBC14\uB098 \uAC01\uC885 \uC124\uC815 \uB370\uC774\uD130\uB97C \uC11C\uBC84\uC5D0 \uC77C\uC2DC \uC800\uC7A5\uD558\uACE0 \uB2E4\uB978 \uCE90\uB9AD\uD130\uC640 \uACF5\uC720\uD560 \uC218 \uC788\uC2B5\uB2C8\uB2E4.";
+        private static readonly KeyValuePair<uint, string>[] ConfigShareAddonTitleRows = new KeyValuePair<uint, string>[]
+        {
+            new KeyValuePair<uint, string>(17300, ConfigShareKoreanTitle),
+            new KeyValuePair<uint, string>(17315, "\uACF5\uC720 \uB370\uC774\uD130 \uD655\uC778"),
+            new KeyValuePair<uint, string>(17330, "\uC124\uC815 \uB370\uC774\uD130 \uC5C5\uB85C\uB4DC"),
+            new KeyValuePair<uint, string>(17360, "\uACF5\uC720 \uB370\uC774\uD130 \uB2E4\uC6B4\uB85C\uB4DC"),
+            new KeyValuePair<uint, string>(17380, "\uACF5\uC720 \uB370\uC774\uD130 \uB2E4\uC6B4\uB85C\uB4DC")
+        };
+        private static readonly uint[] ConfigShareAddonSubtitleRows = new uint[] { 17301, 17316, 17331, 17361, 17381 };
         private const uint MkdSupportJobFirstRow = 0;
         private const uint MkdSupportJobLastPlayableRow = 15;
         private const ushort MkdSupportJobFullNameColumnOffset = 0;
@@ -156,7 +164,13 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
             mainCommandPolicy.SetRowColumnRemap(ConfigShareMainCommandRow, 4, ColumnRemap.Literal(ConfigShareKoreanMainCommandDescription));
             for (int i = 0; i < ConfigShareAddonTitleRows.Length; i++)
             {
-                addonPolicy.SetRowColumnRemap(ConfigShareAddonTitleRows[i], 0, ColumnRemap.Literal(ConfigShareKoreanTitle));
+                KeyValuePair<uint, string> title = ConfigShareAddonTitleRows[i];
+                addonPolicy.SetRowColumnRemap(title.Key, 0, ColumnRemap.Literal(title.Value));
+            }
+
+            for (int i = 0; i < ConfigShareAddonSubtitleRows.Length; i++)
+            {
+                addonPolicy.SetRowColumnRemap(ConfigShareAddonSubtitleRows[i], 0, ColumnRemap.Literal(string.Empty));
             }
 
             // Occult Crescent HUDs consume MkdSupportJob name columns in multiple

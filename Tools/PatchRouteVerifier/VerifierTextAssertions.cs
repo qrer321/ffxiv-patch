@@ -7,14 +7,19 @@ namespace FfxivKoreanPatch.PatchRouteVerifier
         {
             private void ExpectText(string sheet, uint rowId, string expected)
             {
-                string actual = GetFirstString(_patchedText, sheet, rowId, _language);
+                ExpectText(sheet, rowId, expected, _language);
+            }
+
+            private void ExpectText(string sheet, uint rowId, string expected, string language)
+            {
+                string actual = GetFirstString(_patchedText, sheet, rowId, language);
                 if (string.Equals(actual, expected, StringComparison.Ordinal))
                 {
-                    Pass("{0}#{1} = {2}", sheet, rowId, expected);
+                    Pass("{0}#{1}/{2} = {3}", sheet, rowId, language, expected);
                     return;
                 }
 
-                Fail("{0}#{1} expected [{2}], actual [{3}]", sheet, rowId, expected, Escape(actual));
+                Fail("{0}#{1}/{2} expected [{3}], actual [{4}]", sheet, rowId, language, expected, Escape(actual));
             }
 
             private void ExpectTextContains(string sheet, uint rowId, string expected)

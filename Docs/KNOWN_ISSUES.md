@@ -15,10 +15,12 @@
 
 처리 방향:
 
-- 기존 보정은 `Addon#17300/17301` 창 제목만 대상으로 삼았음
+- 기존 보정은 `Addon#17300/17301` 창 제목을 모두 `설정 공유`로 고정해, 실제로는 비어 있어야 하는 subtitle row를 오염시켰음
 - ESC 시스템 메뉴 항목은 `MainCommand#99`를 참조하며, 한국 서버의 `MainCommand#99` title/description이 비어 있었음
 - `MainCommand#99` title과 description을 정책 literal로 보정
-- `configuration-sharing` verifier가 `MainCommand#99`와 `Addon#17300/17301`을 함께 검사하도록 확장
+- `Addon#17300/17315/17330/17360/17380` main title은 한국어로 고정하고, `Addon#17301/17316/17331/17361/17381` subtitle은 빈 문자열로 고정
+- `ColumnRemap.Literal("")`이 secondary language patch에서 무시되던 패처 버그를 수정
+- `configuration-sharing` verifier가 `ja/en/de/fr` 전체 슬롯에서 main/subtitle pair를 검사하고, main과 subtitle이 같은 텍스트이거나 서로 다른 언어로 섞이면 실패하도록 확장
 
 ## 우선순위 높음
 

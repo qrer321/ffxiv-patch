@@ -42,9 +42,9 @@
 
 - [x] ESC system menu: `コンテンツシェア`/`コンフィグシェア` 계열 설정 공유 메뉴 제목이 base client 언어로 남음
   - 보고일: 2026-05-09
-  - 원인: 창 내부 Addon row는 번역됐지만 ESC 시스템 메뉴 항목은 `MainCommand#99`를 참조하며, 한국 서버의 해당 row title/description이 비어 있어 기존 Addon-only 보정이 닿지 않았음.
-  - 검증 보강: `configuration-sharing` verifier가 `Addon#17300/17301`뿐 아니라 `MainCommand#99`의 title/description column을 검사하고, 일본어/영어 공유 제목이 남으면 실패하도록 한다.
-  - 수정 방향: `MainCommand#99` title과 description을 설정 공유 정책 literal로 보정한다.
+  - 원인: ESC 시스템 메뉴 항목은 `MainCommand#99`를 참조하며, 한국 서버의 해당 row title/description이 비어 있어 기존 Addon-only 보정이 닿지 않았음. 추가로 `Addon#17301` 같은 subtitle row는 한섭 기준 빈 문자열이어야 하는데 `설정 공유`로 강제되어 main/subtitle pair가 오염됐음.
+  - 검증 보강: `configuration-sharing` verifier가 `ja/en/de/fr` 전체 슬롯에서 `MainCommand#99`와 설정 공유 Addon title/subtitle pair를 검사한다. `コンフィグシェア`, `コンテンツシェア`, `Configuration Sharing`, `CONFIG SHARE`가 남거나 main/subtitle이 같은 텍스트이면 실패한다.
+  - 처리: `MainCommand#99` title/description과 설정 공유 main title rows(`17300/17315/17330/17360/17380`)는 한국어 literal로 고정하고, subtitle rows(`17301/17316/17331/17361/17381`)는 빈 문자열 literal로 고정했다. `ColumnRemap.Literal("")`이 secondary language patch에서 무시되던 패처 조건도 수정했다.
 
 - [ ] In-game: `즉시 발동` 등 일부 한글 폰트가 크게 보임
   - 재보고일: 2026-05-09

@@ -469,8 +469,9 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
                         }
                     }
 
+                    bool forceReplacement = columnRemap.Mode == ColumnRemapMode.Literal;
                     if (replacement != null &&
-                        (replacement.Length > 0 || sheetPolicy.ShouldUseGlobalFallbackRow(targetRow.RowId)))
+                        (replacement.Length > 0 || forceReplacement || sheetPolicy.ShouldUseGlobalFallbackRow(targetRow.RowId)))
                     {
                         if (!sheetPolicy.ShouldUseGlobalFallbackRow(targetRow.RowId) &&
                             ShouldKeepOriginalForUiStructure(patchPolicy, original, replacement))
