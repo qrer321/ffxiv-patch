@@ -20,6 +20,15 @@ namespace FfxivKoreanPatch.PatchRouteVerifier
                 "\uBAB8\uC5D0 \uD76C\uC0DD\uB4E4\uC774 \uC5B4\uC5D0 \uB5A0\uC624\uB974\uB9AC",
                 "\uD0D0\uC0AC\uB300 \uD638\uC704\uB300\uC6D0"
             };
+
+            private static readonly string[] ReportedInGameHangulPhrases = new string[]
+            {
+                "\uD0D0\uC0AC\uB300 \uD638\uC704\uB300\uC6D0",
+                "\uC989\uC2DC \uBC1C\uB3D9",
+                "\uC2DC\uC804 \uC2DC\uAC04",
+                "\uC7AC\uC0AC\uC6A9 \uB300\uAE30 \uC2DC\uAC04",
+                "\uBC1C\uB3D9 \uC870\uAC74"
+            };
         }
     }
 }

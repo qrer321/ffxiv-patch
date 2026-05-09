@@ -52,16 +52,18 @@
   - 검증 보강: `configuration-sharing` verifier가 `ja/en/de/fr` 전체 슬롯에서 `MainCommand#99`와 설정 공유 Addon title/subtitle pair를 검사한다. `コンフィグシェア`, `コンテンツシェア`, `Configuration Sharing`, `CONFIG SHARE`가 남거나 main/subtitle이 같은 텍스트이면 실패한다.
   - 처리: `MainCommand#99` title/description과 설정 공유 main title rows(`17300/17315/17330/17360/17380`)는 한국어 literal로 고정하고, subtitle rows(`17301/17316/17331/17361/17381`)는 빈 문자열 literal로 고정했다. `ColumnRemap.Literal("")`이 secondary language patch에서 무시되던 패처 조건도 수정했다.
 
-- [ ] In-game: `즉시 발동` 등 일부 한글 폰트가 크게 보임
+- [x] In-game: `즉시 발동` 등 일부 한글 폰트가 크게 보임
   - 재보고일: 2026-05-09
   - 사용자 정정: 폰트가 깨지거나 잘못된 폰트로 보이는 문제는 아님. 다른 인게임 UI 폰트보다 상대적으로 커 보이는지 확인해 달라는 관찰 항목임.
   - 현재 관찰: 인게임 한글 폰트 계열은 원하는 폰트로 돌아왔음. 다만 일부 문구의 glyph size/advance가 원래 TTMP 기준인지, 패치로 과대화된 것인지 확인 필요.
   - 검증 보강: `즉시 발동`과 비슷한 짧은 UI 문구를 TTMP 원본 대비 pixel/metrics/source preservation으로 비교한다.
-  - 수정 방향: TTMP 원본과 다르면 해당 route를 복구한다. TTMP 원본과 같다면 현재 패치의 깨짐/오염 이슈가 아니라 UI route 자체의 기대 폰트 크기 문제로 분리한다.
+  - 처리: `reported-ingame-hangul-phrases` verifier를 추가해 `즉시 발동`, `시전 시간`, `재사용 대기 시간`, `발동 조건`을 모든 TTMP-covered in-game font route에서 문장 단위 pixel/layout/metrics로 비교한다.
+  - 검증 결과: `.tmp\verifier-ja-reported-ingame-phrases.log`와 `.tmp\verifier-ja-regression-with-reported-phrases.log` PASS. patched output이 TTMP 원본과 같으므로 패치가 glyph를 키운 문제는 아닌 것으로 분리한다.
 
-- [ ] In-game: `탐사대 호위대원`의 `호` glyph 깨짐
+- [x] In-game: `탐사대 호위대원`의 `호` glyph 깨짐
   - 검증 보강: `탐사대 호위대원` 문장을 glyph visibility/fallback/layout 검사에 포함한다.
-  - 수정 방향: 특정 글자만 하드코딩하지 않고, Hangul glyph source/atlas 충돌을 일반 규칙으로 처리한다.
+  - 처리: `호` 같은 특정 글자를 보호 배열에 넣지 않고, 보고 문구 목록에서 Hangul codepoint를 자동 수집해 `hangul-source-preservation`으로 TTMP 원본 대비 glyph source를 검증한다. 추가로 `reported-ingame-hangul-phrases`가 문장 전체 pixel/layout/metrics를 TTMP 원본과 비교한다.
+  - 검증 결과: `.tmp\verifier-ja-reported-ingame-phrases.log`와 `.tmp\verifier-ja-regression-with-reported-phrases.log` PASS.
 
 - [ ] Occult Crescent: 메인은 `PHANTOM KNIGHT` / `Ph. Knight`, 서브는 `서포트 나이트`
   - 검증 보강: `MkdSupportJob` playable row 전체의 메인 full/short column과 support 설명 column을 확인한다.
@@ -92,7 +94,7 @@
 - Data center phrase layout and pixel rendering checks now apply FDT kerning before each glyph/space advance.
 - Data center ASCII pixel checks now run against every `DataCenterWorldmapLabels` entry, including DC group names and server/world names.
 - Data center routed ASCII texture-neighborhood checks compare the 2px padding around every non-space ASCII glyph used by DC groups/world names. Latest ja output passes `.tmp\verifier-dc-texture-padding-fix-ja.log`.
-- Current output passes `.tmp\verifier-ja-regression-after-padding.log` for data-center rows/language slots, start-screen system settings, configuration sharing, Bozja, Occult Crescent support jobs, clean ASCII font routes, 4K lobby phrase/layout, Hangul source preservation, and lobby Hangul visibility.
+- Current output passes `.tmp\verifier-ja-regression-with-reported-phrases.log` for data-center rows/language slots, start-screen system settings, configuration sharing, Bozja, Occult Crescent support jobs, clean ASCII font routes, 4K lobby phrase/layout, Hangul source preservation, reported in-game Hangul phrases, and lobby Hangul visibility.
 - ULD font route checks now also assert text node header and text extra render-state bytes match clean global. Current output passes `.tmp\verifier-uld-render-state.log`.
 - `applied-output-files` compares generated output packed bytes against `--applied-game`; use it to rule out an installed-folder mismatch before live client retesting.
 - Release UI reapply now permits an already patched client when a clean base index is available from the current index, installed `orig.*`, or any same-version local `restore-baseline` language folder; this addresses the case where generated output passes but the installed English client still has older lobby font/UI packed files.

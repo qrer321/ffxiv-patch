@@ -46,7 +46,7 @@
 - 데이터 센터 선택 화면의 서버명/데이터센터명은 영어로 나오지만 문자 간격이 서로 침범함. clean glyph/metrics/kerning/phrase pixel/padding verifier 기준 처리됨
 - 시작 화면 시스템 설정에서 UI 배율을 150/200/300%로 키우면 한글이 `=`로 깨지고 문자 간격이 침범함. 코드 검증 기준 처리됨
 - `데이터 센터 Mana에 입장합니다` 계열 팝업 문구는 처리됨. 재발 시 sheet/row/column 추적 verifier를 먼저 보강
-- 인게임 `즉시 발동` 같은 짧은 한글 UI 문구가 다른 인게임 UI 폰트보다 상대적으로 크게 보일 가능성이 있음. 단, 현재 보고는 깨짐/잘못된 폰트 문제가 아니라 시각적 크기 확인 요청임
+- 인게임 `즉시 발동` 같은 짧은 한글 UI 문구가 다른 인게임 UI 폰트보다 상대적으로 크게 보일 가능성이 있음. 단, 현재 보고는 깨짐/잘못된 폰트 문제가 아니라 시각적 크기 확인 요청임. TTMP 원본 대비 문장 pixel/layout/metrics 검증 기준으로는 patched output과 원본이 같음
 - 스토리 종료 후 컷씬/이벤트 이미지 설명문이 베이스 클라이언트 언어로 표시됨. 폰트 패치가 아니라 지역 이동 타이틀처럼 실제 표시 리소스를 한국 클라이언트 리소스로 교체해야 할 가능성이 높음. 단, 아직 scene 리소스로 단정하지 않고 `EventImage` 등 sheet 기반 이미지 가능성부터 확인해야 함
 
 필요 작업:
@@ -56,7 +56,7 @@
 - 데이터센터 화면 서버명과 DC명은 단어 단위가 아니라 실제 리스트 문자열 기준으로 layout 검증. 현재 `DataCenterWorldmapLabels` 전체 기준으로 수행
 - 흐림 문제는 clean global ASCII glyph의 픽셀/metrics뿐 아니라 실제 texture cell alpha 차이까지 비교. 현재 non-space ASCII glyph 주변 2px padding 기준으로 수행
 - 시작 화면 시스템 설정은 인게임 font route와 분리해서, 해당 route의 한글 glyph fallback/spacing만 검증
-- `즉시 발동` 계열 문구는 TTMP 원본과 patched glyph size/metrics가 같은지 확인. TTMP 원본과 같으면 패치 깨짐이 아니라 UI route의 원래 크기 문제로 분리
+- `즉시 발동` 계열 문구는 TTMP 원본과 patched glyph size/metrics가 같은지 확인. `reported-ingame-hangul-phrases`에서 `즉시 발동`, `시전 시간`, `재사용 대기 시간`, `발동 조건`을 문장 단위로 비교하며 현재 ja 산출물은 통과
 - story 완료 설명문이 `EventImage`, `CutScreenImage`, `ScreenImage`, `DynamicEventScreenImage`, `LoadingImage`, event/cutscene texture/ULD bundle 중 어디에서 오는지 추적
 - 설명문이 이미지형 리소스라면 global target 리소스와 Korean source 리소스의 hash를 비교하고, 한국 서버 리소스가 존재하는 경우 output UI index에 Korean packed texture가 매핑됐는지 verifier에 추가
 
@@ -66,7 +66,7 @@
 - verifier가 pass인데 실제 클라이언트에서 실패하면 해당 verifier는 불완전한 것으로 보고 수정
 - 데이터센터 시작 화면의 영어/숫자/특수문자는 clean global 대비 흐림, 간격 침범, fallback 동일 픽셀이 없어야 함
 - 시작 화면 시스템 설정의 한글은 `=`/`-` fallback과 같으면 실패
-- 인게임 한글 TTMP source preservation은 계속 유지해야 함
+- 인게임 한글 TTMP source preservation은 계속 유지해야 함. `탐사대 호위대원` 같은 보고 문구는 특정 글자 보호 배열이 아니라 문구 목록에서 Hangul codepoint를 자동 수집해 검증
 - story 완료 설명문은 EXD 문자열만 한국어인데 실제 화면이 base client 언어로 남으면 실패. 이미지/event/cutscene 리소스까지 Korean source로 교체되었는지 확인해야 함
 
 ### 1. 150% / 200% / 300% UI 대응 부족
@@ -235,7 +235,8 @@
 - Data center routed phrase rendering now applies FDT kerning when measuring layout and phrase pixels.
 - Data center routed ASCII pixel comparison now covers every `DataCenterWorldmapLabels` entry, including DC groups and world names, not only the previous critical subset.
 - Data center routed ASCII texture-neighborhood comparison now covers the 2px padding around every non-space ASCII glyph used by DC groups/world names. Latest ja output passes `.tmp\verifier-dc-texture-padding-fix-ja.log`.
-- Latest ja output passes `.tmp\verifier-ja-regression-after-padding.log` for data-center rows/language slots, start-screen system settings, configuration sharing, Bozja, Occult Crescent support jobs, clean ASCII font routes, 4K lobby phrase/layout, Hangul source preservation, and lobby Hangul visibility.
+- Latest ja output passes `.tmp\verifier-ja-regression-with-reported-phrases.log` for data-center rows/language slots, start-screen system settings, configuration sharing, Bozja, Occult Crescent support jobs, clean ASCII font routes, 4K lobby phrase/layout, Hangul source preservation, reported in-game Hangul phrases, and lobby Hangul visibility.
+- `reported-ingame-hangul-phrases` compares full phrase pixels/layout/metrics against TTMP source for `탐사대 호위대원`, `즉시 발동`, `시전 시간`, `재사용 대기 시간`, and `발동 조건`. This keeps the `호` regression covered without adding a single-character protection rule.
 - ULD route checks now also compare text node header bytes and text extra render-state bytes, not only font id/font size. `.tmp\verifier-uld-render-state.log` passed for data center and start-screen system settings candidates.
 - `applied-output-files` verifier check compares critical generated font/UI packed files against an installed game folder when `--applied-game <game-dir>` is supplied. Use this before asking for live client confirmation when generated output passes but the installed client still differs.
 - Release UI reapply guard now allows applying over an already patched client when clean base indexes are available from current index, installed `orig.*` indexes, or any same-version local `restore-baseline` language folder. This prevents stale installed font/UI dat files from surviving after generated output already passes verification.

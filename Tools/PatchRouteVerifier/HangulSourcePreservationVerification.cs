@@ -141,6 +141,7 @@ namespace FfxivKoreanPatch.PatchRouteVerifier
                 HashSet<uint> codepoints = new HashSet<uint>();
                 AddHangulCodepoints(codepoints, LobbyDiagnosticPhrases);
                 AddHangulCodepoints(codepoints, DialogueDiagnosticPhrases);
+                AddHangulCodepoints(codepoints, ReportedInGameHangulPhrases);
                 AddHangulCodepoints(codepoints, SystemSettingsScaledPhrases);
                 AddHangulCodepoints(codepoints, FourKLobbyPhrases);
                 return ToSortedArray(codepoints);
