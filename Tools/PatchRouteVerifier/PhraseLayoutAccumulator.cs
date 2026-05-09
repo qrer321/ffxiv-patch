@@ -16,6 +16,11 @@ namespace FfxivKoreanPatch.PatchRouteVerifier
                 _cursor += PhraseLayoutSpaceAdvance;
             }
 
+            public void AddKerning(int adjustment)
+            {
+                _cursor += adjustment;
+            }
+
             public void AddGlyph(PhraseGlyphMeasurement glyph)
             {
                 _overlapPixels += AddGlyphPixels(glyph.Alpha);

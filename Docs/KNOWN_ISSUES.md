@@ -229,6 +229,12 @@
 - layout overlap, advance, glyph bbox를 문장 단위로 검증
 - generated output과 실제 applied game folder를 모두 검증하는 모드 유지
 
+### 2026-05-09 verifier note
+
+- Data center routed phrase rendering now applies FDT kerning when measuring layout and phrase pixels.
+- Data center routed ASCII pixel comparison now covers every `DataCenterWorldmapLabels` entry, including DC groups and world names, not only the previous critical subset.
+- `.tmp\verifier-dc-kerning-full.log` passed for the current output. If the live client still shows blurred group labels or narrow server spacing, the remaining gap is likely outside FDT glyph/kerning bytes and should be investigated through ULD render attributes, font slots, runtime scaling, or applied-game-folder verification.
+
 ## 작업 시 주의 사항
 
 - 인게임 폰트가 정상인 상태에서 로비 문제를 고치기 위해 인게임 폰트를 광범위하게 건드리지 말 것

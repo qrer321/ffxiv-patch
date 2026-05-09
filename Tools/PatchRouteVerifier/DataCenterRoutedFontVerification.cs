@@ -28,9 +28,9 @@ namespace FfxivKoreanPatch.PatchRouteVerifier
 
             private void VerifyDataCenterRoutedAsciiPhrasePixels(string fontPath)
             {
-                for (int phraseIndex = 0; phraseIndex < DataCenterCriticalRenderLabels.Length; phraseIndex++)
+                for (int phraseIndex = 0; phraseIndex < DataCenterWorldmapLabels.Length; phraseIndex++)
                 {
-                    VerifyPhrasePixelsMatchClean(fontPath, fontPath, DataCenterCriticalRenderLabels[phraseIndex]);
+                    VerifyPhrasePixelsMatchClean(fontPath, fontPath, DataCenterWorldmapLabels[phraseIndex]);
                 }
             }
 

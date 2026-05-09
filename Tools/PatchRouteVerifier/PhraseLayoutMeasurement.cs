@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 
 namespace FfxivKoreanPatch.PatchRouteVerifier
 {
@@ -21,14 +22,23 @@ namespace FfxivKoreanPatch.PatchRouteVerifier
                 try
                 {
                     byte[] fdt = archive.ReadFile(fontPath);
+                    Dictionary<string, int> kerningAdjustments = ReadKerningAdjustments(fdt);
                     PhraseLayoutAccumulator accumulator = new PhraseLayoutAccumulator();
+                    bool hasPreviousCodepoint = false;
+                    uint previousCodepoint = 0;
                     for (int i = 0; i < phrase.Length; i++)
                     {
                         uint codepoint = ReadCodepoint(phrase, ref i);
+                        if (hasPreviousCodepoint)
+                        {
+                            accumulator.AddKerning(GetKerningAdjustment(kerningAdjustments, previousCodepoint, codepoint));
+                        }
 
                         if (IsPhraseLayoutSpace(codepoint))
                         {
                             accumulator.AddSpace();
+                            previousCodepoint = codepoint;
+                            hasPreviousCodepoint = true;
                             continue;
                         }
 
@@ -39,6 +49,8 @@ namespace FfxivKoreanPatch.PatchRouteVerifier
                         }
 
                         accumulator.AddGlyph(glyph);
+                        previousCodepoint = codepoint;
+                        hasPreviousCodepoint = true;
                     }
 
                     result = accumulator.ToResult();
@@ -63,14 +75,23 @@ namespace FfxivKoreanPatch.PatchRouteVerifier
                 try
                 {
                     byte[] fdt = package.ReadFile(fontPath);
+                    Dictionary<string, int> kerningAdjustments = ReadKerningAdjustments(fdt);
                     PhraseLayoutAccumulator accumulator = new PhraseLayoutAccumulator();
+                    bool hasPreviousCodepoint = false;
+                    uint previousCodepoint = 0;
                     for (int i = 0; i < phrase.Length; i++)
                     {
                         uint codepoint = ReadCodepoint(phrase, ref i);
+                        if (hasPreviousCodepoint)
+                        {
+                            accumulator.AddKerning(GetKerningAdjustment(kerningAdjustments, previousCodepoint, codepoint));
+                        }
 
                         if (IsPhraseLayoutSpace(codepoint))
                         {
                             accumulator.AddSpace();
+                            previousCodepoint = codepoint;
+                            hasPreviousCodepoint = true;
                             continue;
                         }
 
@@ -81,6 +102,8 @@ namespace FfxivKoreanPatch.PatchRouteVerifier
                         }
 
                         accumulator.AddGlyph(glyph);
+                        previousCodepoint = codepoint;
+                        hasPreviousCodepoint = true;
                     }
 
                     result = accumulator.ToResult();

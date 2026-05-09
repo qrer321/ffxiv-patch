@@ -26,15 +26,25 @@ namespace FfxivKoreanPatch.PatchRouteVerifier
                 {
                     byte[] sourceFdt = _cleanFont.ReadFile(sourceFontPath);
                     byte[] targetFdt = _patchedFont.ReadFile(targetFontPath);
+                    Dictionary<string, int> sourceKerningAdjustments = ReadKerningAdjustments(sourceFdt);
                     int advance = 0;
                     int glyphs = 0;
+                    bool hasPreviousCodepoint = false;
+                    uint previousCodepoint = 0;
 
                     for (int i = 0; i < phrase.Length; i++)
                     {
                         uint codepoint = ReadCodepoint(phrase, ref i);
+                        if (hasPreviousCodepoint)
+                        {
+                            advance += GetKerningAdjustment(sourceKerningAdjustments, previousCodepoint, codepoint);
+                        }
+
                         if (codepoint <= 0x20)
                         {
                             advance += 8;
+                            previousCodepoint = codepoint;
+                            hasPreviousCodepoint = true;
                             continue;
                         }
 
@@ -67,6 +77,8 @@ namespace FfxivKoreanPatch.PatchRouteVerifier
 
                         advance += Math.Max(1, sourceGlyph.Width + sourceGlyph.OffsetX);
                         glyphs++;
+                        previousCodepoint = codepoint;
+                        hasPreviousCodepoint = true;
                     }
 
                     Pass("{0} phrase [{1}] metrics match {2}, glyphs={3}, width={4}", targetFontPath, Escape(phrase), sourceFontPath, glyphs, advance);
@@ -135,15 +147,25 @@ namespace FfxivKoreanPatch.PatchRouteVerifier
                 try
                 {
                     byte[] fdt = archive.ReadFile(fontPath);
+                    Dictionary<string, int> kerningAdjustments = ReadKerningAdjustments(fdt);
                     Dictionary<long, byte> pixels = new Dictionary<long, byte>();
                     int cursor = 0;
                     int glyphs = 0;
+                    bool hasPreviousCodepoint = false;
+                    uint previousCodepoint = 0;
                     for (int i = 0; i < phrase.Length; i++)
                     {
                         uint codepoint = ReadCodepoint(phrase, ref i);
+                        if (hasPreviousCodepoint)
+                        {
+                            cursor += GetKerningAdjustment(kerningAdjustments, previousCodepoint, codepoint);
+                        }
+
                         if (IsPhraseLayoutSpace(codepoint))
                         {
                             cursor += PhraseLayoutSpaceAdvance;
+                            previousCodepoint = codepoint;
+                            hasPreviousCodepoint = true;
                             continue;
                         }
 
@@ -156,6 +178,8 @@ namespace FfxivKoreanPatch.PatchRouteVerifier
                         AddPhraseGlyphPixels(pixels, cursor, glyph.Alpha);
                         cursor += glyph.Advance;
                         glyphs++;
+                        previousCodepoint = codepoint;
+                        hasPreviousCodepoint = true;
                     }
 
                     snapshot = new PhraseRenderSnapshot

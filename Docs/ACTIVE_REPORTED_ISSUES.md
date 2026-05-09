@@ -81,3 +81,9 @@
 - verifier가 pass인데 사용자가 다시 실패를 보고하면 해당 검증이 불완전한 것으로 간주한다.
 - 특정 row/codepoint만 임시로 덮지 않고, 가능한 경우 sheet column 역할, ULD route,
   FDT glyph category, atlas 충돌 회피 같은 일반 규칙으로 수정한다.
+
+## 2026-05-09 verifier note
+
+- Data center phrase layout and pixel rendering checks now apply FDT kerning before each glyph/space advance.
+- Data center ASCII pixel checks now run against every `DataCenterWorldmapLabels` entry, including DC group names and server/world names.
+- Current output passes `.tmp\verifier-dc-kerning-full.log`; if the live client still fails, the next check must move beyond FDT glyph/kerning equality and inspect ULD render attributes, runtime scale behavior, or the actually applied game folder.
