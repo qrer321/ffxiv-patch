@@ -75,6 +75,9 @@
     <Compile Include="GlyphDumpOutput.cs" />
     <Compile Include="GlyphSheetDumpOutput.cs" />
     <Compile Include="GlyphVisibilityAssertions.cs" />
+    <Compile Include="LobbyGlyphDiagnosticComparison.cs" />
+    <Compile Include="LobbyGlyphDiagnosticReference.cs" />
+    <Compile Include="LobbyGlyphDiagnosticTargets.cs" />
     <Compile Include="LabelPreviewDumpOutput.cs" />
     <Compile Include="LobbyGlyphDiagnostics.cs" />
     <Compile Include="LobbyDataCenterLabels.cs" />
