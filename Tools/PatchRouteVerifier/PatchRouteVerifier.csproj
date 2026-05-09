@@ -39,6 +39,7 @@
   <ItemGroup>
     <Compile Include="ArchiveAccess.cs" />
     <Compile Include="CliOptions.cs" />
+    <Compile Include="CleanAsciiKerningRouteVerification.cs" />
     <Compile Include="CleanAsciiFontRouteVerification.cs" />
     <Compile Include="DataCenterLabelExpectations.cs" />
     <Compile Include="DataCenterFontVerification.cs" />
