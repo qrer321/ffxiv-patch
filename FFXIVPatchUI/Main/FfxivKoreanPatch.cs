@@ -1534,16 +1534,15 @@ namespace FFXIVKoreanPatch.Main
 
         private string GetManagedReleaseBaseDir()
         {
-            string version = string.IsNullOrWhiteSpace(targetVersion) ? "unknown" : targetVersion.Trim();
-            foreach (char invalidChar in Path.GetInvalidFileNameChars())
-            {
-                version = version.Replace(invalidChar, '_');
-            }
-
-            return Path.Combine(GetRuntimeDataChildDir("generated-release"), targetLanguageCode, version);
+            return Path.Combine(GetRuntimeDataChildDir("generated-release"), targetLanguageCode, GetTargetVersionDirectoryName());
         }
 
         private string GetRestoreBaselineBaseDir()
+        {
+            return Path.Combine(GetRuntimeDataChildDir("restore-baseline"), targetLanguageCode, GetTargetVersionDirectoryName());
+        }
+
+        private string GetTargetVersionDirectoryName()
         {
             string version = string.IsNullOrWhiteSpace(targetVersion) ? "unknown" : targetVersion.Trim();
             foreach (char invalidChar in Path.GetInvalidFileNameChars())
@@ -1551,7 +1550,7 @@ namespace FFXIVKoreanPatch.Main
                 version = version.Replace(invalidChar, '_');
             }
 
-            return Path.Combine(GetRuntimeDataChildDir("restore-baseline"), targetLanguageCode, version);
+            return version;
         }
 
         private string CreateManagedReleaseDirForRun()
@@ -1646,7 +1645,13 @@ namespace FFXIVKoreanPatch.Main
             }
 
             string baselineDir = GetRestoreBaselineBaseDir();
-            return HasCleanIndexAtPath(GetRestoreBaselineOrigPath(baselineDir, fileName));
+            if (HasCleanIndexAtPath(GetRestoreBaselineOrigPath(baselineDir, fileName)))
+            {
+                return true;
+            }
+
+            string existingBaselinePath;
+            return TryFindExistingRestoreBaselineIndex(fileName, out existingBaselinePath);
         }
 
         private bool CanApplyPatchFilesWithCurrentIndexState(IEnumerable<string> selectedPatchFiles)
@@ -1666,6 +1671,41 @@ namespace FFXIVKoreanPatch.Main
             }
 
             return true;
+        }
+
+        private bool TryFindExistingRestoreBaselineIndex(string fileName, out string indexPath)
+        {
+            indexPath = null;
+
+            string baselineRoot = GetRuntimeDataChildDir("restore-baseline");
+            if (!Directory.Exists(baselineRoot))
+            {
+                return false;
+            }
+
+            string version = GetTargetVersionDirectoryName();
+            List<string> candidates = new List<string>();
+            candidates.Add(Path.Combine(baselineRoot, targetLanguageCode, version, "orig." + fileName));
+
+            foreach (string languageDir in Directory.GetDirectories(baselineRoot))
+            {
+                string candidate = Path.Combine(languageDir, version, "orig." + fileName);
+                if (!candidates.Contains(candidate, StringComparer.OrdinalIgnoreCase))
+                {
+                    candidates.Add(candidate);
+                }
+            }
+
+            foreach (string candidate in candidates)
+            {
+                if (HasCleanIndexAtPath(candidate))
+                {
+                    indexPath = candidate;
+                    return true;
+                }
+            }
+
+            return false;
         }
 
         private void AppendCleanBaseIndexArguments(
@@ -2466,6 +2506,15 @@ namespace FFXIVKoreanPatch.Main
                     else if (lines != null)
                     {
                         lines.Add("[주의] " + fileName + "는 이미 dat1 엔트리 " + dat1Count + "개를 포함하고 있어 복구 기준으로 저장하지 않았습니다.");
+                    }
+                }
+
+                if (string.IsNullOrEmpty(sourcePath))
+                {
+                    string existingBaselinePath;
+                    if (TryFindExistingRestoreBaselineIndex(fileName, out existingBaselinePath))
+                    {
+                        sourcePath = existingBaselinePath;
                     }
                 }
 

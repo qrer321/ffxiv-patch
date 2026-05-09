@@ -90,7 +90,7 @@
 - 테스트 빌드에서는 폰트 프로필로 특정 폰트군 제외 패치를 생성해 UI glyph 깨짐 원인을 분리 가능
 - 사전 점검을 통과하지 않으면 실제 전체/폰트 패치 차단
 - 글로벌/한국 서버 버전이 다르면 실제 전체/폰트 패치 차단
-- 이미 패치된 index/index2가 감지되더라도 current/orig/restore-baseline 중 clean base index를 확보할 수 있으면 최신 전체/폰트 패치를 재적용
+- 이미 패치된 index/index2가 감지되더라도 current/orig/같은 버전의 restore-baseline 중 clean base index를 확보할 수 있으면 최신 전체/폰트 패치를 재적용
 - 출력 폴더가 원본 게임 폴더 내부면 제너레이터에서 중단
 - 원본 글로벌/한국 서버 게임 폴더에는 release 생성물을 직접 쓰지 않음
 

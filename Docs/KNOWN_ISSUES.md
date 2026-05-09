@@ -236,7 +236,7 @@
 - `.tmp\verifier-dc-kerning-full.log` passed for the current output. If the live client still shows blurred group labels or narrow server spacing, the remaining gap is likely outside FDT glyph/kerning bytes and should be investigated through ULD render attributes, font slots, runtime scaling, or applied-game-folder verification.
 - ULD route checks now also compare text node header bytes and text extra render-state bytes, not only font id/font size. `.tmp\verifier-uld-render-state.log` passed for data center and start-screen system settings candidates.
 - `applied-output-files` verifier check compares critical generated font/UI packed files against an installed game folder when `--applied-game <game-dir>` is supplied. Use this before asking for live client confirmation when generated output passes but the installed client still differs.
-- Release UI reapply guard now allows applying over an already patched client when clean base indexes are available from current index, installed `orig.*` indexes, or local `restore-baseline`. This prevents stale installed font/UI dat files from surviving after generated output already passes verification.
+- Release UI reapply guard now allows applying over an already patched client when clean base indexes are available from current index, installed `orig.*` indexes, or any same-version local `restore-baseline` language folder. This prevents stale installed font/UI dat files from surviving after generated output already passes verification.
 
 ## 작업 시 주의 사항
 
