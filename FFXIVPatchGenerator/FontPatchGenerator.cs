@@ -17,6 +17,8 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
         private const string Index2FileName = "000000.win32.index2";
         private const string Dat0FileName = "000000.win32.dat0";
         private const string Dat1FileName = "000000.win32.dat1";
+        private const string TextIndexFileName = "0a0000.win32.index";
+        private const string TextDatPrefix = "0a0000.win32";
 
         // Clean index copies used by the UI for rollback without deleting dat1 manually.
         private const string OrigIndexFileName = "orig.000000.win32.index";
@@ -172,6 +174,7 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
             string outputDir = Path.GetFullPath(_options.OutputPath);
             string globalSqpack = Path.Combine(globalGame, RepositoryDir);
             string koreaSqpack = Path.Combine(koreaGame, RepositoryDir);
+            uint[] derived4kLobbyRequiredPhraseCodepoints = CreateDerived4kLobbyRequiredPhraseCodepoints(koreaSqpack);
 
             RequireFile(Path.Combine(globalSqpack, IndexFileName));
             RequireFile(Path.Combine(globalSqpack, Index2FileName));
@@ -231,7 +234,7 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
 
                 if (fontPackage != null)
                 {
-                    WriteTtmpFontFiles(fontPackage, globalArchive, mutableIndex, mutableIndex2, datWriter);
+                    WriteTtmpFontFiles(fontPackage, globalArchive, mutableIndex, mutableIndex2, datWriter, derived4kLobbyRequiredPhraseCodepoints);
                 }
                 else
                 {
@@ -296,7 +299,7 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
             }
         }
 
-        private void WriteTtmpFontFiles(FontPatchPackage fontPackage, SqPackArchive globalArchive, SqPackIndexFile mutableIndex, SqPackIndex2File mutableIndex2, SqPackDatWriter datWriter)
+        private void WriteTtmpFontFiles(FontPatchPackage fontPackage, SqPackArchive globalArchive, SqPackIndexFile mutableIndex, SqPackIndex2File mutableIndex2, SqPackDatWriter datWriter, uint[] derived4kLobbyRequiredPhraseCodepoints)
         {
             using (FileStream mpdStream = new FileStream(fontPackage.MpdPath, FileMode.Open, FileAccess.Read, FileShare.ReadWrite))
             {
@@ -325,7 +328,7 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
                     ProgressReporter.Report(90 + i * 8 / fontPackage.Payloads.Count, "Font patching " + (i + 1).ToString() + "/" + fontPackage.Payloads.Count.ToString());
                     if (!derived4kLobbyFontsWritten && !path.EndsWith(".fdt", StringComparison.OrdinalIgnoreCase))
                     {
-                        WriteDerived4kLobbyFontFiles(mpdStream, globalArchive, mutableIndex, mutableIndex2, datWriter, payloadsByPath, writtenPaths, lobbyHangulRepair, dialogueGlyphRepair, glyphRepair, texturePatches);
+                        WriteDerived4kLobbyFontFiles(mpdStream, globalArchive, mutableIndex, mutableIndex2, datWriter, payloadsByPath, writtenPaths, lobbyHangulRepair, dialogueGlyphRepair, glyphRepair, texturePatches, derived4kLobbyRequiredPhraseCodepoints);
                         derived4kLobbyFontsWritten = true;
                     }
 
@@ -379,7 +382,7 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
 
                 if (!derived4kLobbyFontsWritten)
                 {
-                    WriteDerived4kLobbyFontFiles(mpdStream, globalArchive, mutableIndex, mutableIndex2, datWriter, payloadsByPath, writtenPaths, lobbyHangulRepair, dialogueGlyphRepair, glyphRepair, texturePatches);
+                    WriteDerived4kLobbyFontFiles(mpdStream, globalArchive, mutableIndex, mutableIndex2, datWriter, payloadsByPath, writtenPaths, lobbyHangulRepair, dialogueGlyphRepair, glyphRepair, texturePatches, derived4kLobbyRequiredPhraseCodepoints);
                 }
 
                 foreach (KeyValuePair<string, List<FontTexturePatch>> pair in texturePatches)
@@ -434,7 +437,8 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
             LobbyHangulRepairContext lobbyHangulRepair,
             TargetedGlyphRepairContext dialogueGlyphRepair,
             FontGlyphRepairContext glyphRepair,
-            Dictionary<string, List<FontTexturePatch>> texturePatches)
+            Dictionary<string, List<FontTexturePatch>> texturePatches,
+            uint[] requiredPhraseCodepoints)
         {
             for (int i = 0; i < Derived4kLobbyFonts.Length; i++)
             {
@@ -497,7 +501,8 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
                     mpdStream,
                     payloadsByPath,
                     glyphRepair,
-                    texturePatches);
+                    texturePatches,
+                    requiredPhraseCodepoints);
                 int normalized;
                 long datOffset = WritePreparedFontFdtPayload(datWriter, targetPath, fdt, null, derivedGlyphCells, mpdStream, payloadsByPath, lobbyHangulRepair, dialogueGlyphRepair, glyphRepair, globalArchive, texturePatches, out normalized);
                 if (derivedGlyphCells > 0)
@@ -522,7 +527,8 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
             FileStream mpdStream,
             Dictionary<string, FontPayload> payloadsByPath,
             FontGlyphRepairContext glyphRepair,
-            Dictionary<string, List<FontTexturePatch>> texturePatches)
+            Dictionary<string, List<FontTexturePatch>> texturePatches,
+            uint[] requiredPhraseCodepoints)
         {
             if (sourceFdt == null || targetFdt == null || glyphRepair == null || texturePatches == null)
             {
@@ -537,8 +543,13 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
                 return 0;
             }
 
+            if (requiredPhraseCodepoints == null)
+            {
+                requiredPhraseCodepoints = new uint[0];
+            }
+
             int glyphEnd = checked(glyphStart + checked((int)glyphCount) * FdtGlyphEntrySize);
-            List<byte[]> targetEntries = new List<byte[]>(checked((int)glyphCount + Derived4kLobbyRequiredPhraseCodepoints.Length));
+            List<byte[]> targetEntries = new List<byte[]>(checked((int)glyphCount + requiredPhraseCodepoints.Length));
             Dictionary<uint, int> targetEntryIndexes = new Dictionary<uint, int>();
             for (int glyphIndex = 0; glyphIndex < glyphCount; glyphIndex++)
             {
@@ -564,9 +575,9 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
             int missingTextures = 0;
             int allocationFailures = 0;
             int extractionFailures = 0;
-            for (int requiredIndex = 0; requiredIndex < Derived4kLobbyRequiredPhraseCodepoints.Length; requiredIndex++)
+            for (int requiredIndex = 0; requiredIndex < requiredPhraseCodepoints.Length; requiredIndex++)
             {
-                uint codepoint = Derived4kLobbyRequiredPhraseCodepoints[requiredIndex];
+                uint codepoint = requiredPhraseCodepoints[requiredIndex];
                 uint utf8Value = PackFdtUtf8Value(codepoint);
                 byte[] sourceEntryBytes;
                 if (!sourceEntries.TryGetValue(utf8Value, out sourceEntryBytes))
@@ -2508,6 +2519,163 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
             }
 
             return value;
+        }
+
+        private uint[] CreateDerived4kLobbyRequiredPhraseCodepoints(string koreaSqpack)
+        {
+            HashSet<uint> codepoints = new HashSet<uint>();
+            AddPhraseCodepoints(codepoints, Derived4kLobbyRequiredHangulPhrases);
+            int staticCount = codepoints.Count;
+            int dynamicAdded = AddStartScreenSystemSettingsAddonCodepoints(codepoints, koreaSqpack);
+
+            uint[] values = ToSortedCodepointArray(codepoints);
+            Console.WriteLine(
+                "4K lobby required codepoints: {0} static, {1} addon-derived, {2} total",
+                staticCount,
+                dynamicAdded,
+                values.Length);
+            return values;
+        }
+
+        private int AddStartScreenSystemSettingsAddonCodepoints(HashSet<uint> codepoints, string koreaSqpack)
+        {
+            if (codepoints == null || string.IsNullOrEmpty(koreaSqpack))
+            {
+                return 0;
+            }
+
+            string textIndexPath = Path.Combine(koreaSqpack, TextIndexFileName);
+            if (!File.Exists(textIndexPath))
+            {
+                AddLimitedWarning("Korean text index missing for 4K lobby Addon glyph coverage: " + textIndexPath);
+                return 0;
+            }
+
+            int before = codepoints.Count;
+            try
+            {
+                using (SqPackArchive textArchive = new SqPackArchive(textIndexPath, koreaSqpack, TextDatPrefix))
+                {
+                    ExcelHeader header = ExcelHeader.Parse(textArchive.ReadFile("exd/Addon.exh"));
+                    if (header.Variant != ExcelVariant.Default)
+                    {
+                        AddLimitedWarning("Addon header variant is not supported for dynamic 4K lobby glyph coverage: " + header.Variant.ToString());
+                        return 0;
+                    }
+
+                    byte languageId = LanguageCodes.ToId(_options.SourceLanguage);
+                    bool hasLanguageSuffix = header.HasLanguage(languageId);
+                    List<int> stringColumns = header.GetStringColumnIndexes();
+                    for (int pageIndex = 0; pageIndex < header.Pages.Count; pageIndex++)
+                    {
+                        ExcelPageDefinition page = header.Pages[pageIndex];
+                        if (!AddonPageOverlaps(page, LobbyScaledHangulPhrases.StartScreenSystemSettingsAddonRowRanges))
+                        {
+                            continue;
+                        }
+
+                        string exdPath = BuildExdPath("Addon", page.StartId, hasLanguageSuffix ? _options.SourceLanguage : null);
+                        ExcelDataFile file = ExcelDataFile.Parse(textArchive.ReadFile(exdPath));
+                        for (int rowIndex = 0; rowIndex < file.Rows.Count; rowIndex++)
+                        {
+                            ExcelDataRow row = file.Rows[rowIndex];
+                            if (!RowInRanges(row.RowId, LobbyScaledHangulPhrases.StartScreenSystemSettingsAddonRowRanges))
+                            {
+                                continue;
+                            }
+
+                            for (int columnIndex = 0; columnIndex < stringColumns.Count; columnIndex++)
+                            {
+                                byte[] bytes = file.GetStringBytes(row, header, stringColumns[columnIndex]);
+                                AddUtf8PhraseCodepoints(codepoints, bytes);
+                            }
+                        }
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                AddLimitedWarning("Could not collect Addon glyph coverage for 4K lobby fonts: " + ex.Message);
+                return 0;
+            }
+
+            return codepoints.Count - before;
+        }
+
+        private static bool AddonPageOverlaps(ExcelPageDefinition page, AddonRowRange[] ranges)
+        {
+            uint pageEnd = page.RowCount == 0 ? page.StartId : page.StartId + page.RowCount - 1;
+            for (int i = 0; i < ranges.Length; i++)
+            {
+                if (ranges[i].StartId <= pageEnd && ranges[i].EndId >= page.StartId)
+                {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
+        private static bool RowInRanges(uint rowId, AddonRowRange[] ranges)
+        {
+            for (int i = 0; i < ranges.Length; i++)
+            {
+                if (ranges[i].Contains(rowId))
+                {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
+        private static string BuildExdPath(string sheet, uint pageStartId, string language)
+        {
+            return "exd/" + sheet + "_" + pageStartId + (string.IsNullOrEmpty(language) ? string.Empty : "_" + language) + ".exd";
+        }
+
+        private static void AddPhraseCodepoints(HashSet<uint> codepoints, string[] phrases)
+        {
+            for (int phraseIndex = 0; phraseIndex < phrases.Length; phraseIndex++)
+            {
+                AddPhraseCodepoints(codepoints, phrases[phraseIndex]);
+            }
+        }
+
+        private static void AddUtf8PhraseCodepoints(HashSet<uint> codepoints, byte[] bytes)
+        {
+            if (bytes == null || bytes.Length == 0)
+            {
+                return;
+            }
+
+            AddPhraseCodepoints(codepoints, Encoding.UTF8.GetString(bytes));
+        }
+
+        private static void AddPhraseCodepoints(HashSet<uint> codepoints, string phrase)
+        {
+            phrase = phrase ?? string.Empty;
+            for (int charIndex = 0; charIndex < phrase.Length; charIndex++)
+            {
+                uint codepoint = ReadCodepoint(phrase, ref charIndex);
+                if (ShouldIncludeDerived4kLobbyCodepoint(codepoint))
+                {
+                    codepoints.Add(codepoint);
+                }
+            }
+        }
+
+        private static bool ShouldIncludeDerived4kLobbyCodepoint(uint codepoint)
+        {
+            return (codepoint > 0x20 && codepoint <= 0x7E) || IsHangulCodepoint(codepoint);
+        }
+
+        private static uint[] ToSortedCodepointArray(HashSet<uint> codepoints)
+        {
+            uint[] values = new uint[codepoints.Count];
+            codepoints.CopyTo(values);
+            Array.Sort(values);
+            return values;
         }
 
         private static uint[] CreateHangulCodepoints(string[] phrases)

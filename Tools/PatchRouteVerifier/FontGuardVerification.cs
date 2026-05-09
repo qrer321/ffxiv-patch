@@ -1,4 +1,7 @@
 using System;
+using System.Collections.Generic;
+using System.Text;
+using FfxivKoreanPatch.FFXIVPatchGenerator;
 
 namespace FfxivKoreanPatch.PatchRouteVerifier
 {
@@ -9,6 +12,7 @@ namespace FfxivKoreanPatch.PatchRouteVerifier
             private void Verify4kLobbyFontDerivations()
             {
                 Console.WriteLine("[FDT] 4K lobby font derivations");
+                uint[] requiredHangulCodepoints = Collect4kLobbyRequiredHangulCodepoints();
 
                 for (int i = 0; i < Derived4kLobbyFontPairs.GetLength(0); i++)
                 {
@@ -33,9 +37,9 @@ namespace FfxivKoreanPatch.PatchRouteVerifier
 
                     bool checkedHangul = false;
                     int checkedHangulCount = 0;
-                    for (int codepointIndex = 0; codepointIndex < Derived4kLobbyRequiredHangulCodepoints.Length; codepointIndex++)
+                    for (int codepointIndex = 0; codepointIndex < requiredHangulCodepoints.Length; codepointIndex++)
                     {
-                        uint codepoint = Derived4kLobbyRequiredHangulCodepoints[codepointIndex];
+                        uint codepoint = requiredHangulCodepoints[codepointIndex];
                         FdtGlyphEntry ignored;
                         if (!TryFindGlyph(sourceFdt, codepoint, out ignored))
                         {
@@ -58,6 +62,127 @@ namespace FfxivKoreanPatch.PatchRouteVerifier
                     else
                     {
                         Pass("{0} required 4K lobby Hangul glyphs checked: {1}", targetFontPath, checkedHangulCount);
+                    }
+                }
+            }
+
+            private uint[] Collect4kLobbyRequiredHangulCodepoints()
+            {
+                HashSet<uint> codepoints = new HashSet<uint>();
+                AddDynamicHangulCodepoints(codepoints, Derived4kLobbyRequiredHangulPhrases);
+                int staticCount = codepoints.Count;
+                int addonDerived = AddPatchedAddonRangeHangulCodepoints(codepoints);
+                uint[] values = new uint[codepoints.Count];
+                codepoints.CopyTo(values);
+                Array.Sort(values);
+                Pass("4K lobby required Hangul codepoints collected: static={0}, addon-derived={1}, total={2}", staticCount, addonDerived, values.Length);
+                return values;
+            }
+
+            private int AddPatchedAddonRangeHangulCodepoints(HashSet<uint> codepoints)
+            {
+                int before = codepoints.Count;
+                try
+                {
+                    ExcelHeader header = ExcelHeader.Parse(_patchedText.ReadFile("exd/Addon.exh"));
+                    if (header.Variant != ExcelVariant.Default)
+                    {
+                        Warn("Addon header variant is not supported for dynamic 4K lobby glyph verification: {0}", header.Variant);
+                        return 0;
+                    }
+
+                    byte languageId = LanguageToId(_language);
+                    bool hasLanguageSuffix = header.HasLanguage(languageId);
+                    List<int> stringColumns = header.GetStringColumnIndexes();
+                    for (int pageIndex = 0; pageIndex < header.Pages.Count; pageIndex++)
+                    {
+                        ExcelPageDefinition page = header.Pages[pageIndex];
+                        if (!AddonPageOverlaps(page, LobbyScaledHangulPhrases.StartScreenSystemSettingsAddonRowRanges))
+                        {
+                            continue;
+                        }
+
+                        string exdPath = BuildExdPath("Addon", page.StartId, _language, hasLanguageSuffix);
+                        ExcelDataFile file = ExcelDataFile.Parse(_patchedText.ReadFile(exdPath));
+                        for (int rowIndex = 0; rowIndex < file.Rows.Count; rowIndex++)
+                        {
+                            ExcelDataRow row = file.Rows[rowIndex];
+                            if (!RowInRanges(row.RowId, LobbyScaledHangulPhrases.StartScreenSystemSettingsAddonRowRanges))
+                            {
+                                continue;
+                            }
+
+                            for (int columnIndex = 0; columnIndex < stringColumns.Count; columnIndex++)
+                            {
+                                byte[] bytes = file.GetStringBytes(row, header, stringColumns[columnIndex]);
+                                AddDynamicHangulCodepoints(codepoints, bytes);
+                            }
+                        }
+                    }
+                }
+                catch (Exception ex)
+                {
+                    Warn("Could not collect Addon glyph coverage for 4K lobby verification: {0}", ex.Message);
+                    return 0;
+                }
+
+                return codepoints.Count - before;
+            }
+
+            private static bool AddonPageOverlaps(ExcelPageDefinition page, AddonRowRange[] ranges)
+            {
+                uint pageEnd = page.RowCount == 0 ? page.StartId : page.StartId + page.RowCount - 1;
+                for (int i = 0; i < ranges.Length; i++)
+                {
+                    if (ranges[i].StartId <= pageEnd && ranges[i].EndId >= page.StartId)
+                    {
+                        return true;
+                    }
+                }
+
+                return false;
+            }
+
+            private static bool RowInRanges(uint rowId, AddonRowRange[] ranges)
+            {
+                for (int i = 0; i < ranges.Length; i++)
+                {
+                    if (ranges[i].Contains(rowId))
+                    {
+                        return true;
+                    }
+                }
+
+                return false;
+            }
+
+            private static void AddDynamicHangulCodepoints(HashSet<uint> codepoints, string[] phrases)
+            {
+                for (int phraseIndex = 0; phraseIndex < phrases.Length; phraseIndex++)
+                {
+                    AddDynamicHangulCodepoints(codepoints, phrases[phraseIndex]);
+                }
+            }
+
+            private static void AddDynamicHangulCodepoints(HashSet<uint> codepoints, byte[] bytes)
+            {
+                if (bytes == null || bytes.Length == 0)
+                {
+                    return;
+                }
+
+                AddDynamicHangulCodepoints(codepoints, Encoding.UTF8.GetString(bytes));
+            }
+
+            private static void AddDynamicHangulCodepoints(HashSet<uint> codepoints, string value)
+            {
+                value = value ?? string.Empty;
+                for (int index = 0; index < value.Length; index++)
+                {
+                    uint codepoint = ReadCodepoint(value, ref index);
+                    if (IsHangulCodepoint(codepoint))
+                    {
+                        codepoints.Add(codepoint);
                     }
                 }
             }

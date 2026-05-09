@@ -15,6 +15,8 @@ param(
 
     [switch]$NoGlyphDump,
 
+    [string]$Checks,
+
     [string]$Configuration = "Release"
 )
 
@@ -45,6 +47,9 @@ if (![string]::IsNullOrWhiteSpace($GlyphDumpDir)) {
 }
 if ($NoGlyphDump) {
     $arguments += "--no-glyph-dump"
+}
+if (![string]::IsNullOrWhiteSpace($Checks)) {
+    $arguments += @("--checks", $Checks)
 }
 
 & $toolExe @arguments

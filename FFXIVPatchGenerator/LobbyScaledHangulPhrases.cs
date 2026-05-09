@@ -5,6 +5,13 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
 {
     internal static class LobbyScaledHangulPhrases
     {
+        public static readonly AddonRowRange[] StartScreenSystemSettingsAddonRowRanges = new AddonRowRange[]
+        {
+            // System Config header/options and the high-resolution UI option block.
+            new AddonRowRange(4000, 4200),
+            new AddonRowRange(8683, 8722)
+        };
+
         public static readonly string[] Core = new string[]
         {
             "\uCE90\uB9AD\uD130 \uC815\uBCF4\uB97C \uBCC0\uACBD\uD558\uAE30 \uC704\uD574",
@@ -83,6 +90,23 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
             }
 
             return values.ToArray();
+        }
+    }
+
+    internal struct AddonRowRange
+    {
+        public readonly uint StartId;
+        public readonly uint EndId;
+
+        public AddonRowRange(uint startId, uint endId)
+        {
+            StartId = startId;
+            EndId = endId;
+        }
+
+        public bool Contains(uint rowId)
+        {
+            return rowId >= StartId && rowId <= EndId;
         }
     }
 }
