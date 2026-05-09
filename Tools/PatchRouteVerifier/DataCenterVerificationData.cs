@@ -48,6 +48,14 @@ namespace FfxivKoreanPatch.PatchRouteVerifier
             "Shadow",
             "NA Cloud DC (Beta)"
         };
+        private static readonly string[] DataCenterActionLabels = new string[]
+        {
+            "OK",
+            "Proceed",
+            "Cancel",
+            "Exit",
+            "Data Center"
+        };
         private static readonly string[] DataCenterWorldmapLabels = CreateDataCenterGlyphLabels();
 
         private static string[] CreateDataCenterGlyphLabels()
@@ -77,6 +85,7 @@ namespace FfxivKoreanPatch.PatchRouteVerifier
             }
 
             labels.Add("NA Cloud Data Center (Beta)");
+            AddLabels(labels, DataCenterActionLabels);
             AddLabels(labels, WorldRegionGroupLabels);
             AddLabels(labels, WorldPhysicalDcLabels);
             AddLabels(labels, WorldDcGroupTypeLabels);
