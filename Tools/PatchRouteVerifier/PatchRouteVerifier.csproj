@@ -77,7 +77,8 @@
     <Compile Include="PatchRouteVerifier.cs" />
     <Compile Include="PhraseLayoutMeasurement.cs" />
     <Compile Include="PhraseLayoutVerificationData.cs" />
-    <Compile Include="PhraseLayoutVerification.cs" />
+    <Compile Include="PhraseMetricsVerification.cs" />
+    <Compile Include="PhraseOverlapVerification.cs" />
     <Compile Include="ProtectedGlyphVerification.cs" />
     <Compile Include="UldFontPathResolver.cs" />
     <Compile Include="UldFontRoutes.cs" />
