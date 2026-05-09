@@ -18,7 +18,7 @@ if ($LASTEXITCODE -ne 0) {
     exit $LASTEXITCODE
 }
 
-& $msbuild $solutionPath /restore "/p:Configuration=$Configuration" /m
+& $msbuild $solutionPath /restore /t:Rebuild "/p:Configuration=$Configuration" /m
 if ($LASTEXITCODE -ne 0) {
     exit $LASTEXITCODE
 }

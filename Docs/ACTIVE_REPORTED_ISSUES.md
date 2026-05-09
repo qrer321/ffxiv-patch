@@ -5,25 +5,35 @@
 
 ## Current Checklist
 
+- [x] Start screen: `종료`가 `EXIT`로 표시됨
+  - 재보고일: 2026-05-09
+  - 원인: `Lobby#2002`를 글로벌 target row로 강제한 정책 때문에 시작 화면 종료 버튼이 영어 클라이언트 기준 `EXIT`로 바뀜.
+  - 검증 보강: `data-center-rows`가 `Lobby#2002`를 `종료`로 확인하고, `EXIT`가 남으면 실패해야 한다.
+  - 처리: 단순히 글로벌 target row를 제거하면 한국 원본이 `나가기`로 들어가므로, 사용자 요구에 맞춰 `Lobby#2002`는 `종료` literal로 고정했다. `data-center-language-slots`도 이 row의 한글을 허용해 모든 언어 슬롯에서 `종료`가 유지되는지 확인한다.
+  - 남은 분리 작업: 데이터센터 화면에서 깨졌던 `-로?`는 별도 `뒤로` 버튼 row일 가능성이 있으므로, 다시 보이면 `Lobby#2002`와 혼동하지 않고 실제 row를 추적한다.
+
 - [ ] Data center select: 그룹명은 영어로 나오지만 흐리게 렌더링됨
   - 재보고일: 2026-05-09
   - 검증 보강: 실제 `Title_DataCenter.uld`/`Title_Worldmap.uld` route가 쓰는 font와 texture를 확인하고, 해당 라벨을 clean global 렌더와 픽셀/metrics 비교한다.
   - 수정 방향: 데이터센터 선택 화면의 ASCII 라벨은 TTMP 한글 폰트가 아니라 clean global ASCII glyph/kerning/texture를 사용해야 한다.
+  - 2026-05-09 보강: `Elemental`, `Mana`, 주요 서버명 등 핵심 라벨을 문장 픽셀 스냅샷으로 clean global과 직접 비교하도록 verifier를 확장했다. 현재 산출물은 FDT glyph/metrics/kerning/문장 픽셀 기준으로 통과한다.
 
 - [ ] Data center select: 서버명은 영어로 나오지만 문자 간격이 서로 침범함
   - 재보고일: 2026-05-09
   - 검증 보강: `Elemental`, `Gaia`, `Mana`, 실제 월드명 전체를 데이터센터 화면 route font에서 문장 단위 layout으로 검사한다.
   - 수정 방향: 월드/데이터센터 ASCII 라벨의 advance/kerning을 clean global과 일치시키고, TTMP texture cell에 덮어쓴 ASCII가 흐리거나 좁게 나오지 않게 한다.
+  - 2026-05-09 보강: 데이터센터 ULD route별 핵심 라벨 문장 픽셀 비교를 추가했다. 현재 산출물은 clean global 대비 라벨 문장 폭과 픽셀이 일치한다.
 
 - [ ] Data center select: 화면을 나가는 버튼이 `-로?` / `-료?`처럼 잘못 표시됨
   - 재보고일: 2026-05-09
   - 검증 보강: 데이터센터 선택 화면 종료/뒤로가기/취소 버튼 row를 찾아 base client 언어 슬롯별로 확인하고, 실제 버튼 문자열 glyph를 fallback `-`/`=`와 비교한다.
   - 수정 방향: 시작 화면 전용 버튼은 한국어가 아니라 base client 원문을 유지하거나, 한글을 유지할 경우 해당 route font가 한글을 정상 렌더링해야 한다.
 
-- [ ] Start screen system settings: UI 배율을 키우면 한글이 `=`로 깨지고 문자 간격이 침범함
+- [x] Start screen system settings: UI 배율을 키우면 한글이 `=`로 깨지고 문자 간격이 침범함
   - 재보고일: 2026-05-09
   - 검증 보강: 시작 화면 시스템 설정이 실제로 쓰는 ULD/font route를 찾고, 150/200/300%에서 해당 route의 한글 대표 문구를 glyph fallback/layout 검사에 넣는다.
-  - 수정 방향: 인게임 한글 폰트를 오염시키지 않고, 시작 화면 시스템 설정 전용 font route에 필요한 한글 glyph와 spacing만 보정한다.
+  - 처리: `그래픽 설정`, `UI 해상도 설정`, `고해상도 UI 크기 설정` 등 실제 시스템 설정 Addon 라벨을 `LobbyScaledHangulPhrases`로 분리하고, 제너레이터와 verifier가 같은 목록을 사용하도록 변경했다. 4K 로비 파생 폰트에 필요한 glyph cell을 추가하고, `start-system-settings-uld`/`4k-lobby-phrase-layouts`에서 150/200/300% 대표 라벨을 검사한다.
+  - 검증 결과: 이전 산출물은 새 verifier에서 누락 glyph로 실패했고, 새 산출물은 4K lobby phrase/layout 및 TTMP source preservation 기준으로 통과했다.
 
 - [ ] Data center select popup: `데이터 센터 Mana에 입장합니다` 계열 팝업 문구가 base client 언어로 나옴
   - 재보고일: 2026-05-09

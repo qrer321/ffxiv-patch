@@ -12,6 +12,7 @@ namespace FfxivKoreanPatch.PatchRouteVerifier
                 {
                     VerifyLabelGlyphsEqualClean(fontPath, DataCenterWorldmapLabels);
                     VerifyDataCenterRoutedAsciiPhraseMetrics(fontPath);
+                    VerifyDataCenterRoutedAsciiPhrasePixels(fontPath);
                     VerifyDataCenterRoutedKoreanPhraseLayouts(fontPath);
                     DumpLabelPreview(dumpGroup, fontPath, DataCenterWorldmapLabels);
                 }
@@ -22,6 +23,14 @@ namespace FfxivKoreanPatch.PatchRouteVerifier
                 for (int phraseIndex = 0; phraseIndex < DataCenterWorldmapLabels.Length; phraseIndex++)
                 {
                     VerifyPhraseMetricsMatchClean(fontPath, fontPath, DataCenterWorldmapLabels[phraseIndex]);
+                }
+            }
+
+            private void VerifyDataCenterRoutedAsciiPhrasePixels(string fontPath)
+            {
+                for (int phraseIndex = 0; phraseIndex < DataCenterCriticalRenderLabels.Length; phraseIndex++)
+                {
+                    VerifyPhrasePixelsMatchClean(fontPath, fontPath, DataCenterCriticalRenderLabels[phraseIndex]);
                 }
             }
 
