@@ -49,6 +49,9 @@
     <Compile Include="DataCenterUldFontRouteVerification.cs" />
     <Compile Include="DataCenterVerificationData.cs" />
     <Compile Include="DataCenterVerification.cs" />
+    <Compile Include="DialogueGlyphDiagnosticComparison.cs" />
+    <Compile Include="DialogueGlyphDiagnosticReporting.cs" />
+    <Compile Include="DialogueGlyphDiagnosticTargets.cs" />
     <Compile Include="DialogueGlyphDiagnostics.cs" />
     <Compile Include="ExcelTextAccess.cs" />
     <Compile Include="ExdScenarioVerification.cs" />
