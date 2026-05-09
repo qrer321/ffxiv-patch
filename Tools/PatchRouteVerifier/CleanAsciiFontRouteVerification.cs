@@ -118,6 +118,12 @@ namespace FfxivKoreanPatch.PatchRouteVerifier
                     }
                 }
 
+                int lobbySuffixIndex = normalized.LastIndexOf("_lobby.fdt", StringComparison.OrdinalIgnoreCase);
+                if (lobbySuffixIndex >= 0)
+                {
+                    return normalized.Substring(0, lobbySuffixIndex) + ".fdt";
+                }
+
                 return normalized;
             }
 

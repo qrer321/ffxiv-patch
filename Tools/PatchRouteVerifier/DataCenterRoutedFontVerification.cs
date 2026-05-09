@@ -22,17 +22,19 @@ namespace FfxivKoreanPatch.PatchRouteVerifier
 
             private void VerifyDataCenterRoutedAsciiPhraseMetrics(string fontPath)
             {
+                string sourceFontPath = ResolveCleanAsciiReferenceFontPath(fontPath);
                 for (int phraseIndex = 0; phraseIndex < DataCenterWorldmapLabels.Length; phraseIndex++)
                 {
-                    VerifyPhraseMetricsMatchClean(fontPath, fontPath, DataCenterWorldmapLabels[phraseIndex]);
+                    VerifyPhraseMetricsMatchClean(sourceFontPath, fontPath, DataCenterWorldmapLabels[phraseIndex]);
                 }
             }
 
             private void VerifyDataCenterRoutedAsciiPhrasePixels(string fontPath)
             {
+                string sourceFontPath = ResolveCleanAsciiReferenceFontPath(fontPath);
                 for (int phraseIndex = 0; phraseIndex < DataCenterWorldmapLabels.Length; phraseIndex++)
                 {
-                    VerifyPhrasePixelsMatchClean(fontPath, fontPath, DataCenterWorldmapLabels[phraseIndex]);
+                    VerifyPhrasePixelsMatchClean(sourceFontPath, fontPath, DataCenterWorldmapLabels[phraseIndex]);
                 }
             }
 
@@ -46,6 +48,7 @@ namespace FfxivKoreanPatch.PatchRouteVerifier
 
             private void VerifyDataCenterRoutedAsciiTexturePadding(string fontPath)
             {
+                string sourceFontPath = ResolveCleanAsciiReferenceFontPath(fontPath);
                 uint[] codepoints = CollectNonSpaceCodepoints(DataCenterWorldmapLabels);
                 int checkedGlyphs = 0;
                 int failures = 0;
@@ -58,12 +61,13 @@ namespace FfxivKoreanPatch.PatchRouteVerifier
                     }
 
                     string error;
-                    if (!VerifyGlyphTextureNeighborhoodMatchesClean(fontPath, fontPath, codepoint, DataCenterGlyphTexturePadding, out error))
+                    if (!VerifyGlyphTextureNeighborhoodMatchesClean(sourceFontPath, fontPath, codepoint, DataCenterGlyphTexturePadding, out error))
                     {
                         Fail(
-                            "{0} U+{1:X4} texture padding differs from clean route: {2}",
+                            "{0} U+{1:X4} texture padding differs from clean route {2}: {3}",
                             fontPath,
                             codepoint,
+                            sourceFontPath,
                             error);
                         failures++;
                         if (failures >= MaxTexturePaddingFailuresPerFont)

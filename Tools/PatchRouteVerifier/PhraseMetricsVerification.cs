@@ -13,9 +13,10 @@ namespace FfxivKoreanPatch.PatchRouteVerifier
                 for (int fontIndex = 0; fontIndex < HighScaleAsciiFontPairs.Length; fontIndex++)
                 {
                     FontPair fontPair = HighScaleAsciiFontPairs[fontIndex];
+                    string sourceFontPath = ResolveCleanAsciiReferenceFontPath(fontPair.TargetFontPath);
                     for (int phraseIndex = 0; phraseIndex < HighScaleAsciiPhrases.Length; phraseIndex++)
                     {
-                        VerifyPhraseMetricsMatchClean(fontPair.SourceFontPath, fontPair.TargetFontPath, HighScaleAsciiPhrases[phraseIndex]);
+                        VerifyPhraseMetricsMatchClean(sourceFontPath, fontPair.TargetFontPath, HighScaleAsciiPhrases[phraseIndex]);
                     }
                 }
             }
@@ -102,22 +103,10 @@ namespace FfxivKoreanPatch.PatchRouteVerifier
                         hasPreviousCodepoint = true;
                     }
 
-                    if (!IsLobbyFontPath(targetFontPath) && targetAdvance != sourceAdvance)
+                    if (targetAdvance != sourceAdvance)
                     {
                         Fail(
                             "{0} phrase [{1}] width differs from {2}: target={3}, clean={4}",
-                            targetFontPath,
-                            Escape(phrase),
-                            sourceFontPath,
-                            targetAdvance,
-                            sourceAdvance);
-                        return;
-                    }
-
-                    if (IsLobbyFontPath(targetFontPath) && targetAdvance < sourceAdvance)
-                    {
-                        Fail(
-                            "{0} phrase [{1}] lobby-safe width is narrower than {2}: target={3}, clean={4}",
                             targetFontPath,
                             Escape(phrase),
                             sourceFontPath,

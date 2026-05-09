@@ -25,28 +25,7 @@ namespace FfxivKoreanPatch.PatchRouteVerifier
             FdtGlyphEntry sourceGlyph,
             FdtGlyphEntry targetGlyph)
         {
-            if (GlyphSpacingMetricsMatch(sourceGlyph, targetGlyph))
-            {
-                return true;
-            }
-
-            if (!IsLobbyFontPath(targetFontPath) || !IsVisibleAsciiCodepoint(codepoint))
-            {
-                return false;
-            }
-
-            if (sourceGlyph.ShiftJisValue != targetGlyph.ShiftJisValue ||
-                sourceGlyph.Width != targetGlyph.Width ||
-                sourceGlyph.Height != targetGlyph.Height ||
-                sourceGlyph.OffsetY != targetGlyph.OffsetY)
-            {
-                return false;
-            }
-
-            int expectedAdvance = Math.Max(
-                GetGlyphAdvance(sourceGlyph),
-                targetGlyph.Width + GetRequiredLobbyGlyphGap(targetGlyph));
-            return GetGlyphAdvance(targetGlyph) >= expectedAdvance;
+            return GlyphSpacingMetricsMatch(sourceGlyph, targetGlyph);
         }
 
         private static string FormatGlyphSpacing(FdtGlyphEntry glyph)
@@ -61,20 +40,10 @@ namespace FfxivKoreanPatch.PatchRouteVerifier
             return Math.Max(1, glyph.Width + glyph.OffsetX);
         }
 
-        private static int GetRequiredLobbyGlyphGap(FdtGlyphEntry glyph)
-        {
-            return Math.Max(2, (glyph.Height + 13) / 14 + 1);
-        }
-
         private static bool IsLobbyFontPath(string fontPath)
         {
             return !string.IsNullOrEmpty(fontPath) &&
                    fontPath.Replace('\\', '/').IndexOf("_lobby.fdt", StringComparison.OrdinalIgnoreCase) >= 0;
-        }
-
-        private static bool IsVisibleAsciiCodepoint(uint codepoint)
-        {
-            return codepoint > 0x20u && codepoint <= 0x7Eu;
         }
 
         private static bool TryComputeMedianCjkAdvance(byte[] fdt, out int medianAdvance, out int sampleCount)

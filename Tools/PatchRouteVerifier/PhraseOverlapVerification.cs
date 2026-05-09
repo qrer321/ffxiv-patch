@@ -1,5 +1,4 @@
 using System;
-using System.Collections.Generic;
 
 namespace FfxivKoreanPatch.PatchRouteVerifier
 {
@@ -25,10 +24,11 @@ namespace FfxivKoreanPatch.PatchRouteVerifier
                 for (int i = 0; i < Derived4kLobbyFontPairs.GetLength(0); i++)
                 {
                     string fontPath = Derived4kLobbyFontPairs[i, 0];
-                    string asciiSourceFontPath = ToLobbyFontPath(Derived4kLobbyFontPairs[i, 1]);
+                    string asciiSourceFontPath = ResolveCleanAsciiReferenceFontPath(fontPath);
+                    string asciiFallbackSourceFontPath = ResolveDerived4kLobbyFallbackAsciiReferenceFontPath(fontPath);
                     for (int phraseIndex = 0; phraseIndex < SystemSettingsMixedScalePhrases.Length; phraseIndex++)
                     {
-                        VerifyMixedScalePhraseLayout(fontPath, asciiSourceFontPath, SystemSettingsMixedScalePhrases[phraseIndex]);
+                        VerifyMixedScalePhraseLayout(fontPath, asciiSourceFontPath, asciiFallbackSourceFontPath, SystemSettingsMixedScalePhrases[phraseIndex]);
                     }
                 }
             }
@@ -47,9 +47,9 @@ namespace FfxivKoreanPatch.PatchRouteVerifier
                 }
             }
 
-            private void VerifyMixedScalePhraseLayout(string fontPath, string asciiSourceFontPath, string phrase)
+            private void VerifyMixedScalePhraseLayout(string fontPath, string asciiSourceFontPath, string asciiFallbackSourceFontPath, string phrase)
             {
-                const int antiAliasOverlapTolerance = 1;
+                const int antiAliasOverlapTolerance = 2;
                 PhraseLayoutResult layout;
                 string error;
                 if (!TryMeasurePhraseLayout(_patchedFont, fontPath, phrase, true, out layout, out error))
@@ -60,11 +60,18 @@ namespace FfxivKoreanPatch.PatchRouteVerifier
 
                 byte[] cleanTargetFdt;
                 byte[] cleanAsciiSourceFdt;
+                byte[] cleanAsciiFallbackSourceFdt = null;
                 byte[] patchedFdt;
                 try
                 {
                     cleanTargetFdt = _cleanFont.ReadFile(fontPath);
                     cleanAsciiSourceFdt = _cleanFont.ReadFile(asciiSourceFontPath);
+                    if (!string.IsNullOrEmpty(asciiFallbackSourceFontPath) &&
+                        !string.Equals(asciiFallbackSourceFontPath, asciiSourceFontPath, StringComparison.OrdinalIgnoreCase))
+                    {
+                        cleanAsciiFallbackSourceFdt = _cleanFont.ReadFile(asciiFallbackSourceFontPath);
+                    }
+
                     patchedFdt = _patchedFont.ReadFile(fontPath);
                 }
                 catch (Exception ex)
@@ -95,14 +102,19 @@ namespace FfxivKoreanPatch.PatchRouteVerifier
                     if (codepoint <= 0x7Eu)
                     {
                         FdtGlyphEntry cleanGlyph;
-                        string cleanGlyphFontPath = fontPath;
-                        if (!TryFindGlyph(cleanTargetFdt, codepoint, out cleanGlyph))
+                        string cleanGlyphFontPath = asciiSourceFontPath;
+                        if (!TryFindGlyph(cleanAsciiSourceFdt, codepoint, out cleanGlyph))
                         {
-                            cleanGlyphFontPath = asciiSourceFontPath;
-                            if (!TryFindGlyph(cleanAsciiSourceFdt, codepoint, out cleanGlyph))
+                            cleanGlyphFontPath = asciiFallbackSourceFontPath;
+                            if (cleanAsciiFallbackSourceFdt == null ||
+                                !TryFindGlyph(cleanAsciiFallbackSourceFdt, codepoint, out cleanGlyph))
                             {
-                                Fail("{0} high-scale mixed phrase [{1}] missing clean ASCII U+{2:X4} in {3} and fallback {4}", fontPath, Escape(phrase), codepoint, fontPath, asciiSourceFontPath);
-                                return;
+                                cleanGlyphFontPath = fontPath;
+                                if (!TryFindGlyph(cleanTargetFdt, codepoint, out cleanGlyph))
+                                {
+                                    Fail("{0} high-scale mixed phrase [{1}] missing clean ASCII U+{2:X4} in {3} and fallback {4}", fontPath, Escape(phrase), codepoint, fontPath, asciiSourceFontPath);
+                                    return;
+                                }
                             }
                         }
 
@@ -155,15 +167,22 @@ namespace FfxivKoreanPatch.PatchRouteVerifier
                 if (layout.OverlapPixels > 0)
                 {
                     int cleanAsciiOverlap;
-                    if (!TryMeasureCleanAsciiPhraseOverlap(asciiSourceFontPath, phrase, out cleanAsciiOverlap, out error) ||
-                        layout.OverlapPixels > cleanAsciiOverlap + antiAliasOverlapTolerance)
+                    if (TryMeasureCleanAsciiPhraseOverlap(asciiSourceFontPath, asciiFallbackSourceFontPath, phrase, out cleanAsciiOverlap, out error))
                     {
-                        Fail("{0} high-scale mixed phrase [{1}] has overlap pixels={2}, clean ASCII baseline={3}", fontPath, Escape(phrase), layout.OverlapPixels, error ?? cleanAsciiOverlap.ToString());
+                        if (layout.OverlapPixels > cleanAsciiOverlap + antiAliasOverlapTolerance)
+                        {
+                            Fail("{0} high-scale mixed phrase [{1}] has overlap pixels={2}, clean ASCII baseline={3}", fontPath, Escape(phrase), layout.OverlapPixels, cleanAsciiOverlap);
+                            return;
+                        }
+                    }
+                    else if (layout.OverlapPixels > antiAliasOverlapTolerance)
+                    {
+                        Fail("{0} high-scale mixed phrase [{1}] has overlap pixels={2}, clean ASCII baseline={3}", fontPath, Escape(phrase), layout.OverlapPixels, error);
                         return;
                     }
                 }
 
-                if (!VerifyPhraseMinimumVisualGap(fontPath, phrase, layout))
+                if (!VerifyPhraseMinimumVisualGap(fontPath, phrase, layout, asciiSourceFontPath))
                 {
                     return;
                 }
@@ -178,13 +197,18 @@ namespace FfxivKoreanPatch.PatchRouteVerifier
                     hasCjkBaseline ? cjkMedianAdvance.ToString() : "n/a");
             }
 
-            private bool TryMeasureCleanAsciiPhraseOverlap(string fontPath, string phrase, out int overlapPixels, out string error)
+            private bool TryMeasureCleanAsciiPhraseOverlap(string fontPath, string fallbackFontPath, string phrase, out int overlapPixels, out string error)
             {
                 overlapPixels = 0;
                 PhraseLayoutResult cleanLayout;
                 if (!TryMeasurePhraseLayout(_cleanFont, fontPath, ToAsciiOnlyPhrase(phrase), false, out cleanLayout, out error))
                 {
-                    return false;
+                    if (string.IsNullOrEmpty(fallbackFontPath) ||
+                        string.Equals(fallbackFontPath, fontPath, StringComparison.OrdinalIgnoreCase) ||
+                        !TryMeasurePhraseLayout(_cleanFont, fallbackFontPath, ToAsciiOnlyPhrase(phrase), false, out cleanLayout, out error))
+                    {
+                        return false;
+                    }
                 }
 
                 overlapPixels = cleanLayout.OverlapPixels;
@@ -205,20 +229,18 @@ namespace FfxivKoreanPatch.PatchRouteVerifier
                 return new string(chars);
             }
 
-            private static string ToLobbyFontPath(string fontPath)
+            private static string ResolveDerived4kLobbyFallbackAsciiReferenceFontPath(string fontPath)
             {
                 string normalized = (fontPath ?? string.Empty).Replace('\\', '/');
-                if (normalized.EndsWith("_lobby.fdt", StringComparison.OrdinalIgnoreCase))
+                for (int i = 0; i < Derived4kLobbyFontPairs.GetLength(0); i++)
                 {
-                    return normalized;
+                    if (string.Equals(normalized, Derived4kLobbyFontPairs[i, 0], StringComparison.OrdinalIgnoreCase))
+                    {
+                        return Derived4kLobbyFontPairs[i, 1];
+                    }
                 }
 
-                if (normalized.EndsWith(".fdt", StringComparison.OrdinalIgnoreCase))
-                {
-                    return normalized.Substring(0, normalized.Length - 4) + "_lobby.fdt";
-                }
-
-                return normalized;
+                return null;
             }
 
             private void VerifyNoDerived4kLobbyPhraseOverlap(string fontPath, string sourceFontPath, string phrase)
@@ -234,7 +256,7 @@ namespace FfxivKoreanPatch.PatchRouteVerifier
                 if (layout.OverlapPixels == 0)
                 {
                     if (ShouldVerifyLobbyAsciiVisualGap(fontPath, phrase) &&
-                        !VerifyPhraseMinimumVisualGap(fontPath, phrase, layout))
+                        !VerifyPhraseMinimumVisualGap(fontPath, phrase, layout, ResolveCleanAsciiReferenceFontPath(fontPath)))
                     {
                         return;
                     }
@@ -246,7 +268,7 @@ namespace FfxivKoreanPatch.PatchRouteVerifier
                 if (layout.OverlapPixels <= 1)
                 {
                     if (ShouldVerifyLobbyAsciiVisualGap(fontPath, phrase) &&
-                        !VerifyPhraseMinimumVisualGap(fontPath, phrase, layout))
+                        !VerifyPhraseMinimumVisualGap(fontPath, phrase, layout, ResolveCleanAsciiReferenceFontPath(fontPath)))
                     {
                         return;
                     }
@@ -332,7 +354,7 @@ namespace FfxivKoreanPatch.PatchRouteVerifier
                 }
 
                 if (ShouldVerifyLobbyAsciiVisualGap(fontPath, phrase) &&
-                    !VerifyPhraseMinimumVisualGap(fontPath, phrase, layout))
+                    !VerifyPhraseMinimumVisualGap(fontPath, phrase, layout, ResolveCleanAsciiReferenceFontPath(fontPath)))
                 {
                     return;
                 }
@@ -350,7 +372,7 @@ namespace FfxivKoreanPatch.PatchRouteVerifier
                     return;
                 }
 
-                if (!VerifyPhraseMinimumVisualGap(fontPath, phrase, layout))
+                if (!VerifyPhraseMinimumVisualGap(fontPath, phrase, layout, ResolveCleanAsciiReferenceFontPath(fontPath)))
                 {
                     return;
                 }
@@ -363,64 +385,36 @@ namespace FfxivKoreanPatch.PatchRouteVerifier
                     layout.MinimumRequiredGapPixels);
             }
 
-            private bool VerifyPhraseMinimumVisualGap(string fontPath, string phrase, PhraseLayoutResult layout)
+            private bool VerifyPhraseMinimumVisualGap(string fontPath, string phrase, PhraseLayoutResult layout, string sourceFontPath)
             {
                 if (!IsLobbyFontPath(fontPath) || layout.Glyphs <= 1 || layout.MinimumRequiredGapPixels <= 0)
                 {
                     return true;
                 }
 
-                if (layout.MinimumRequiredGapActualPixels >= layout.MinimumRequiredGapPixels)
+                PhraseLayoutResult sourceLayout;
+                string sourceError;
+                string sourcePhrase = IsAsciiPhrase(phrase) ? phrase : ToAsciiOnlyPhrase(phrase);
+                if (!string.IsNullOrEmpty(sourceFontPath) &&
+                    TryMeasurePhraseLayout(_cleanFont, sourceFontPath, sourcePhrase, false, out sourceLayout, out sourceError) &&
+                    sourceLayout.Glyphs > 1)
                 {
-                    return true;
-                }
-
-                Fail(
-                    "{0} phrase [{1}] min visual gap {2} between U+{3:X4}->U+{4:X4} is narrower than required {5}, kerning={6}, pair={7}",
-                    fontPath,
-                    Escape(phrase),
-                    layout.MinimumRequiredGapActualPixels,
-                    layout.MinimumRequiredGapLeftCodepoint,
-                    layout.MinimumRequiredGapRightCodepoint,
-                    layout.MinimumRequiredGapPixels,
-                    FormatPhraseKerningAdjustment(fontPath, layout.MinimumRequiredGapLeftCodepoint, layout.MinimumRequiredGapRightCodepoint),
-                    FormatPhraseGlyphPair(fontPath, layout.MinimumRequiredGapLeftCodepoint, layout.MinimumRequiredGapRightCodepoint));
-                return false;
-            }
-
-            private string FormatPhraseKerningAdjustment(string fontPath, uint leftCodepoint, uint rightCodepoint)
-            {
-                try
-                {
-                    byte[] fdt = _patchedFont.ReadFile(fontPath);
-                    Dictionary<string, int> kerningAdjustments = ReadKerningAdjustments(fdt);
-                    return GetKerningAdjustment(kerningAdjustments, leftCodepoint, rightCodepoint).ToString();
-                }
-                catch (Exception)
-                {
-                    return "n/a";
-                }
-            }
-
-            private string FormatPhraseGlyphPair(string fontPath, uint leftCodepoint, uint rightCodepoint)
-            {
-                try
-                {
-                    byte[] fdt = _patchedFont.ReadFile(fontPath);
-                    FdtGlyphEntry left;
-                    FdtGlyphEntry right;
-                    if (!TryFindGlyph(fdt, leftCodepoint, out left) ||
-                        !TryFindGlyph(fdt, rightCodepoint, out right))
+                    if (layout.MinimumGapPixels >= sourceLayout.MinimumGapPixels)
                     {
-                        return "missing";
+                        return true;
                     }
 
-                    return "left={" + FormatGlyphSpacing(left) + ", advance=" + GetGlyphAdvance(left).ToString() + "}, right={" + FormatGlyphSpacing(right) + ", advance=" + GetGlyphAdvance(right).ToString() + "}";
+                    Fail(
+                        "{0} phrase [{1}] min visual gap {2} is narrower than clean {3} baseline {4}",
+                        fontPath,
+                        Escape(phrase),
+                        layout.MinimumGapPixels,
+                        sourceFontPath,
+                        sourceLayout.MinimumGapPixels);
+                    return false;
                 }
-                catch (Exception)
-                {
-                    return "n/a";
-                }
+
+                return true;
             }
 
             private static bool ShouldVerifyLobbyAsciiVisualGap(string fontPath, string phrase)

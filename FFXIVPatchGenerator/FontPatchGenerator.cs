@@ -568,8 +568,10 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
 
             Dictionary<uint, byte[]> hangulSourceEntries = ReadGlyphEntriesByUtf8Value(sourceFdt);
             Dictionary<uint, byte[]> cleanAsciiSourceEntries = new Dictionary<uint, byte[]>();
+            Dictionary<uint, byte[]> cleanAsciiFallbackSourceEntries = new Dictionary<uint, byte[]>();
             byte[] cleanAsciiSourceFdt = null;
             string cleanAsciiSourcePath = ResolveDerivedLobbyCleanAsciiSourceFdtPath(targetPath);
+            string cleanAsciiFallbackSourcePath = ResolveDerivedLobbyFallbackCleanAsciiSourceFdtPath(targetPath);
             if (globalArchive != null)
             {
                 try
@@ -585,6 +587,24 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
                 {
                     cleanAsciiSourceEntries = new Dictionary<uint, byte[]>();
                 }
+
+                if (!string.IsNullOrEmpty(cleanAsciiFallbackSourcePath) &&
+                    !string.Equals(cleanAsciiFallbackSourcePath, cleanAsciiSourcePath, StringComparison.OrdinalIgnoreCase))
+                {
+                    try
+                    {
+                        byte[] cleanAsciiFallbackSourceFdt = globalArchive.ReadFile(cleanAsciiFallbackSourcePath);
+                        cleanAsciiFallbackSourceEntries = ReadGlyphEntriesByUtf8Value(cleanAsciiFallbackSourceFdt);
+                    }
+                    catch (IOException)
+                    {
+                        cleanAsciiFallbackSourceEntries = new Dictionary<uint, byte[]>();
+                    }
+                    catch (InvalidDataException)
+                    {
+                        cleanAsciiFallbackSourceEntries = new Dictionary<uint, byte[]>();
+                    }
+                }
             }
 
             if (hangulSourceEntries.Count == 0 && cleanAsciiSourceEntries.Count == 0)
@@ -594,9 +614,9 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
 
             int minimumCjkAdvance = ComputeMedianCjkAdvance(targetEntries);
             bool cleanAsciiSourceIsTarget = string.Equals(cleanAsciiSourcePath, NormalizeGamePath(targetPath), StringComparison.OrdinalIgnoreCase);
-            int lobbyAsciiMinimumVisualGap = ComputeLobbyMinimumVisualGap(targetPath, cleanAsciiSourceEntries, CleanAsciiFirst, CleanAsciiLast);
             Dictionary<string, byte[]> hangulSourceTextures = new Dictionary<string, byte[]>(StringComparer.OrdinalIgnoreCase);
             Dictionary<string, byte[]> cleanAsciiSourceTextures = new Dictionary<string, byte[]>(StringComparer.OrdinalIgnoreCase);
+            Dictionary<string, byte[]> cleanAsciiFallbackSourceTextures = new Dictionary<string, byte[]>(StringComparer.OrdinalIgnoreCase);
             int queued = 0;
             int missingTextures = 0;
             int allocationFailures = 0;
@@ -618,10 +638,17 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
                 {
                     if (!cleanAsciiSourceEntries.TryGetValue(utf8Value, out sourceEntryBytes))
                     {
-                        continue;
-                    }
+                        if (!cleanAsciiFallbackSourceEntries.TryGetValue(utf8Value, out sourceEntryBytes))
+                        {
+                            continue;
+                        }
 
-                    sourceFdtPath = cleanAsciiSourcePath;
+                        sourceFdtPath = cleanAsciiFallbackSourcePath;
+                    }
+                    else
+                    {
+                        sourceFdtPath = cleanAsciiSourcePath;
+                    }
                 }
                 else if (hangul)
                 {
@@ -653,7 +680,10 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
                 byte[] sourceTexture;
                 if (ascii)
                 {
-                    if (!TryReadCachedRawTexture(globalArchive, cleanAsciiSourceTextures, sourceTexturePath, out sourceTexture))
+                    Dictionary<string, byte[]> asciiSourceTextures = string.Equals(sourceFdtPath, cleanAsciiFallbackSourcePath, StringComparison.OrdinalIgnoreCase)
+                        ? cleanAsciiFallbackSourceTextures
+                        : cleanAsciiSourceTextures;
+                    if (!TryReadCachedRawTexture(globalArchive, asciiSourceTextures, sourceTexturePath, out sourceTexture))
                     {
                         missingTextures++;
                         continue;
@@ -741,10 +771,6 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
                 if (hangul)
                 {
                     targetEntry[14] = unchecked((byte)NormalizeDerivedLobbyAdvanceAdjustment(sourceEntry.Width, sourceEntry.Height, sourceEntry.OffsetX, minimumCjkAdvance));
-                }
-                else if (ascii)
-                {
-                    ApplyLobbyMinimumVisualGap(targetPath, targetEntry, 0, lobbyAsciiMinimumVisualGap);
                 }
 
                 int targetEntryIndex;
@@ -882,12 +908,13 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
 
             if (normalizedFdtPath.IndexOf("_lobby.fdt", StringComparison.OrdinalIgnoreCase) >= 0)
             {
+                string sourceCandidate = IsLobbyFontTexturePath(sourceTexturePath) ? sourceTexturePath : null;
                 return TryAllocateFromCandidateTextures(
                     glyphRepair,
                     new string[]
                     {
                         preferredTexturePath,
-                        sourceTexturePath,
+                        sourceCandidate,
                         FontLobby1TexturePath,
                         FontLobby2TexturePath,
                         FontLobby3TexturePath,
@@ -1871,7 +1898,6 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
             bool digitsOnly = ShouldRepairCleanDigitsOnlyFont(normalizedPath) && !ShouldRepairCleanFullAsciiAxisFont(normalizedPath);
             int firstCodepoint = digitsOnly ? '0' : CleanAsciiFirst;
             int lastCodepoint = digitsOnly ? '9' : CleanAsciiLast;
-            int lobbyMinimumVisualGap = ComputeLobbyMinimumVisualGap(normalizedPath, sourceEntries, firstCodepoint, lastCodepoint);
             for (int codepoint = firstCodepoint; codepoint <= lastCodepoint; codepoint++)
             {
                 uint utf8Value = PackFdtUtf8Value((uint)codepoint);
@@ -1929,7 +1955,6 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
                     Endian.WriteUInt16LE(replacementEntry, 6, checked((ushort)allocatedCell.ImageIndex));
                     Endian.WriteUInt16LE(replacementEntry, 8, checked((ushort)(allocatedCell.X + allocationRegion.LeftPadding)));
                     Endian.WriteUInt16LE(replacementEntry, 10, checked((ushort)(allocatedCell.Y + allocationRegion.TopPadding)));
-                    ApplyLobbyMinimumVisualGap(normalizedPath, replacementEntry, 0, lobbyMinimumVisualGap);
                     Buffer.BlockCopy(replacementEntry, 0, targetFdt, targetOffset, FdtGlyphEntrySize);
                     useAllocatedCell = true;
                 }
@@ -1937,7 +1962,6 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
                 {
                     byte[] replacementEntry = new byte[FdtGlyphEntrySize];
                     Buffer.BlockCopy(sourceEntryBytes, 0, replacementEntry, 0, FdtGlyphEntrySize);
-                    ApplyLobbyMinimumVisualGap(normalizedPath, replacementEntry, 0, lobbyMinimumVisualGap);
                     Buffer.BlockCopy(replacementEntry, 0, targetFdt, targetOffset, FdtGlyphEntrySize);
                 }
 
@@ -1964,7 +1988,7 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
                             patchRegion,
                             patchRegion.Width,
                             patchRegion.Height,
-                            normalizedPath,
+                            sourceFdtPath,
                             (uint)codepoint);
                         AddTexturePatch(texturePatches, useAllocatedCell ? allocatedTexturePath : sourceTexturePath, patch);
                     }
@@ -1988,7 +2012,7 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
                         patchRegion,
                         useAllocatedCell ? patchRegion.Width : Math.Max(targetEntry.Width, patchRegion.Width),
                         useAllocatedCell ? patchRegion.Height : Math.Max(targetEntry.Height, patchRegion.Height),
-                        normalizedPath,
+                        sourceFdtPath,
                         (uint)codepoint);
                     AddTexturePatch(texturePatches, useAllocatedCell ? allocatedTexturePath : targetTexturePath, patch);
                 }
@@ -1997,7 +2021,7 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
                 {
                     targetFdt[targetOffset + 12] = sourceEntry.Width;
                     targetFdt[targetOffset + 13] = sourceEntry.Height;
-                    targetFdt[targetOffset + 14] = unchecked((byte)NormalizeLobbyAdvanceAdjustment(normalizedPath, sourceEntry.Width, sourceEntry.Height, sourceEntry.OffsetX, lobbyMinimumVisualGap));
+                    targetFdt[targetOffset + 14] = unchecked((byte)sourceEntry.OffsetX);
                     targetFdt[targetOffset + 15] = unchecked((byte)sourceEntry.OffsetY);
                 }
 
@@ -2033,46 +2057,6 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
             }
 
             int changed = ReplaceAsciiKerningEntries(ref targetFdt, sourceFdt);
-            changed += NormalizeLobbyAsciiKerning(normalizedPath, targetFdt);
-            return changed;
-        }
-
-        private static int NormalizeLobbyAsciiKerning(string path, byte[] targetFdt)
-        {
-            if (!IsLobbyFontPath(path) || targetFdt == null)
-            {
-                return 0;
-            }
-
-            int headerOffset;
-            int entryStart;
-            int entryCount;
-            if (!TryGetFdtKerningTable(targetFdt, out headerOffset, out entryStart, out entryCount))
-            {
-                return 0;
-            }
-
-            int changed = 0;
-            for (int i = 0; i < entryCount; i++)
-            {
-                int offset = entryStart + i * FdtKerningEntrySize;
-                uint left = Endian.ReadUInt32LE(targetFdt, offset);
-                uint right = Endian.ReadUInt32LE(targetFdt, offset + 4);
-                if (!IsAsciiKerningKey(left) || !IsAsciiKerningKey(right))
-                {
-                    continue;
-                }
-
-                int adjustment = unchecked((int)Endian.ReadUInt32LE(targetFdt, offset + 12));
-                if (adjustment >= 0)
-                {
-                    continue;
-                }
-
-                Endian.WriteUInt32LE(targetFdt, offset + 12, 0);
-                changed++;
-            }
-
             return changed;
         }
 
@@ -2332,14 +2316,6 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
         private static string ResolveDerivedLobbyCleanAsciiSourceFdtPath(string targetPath)
         {
             string normalized = NormalizeGamePath(targetPath);
-            for (int i = 0; i < Derived4kLobbyFonts.Length; i++)
-            {
-                if (string.Equals(normalized, NormalizeGamePath(Derived4kLobbyFonts[i].TargetPath), StringComparison.OrdinalIgnoreCase))
-                {
-                    return ToLobbyFontPath(Derived4kLobbyFonts[i].SourcePath);
-                }
-            }
-
             int suffixIndex = normalized.LastIndexOf("_lobby.fdt", StringComparison.OrdinalIgnoreCase);
             if (suffixIndex < 0)
             {
@@ -2347,6 +2323,20 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
             }
 
             return normalized.Substring(0, suffixIndex) + ".fdt";
+        }
+
+        private static string ResolveDerivedLobbyFallbackCleanAsciiSourceFdtPath(string targetPath)
+        {
+            string normalized = NormalizeGamePath(targetPath);
+            for (int i = 0; i < Derived4kLobbyFonts.Length; i++)
+            {
+                if (string.Equals(normalized, NormalizeGamePath(Derived4kLobbyFonts[i].TargetPath), StringComparison.OrdinalIgnoreCase))
+                {
+                    return NormalizeGamePath(Derived4kLobbyFonts[i].SourcePath);
+                }
+            }
+
+            return null;
         }
 
         private static string ToLobbyFontPath(string fontPath)
@@ -2376,40 +2366,6 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
             return ToAdvanceAdjustment(glyphWidth, targetAdvance);
         }
 
-        private static void ApplyLobbyMinimumVisualGap(string fontPath, byte[] glyphEntry, int entryOffset)
-        {
-            ApplyLobbyMinimumVisualGap(fontPath, glyphEntry, entryOffset, 0);
-        }
-
-        private static void ApplyLobbyMinimumVisualGap(string fontPath, byte[] glyphEntry, int entryOffset, int minimumVisualGap)
-        {
-            if (!IsLobbyFontPath(fontPath) || glyphEntry == null || entryOffset < 0 || entryOffset + FdtGlyphEntrySize > glyphEntry.Length)
-            {
-                return;
-            }
-
-            FdtGlyphEntry entry = ReadFdtGlyphEntry(glyphEntry, entryOffset);
-            glyphEntry[entryOffset + 14] = unchecked((byte)NormalizeLobbyAdvanceAdjustment(fontPath, entry.Width, entry.Height, entry.OffsetX, minimumVisualGap));
-        }
-
-        private static sbyte NormalizeLobbyAdvanceAdjustment(string fontPath, byte glyphWidth, byte glyphHeight, sbyte sourceAdvanceAdjustment)
-        {
-            return NormalizeLobbyAdvanceAdjustment(fontPath, glyphWidth, glyphHeight, sourceAdvanceAdjustment, 0);
-        }
-
-        private static sbyte NormalizeLobbyAdvanceAdjustment(string fontPath, byte glyphWidth, byte glyphHeight, sbyte sourceAdvanceAdjustment, int minimumVisualGap)
-        {
-            if (!IsLobbyFontPath(fontPath))
-            {
-                return sourceAdvanceAdjustment;
-            }
-
-            int sourceAdvance = Math.Max(1, glyphWidth + sourceAdvanceAdjustment);
-            int targetVisualGap = Math.Max(ComputeLobbyMinimumVisualGap(fontPath, glyphHeight), minimumVisualGap);
-            int targetAdvance = Math.Max(sourceAdvance, glyphWidth + targetVisualGap);
-            return ToAdvanceAdjustment(glyphWidth, targetAdvance);
-        }
-
         private static sbyte ToAdvanceAdjustment(byte glyphWidth, int targetAdvance)
         {
             int normalizedOffsetX = targetAdvance - glyphWidth;
@@ -2424,34 +2380,6 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
             }
 
             return (sbyte)normalizedOffsetX;
-        }
-
-        private static int ComputeLobbyMinimumVisualGap(string fontPath, byte glyphHeight)
-        {
-            return IsLobbyFontPath(fontPath) ? ComputeLobbyMinimumVisualGap(glyphHeight) : 0;
-        }
-
-        private static int ComputeLobbyMinimumVisualGap(string fontPath, Dictionary<uint, byte[]> glyphEntries, int firstCodepoint, int lastCodepoint)
-        {
-            if (!IsLobbyFontPath(fontPath) || glyphEntries == null || glyphEntries.Count == 0)
-            {
-                return 0;
-            }
-
-            int minimumGap = 0;
-            for (int codepoint = firstCodepoint; codepoint <= lastCodepoint; codepoint++)
-            {
-                byte[] entryBytes;
-                if (!glyphEntries.TryGetValue(PackFdtUtf8Value((uint)codepoint), out entryBytes))
-                {
-                    continue;
-                }
-
-                FdtGlyphEntry entry = ReadFdtGlyphEntry(entryBytes, 0);
-                minimumGap = Math.Max(minimumGap, ComputeLobbyMinimumVisualGap(entry.Height));
-            }
-
-            return minimumGap;
         }
 
         private static int ComputeLobbyMinimumVisualGap(byte glyphHeight)
@@ -2537,7 +2465,19 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
                 return "common/font/AXIS_36.fdt";
             }
 
+            int lobbySuffixIndex = normalized.LastIndexOf("_lobby.fdt", StringComparison.OrdinalIgnoreCase);
+            if (lobbySuffixIndex >= 0)
+            {
+                return normalized.Substring(0, lobbySuffixIndex) + ".fdt";
+            }
+
             return normalized;
+        }
+
+        private static bool IsLobbyFontTexturePath(string path)
+        {
+            return !string.IsNullOrEmpty(path) &&
+                   NormalizeGamePath(path).IndexOf("/font_lobby", StringComparison.OrdinalIgnoreCase) >= 0;
         }
 
         private static bool TryFindGlyphEntryOffset(byte[] fdt, int glyphStart, uint glyphCount, uint utf8Value, out int offset)
