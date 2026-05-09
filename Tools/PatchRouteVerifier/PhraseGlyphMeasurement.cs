@@ -32,7 +32,7 @@ namespace FfxivKoreanPatch.PatchRouteVerifier
                     return false;
                 }
 
-                measurement = new PhraseGlyphMeasurement(Math.Max(1, glyph.Width + glyph.OffsetX), canvas.Alpha);
+                measurement = CreatePhraseGlyphMeasurement(codepoint, glyph, canvas);
                 return true;
             }
 
@@ -55,8 +55,20 @@ namespace FfxivKoreanPatch.PatchRouteVerifier
                 }
 
                 GlyphCanvas canvas = RenderGlyph(package, fontPath, codepoint);
-                measurement = new PhraseGlyphMeasurement(Math.Max(1, glyph.Width + glyph.OffsetX), canvas.Alpha);
+                measurement = CreatePhraseGlyphMeasurement(codepoint, glyph, canvas);
                 return true;
+            }
+
+            private static PhraseGlyphMeasurement CreatePhraseGlyphMeasurement(uint codepoint, FdtGlyphEntry glyph, GlyphCanvas canvas)
+            {
+                GlyphStats stats = AnalyzeGlyph(canvas);
+                return new PhraseGlyphMeasurement(
+                    codepoint,
+                    GetGlyphAdvance(glyph),
+                    canvas.Alpha,
+                    glyph.Height,
+                    stats.MinX <= stats.MaxX ? stats.MinX : GlyphCanvasSize,
+                    stats.MaxX);
             }
 
             private bool TryValidatePhraseGlyphShape(string fontPath, uint codepoint, GlyphCanvas canvas, out string error)
@@ -88,13 +100,21 @@ namespace FfxivKoreanPatch.PatchRouteVerifier
 
         private struct PhraseGlyphMeasurement
         {
+            public readonly uint Codepoint;
             public readonly int Advance;
             public readonly byte[] Alpha;
+            public readonly int Height;
+            public readonly int MinX;
+            public readonly int MaxX;
 
-            public PhraseGlyphMeasurement(int advance, byte[] alpha)
+            public PhraseGlyphMeasurement(uint codepoint, int advance, byte[] alpha, int height, int minX, int maxX)
             {
+                Codepoint = codepoint;
                 Advance = advance;
                 Alpha = alpha;
+                Height = height;
+                MinX = minX;
+                MaxX = maxX;
             }
         }
     }

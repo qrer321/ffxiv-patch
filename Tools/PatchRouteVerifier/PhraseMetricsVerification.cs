@@ -27,7 +27,9 @@ namespace FfxivKoreanPatch.PatchRouteVerifier
                     byte[] sourceFdt = _cleanFont.ReadFile(sourceFontPath);
                     byte[] targetFdt = _patchedFont.ReadFile(targetFontPath);
                     Dictionary<string, int> sourceKerningAdjustments = ReadKerningAdjustments(sourceFdt);
-                    int advance = 0;
+                    Dictionary<string, int> targetKerningAdjustments = ReadKerningAdjustments(targetFdt);
+                    int sourceAdvance = 0;
+                    int targetAdvance = 0;
                     int glyphs = 0;
                     bool hasPreviousCodepoint = false;
                     uint previousCodepoint = 0;
@@ -37,12 +39,30 @@ namespace FfxivKoreanPatch.PatchRouteVerifier
                         uint codepoint = ReadCodepoint(phrase, ref i);
                         if (hasPreviousCodepoint)
                         {
-                            advance += GetKerningAdjustment(sourceKerningAdjustments, previousCodepoint, codepoint);
+                            int sourceKerning = GetKerningAdjustment(sourceKerningAdjustments, previousCodepoint, codepoint);
+                            int targetKerning = GetKerningAdjustment(targetKerningAdjustments, previousCodepoint, codepoint);
+                            if (!KerningAdjustmentMatchesOrLobbySafe(targetFontPath, sourceKerning, targetKerning))
+                            {
+                                Fail(
+                                    "{0} phrase [{1}] kerning U+{2:X4}->U+{3:X4} differs from {4}: target={5}, clean={6}",
+                                    targetFontPath,
+                                    Escape(phrase),
+                                    previousCodepoint,
+                                    codepoint,
+                                    sourceFontPath,
+                                    targetKerning,
+                                    sourceKerning);
+                                return;
+                            }
+
+                            sourceAdvance += sourceKerning;
+                            targetAdvance += targetKerning;
                         }
 
                         if (codepoint <= 0x20)
                         {
-                            advance += 8;
+                            sourceAdvance += 8;
+                            targetAdvance += 8;
                             previousCodepoint = codepoint;
                             hasPreviousCodepoint = true;
                             continue;
@@ -62,7 +82,7 @@ namespace FfxivKoreanPatch.PatchRouteVerifier
                             return;
                         }
 
-                        if (!GlyphSpacingMetricsMatch(sourceGlyph, targetGlyph))
+                        if (!GlyphSpacingMetricsMatchOrLobbySafe(targetFontPath, codepoint, sourceGlyph, targetGlyph))
                         {
                             Fail(
                                 "{0} phrase [{1}] U+{2:X4} metrics differ from {3}: target={4}, clean={5}",
@@ -75,13 +95,38 @@ namespace FfxivKoreanPatch.PatchRouteVerifier
                             return;
                         }
 
-                        advance += Math.Max(1, sourceGlyph.Width + sourceGlyph.OffsetX);
+                        sourceAdvance += GetGlyphAdvance(sourceGlyph);
+                        targetAdvance += GetGlyphAdvance(targetGlyph);
                         glyphs++;
                         previousCodepoint = codepoint;
                         hasPreviousCodepoint = true;
                     }
 
-                    Pass("{0} phrase [{1}] metrics match {2}, glyphs={3}, width={4}", targetFontPath, Escape(phrase), sourceFontPath, glyphs, advance);
+                    if (!IsLobbyFontPath(targetFontPath) && targetAdvance != sourceAdvance)
+                    {
+                        Fail(
+                            "{0} phrase [{1}] width differs from {2}: target={3}, clean={4}",
+                            targetFontPath,
+                            Escape(phrase),
+                            sourceFontPath,
+                            targetAdvance,
+                            sourceAdvance);
+                        return;
+                    }
+
+                    if (IsLobbyFontPath(targetFontPath) && targetAdvance < sourceAdvance)
+                    {
+                        Fail(
+                            "{0} phrase [{1}] lobby-safe width is narrower than {2}: target={3}, clean={4}",
+                            targetFontPath,
+                            Escape(phrase),
+                            sourceFontPath,
+                            targetAdvance,
+                            sourceAdvance);
+                        return;
+                    }
+
+                    Pass("{0} phrase [{1}] metrics match {2}, glyphs={3}, width={4}/{5}", targetFontPath, Escape(phrase), sourceFontPath, glyphs, targetAdvance, sourceAdvance);
                 }
                 catch (Exception ex)
                 {
@@ -121,6 +166,24 @@ namespace FfxivKoreanPatch.PatchRouteVerifier
                     return;
                 }
 
+                int checkedGlyphs;
+                if (IsLobbyFontPath(targetFontPath) &&
+                    target.Glyphs == source.Glyphs &&
+                    target.Width >= source.Width &&
+                    TryPhraseGlyphPixelsMatchClean(sourceFontPath, targetFontPath, phrase, out checkedGlyphs, out error))
+                {
+                    Pass(
+                        "{0} phrase [{1}] pixels match {2} with lobby-safe advances, glyphs={3}, width={4}/{5}, checkedGlyphs={6}",
+                        targetFontPath,
+                        Escape(phrase),
+                        sourceFontPath,
+                        target.Glyphs,
+                        target.Width,
+                        source.Width,
+                        checkedGlyphs);
+                    return;
+                }
+
                 Fail(
                     "{0} phrase [{1}] pixels differ from {2}: glyphs={3}/{4}, width={5}/{6}, pixels={7}/{8}",
                     targetFontPath,
@@ -132,6 +195,48 @@ namespace FfxivKoreanPatch.PatchRouteVerifier
                     source.Width,
                     target.Pixels.Count,
                     source.Pixels.Count);
+            }
+
+            private bool TryPhraseGlyphPixelsMatchClean(
+                string sourceFontPath,
+                string targetFontPath,
+                string phrase,
+                out int checkedGlyphs,
+                out string error)
+            {
+                checkedGlyphs = 0;
+                error = null;
+                for (int i = 0; i < phrase.Length; i++)
+                {
+                    uint codepoint = ReadCodepoint(phrase, ref i);
+                    if (IsPhraseLayoutSpace(codepoint))
+                    {
+                        continue;
+                    }
+
+                    try
+                    {
+                        GlyphCanvas source = RenderGlyph(_cleanFont, sourceFontPath, codepoint);
+                        GlyphCanvas target = RenderGlyph(_patchedFont, targetFontPath, codepoint);
+                        long score = Diff(source.Alpha, target.Alpha);
+                        if (score != 0 || source.VisiblePixels == 0 || target.VisiblePixels == 0)
+                        {
+                            error = "U+" + codepoint.ToString("X4") +
+                                " score=" + score.ToString() +
+                                ", visible=" + source.VisiblePixels.ToString() + "/" + target.VisiblePixels.ToString();
+                            return false;
+                        }
+
+                        checkedGlyphs++;
+                    }
+                    catch (Exception ex)
+                    {
+                        error = "U+" + codepoint.ToString("X4") + " " + ex.Message;
+                        return false;
+                    }
+                }
+
+                return checkedGlyphs > 0;
             }
 
             private bool TryRenderPhrasePixels(

@@ -9,7 +9,7 @@ namespace FfxivKoreanPatch.PatchRouteVerifier
         {
             byte[] canvas = new byte[GlyphCanvasSize * GlyphCanvasSize];
             int channel = glyph.ImageIndex % 4;
-            int startX = 32 + glyph.OffsetX;
+            int startX = 32;
             int startY = 32 + glyph.OffsetY;
             for (int y = 0; y < glyph.Height; y++)
             {

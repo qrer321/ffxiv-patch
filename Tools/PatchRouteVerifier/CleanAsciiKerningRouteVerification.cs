@@ -27,7 +27,7 @@ namespace FfxivKoreanPatch.PatchRouteVerifier
                         continue;
                     }
 
-                    if (!BytesEqual(sourcePair.Value, targetEntry))
+                    if (!KerningEntryMatchesOrLobbySafe(targetFontPath, sourcePair.Value, targetEntry))
                     {
                         Fail(
                             "{0} ASCII kerning pair {1} differs from {2}: target={3}, clean={4}",

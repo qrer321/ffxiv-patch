@@ -19,7 +19,11 @@ namespace FfxivKoreanPatch.PatchRouteVerifier
                     GlyphCanvas source = RenderGlyph(sourceArchive, sourceFdtPath, sourceCodepoint);
                     GlyphCanvas target = RenderGlyph(targetArchive, targetFdtPath, targetCodepoint);
                     long score = Diff(source.Alpha, target.Alpha);
-                    bool spacingMatch = GlyphSpacingMetricsMatch(source.Glyph, target.Glyph);
+                    bool spacingMatch = GlyphSpacingMetricsMatchOrLobbySafe(
+                        targetFdtPath,
+                        targetCodepoint,
+                        source.Glyph,
+                        target.Glyph);
                     if (score == 0 && spacingMatch && source.VisiblePixels > 0 && target.VisiblePixels > 0)
                     {
                         Pass("{0} U+{1:X4} -> {2} U+{3:X4}", sourceFdtPath, sourceCodepoint, targetFdtPath, targetCodepoint);

@@ -57,7 +57,7 @@ namespace FfxivKoreanPatch.PatchRouteVerifier
                             continue;
                         }
 
-                        if (!GlyphSpacingMetricsMatch(sourceGlyph, targetGlyph))
+                        if (!GlyphSpacingMetricsMatchOrLobbySafe(targetFontPath, codepoint, sourceGlyph, targetGlyph))
                         {
                             Fail(
                                 "{0} U+{1:X4} spacing differs from {2}: target={3}, clean={4}",

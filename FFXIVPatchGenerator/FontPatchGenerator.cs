@@ -594,6 +594,7 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
 
             int minimumCjkAdvance = ComputeMedianCjkAdvance(targetEntries);
             bool cleanAsciiSourceIsTarget = string.Equals(cleanAsciiSourcePath, NormalizeGamePath(targetPath), StringComparison.OrdinalIgnoreCase);
+            int lobbyAsciiMinimumVisualGap = ComputeLobbyMinimumVisualGap(targetPath, cleanAsciiSourceEntries, CleanAsciiFirst, CleanAsciiLast);
             Dictionary<string, byte[]> hangulSourceTextures = new Dictionary<string, byte[]>(StringComparer.OrdinalIgnoreCase);
             Dictionary<string, byte[]> cleanAsciiSourceTextures = new Dictionary<string, byte[]>(StringComparer.OrdinalIgnoreCase);
             int queued = 0;
@@ -739,7 +740,11 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
                 Endian.WriteUInt16LE(targetEntry, 10, checked((ushort)(allocatedCell.Y + entryTopPadding)));
                 if (hangul)
                 {
-                    targetEntry[14] = unchecked((byte)NormalizeDerivedLobbyNextOffsetX(sourceEntry.Width, sourceEntry.OffsetX, minimumCjkAdvance));
+                    targetEntry[14] = unchecked((byte)NormalizeDerivedLobbyAdvanceAdjustment(sourceEntry.Width, sourceEntry.Height, sourceEntry.OffsetX, minimumCjkAdvance));
+                }
+                else if (ascii)
+                {
+                    ApplyLobbyMinimumVisualGap(targetPath, targetEntry, 0, lobbyAsciiMinimumVisualGap);
                 }
 
                 int targetEntryIndex;
@@ -1866,6 +1871,7 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
             bool digitsOnly = ShouldRepairCleanDigitsOnlyFont(normalizedPath) && !ShouldRepairCleanFullAsciiAxisFont(normalizedPath);
             int firstCodepoint = digitsOnly ? '0' : CleanAsciiFirst;
             int lastCodepoint = digitsOnly ? '9' : CleanAsciiLast;
+            int lobbyMinimumVisualGap = ComputeLobbyMinimumVisualGap(normalizedPath, sourceEntries, firstCodepoint, lastCodepoint);
             for (int codepoint = firstCodepoint; codepoint <= lastCodepoint; codepoint++)
             {
                 uint utf8Value = PackFdtUtf8Value((uint)codepoint);
@@ -1923,12 +1929,16 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
                     Endian.WriteUInt16LE(replacementEntry, 6, checked((ushort)allocatedCell.ImageIndex));
                     Endian.WriteUInt16LE(replacementEntry, 8, checked((ushort)(allocatedCell.X + allocationRegion.LeftPadding)));
                     Endian.WriteUInt16LE(replacementEntry, 10, checked((ushort)(allocatedCell.Y + allocationRegion.TopPadding)));
+                    ApplyLobbyMinimumVisualGap(normalizedPath, replacementEntry, 0, lobbyMinimumVisualGap);
                     Buffer.BlockCopy(replacementEntry, 0, targetFdt, targetOffset, FdtGlyphEntrySize);
                     useAllocatedCell = true;
                 }
                 else if (repointFullEntry)
                 {
-                    Buffer.BlockCopy(sourceEntryBytes, 0, targetFdt, targetOffset, FdtGlyphEntrySize);
+                    byte[] replacementEntry = new byte[FdtGlyphEntrySize];
+                    Buffer.BlockCopy(sourceEntryBytes, 0, replacementEntry, 0, FdtGlyphEntrySize);
+                    ApplyLobbyMinimumVisualGap(normalizedPath, replacementEntry, 0, lobbyMinimumVisualGap);
+                    Buffer.BlockCopy(replacementEntry, 0, targetFdt, targetOffset, FdtGlyphEntrySize);
                 }
 
                 FdtGlyphEntry targetEntry = ReadFdtGlyphEntry(targetFdt, targetOffset);
@@ -1987,7 +1997,7 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
                 {
                     targetFdt[targetOffset + 12] = sourceEntry.Width;
                     targetFdt[targetOffset + 13] = sourceEntry.Height;
-                    targetFdt[targetOffset + 14] = unchecked((byte)sourceEntry.OffsetX);
+                    targetFdt[targetOffset + 14] = unchecked((byte)NormalizeLobbyAdvanceAdjustment(normalizedPath, sourceEntry.Width, sourceEntry.Height, sourceEntry.OffsetX, lobbyMinimumVisualGap));
                     targetFdt[targetOffset + 15] = unchecked((byte)sourceEntry.OffsetY);
                 }
 
@@ -2022,7 +2032,48 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
                 return 0;
             }
 
-            return ReplaceAsciiKerningEntries(ref targetFdt, sourceFdt);
+            int changed = ReplaceAsciiKerningEntries(ref targetFdt, sourceFdt);
+            changed += NormalizeLobbyAsciiKerning(normalizedPath, targetFdt);
+            return changed;
+        }
+
+        private static int NormalizeLobbyAsciiKerning(string path, byte[] targetFdt)
+        {
+            if (!IsLobbyFontPath(path) || targetFdt == null)
+            {
+                return 0;
+            }
+
+            int headerOffset;
+            int entryStart;
+            int entryCount;
+            if (!TryGetFdtKerningTable(targetFdt, out headerOffset, out entryStart, out entryCount))
+            {
+                return 0;
+            }
+
+            int changed = 0;
+            for (int i = 0; i < entryCount; i++)
+            {
+                int offset = entryStart + i * FdtKerningEntrySize;
+                uint left = Endian.ReadUInt32LE(targetFdt, offset);
+                uint right = Endian.ReadUInt32LE(targetFdt, offset + 4);
+                if (!IsAsciiKerningKey(left) || !IsAsciiKerningKey(right))
+                {
+                    continue;
+                }
+
+                int adjustment = unchecked((int)Endian.ReadUInt32LE(targetFdt, offset + 12));
+                if (adjustment >= 0)
+                {
+                    continue;
+                }
+
+                Endian.WriteUInt32LE(targetFdt, offset + 12, 0);
+                changed++;
+            }
+
+            return changed;
         }
 
         private static int ReplaceAsciiKerningEntries(ref byte[] targetFdt, byte[] sourceFdt)
@@ -2314,13 +2365,53 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
             return normalized;
         }
 
-        private static sbyte NormalizeDerivedLobbyNextOffsetX(byte glyphWidth, sbyte sourceOffsetX, int minimumCjkAdvance)
+        private static sbyte NormalizeDerivedLobbyAdvanceAdjustment(byte glyphWidth, byte glyphHeight, sbyte sourceAdvanceAdjustment, int minimumCjkAdvance)
         {
-            int sourceAdvance = Math.Max(1, glyphWidth + sourceOffsetX);
+            int sourceAdvance = Math.Max(1, glyphWidth + sourceAdvanceAdjustment);
             int baseAdvance = Math.Max(sourceAdvance, glyphWidth);
+            int visualGapAdvance = glyphWidth + ComputeLobbyMinimumVisualGap(glyphHeight);
             int targetAdvance = minimumCjkAdvance > 0
-                ? Math.Max(baseAdvance, minimumCjkAdvance)
-                : baseAdvance + ComputeNoCjkFallbackSafetyAdvance(glyphWidth);
+                ? Math.Max(Math.Max(baseAdvance, minimumCjkAdvance), visualGapAdvance)
+                : Math.Max(baseAdvance + ComputeNoCjkFallbackSafetyAdvance(glyphWidth), visualGapAdvance);
+            return ToAdvanceAdjustment(glyphWidth, targetAdvance);
+        }
+
+        private static void ApplyLobbyMinimumVisualGap(string fontPath, byte[] glyphEntry, int entryOffset)
+        {
+            ApplyLobbyMinimumVisualGap(fontPath, glyphEntry, entryOffset, 0);
+        }
+
+        private static void ApplyLobbyMinimumVisualGap(string fontPath, byte[] glyphEntry, int entryOffset, int minimumVisualGap)
+        {
+            if (!IsLobbyFontPath(fontPath) || glyphEntry == null || entryOffset < 0 || entryOffset + FdtGlyphEntrySize > glyphEntry.Length)
+            {
+                return;
+            }
+
+            FdtGlyphEntry entry = ReadFdtGlyphEntry(glyphEntry, entryOffset);
+            glyphEntry[entryOffset + 14] = unchecked((byte)NormalizeLobbyAdvanceAdjustment(fontPath, entry.Width, entry.Height, entry.OffsetX, minimumVisualGap));
+        }
+
+        private static sbyte NormalizeLobbyAdvanceAdjustment(string fontPath, byte glyphWidth, byte glyphHeight, sbyte sourceAdvanceAdjustment)
+        {
+            return NormalizeLobbyAdvanceAdjustment(fontPath, glyphWidth, glyphHeight, sourceAdvanceAdjustment, 0);
+        }
+
+        private static sbyte NormalizeLobbyAdvanceAdjustment(string fontPath, byte glyphWidth, byte glyphHeight, sbyte sourceAdvanceAdjustment, int minimumVisualGap)
+        {
+            if (!IsLobbyFontPath(fontPath))
+            {
+                return sourceAdvanceAdjustment;
+            }
+
+            int sourceAdvance = Math.Max(1, glyphWidth + sourceAdvanceAdjustment);
+            int targetVisualGap = Math.Max(ComputeLobbyMinimumVisualGap(fontPath, glyphHeight), minimumVisualGap);
+            int targetAdvance = Math.Max(sourceAdvance, glyphWidth + targetVisualGap);
+            return ToAdvanceAdjustment(glyphWidth, targetAdvance);
+        }
+
+        private static sbyte ToAdvanceAdjustment(byte glyphWidth, int targetAdvance)
+        {
             int normalizedOffsetX = targetAdvance - glyphWidth;
             if (normalizedOffsetX < 0)
             {
@@ -2333,6 +2424,45 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
             }
 
             return (sbyte)normalizedOffsetX;
+        }
+
+        private static int ComputeLobbyMinimumVisualGap(string fontPath, byte glyphHeight)
+        {
+            return IsLobbyFontPath(fontPath) ? ComputeLobbyMinimumVisualGap(glyphHeight) : 0;
+        }
+
+        private static int ComputeLobbyMinimumVisualGap(string fontPath, Dictionary<uint, byte[]> glyphEntries, int firstCodepoint, int lastCodepoint)
+        {
+            if (!IsLobbyFontPath(fontPath) || glyphEntries == null || glyphEntries.Count == 0)
+            {
+                return 0;
+            }
+
+            int minimumGap = 0;
+            for (int codepoint = firstCodepoint; codepoint <= lastCodepoint; codepoint++)
+            {
+                byte[] entryBytes;
+                if (!glyphEntries.TryGetValue(PackFdtUtf8Value((uint)codepoint), out entryBytes))
+                {
+                    continue;
+                }
+
+                FdtGlyphEntry entry = ReadFdtGlyphEntry(entryBytes, 0);
+                minimumGap = Math.Max(minimumGap, ComputeLobbyMinimumVisualGap(entry.Height));
+            }
+
+            return minimumGap;
+        }
+
+        private static int ComputeLobbyMinimumVisualGap(byte glyphHeight)
+        {
+            return Math.Max(2, (glyphHeight + 13) / 14 + 1);
+        }
+
+        private static bool IsLobbyFontPath(string fontPath)
+        {
+            return !string.IsNullOrEmpty(fontPath) &&
+                   NormalizeGamePath(fontPath).IndexOf("_lobby.fdt", StringComparison.OrdinalIgnoreCase) >= 0;
         }
 
         private static int ComputeNoCjkFallbackSafetyAdvance(byte glyphWidth)
