@@ -57,13 +57,16 @@
     <Compile Include="FontGuardVerificationData.cs" />
     <Compile Include="FontGuardVerification.cs" />
     <Compile Include="FontGlyphRendering.cs" />
+    <Compile Include="FontTextureLoading.cs" />
     <Compile Include="FontRouteVerification.cs" />
     <Compile Include="FontTextureDecoding.cs" />
     <Compile Include="FontTextureRouting.cs" />
     <Compile Include="FontRouteVerificationData.cs" />
     <Compile Include="GlyphAnalysis.cs" />
+    <Compile Include="GlyphAlphaRendering.cs" />
     <Compile Include="GlyphBitmapDiff.cs" />
     <Compile Include="GlyphBitmapWriter.cs" />
+    <Compile Include="GlyphCanvas.cs" />
     <Compile Include="GlyphEqualityAssertions.cs" />
     <Compile Include="GlyphFallbackAssertions.cs" />
     <Compile Include="GlyphDiagnosticsData.cs" />
