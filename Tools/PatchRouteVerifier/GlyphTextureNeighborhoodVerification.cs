@@ -5,7 +5,7 @@ namespace FfxivKoreanPatch.PatchRouteVerifier
 {
     internal static partial class PatchRouteVerifier
     {
-        private const int DataCenterGlyphTexturePadding = 2;
+        private const int DataCenterGlyphTexturePadding = 4;
         private const int MaxTexturePaddingFailuresPerFont = 20;
 
         private sealed partial class Verifier

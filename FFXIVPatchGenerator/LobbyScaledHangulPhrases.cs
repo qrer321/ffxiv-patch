@@ -71,7 +71,16 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
             "\uC870\uC791 \uC124\uC815"
         };
 
-        public static readonly string[] All = Combine(Core, StartScreenSystemSettings);
+        public static readonly string[] HighResolutionUiScaleOptions = new string[]
+        {
+            "\uB192\uC740 \uD574\uC0C1\uB3C4\uB85C \uD50C\uB808\uC774\uD558\uB294 \uBD84\uC744 \uC704\uD55C \uC124\uC815\uC785\uB2C8\uB2E4.",
+            "100%(\uD45C\uC900): \uAE30\uBCF8 UI \uD06C\uAE30",
+            "150%(FHD): 1728x972 \uC774\uC0C1 \uAD8C\uC7A5",
+            "200%(WQHD): 2304x1296 \uC774\uC0C1 \uAD8C\uC7A5",
+            "300%(4K): 3456x1944 \uC774\uC0C1 \uAD8C\uC7A5"
+        };
+
+        public static readonly string[] All = Combine(Core, StartScreenSystemSettings, HighResolutionUiScaleOptions);
 
         private static string[] Combine(params string[][] groups)
         {

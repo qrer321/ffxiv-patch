@@ -23,6 +23,7 @@ namespace FfxivKoreanPatch.PatchRouteVerifier
                     new VerificationStep("clean-ascii-font-routes", VerifyCleanAsciiFontRoutes),
                     new VerificationStep("high-scale-ascii-phrase-layouts", VerifyHighScaleAsciiPhraseLayouts),
                     new VerificationStep("system-settings-scaled-phrase-layouts", VerifySystemSettingsScaledPhraseLayouts),
+                    new VerificationStep("system-settings-mixed-scale-layouts", VerifySystemSettingsMixedScalePhraseLayouts),
                     new VerificationStep("4k-lobby-font-derivations", Verify4kLobbyFontDerivations),
                     new VerificationStep("4k-lobby-phrase-layouts", Verify4kLobbyPhraseLayouts),
                     new VerificationStep("numeric-glyphs", VerifyNumericGlyphs),

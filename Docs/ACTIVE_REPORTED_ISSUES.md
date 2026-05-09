@@ -20,6 +20,7 @@
   - 2026-05-09 추가 보강: glyph box만 비교하면 런타임 스케일링에서 atlas 주변 픽셀이 섞이는 문제를 놓칠 수 있어, 데이터센터 routed ASCII glyph의 2px texture neighborhood를 clean global과 비교하도록 verifier를 확장했다. 제너레이터는 lobby clean ASCII cell을 할당할 때 해당 padding까지 같이 복사한다.
   - 검증 결과: 최신 ja 산출물은 `.tmp\verifier-dc-texture-padding-fix-ja.log`에서 `data-center-title-uld,data-center-worldmap-uld` PASS.
   - 2026-05-09 재보고 후 확인: 최신 산출물은 PASS지만 실제 적용 폴더 `D:\SquareEnix\FINAL FANTASY XIV - A Realm Reborn\game`은 `applied-output-files`에서 lobby FDT/texture가 generated output과 다르고, `data-center-title-uld`에서 `AXIS_12_lobby`/`AXIS_14_lobby` ASCII 2px texture padding이 FAIL한다. 현재 문제는 실제 클라이언트에 최신 `000000` font dat/index가 반영되지 않은 상태로 분리한다.
+  - 2026-05-09 재검증 보강: 사용자가 계속 보고한 번짐은 2px 주변 비교로 부족할 수 있으므로 clean global ASCII texture neighborhood 기준을 4px로 올렸다. 이전 산출물은 새 4px verifier에서 실패했고, 새 산출물은 `data-center-title-uld,data-center-worldmap-uld`를 포함한 `.tmp\verifier-reported-font-routes-after-fix2.log`에서 PASS한다.
   - 다음 처리: 클라이언트/런처 종료 후 최신 산출물 또는 release UI로 font patch를 재적용하고, `applied-output-files,data-center-title-uld,data-center-worldmap-uld`를 실제 적용 폴더 기준으로 PASS시킨다.
 
 - [ ] Data center select: 서버명은 영어로 나오지만 문자 간격이 서로 침범함
@@ -30,6 +31,7 @@
   - 2026-05-09 추가 보강: `DataCenterWorldmapLabels`의 non-space ASCII glyph 전체에 대해 clean global 대비 2px texture padding까지 비교한다. padding 복사는 lobby FDT에만 제한해 일반 인게임/대사 폰트의 atlas 오염을 막는다.
   - 검증 결과: `.tmp\verifier-ja-clean-ascii-after-padding-scope.log` PASS, `.tmp\verifier-ja-regression-after-padding.log` PASS.
   - 2026-05-09 재보고 후 확인: 실제 적용 폴더 기준 verifier에서 lobby ASCII texture padding이 실패하므로, 서버명 간격/번짐 문제도 산출물 수정 미적용 상태로 추적한다.
+  - 2026-05-09 재검증 보강: 서버/데이터센터 ASCII도 4px texture neighborhood로 올려 검증한다. 새 산출물은 데이터센터 전체 라벨 metrics/pixels/padding route 검증을 PASS한다.
 
 - [x] Data center select: 화면을 나가는 버튼이 `-로?` / `-료?`처럼 잘못 표시됨
   - 재보고일: 2026-05-09
@@ -45,6 +47,9 @@
   - 2026-05-09 재보고 후 확인: 실제 적용 폴더의 lobby FDT/texture가 최신 산출물과 다르다. `start-system-settings-uld` 자체는 기존 대표 문구 layout 기준으로 PASS하지만, 고배율 로비 폰트가 실제 적용 산출물과 일치하지 않는 상태에서는 클라이언트 증상을 닫지 않는다.
   - 2026-05-09 검증/생성 보강: 4K 로비 파생 폰트의 필요 glyph를 고정 대표 문구만으로 만들지 않고, 한국 Addon의 시스템 설정/고해상도 UI 관련 row 범위(`4000-4200`, `8683-8722`)에서 Hangul/ASCII codepoint를 수집해 생성한다. verifier도 같은 row 범위를 patched text에서 읽어 4K 로비 폰트 누락 glyph를 검사한다.
   - 검증 결과: `.tmp\lobby-dynamic-glyphs-ja`는 `4k-lobby-font-derivations,data-center-title-uld,data-center-worldmap-uld,start-system-settings-uld` PASS. 생성 로그 기준 4K 로비 required codepoint는 static 123 + Addon-derived 204 = 327개.
+  - 2026-05-09 재보고 후 원인 보강: 기존 검증은 glyph 존재 여부와 대표 한글 문구만 봐서, `150%(FHD): 1728x972 이상 권장`처럼 한글/ASCII/숫자/기호가 섞인 실제 문장 layout 오염을 놓쳤다. 새 `system-settings-mixed-scale-layouts` verifier는 스크린샷 문장을 그대로 사용해 ASCII metrics, 4px texture padding, Hangul advance, phrase overlap을 함께 검사한다.
+  - 처리: 4K lobby 파생 폰트는 Hangul만 한국 TTMP source에서 가져오고, ASCII/숫자/기호는 clean global lobby route를 유지한다. clean target에 일부 ASCII가 없는 4K lobby font는 기존 파생 source pair의 clean lobby font에서만 보충하며, 이 보충 glyph도 4px padding을 같이 복사한다. Hangul advance는 clean CJK median 또는 glyph width 기반 safety advance보다 좁아지지 않게 보정한다.
+  - 검증 결과: 이전 산출물은 `system-settings-mixed-scale-layouts`에서 ASCII texture padding/overlap/missing glyph로 FAIL했고, 새 산출물 `.tmp\mixed-scale-spacing-fix-ja9`는 `.tmp\verifier-reported-font-routes-after-fix2.log`에서 `data-center-title-uld,data-center-worldmap-uld,start-system-settings-uld,system-settings-mixed-scale-layouts,high-scale-ascii-phrase-layouts,clean-ascii-font-routes,4k-lobby-font-derivations,4k-lobby-phrase-layouts` PASS.
   - 다음 처리: font patch 재적용 후 `applied-output-files,start-system-settings-uld,4k-lobby-phrase-layouts,lobby-hangul-visibility`를 실제 적용 폴더 기준으로 PASS시킨다. 그래도 재현되면 시작화면 시스템 설정의 실제 scale별 font substitution을 별도 verifier로 추가한다.
 
 - [x] Data center select popup: `데이터 센터 Mana에 입장합니다` 계열 팝업 문구가 base client 언어로 나옴 - 처리됨
@@ -100,9 +105,10 @@
 
 - Data center phrase layout and pixel rendering checks now apply FDT kerning before each glyph/space advance.
 - Data center ASCII pixel checks now run against every `DataCenterWorldmapLabels` entry, including DC group names and server/world names.
-- Data center routed ASCII texture-neighborhood checks compare the 2px padding around every non-space ASCII glyph used by DC groups/world names. Latest ja output passes `.tmp\verifier-dc-texture-padding-fix-ja.log`.
+- Data center routed ASCII texture-neighborhood checks compare the 4px padding around every non-space ASCII glyph used by DC groups/world names. Latest ja output passes `.tmp\verifier-reported-font-routes-after-fix2.log`.
 - Latest ja output passes `data-center-title-uld`, but the installed `D:` game folder currently fails `applied-output-files` for lobby FDT/texture files and fails `data-center-title-uld` texture padding for `AXIS_12_lobby`/`AXIS_14_lobby`. Do not treat generated-output PASS as client PASS until the applied folder also passes.
 - 4K lobby font generation now derives additional system-settings Hangul/ASCII coverage from Korean Addon rows `4000-4200` and `8683-8722`, instead of relying only on the fixed representative phrase list. `.tmp\verifier-lobby-dynamic-core.log` passes the focused lobby/start-screen checks.
+- `system-settings-mixed-scale-layouts` now verifies the exact high-resolution UI option strings shown in the start-screen system settings, including `150%(FHD): 1728x972 이상 권장`, with ASCII metrics/texture padding and Hangul advance checks.
 - Current output passes `.tmp\verifier-ja-regression-with-reported-phrases.log` for data-center rows/language slots, start-screen system settings, configuration sharing, Bozja, Occult Crescent support jobs, clean ASCII font routes, 4K lobby phrase/layout, Hangul source preservation, reported in-game Hangul phrases, and lobby Hangul visibility.
 - ULD font route checks now also assert text node header and text extra render-state bytes match clean global. Current output passes `.tmp\verifier-uld-render-state.log`.
 - `applied-output-files` compares generated output packed bytes against `--applied-game`; use it to rule out an installed-folder mismatch before live client retesting.
