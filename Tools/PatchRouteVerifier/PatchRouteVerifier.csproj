@@ -67,6 +67,7 @@
     <Compile Include="GlyphSheetDumpOutput.cs" />
     <Compile Include="LabelPreviewDumpOutput.cs" />
     <Compile Include="LobbyGlyphDiagnostics.cs" />
+    <Compile Include="NumericGlyphVerification.cs" />
     <Compile Include="PatchRouteVerifier.cs" />
     <Compile Include="PhraseLayoutMeasurement.cs" />
     <Compile Include="PhraseLayoutVerificationData.cs" />
