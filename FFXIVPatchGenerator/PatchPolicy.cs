@@ -21,6 +21,9 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
             new KeyValuePair<uint, string>(8294, "60m")
         };
         private static readonly uint[] ConfigShareAddonTitleRows = new uint[] { 17300, 17301 };
+        private const uint ConfigShareMainCommandRow = 99;
+        private const string ConfigShareKoreanTitle = "\uC124\uC815 \uACF5\uC720";
+        private const string ConfigShareKoreanMainCommandDescription = "\uB2E8\uCD95\uBC14\uB098 \uAC01\uC885 \uC124\uC815 \uB370\uC774\uD130\uB97C \uC11C\uBC84\uC5D0 \uC77C\uC2DC \uC800\uC7A5\uD558\uACE0 \uB2E4\uB978 \uCE90\uB9AD\uD130\uC640 \uACF5\uC720\uD560 \uC218 \uC788\uC2B5\uB2C8\uB2E4.";
         private const uint MkdSupportJobFirstRow = 0;
         private const uint MkdSupportJobLastPlayableRow = 15;
         private const ushort MkdSupportJobFullNameColumnOffset = 0;
@@ -82,6 +85,7 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
             PatchPolicy policy = new PatchPolicy();
             PatchSheetPolicy addonPolicy = policy.GetOrCreateSheetPolicy("Addon");
             PatchSheetPolicy lobbyPolicy = policy.GetOrCreateSheetPolicy("Lobby");
+            PatchSheetPolicy mainCommandPolicy = policy.GetOrCreateSheetPolicy("MainCommand");
             PatchSheetPolicy mkdSupportJobPolicy = policy.GetOrCreateSheetPolicy("MkdSupportJob");
             PatchSheetPolicy worldDcGroupTypePolicy = policy.GetOrCreateSheetPolicy("WorldDCGroupType");
             PatchSheetPolicy worldPhysicalDcPolicy = policy.GetOrCreateSheetPolicy("WorldPhysicalDC");
@@ -145,12 +149,14 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
                 addonPolicy.SetRowColumnRemap(preset.Key, 0, ColumnRemap.Literal(preset.Value));
             }
 
-            // The Configuration Sharing window title lives in Addon, not
-            // MainCommand. Keep both nearby title rows pinned to Korean because
-            // some global clients route the visible label through Addon#17300.
+            // Configuration Sharing is split between the ESC system menu entry
+            // and the window Addon rows. The Korean MainCommand row is empty in
+            // some data sets, so pin the visible menu label separately.
+            mainCommandPolicy.SetRowColumnRemap(ConfigShareMainCommandRow, 0, ColumnRemap.Literal(ConfigShareKoreanTitle));
+            mainCommandPolicy.SetRowColumnRemap(ConfigShareMainCommandRow, 4, ColumnRemap.Literal(ConfigShareKoreanMainCommandDescription));
             for (int i = 0; i < ConfigShareAddonTitleRows.Length; i++)
             {
-                addonPolicy.SetRowColumnRemap(ConfigShareAddonTitleRows[i], 0, ColumnRemap.Literal("\uC124\uC815 \uACF5\uC720"));
+                addonPolicy.SetRowColumnRemap(ConfigShareAddonTitleRows[i], 0, ColumnRemap.Literal(ConfigShareKoreanTitle));
             }
 
             // Occult Crescent HUDs consume MkdSupportJob name columns in multiple

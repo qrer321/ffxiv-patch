@@ -30,6 +30,12 @@
   - 검증 보강: 팝업 문구의 sheet/row/column과 lookup 구조를 찾아 EN/JA 각각에서 값이 의도한 언어인지 확인한다.
   - 수정 방향: 글로벌 전용 lookup row가 아닌 실제 번역 가능한 row라면 한국어로 유지하고, lookup 구조가 글로벌 전용이면 SeString 구조를 깨지 않는 방식으로 literal만 병합한다.
 
+- [x] ESC system menu: `コンテンツシェア`/`コンフィグシェア` 계열 설정 공유 메뉴 제목이 base client 언어로 남음
+  - 보고일: 2026-05-09
+  - 원인: 창 내부 Addon row는 번역됐지만 ESC 시스템 메뉴 항목은 `MainCommand#99`를 참조하며, 한국 서버의 해당 row title/description이 비어 있어 기존 Addon-only 보정이 닿지 않았음.
+  - 검증 보강: `configuration-sharing` verifier가 `Addon#17300/17301`뿐 아니라 `MainCommand#99`의 title/description column을 검사하고, 일본어/영어 공유 제목이 남으면 실패하도록 한다.
+  - 수정 방향: `MainCommand#99` title과 description을 설정 공유 정책 literal로 보정한다.
+
 - [ ] In-game: `즉시 발동` 등 일부 한글 폰트가 크게 보임
   - 재보고일: 2026-05-09
   - 사용자 정정: 폰트가 깨지거나 잘못된 폰트로 보이는 문제는 아님. 다른 인게임 UI 폰트보다 상대적으로 커 보이는지 확인해 달라는 관찰 항목임.
