@@ -5,19 +5,36 @@
 
 ## Current Checklist
 
-- [ ] Data center select: 그룹 선택 후 확인/취소 단계가 `==`로 보이는 문제
-  - 검증 보강: `Lobby` 808~811을 EN/JA 및 모든 글로벌 언어 슬롯에서 확인한다.
-  - 수정 방향: 시작 화면 데이터센터 전용 row는 베이스 글로벌 문구를 유지한다.
+- [ ] Data center select: 그룹명은 영어로 나오지만 흐리게 렌더링됨
+  - 재보고일: 2026-05-09
+  - 검증 보강: 실제 `Title_DataCenter.uld`/`Title_Worldmap.uld` route가 쓰는 font와 texture를 확인하고, 해당 라벨을 clean global 렌더와 픽셀/metrics 비교한다.
+  - 수정 방향: 데이터센터 선택 화면의 ASCII 라벨은 TTMP 한글 폰트가 아니라 clean global ASCII glyph/kerning/texture를 사용해야 한다.
 
-- [ ] Data center select: 영어 그룹명 및 `Information` 계열 문자 간격 겹침
-  - 검증 보강: 실제 시작 화면 ULD가 참조하는 FDT의 ASCII metrics를 clean global과 비교한다.
-  - 수정 방향: 시작 화면 ASCII glyph/kerning은 clean global과 일치시킨다.
+- [ ] Data center select: 서버명은 영어로 나오지만 문자 간격이 서로 침범함
+  - 재보고일: 2026-05-09
+  - 검증 보강: `Elemental`, `Gaia`, `Mana`, 실제 월드명 전체를 데이터센터 화면 route font에서 문장 단위 layout으로 검사한다.
+  - 수정 방향: 월드/데이터센터 ASCII 라벨의 advance/kerning을 clean global과 일치시키고, TTMP texture cell에 덮어쓴 ASCII가 흐리거나 좁게 나오지 않게 한다.
 
-- [ ] System settings: FHD 150% / QHD 200% / UHD 300%에서 글자 깨짐 및 간격 겹침
-  - 검증 보강: `시스템 설정 150%`, `시스템 설정 200%`, `시스템 설정 300%`,
-    `FHD 150% QHD 200% UHD 300%` 문장 단위 레이아웃 검사를 수행한다.
-  - 수정 방향: 한글 glyph의 음수 next offset은 일반 규칙으로 정규화하고,
-    ASCII 복구는 기존 atlas cell을 오염시키지 않도록 빈 cell로 재배치한다.
+- [ ] Data center select: 화면을 나가는 버튼이 `-로?` / `-료?`처럼 잘못 표시됨
+  - 재보고일: 2026-05-09
+  - 검증 보강: 데이터센터 선택 화면 종료/뒤로가기/취소 버튼 row를 찾아 base client 언어 슬롯별로 확인하고, 실제 버튼 문자열 glyph를 fallback `-`/`=`와 비교한다.
+  - 수정 방향: 시작 화면 전용 버튼은 한국어가 아니라 base client 원문을 유지하거나, 한글을 유지할 경우 해당 route font가 한글을 정상 렌더링해야 한다.
+
+- [ ] Start screen system settings: UI 배율을 키우면 한글이 `=`로 깨지고 문자 간격이 침범함
+  - 재보고일: 2026-05-09
+  - 검증 보강: 시작 화면 시스템 설정이 실제로 쓰는 ULD/font route를 찾고, 150/200/300%에서 해당 route의 한글 대표 문구를 glyph fallback/layout 검사에 넣는다.
+  - 수정 방향: 인게임 한글 폰트를 오염시키지 않고, 시작 화면 시스템 설정 전용 font route에 필요한 한글 glyph와 spacing만 보정한다.
+
+- [ ] Data center select popup: `데이터 센터 Mana에 입장합니다` 계열 팝업 문구가 base client 언어로 나옴
+  - 재보고일: 2026-05-09
+  - 검증 보강: 팝업 문구의 sheet/row/column과 lookup 구조를 찾아 EN/JA 각각에서 값이 의도한 언어인지 확인한다.
+  - 수정 방향: 글로벌 전용 lookup row가 아닌 실제 번역 가능한 row라면 한국어로 유지하고, lookup 구조가 글로벌 전용이면 SeString 구조를 깨지 않는 방식으로 literal만 병합한다.
+
+- [ ] In-game: `즉시 발동` 등 일부 한글 폰트가 크게 보임
+  - 재보고일: 2026-05-09
+  - 현재 관찰: 인게임 한글 폰트 계열은 원하는 폰트로 돌아왔음. 다만 일부 문구의 glyph size/advance가 원래 TTMP 기준인지, 패치로 과대화된 것인지 확인 필요.
+  - 검증 보강: `즉시 발동`과 비슷한 짧은 UI 문구를 TTMP 원본 대비 pixel/metrics/source preservation으로 비교한다.
+  - 수정 방향: TTMP 원본과 다르면 해당 route를 복구하고, TTMP 원본과 같다면 UI route 자체의 기대 폰트 크기 문제로 분리한다.
 
 - [ ] In-game: `탐사대 호위대원`의 `호` glyph 깨짐
   - 검증 보강: `탐사대 호위대원` 문장을 glyph visibility/fallback/layout 검사에 포함한다.
@@ -28,9 +45,8 @@
   - 수정 방향: 특정 Knight만 예외 처리하지 않고, column 역할 기준으로 매핑한다.
 
 - [ ] Follow-up: 기존 한글 폰트와 달라져 보이는 glyph 대응 어색함
-  - 지금 수정 대상은 아니다.
-  - 후속 검증 방향: 한글 glyph가 기존 Korean TTMP source font/atlas와 다른 계열로 대체된 route를 찾는다.
-  - 수정 방향: fallback/clean ASCII 복구가 한글 glyph source를 바꾸지 않도록 route별 glyph provenance를 확인한다.
+  - 2026-05-09 처리: `hangul-source-preservation` verifier 추가, 전역 Hangul offset 정규화 제거.
+  - 남은 방향: 새로 보고된 `즉시 발동` 계열 문구가 TTMP 원본과 같은지 별도 대표 문구로 확인한다.
 
 ## Verification Rule
 
