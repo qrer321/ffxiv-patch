@@ -79,6 +79,9 @@
     <Compile Include="OccultCrescentSupportJobVerification.cs" />
     <Compile Include="PatchRouteVerifier.cs" />
     <Compile Include="PhraseLayoutMeasurement.cs" />
+    <Compile Include="PhraseGlyphMeasurement.cs" />
+    <Compile Include="PhraseLayoutAccumulator.cs" />
+    <Compile Include="PhraseLayoutResult.cs" />
     <Compile Include="PhraseLayoutVerificationData.cs" />
     <Compile Include="PhraseMetricsVerification.cs" />
     <Compile Include="PhraseOverlapVerification.cs" />

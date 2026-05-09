@@ -1,11 +1,11 @@
 using System;
-using System.Collections.Generic;
-using System.Globalization;
 
 namespace FfxivKoreanPatch.PatchRouteVerifier
 {
     internal static partial class PatchRouteVerifier
     {
+        private const int PhraseLayoutSpaceAdvance = 8;
+
         private sealed partial class Verifier
         {
             private bool TryMeasurePhraseLayout(
@@ -21,59 +21,27 @@ namespace FfxivKoreanPatch.PatchRouteVerifier
                 try
                 {
                     byte[] fdt = archive.ReadFile(fontPath);
-                    HashSet<long> occupiedPixels = new HashSet<long>();
-                    int cursor = 0;
-                    int glyphs = 0;
-                    int overlap = 0;
+                    PhraseLayoutAccumulator accumulator = new PhraseLayoutAccumulator();
                     for (int i = 0; i < phrase.Length; i++)
                     {
                         uint codepoint = ReadCodepoint(phrase, ref i);
 
-                        if (codepoint <= 0x20)
+                        if (IsPhraseLayoutSpace(codepoint))
                         {
-                            cursor += 8;
+                            accumulator.AddSpace();
                             continue;
                         }
 
-                        FdtGlyphEntry glyph;
-                        if (!TryFindGlyph(fdt, codepoint, out glyph))
+                        PhraseGlyphMeasurement glyph;
+                        if (!TryMeasurePhraseGlyph(archive, fontPath, fdt, codepoint, validateGlyphShape, out glyph, out error))
                         {
-                            error = "missing U+" + codepoint.ToString("X4");
                             return false;
                         }
 
-                        GlyphCanvas canvas = RenderGlyph(archive, fontPath, codepoint);
-                        if (validateGlyphShape)
-                        {
-                            int minimumVisiblePixels = IsHangulCodepoint(codepoint) ? 10 : 1;
-                            if (canvas.VisiblePixels < minimumVisiblePixels)
-                            {
-                                error = string.Format(
-                                    CultureInfo.InvariantCulture,
-                                    "U+{0:X4} visible={1}, expected at least {2}",
-                                    codepoint,
-                                    canvas.VisiblePixels,
-                                    minimumVisiblePixels);
-                                return false;
-                            }
-
-                            if (IsHangulCodepoint(codepoint) &&
-                                (GlyphMatchesFallback(fontPath, canvas, codepoint, '-') ||
-                                 GlyphMatchesFallback(fontPath, canvas, codepoint, '=')))
-                            {
-                                error = "U+" + codepoint.ToString("X4") + " matches fallback glyph";
-                                return false;
-                            }
-                        }
-
-                        overlap += AddGlyphPixelsToLayout(occupiedPixels, cursor, canvas.Alpha);
-                        cursor += Math.Max(1, glyph.Width + glyph.OffsetX);
-                        glyphs++;
+                        accumulator.AddGlyph(glyph);
                     }
 
-                    result.Glyphs = glyphs;
-                    result.Width = cursor;
-                    result.OverlapPixels = overlap;
+                    result = accumulator.ToResult();
                     return true;
                 }
                 catch (Exception ex)
@@ -83,38 +51,10 @@ namespace FfxivKoreanPatch.PatchRouteVerifier
                 }
             }
 
-            private static int AddGlyphPixelsToLayout(HashSet<long> occupiedPixels, int cursor, byte[] alpha)
+            private static bool IsPhraseLayoutSpace(uint codepoint)
             {
-                int overlap = 0;
-                for (int y = 0; y < GlyphCanvasSize; y++)
-                {
-                    int rowOffset = y * GlyphCanvasSize;
-                    for (int x = 0; x < GlyphCanvasSize; x++)
-                    {
-                        if (alpha[rowOffset + x] == 0)
-                        {
-                            continue;
-                        }
-
-                        int pixelX = cursor + x - 32;
-                        int pixelY = y - 32;
-                        long key = ((long)pixelY << 32) ^ (uint)pixelX;
-                        if (!occupiedPixels.Add(key))
-                        {
-                            overlap++;
-                        }
-                    }
-                }
-
-                return overlap;
+                return codepoint <= 0x20;
             }
-        }
-
-        private struct PhraseLayoutResult
-        {
-            public int Glyphs;
-            public int Width;
-            public int OverlapPixels;
         }
     }
 }
