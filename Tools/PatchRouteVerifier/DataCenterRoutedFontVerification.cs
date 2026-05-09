@@ -13,6 +13,7 @@ namespace FfxivKoreanPatch.PatchRouteVerifier
                     VerifyLabelGlyphsEqualClean(fontPath, DataCenterWorldmapLabels);
                     VerifyDataCenterRoutedAsciiPhraseMetrics(fontPath);
                     VerifyDataCenterRoutedAsciiPhrasePixels(fontPath);
+                    VerifyDataCenterRoutedAsciiTexturePadding(fontPath);
                     VerifyDataCenterRoutedKoreanPhraseLayouts(fontPath);
                     DumpLabelPreview(dumpGroup, fontPath, DataCenterWorldmapLabels);
                 }
@@ -31,6 +32,46 @@ namespace FfxivKoreanPatch.PatchRouteVerifier
                 for (int phraseIndex = 0; phraseIndex < DataCenterWorldmapLabels.Length; phraseIndex++)
                 {
                     VerifyPhrasePixelsMatchClean(fontPath, fontPath, DataCenterWorldmapLabels[phraseIndex]);
+                }
+            }
+
+            private void VerifyDataCenterRoutedAsciiTexturePadding(string fontPath)
+            {
+                uint[] codepoints = CollectNonSpaceCodepoints(DataCenterWorldmapLabels);
+                int checkedGlyphs = 0;
+                int failures = 0;
+                for (int codepointIndex = 0; codepointIndex < codepoints.Length; codepointIndex++)
+                {
+                    uint codepoint = codepoints[codepointIndex];
+                    if (codepoint > 0x7E)
+                    {
+                        continue;
+                    }
+
+                    string error;
+                    if (!VerifyGlyphTextureNeighborhoodMatchesClean(fontPath, fontPath, codepoint, DataCenterGlyphTexturePadding, out error))
+                    {
+                        Fail(
+                            "{0} U+{1:X4} texture padding differs from clean route: {2}",
+                            fontPath,
+                            codepoint,
+                            error);
+                        failures++;
+                        if (failures >= MaxTexturePaddingFailuresPerFont)
+                        {
+                            Warn("{0} texture padding check stopped after {1} failures", fontPath, failures);
+                            break;
+                        }
+
+                        continue;
+                    }
+
+                    checkedGlyphs++;
+                }
+
+                if (failures == 0)
+                {
+                    Pass("{0} data-center ASCII texture padding matches clean route: glyphs={1}, padding={2}", fontPath, checkedGlyphs, DataCenterGlyphTexturePadding);
                 }
             }
 

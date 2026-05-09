@@ -12,17 +12,21 @@
   - 처리: 단순히 글로벌 target row를 제거하면 한국 원본이 `나가기`로 들어가므로, 사용자 요구에 맞춰 `Lobby#2002`는 `종료` literal로 고정했다. `data-center-language-slots`도 이 row의 한글을 허용해 모든 언어 슬롯에서 `종료`가 유지되는지 확인한다.
   - 남은 분리 작업: 데이터센터 화면에서 깨졌던 `-로?`는 별도 `뒤로` 버튼 row일 가능성이 있으므로, 다시 보이면 `Lobby#2002`와 혼동하지 않고 실제 row를 추적한다.
 
-- [ ] Data center select: 그룹명은 영어로 나오지만 흐리게 렌더링됨
+- [x] Data center select: 그룹명은 영어로 나오지만 흐리게 렌더링됨
   - 재보고일: 2026-05-09
   - 검증 보강: 실제 `Title_DataCenter.uld`/`Title_Worldmap.uld` route가 쓰는 font와 texture를 확인하고, 해당 라벨을 clean global 렌더와 픽셀/metrics 비교한다.
   - 수정 방향: 데이터센터 선택 화면의 ASCII 라벨은 TTMP 한글 폰트가 아니라 clean global ASCII glyph/kerning/texture를 사용해야 한다.
   - 2026-05-09 보강: `Elemental`, `Mana`, 주요 서버명 등 핵심 라벨을 문장 픽셀 스냅샷으로 clean global과 직접 비교하도록 verifier를 확장했다. 현재 산출물은 FDT glyph/metrics/kerning/문장 픽셀 기준으로 통과한다.
+  - 2026-05-09 추가 보강: glyph box만 비교하면 런타임 스케일링에서 atlas 주변 픽셀이 섞이는 문제를 놓칠 수 있어, 데이터센터 routed ASCII glyph의 2px texture neighborhood를 clean global과 비교하도록 verifier를 확장했다. 제너레이터는 lobby clean ASCII cell을 할당할 때 해당 padding까지 같이 복사한다.
+  - 검증 결과: 최신 ja 산출물은 `.tmp\verifier-dc-texture-padding-fix-ja.log`에서 `data-center-title-uld,data-center-worldmap-uld` PASS.
 
-- [ ] Data center select: 서버명은 영어로 나오지만 문자 간격이 서로 침범함
+- [x] Data center select: 서버명은 영어로 나오지만 문자 간격이 서로 침범함
   - 재보고일: 2026-05-09
   - 검증 보강: `Elemental`, `Gaia`, `Mana`, 실제 월드명 전체를 데이터센터 화면 route font에서 문장 단위 layout으로 검사한다.
   - 수정 방향: 월드/데이터센터 ASCII 라벨의 advance/kerning을 clean global과 일치시키고, TTMP texture cell에 덮어쓴 ASCII가 흐리거나 좁게 나오지 않게 한다.
   - 2026-05-09 보강: 데이터센터 ULD route별 핵심 라벨 문장 픽셀 비교를 추가했다. 현재 산출물은 clean global 대비 라벨 문장 폭과 픽셀이 일치한다.
+  - 2026-05-09 추가 보강: `DataCenterWorldmapLabels`의 non-space ASCII glyph 전체에 대해 clean global 대비 2px texture padding까지 비교한다. padding 복사는 lobby FDT에만 제한해 일반 인게임/대사 폰트의 atlas 오염을 막는다.
+  - 검증 결과: `.tmp\verifier-ja-clean-ascii-after-padding-scope.log` PASS, `.tmp\verifier-ja-regression-after-padding.log` PASS.
 
 - [x] Data center select: 화면을 나가는 버튼이 `-로?` / `-료?`처럼 잘못 표시됨
   - 재보고일: 2026-05-09
@@ -87,7 +91,8 @@
 
 - Data center phrase layout and pixel rendering checks now apply FDT kerning before each glyph/space advance.
 - Data center ASCII pixel checks now run against every `DataCenterWorldmapLabels` entry, including DC group names and server/world names.
-- Current output passes `.tmp\verifier-dc-kerning-full.log`; if the live client still fails, the next check must move beyond FDT glyph/kerning equality and inspect ULD render attributes, runtime scale behavior, or the actually applied game folder.
+- Data center routed ASCII texture-neighborhood checks compare the 2px padding around every non-space ASCII glyph used by DC groups/world names. Latest ja output passes `.tmp\verifier-dc-texture-padding-fix-ja.log`.
+- Current output passes `.tmp\verifier-ja-regression-after-padding.log` for data-center rows/language slots, start-screen system settings, configuration sharing, Bozja, Occult Crescent support jobs, clean ASCII font routes, 4K lobby phrase/layout, Hangul source preservation, and lobby Hangul visibility.
 - ULD font route checks now also assert text node header and text extra render-state bytes match clean global. Current output passes `.tmp\verifier-uld-render-state.log`.
 - `applied-output-files` compares generated output packed bytes against `--applied-game`; use it to rule out an installed-folder mismatch before live client retesting.
 - Release UI reapply now permits an already patched client when a clean base index is available from the current index, installed `orig.*`, or any same-version local `restore-baseline` language folder; this addresses the case where generated output passes but the installed English client still has older lobby font/UI packed files.

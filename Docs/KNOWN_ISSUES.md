@@ -26,7 +26,7 @@
 
 ### 0. 2026-05-09 재보고: 시작 화면 데이터센터/시스템 설정 실사용 경로 미검증
 
-상태: 작업 필요
+상태: 코드 검증 통과, 실제 일본어 클라이언트 확인 대기
 
 최근 verifier는 통과했지만 실제 클라이언트에서 아래 문제가 계속 재현되었습니다. 이는 기존 검증이 실제 시작 화면 UI route를 충분히 잡지 못했다는 뜻으로 취급합니다.
 
@@ -36,13 +36,14 @@
 - 데이터센터 화면의 뒤로/확인/취소 계열은 `Lobby#2002`가 아니라 `Lobby#2009`, `Lobby#2047`, `Lobby#2050`, `Lobby#2051`, `Lobby#2052`에도 분산되어 있었다. 이 row들을 로비 액션 literal 정책과 verifier 기대값에 추가했다.
 - 시작 화면 시스템 설정은 실제 설정 Addon 라벨을 공유 목록으로 분리해 4K 로비 파생 glyph와 verifier가 같은 기준을 쓰도록 했다. 이전 산출물은 새 verifier에서 실패했고, 새 산출물은 통과했다.
 - 데이터센터 ULD route는 기존 glyph/metrics/kerning 비교에 더해 핵심 라벨 문장 픽셀 스냅샷을 clean global과 비교하도록 보강했다. 현재 산출물은 코드 기준으로 통과한다.
+- 데이터센터 그룹명 흐림/서버명 간격 문제는 glyph box 비교만으로는 부족했으므로, clean global 대비 2px texture neighborhood까지 비교하도록 verifier를 보강했다. 제너레이터는 lobby clean ASCII cell을 할당할 때 glyph 주변 padding도 같이 복사하며, 이 padding 복사는 lobby FDT에만 제한해 일반 인게임/대사 폰트 atlas 오염을 막는다.
 
 재보고 항목:
 
 - 시작 화면의 `종료`가 `EXIT`로 표시됨. 처리됨
 - 데이터 센터 선택 화면을 나가는 버튼이 `-로?` / `-료?`처럼 깨져 보임. `Lobby#2009/#2052` 뒤로 row와 관련 ULD font phrase 검증을 추가해 처리됨
-- 데이터 센터 선택 화면의 group label은 영어로 나오지만 흐리게 보임
-- 데이터 센터 선택 화면의 서버명/데이터센터명은 영어로 나오지만 문자 간격이 서로 침범함
+- 데이터 센터 선택 화면의 group label은 영어로 나오지만 흐리게 보임. 2px texture-neighborhood verifier와 ja 산출물 기준 처리됨
+- 데이터 센터 선택 화면의 서버명/데이터센터명은 영어로 나오지만 문자 간격이 서로 침범함. clean glyph/metrics/kerning/phrase pixel/padding verifier 기준 처리됨
 - 시작 화면 시스템 설정에서 UI 배율을 150/200/300%로 키우면 한글이 `=`로 깨지고 문자 간격이 침범함. 코드 검증 기준 처리됨
 - `데이터 센터 Mana에 입장합니다` 계열 팝업 문구는 처리됨. 재발 시 sheet/row/column 추적 verifier를 먼저 보강
 - 인게임 `즉시 발동` 같은 짧은 한글 UI 문구가 다른 인게임 UI 폰트보다 상대적으로 크게 보일 가능성이 있음. 단, 현재 보고는 깨짐/잘못된 폰트 문제가 아니라 시각적 크기 확인 요청임
@@ -52,8 +53,8 @@
 
 - `Title_DataCenter.uld`, `Title_Worldmap.uld`, 시작 화면 시스템 설정 ULD가 실제로 참조하는 font id와 FDT route를 확정
 - 데이터센터 화면에서 재발하는 버튼/문구가 있으면 어느 sheet/row/column에서 오는지 찾아서 EN/JA 언어 슬롯별로 확인
-- 데이터센터 화면 서버명과 DC명은 단어 단위가 아니라 실제 리스트 문자열 기준으로 layout 검증
-- 흐림 문제는 clean global ASCII glyph의 픽셀/metrics뿐 아니라 실제 texture cell alpha 차이까지 비교
+- 데이터센터 화면 서버명과 DC명은 단어 단위가 아니라 실제 리스트 문자열 기준으로 layout 검증. 현재 `DataCenterWorldmapLabels` 전체 기준으로 수행
+- 흐림 문제는 clean global ASCII glyph의 픽셀/metrics뿐 아니라 실제 texture cell alpha 차이까지 비교. 현재 non-space ASCII glyph 주변 2px padding 기준으로 수행
 - 시작 화면 시스템 설정은 인게임 font route와 분리해서, 해당 route의 한글 glyph fallback/spacing만 검증
 - `즉시 발동` 계열 문구는 TTMP 원본과 patched glyph size/metrics가 같은지 확인. TTMP 원본과 같으면 패치 깨짐이 아니라 UI route의 원래 크기 문제로 분리
 - story 완료 설명문이 `EventImage`, `CutScreenImage`, `ScreenImage`, `DynamicEventScreenImage`, `LoadingImage`, event/cutscene texture/ULD bundle 중 어디에서 오는지 추적
@@ -233,7 +234,8 @@
 
 - Data center routed phrase rendering now applies FDT kerning when measuring layout and phrase pixels.
 - Data center routed ASCII pixel comparison now covers every `DataCenterWorldmapLabels` entry, including DC groups and world names, not only the previous critical subset.
-- `.tmp\verifier-dc-kerning-full.log` passed for the current output. If the live client still shows blurred group labels or narrow server spacing, the remaining gap is likely outside FDT glyph/kerning bytes and should be investigated through ULD render attributes, font slots, runtime scaling, or applied-game-folder verification.
+- Data center routed ASCII texture-neighborhood comparison now covers the 2px padding around every non-space ASCII glyph used by DC groups/world names. Latest ja output passes `.tmp\verifier-dc-texture-padding-fix-ja.log`.
+- Latest ja output passes `.tmp\verifier-ja-regression-after-padding.log` for data-center rows/language slots, start-screen system settings, configuration sharing, Bozja, Occult Crescent support jobs, clean ASCII font routes, 4K lobby phrase/layout, Hangul source preservation, and lobby Hangul visibility.
 - ULD route checks now also compare text node header bytes and text extra render-state bytes, not only font id/font size. `.tmp\verifier-uld-render-state.log` passed for data center and start-screen system settings candidates.
 - `applied-output-files` verifier check compares critical generated font/UI packed files against an installed game folder when `--applied-game <game-dir>` is supplied. Use this before asking for live client confirmation when generated output passes but the installed client still differs.
 - Release UI reapply guard now allows applying over an already patched client when clean base indexes are available from current index, installed `orig.*` indexes, or any same-version local `restore-baseline` language folder. This prevents stale installed font/UI dat files from surviving after generated output already passes verification.
