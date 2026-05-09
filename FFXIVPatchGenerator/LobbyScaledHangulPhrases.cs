@@ -80,7 +80,16 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
             "300%(4K): 3456x1944 \uC774\uC0C1 \uAD8C\uC7A5"
         };
 
-        public static readonly string[] All = Combine(Core, StartScreenSystemSettings, HighResolutionUiScaleOptions);
+        public static readonly string[] StartScreenSystemSettingsResultMessages = new string[]
+        {
+            "\uC124\uC815\uC744 \uBCC0\uACBD\uD588\uC2B5\uB2C8\uB2E4."
+        };
+
+        public static readonly string[] All = Combine(
+            Core,
+            StartScreenSystemSettings,
+            HighResolutionUiScaleOptions,
+            StartScreenSystemSettingsResultMessages);
 
         private static string[] Combine(params string[][] groups)
         {

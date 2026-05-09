@@ -56,11 +56,34 @@ namespace FfxivKoreanPatch.PatchRouteVerifier
                 "common/font/TrumpGothic_184.fdt"
             };
 
-            private static readonly string[] SystemSettingsScaledPhrases = LobbyScaledHangulPhrases.StartScreenSystemSettings;
+            private static readonly string[] SystemSettingsScaledPhrases = CombinePhraseGroups(
+                LobbyScaledHangulPhrases.StartScreenSystemSettings,
+                LobbyScaledHangulPhrases.StartScreenSystemSettingsResultMessages);
 
-            private static readonly string[] SystemSettingsMixedScalePhrases = LobbyScaledHangulPhrases.HighResolutionUiScaleOptions;
+            private static readonly string[] SystemSettingsMixedScalePhrases = CombinePhraseGroups(
+                LobbyScaledHangulPhrases.HighResolutionUiScaleOptions,
+                LobbyScaledHangulPhrases.StartScreenSystemSettingsResultMessages);
 
             private static readonly string[] FourKLobbyPhrases = Derived4kLobbyRequiredHangulPhrases;
+
+            private static string[] CombinePhraseGroups(params string[][] groups)
+            {
+                List<string> phrases = new List<string>();
+                HashSet<string> seen = new HashSet<string>();
+                for (int groupIndex = 0; groupIndex < groups.Length; groupIndex++)
+                {
+                    string[] group = groups[groupIndex];
+                    for (int i = 0; i < group.Length; i++)
+                    {
+                        if (seen.Add(group[i]))
+                        {
+                            phrases.Add(group[i]);
+                        }
+                    }
+                }
+
+                return phrases.ToArray();
+            }
 
             private static string[] CreateHighScaleAsciiPhrases()
             {
