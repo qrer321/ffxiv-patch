@@ -45,6 +45,8 @@
     <Compile Include="DataCenterLabelAssertions.cs" />
     <Compile Include="DataCenterLabelExpectations.cs" />
     <Compile Include="DataCenterFontVerification.cs" />
+    <Compile Include="DataCenterRoutedFontVerification.cs" />
+    <Compile Include="DataCenterUldFontRouteVerification.cs" />
     <Compile Include="DataCenterVerificationData.cs" />
     <Compile Include="DataCenterVerification.cs" />
     <Compile Include="DialogueGlyphDiagnostics.cs" />
