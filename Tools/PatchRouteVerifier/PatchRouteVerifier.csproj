@@ -82,6 +82,7 @@
     <Compile Include="ProtectedGlyphVerification.cs" />
     <Compile Include="UldFontPathResolver.cs" />
     <Compile Include="UldFontRoutes.cs" />
+    <Compile Include="Verifier.cs" />
     <Compile Include="VerifierAssertions.cs" />
     <Compile Include="VerifierGlyphAssertions.cs" />
     <Compile Include="VerifierTextColumnAssertions.cs" />
