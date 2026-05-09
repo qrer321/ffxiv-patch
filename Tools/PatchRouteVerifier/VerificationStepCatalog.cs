@@ -25,6 +25,7 @@ namespace FfxivKoreanPatch.PatchRouteVerifier
                     new VerificationStep("4k-lobby-phrase-layouts", Verify4kLobbyPhraseLayouts),
                     new VerificationStep("numeric-glyphs", VerifyNumericGlyphs),
                     new VerificationStep("protected-hangul-glyphs", VerifyProtectedHangulGlyphs),
+                    new VerificationStep("hangul-source-preservation", VerifyHangulSourcePreservation),
                     new VerificationStep("party-list-self-marker", VerifyPartyListSelfMarker),
                     new VerificationStep("lobby-hangul-visibility", VerifyLobbyHangulVisibility),
                     new VerificationStep("lobby-phrase-glyph-diagnostics", VerifyLobbyPhraseGlyphDiagnostics),

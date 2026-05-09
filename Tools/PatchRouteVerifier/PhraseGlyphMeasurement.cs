@@ -36,6 +36,29 @@ namespace FfxivKoreanPatch.PatchRouteVerifier
                 return true;
             }
 
+            private bool TryMeasurePhraseGlyph(
+                TtmpFontPackage package,
+                string fontPath,
+                byte[] fdt,
+                uint codepoint,
+                out PhraseGlyphMeasurement measurement,
+                out string error)
+            {
+                measurement = new PhraseGlyphMeasurement();
+                error = null;
+
+                FdtGlyphEntry glyph;
+                if (!TryFindGlyph(fdt, codepoint, out glyph))
+                {
+                    error = "missing U+" + codepoint.ToString("X4");
+                    return false;
+                }
+
+                GlyphCanvas canvas = RenderGlyph(package, fontPath, codepoint);
+                measurement = new PhraseGlyphMeasurement(Math.Max(1, glyph.Width + glyph.OffsetX), canvas.Alpha);
+                return true;
+            }
+
             private bool TryValidatePhraseGlyphShape(string fontPath, uint codepoint, GlyphCanvas canvas, out string error)
             {
                 int minimumVisiblePixels = IsHangulCodepoint(codepoint) ? 10 : 1;

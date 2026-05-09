@@ -993,7 +993,6 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
             int aliases = AddPartyListSelfMarkerAliases(path, ref fdt);
             int lobbyHangulAliases = ReplaceBlankLobbyHangulGlyphsFromAxis12(path, fdt, lobbyHangulRepair);
             int relocatedSkippedTextureHangulGlyphs = RelocateHangulGlyphsFromSkippedTextures(path, fdt, mpdStream, payloadsByPath, glyphRepair, texturePatches);
-            int normalizedHangulSpacing = NormalizeHangulNextOffsetX(fdt);
             int dialogueGlyphFixes = ApplyDialogueGlyphArtifactFix(path, fdt, dialogueGlyphRepair, glyphRepair, texturePatches);
             int partyShapeFixes = ApplyPartyListSelfMarkerCleanShapes(path, ref fdt, glyphRepair, globalArchive, texturePatches);
             int cleanAsciiFixes = ApplyCleanAsciiGlyphShapes(path, fdt, glyphRepair, globalArchive, texturePatches);
@@ -1006,7 +1005,6 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
                 aliases == 0 &&
                 lobbyHangulAliases == 0 &&
                 relocatedSkippedTextureHangulGlyphs == 0 &&
-                normalizedHangulSpacing == 0 &&
                 dialogueGlyphFixes == 0 &&
                 partyShapeFixes == 0 &&
                 cleanAsciiFixes == 0 &&
@@ -1029,11 +1027,6 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
             if (relocatedSkippedTextureHangulGlyphs > 0)
             {
                 Console.WriteLine("  Relocated Hangul glyphs from skipped texture cells: {0} ({1})", relocatedSkippedTextureHangulGlyphs, path);
-            }
-
-            if (normalizedHangulSpacing > 0)
-            {
-                Console.WriteLine("  Normalized negative Hangul next offsets: {0} ({1})", normalizedHangulSpacing, path);
             }
 
             if (dialogueGlyphFixes > 0)
@@ -1281,46 +1274,6 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
             }
 
             return entries;
-        }
-
-        private static int NormalizeHangulNextOffsetX(byte[] targetFdt)
-        {
-            if (targetFdt == null)
-            {
-                return 0;
-            }
-
-            int fontTableOffset;
-            uint glyphCount;
-            int glyphStart;
-            if (!TryGetFdtGlyphTable(targetFdt, out fontTableOffset, out glyphCount, out glyphStart))
-            {
-                return 0;
-            }
-
-            int changed = 0;
-            for (int i = 0; i < glyphCount; i++)
-            {
-                int offset = glyphStart + i * FdtGlyphEntrySize;
-                uint codepoint;
-                if (!TryDecodeFdtUtf8Value(Endian.ReadUInt32LE(targetFdt, offset), out codepoint) ||
-                    codepoint < HangulFirst ||
-                    codepoint > HangulLast)
-                {
-                    continue;
-                }
-
-                sbyte nextOffsetX = unchecked((sbyte)targetFdt[offset + 14]);
-                if (nextOffsetX >= 0)
-                {
-                    continue;
-                }
-
-                targetFdt[offset + 14] = 0;
-                changed++;
-            }
-
-            return changed;
         }
 
         private int RelocateHangulGlyphsFromSkippedTextures(

@@ -38,7 +38,7 @@ namespace FfxivKoreanPatch.PatchRouteVerifier
                         ? Path.Combine(output, DefaultGlyphDumpFolderName)
                         : Path.GetFullPath(options.GlyphDumpDir));
 
-                Verifier verifier = new Verifier(output, appliedSqpack, globalSqpack, language, glyphDumpDir, options.Checks);
+                Verifier verifier = new Verifier(output, appliedSqpack, globalSqpack, language, glyphDumpDir, options.Checks, options.FontPackDir);
                 verifier.Run();
                 return verifier.Failed ? 1 : 0;
             }
@@ -52,7 +52,7 @@ namespace FfxivKoreanPatch.PatchRouteVerifier
 
         private static void PrintUsage()
         {
-            Console.WriteLine("PatchRouteVerifier.exe --output <patch-output-dir> --global <global-game-dir> [--applied-game <game-dir>] [--target-language ja] [--glyph-dump-dir <dir>] [--no-glyph-dump] [--checks <name[,name]>]");
+            Console.WriteLine("PatchRouteVerifier.exe --output <patch-output-dir> --global <global-game-dir> [--applied-game <game-dir>] [--target-language ja] [--font-pack-dir <dir>] [--glyph-dump-dir <dir>] [--no-glyph-dump] [--checks <name[,name]>]");
         }
 
     }

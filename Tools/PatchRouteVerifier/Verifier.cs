@@ -19,13 +19,14 @@ namespace FfxivKoreanPatch.PatchRouteVerifier
             private readonly CompositeArchive _patchedUi;
             private readonly CompositeArchive _cleanFont;
             private readonly CompositeArchive _cleanUi;
+            private readonly TtmpFontPackage _ttmpFont;
             private readonly Dictionary<string, byte[]> _textureCache = new Dictionary<string, byte[]>(StringComparer.OrdinalIgnoreCase);
             private readonly string _glyphDumpDir;
             private readonly string[] _selectedChecks;
 
             public bool Failed { get; private set; }
 
-            public Verifier(string output, string patchedSqpack, string globalSqpack, string language, string glyphDumpDir, string[] selectedChecks)
+            public Verifier(string output, string patchedSqpack, string globalSqpack, string language, string glyphDumpDir, string[] selectedChecks, string fontPackDir)
             {
                 _output = output;
                 _patchedSqpack = patchedSqpack;
@@ -59,6 +60,7 @@ namespace FfxivKoreanPatch.PatchRouteVerifier
                     globalSqpack,
                     globalSqpack,
                     UiPrefix);
+                _ttmpFont = TtmpFontPackage.TryOpen(fontPackDir);
 
                 if (!string.IsNullOrWhiteSpace(_glyphDumpDir))
                 {
@@ -77,6 +79,7 @@ namespace FfxivKoreanPatch.PatchRouteVerifier
                 using (_patchedUi)
                 using (_cleanFont)
                 using (_cleanUi)
+                using (_ttmpFont)
                 {
                     Console.WriteLine("Patch route verification");
                     Console.WriteLine("  output: {0}", _output);

@@ -43,6 +43,24 @@ namespace FfxivKoreanPatch.PatchRouteVerifier
 
                 if (layout.OverlapPixels > 0)
                 {
+                    PhraseLayoutResult sourceLayout;
+                    string sourceError;
+                    if (_ttmpFont != null &&
+                        _ttmpFont.ContainsPath(fontPath) &&
+                        TryMeasurePhraseLayout(_ttmpFont, fontPath, phrase, out sourceLayout, out sourceError) &&
+                        layout.OverlapPixels <= sourceLayout.OverlapPixels)
+                    {
+                        Pass(
+                            "{0} phrase [{1}] layout glyphs={2}, width={3}, overlap={4} matches TTMP baseline={5}",
+                            fontPath,
+                            Escape(phrase),
+                            layout.Glyphs,
+                            layout.Width,
+                            layout.OverlapPixels,
+                            sourceLayout.OverlapPixels);
+                        return;
+                    }
+
                     PhraseLayoutResult cleanLayout;
                     string cleanError;
                     if (IsAsciiPhrase(phrase) &&

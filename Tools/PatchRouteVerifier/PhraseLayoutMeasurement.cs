@@ -51,6 +51,48 @@ namespace FfxivKoreanPatch.PatchRouteVerifier
                 }
             }
 
+            private bool TryMeasurePhraseLayout(
+                TtmpFontPackage package,
+                string fontPath,
+                string phrase,
+                out PhraseLayoutResult result,
+                out string error)
+            {
+                result = new PhraseLayoutResult();
+                error = null;
+                try
+                {
+                    byte[] fdt = package.ReadFile(fontPath);
+                    PhraseLayoutAccumulator accumulator = new PhraseLayoutAccumulator();
+                    for (int i = 0; i < phrase.Length; i++)
+                    {
+                        uint codepoint = ReadCodepoint(phrase, ref i);
+
+                        if (IsPhraseLayoutSpace(codepoint))
+                        {
+                            accumulator.AddSpace();
+                            continue;
+                        }
+
+                        PhraseGlyphMeasurement glyph;
+                        if (!TryMeasurePhraseGlyph(package, fontPath, fdt, codepoint, out glyph, out error))
+                        {
+                            return false;
+                        }
+
+                        accumulator.AddGlyph(glyph);
+                    }
+
+                    result = accumulator.ToResult();
+                    return true;
+                }
+                catch (Exception ex)
+                {
+                    error = ex.Message;
+                    return false;
+                }
+            }
+
             private static bool IsPhraseLayoutSpace(uint codepoint)
             {
                 return codepoint <= 0x20;

@@ -80,6 +80,7 @@
     <Compile Include="GlyphSheetBitmapWriter.cs" />
     <Compile Include="GlyphSheetDumpOutput.cs" />
     <Compile Include="GlyphVisibilityAssertions.cs" />
+    <Compile Include="HangulSourcePreservationVerification.cs" />
     <Compile Include="LobbyGlyphDiagnosticComparison.cs" />
     <Compile Include="LobbyGlyphDiagnosticReference.cs" />
     <Compile Include="LobbyGlyphDiagnosticTargets.cs" />
@@ -97,6 +98,8 @@
     <Compile Include="PhraseMetricsVerification.cs" />
     <Compile Include="PhraseOverlapVerification.cs" />
     <Compile Include="ProtectedGlyphVerification.cs" />
+    <Compile Include="TtmpFontPackage.cs" />
+    <Compile Include="TtmpGlyphRendering.cs" />
     <Compile Include="UldFontPathResolver.cs" />
     <Compile Include="UldFontRoutes.cs" />
     <Compile Include="Verifier.cs" />

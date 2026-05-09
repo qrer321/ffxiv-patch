@@ -9,6 +9,7 @@ namespace FfxivKoreanPatch.PatchRouteVerifier
             public string OutputPath;
             public string AppliedGamePath;
             public string GlobalGamePath;
+            public string FontPackDir;
             public string TargetLanguage = "ja";
             public string GlyphDumpDir;
             public string[] Checks;
@@ -33,6 +34,10 @@ namespace FfxivKoreanPatch.PatchRouteVerifier
                     else if (string.Equals(arg, "--global", StringComparison.OrdinalIgnoreCase))
                     {
                         options.GlobalGamePath = RequireValue(args, ref i, arg);
+                    }
+                    else if (string.Equals(arg, "--font-pack-dir", StringComparison.OrdinalIgnoreCase))
+                    {
+                        options.FontPackDir = RequireValue(args, ref i, arg);
                     }
                     else if (string.Equals(arg, "--applied-game", StringComparison.OrdinalIgnoreCase))
                     {
