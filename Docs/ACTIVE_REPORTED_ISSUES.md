@@ -36,10 +36,11 @@
   - 처리: `그래픽 설정`, `UI 해상도 설정`, `고해상도 UI 크기 설정` 등 실제 시스템 설정 Addon 라벨을 `LobbyScaledHangulPhrases`로 분리하고, 제너레이터와 verifier가 같은 목록을 사용하도록 변경했다. 4K 로비 파생 폰트에 필요한 glyph cell을 추가하고, `start-system-settings-uld`/`4k-lobby-phrase-layouts`에서 150/200/300% 대표 라벨을 검사한다.
   - 검증 결과: 이전 산출물은 새 verifier에서 누락 glyph로 실패했고, 새 산출물은 4K lobby phrase/layout 및 TTMP source preservation 기준으로 통과했다.
 
-- [ ] Data center select popup: `데이터 센터 Mana에 입장합니다` 계열 팝업 문구가 base client 언어로 나옴
+- [x] Data center select popup: `데이터 센터 Mana에 입장합니다` 계열 팝업 문구가 base client 언어로 나옴 - 처리됨
   - 재보고일: 2026-05-09
   - 검증 보강: 팝업 문구의 sheet/row/column과 lookup 구조를 찾아 EN/JA 각각에서 값이 의도한 언어인지 확인한다.
   - 수정 방향: 글로벌 전용 lookup row가 아닌 실제 번역 가능한 row라면 한국어로 유지하고, lookup 구조가 글로벌 전용이면 SeString 구조를 깨지 않는 방식으로 literal만 병합한다.
+  - 상태 정정: 사용자 확인 기준으로 이미 수정된 항목이므로 재작업 대상에서 제외한다. 재발하면 이 항목의 verifier를 먼저 실패하도록 보강한다.
 
 - [x] ESC system menu: `コンテンツシェア`/`コンフィグシェア` 계열 설정 공유 메뉴 제목이 base client 언어로 남음
   - 보고일: 2026-05-09
