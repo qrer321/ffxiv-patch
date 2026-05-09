@@ -85,4 +85,53 @@ foreach ($file in $files) {
     }
 }
 
+function Get-EmbeddedResourceSha256 {
+    param(
+        [Parameter(Mandatory=$true)]
+        [string]$AssemblyPath,
+
+        [Parameter(Mandatory=$true)]
+        [string]$ResourceName
+    )
+
+    $assembly = [System.Reflection.Assembly]::LoadFile([System.IO.Path]::GetFullPath($AssemblyPath))
+    $stream = $assembly.GetManifestResourceStream($ResourceName)
+    if ($null -eq $stream) {
+        throw "Embedded resource was not found: $ResourceName in $AssemblyPath"
+    }
+
+    try {
+        $sha256 = [System.Security.Cryptography.SHA256]::Create()
+        try {
+            return [System.BitConverter]::ToString($sha256.ComputeHash($stream)).Replace("-", "")
+        }
+        finally {
+            $sha256.Dispose()
+        }
+    }
+    finally {
+        $stream.Dispose()
+    }
+}
+
+$releaseExe = Join-Path $releaseDir "FFXIVKoreanPatch.exe"
+$generatorExe = Join-Path $repoRoot "FFXIVPatchGenerator\bin\$Configuration\FFXIVPatchGenerator.exe"
+if (!(Test-Path $releaseExe)) {
+    throw "Release executable was not written: $releaseExe"
+}
+
+if (!(Test-Path $generatorExe)) {
+    throw "Generator executable was not built: $generatorExe"
+}
+
+$generatorHash = (Get-FileHash -LiteralPath $generatorExe -Algorithm SHA256).Hash
+$embeddedGeneratorHash = Get-EmbeddedResourceSha256 `
+    -AssemblyPath $releaseExe `
+    -ResourceName "EmbeddedPayloads.FFXIVPatchGenerator.exe"
+
+if ($embeddedGeneratorHash -ne $generatorHash) {
+    throw "Release executable embedded an outdated FFXIVPatchGenerator.exe. Embedded=$embeddedGeneratorHash Built=$generatorHash"
+}
+
 Write-Host "Release files written to $releaseDir"
+Write-Host "Embedded FFXIVPatchGenerator verified: $generatorHash"

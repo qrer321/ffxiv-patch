@@ -21,7 +21,8 @@
   - 검증 결과: 최신 ja 산출물은 `.tmp\verifier-dc-texture-padding-fix-ja.log`에서 `data-center-title-uld,data-center-worldmap-uld` PASS.
   - 2026-05-09 재보고 후 확인: 최신 산출물은 PASS지만 실제 적용 폴더 `D:\SquareEnix\FINAL FANTASY XIV - A Realm Reborn\game`은 `applied-output-files`에서 lobby FDT/texture가 generated output과 다르고, `data-center-title-uld`에서 `AXIS_12_lobby`/`AXIS_14_lobby` ASCII 2px texture padding이 FAIL한다. 현재 문제는 실제 클라이언트에 최신 `000000` font dat/index가 반영되지 않은 상태로 분리한다.
   - 2026-05-09 재검증 보강: 사용자가 계속 보고한 번짐은 2px 주변 비교로 부족할 수 있으므로 clean global ASCII texture neighborhood 기준을 4px로 올렸다. 이전 산출물은 새 4px verifier에서 실패했고, 새 산출물은 `data-center-title-uld,data-center-worldmap-uld`를 포함한 `.tmp\verifier-reported-font-routes-after-fix2.log`에서 PASS한다.
-  - 다음 처리: 클라이언트/런처 종료 후 최신 산출물 또는 release UI로 font patch를 재적용하고, `applied-output-files,data-center-title-uld,data-center-worldmap-uld`를 실제 적용 폴더 기준으로 PASS시킨다.
+  - 2026-05-09 재보고 후 확인: 실제 적용 폴더는 여전히 최신 산출물과 달랐다. `ffxiv_dx11.exe`/`XIVLauncher.exe` 실행 중인 상태에서 `.tmp\verifier-applied-after-user-report.log`가 `applied-output-files` 및 lobby ASCII padding FAIL을 보고했다. 또한 `Release\Public\FFXIVKoreanPatch.exe`가 오래된 embedded generator를 포함하고 있었으므로 release build script에 embedded generator SHA-256 검증을 추가했다.
+  - 다음 처리: 클라이언트/런처 종료 후 최신 `Release\Public\FFXIVKoreanPatch.exe` 또는 산출물로 font patch를 재적용하고, `applied-output-files,data-center-title-uld,data-center-worldmap-uld`를 실제 적용 폴더 기준으로 PASS시킨다.
 
 - [ ] Data center select: 서버명은 영어로 나오지만 문자 간격이 서로 침범함
   - 재보고일: 2026-05-09
@@ -50,6 +51,7 @@
   - 2026-05-09 재보고 후 원인 보강: 기존 검증은 glyph 존재 여부와 대표 한글 문구만 봐서, `150%(FHD): 1728x972 이상 권장`처럼 한글/ASCII/숫자/기호가 섞인 실제 문장 layout 오염을 놓쳤다. 새 `system-settings-mixed-scale-layouts` verifier는 스크린샷 문장을 그대로 사용해 ASCII metrics, 4px texture padding, Hangul advance, phrase overlap을 함께 검사한다.
   - 처리: 4K lobby 파생 폰트는 Hangul만 한국 TTMP source에서 가져오고, ASCII/숫자/기호는 clean global lobby route를 유지한다. clean target에 일부 ASCII가 없는 4K lobby font는 기존 파생 source pair의 clean lobby font에서만 보충하며, 이 보충 glyph도 4px padding을 같이 복사한다. Hangul advance는 clean CJK median 또는 glyph width 기반 safety advance보다 좁아지지 않게 보정한다.
   - 검증 결과: 이전 산출물은 `system-settings-mixed-scale-layouts`에서 ASCII texture padding/overlap/missing glyph로 FAIL했고, 새 산출물 `.tmp\mixed-scale-spacing-fix-ja9`는 `.tmp\verifier-reported-font-routes-after-fix2.log`에서 `data-center-title-uld,data-center-worldmap-uld,start-system-settings-uld,system-settings-mixed-scale-layouts,high-scale-ascii-phrase-layouts,clean-ascii-font-routes,4k-lobby-font-derivations,4k-lobby-phrase-layouts` PASS.
+  - 2026-05-09 재보고 후 확인: 생성 산출물 PASS만으로 닫으면 안 된다. 실제 적용 폴더는 최신 font output과 다르고, 기존 `Release\Public` exe도 오래된 embedded generator를 포함하고 있었다. `Scripts\build-release.ps1`가 배포 exe의 embedded `FFXIVPatchGenerator.exe` SHA-256을 최신 빌드 산출물과 비교하도록 보강했다.
   - 다음 처리: font patch 재적용 후 `applied-output-files,start-system-settings-uld,4k-lobby-phrase-layouts,lobby-hangul-visibility`를 실제 적용 폴더 기준으로 PASS시킨다. 그래도 재현되면 시작화면 시스템 설정의 실제 scale별 font substitution을 별도 verifier로 추가한다.
 
 - [x] Data center select popup: `데이터 센터 Mana에 입장합니다` 계열 팝업 문구가 base client 언어로 나옴 - 처리됨
@@ -107,6 +109,7 @@
 - Data center ASCII pixel checks now run against every `DataCenterWorldmapLabels` entry, including DC group names and server/world names.
 - Data center routed ASCII texture-neighborhood checks compare the 4px padding around every non-space ASCII glyph used by DC groups/world names. Latest ja output passes `.tmp\verifier-reported-font-routes-after-fix2.log`.
 - Latest ja output passes `data-center-title-uld`, but the installed `D:` game folder currently fails `applied-output-files` for lobby FDT/texture files and fails `data-center-title-uld` texture padding for `AXIS_12_lobby`/`AXIS_14_lobby`. Do not treat generated-output PASS as client PASS until the applied folder also passes.
+- Release build now verifies that `Release\Public\FFXIVKoreanPatch.exe` embeds the same `FFXIVPatchGenerator.exe` SHA-256 as the freshly built generator. This prevents stale release executables from regenerating old font output after code fixes.
 - 4K lobby font generation now derives additional system-settings Hangul/ASCII coverage from Korean Addon rows `4000-4200` and `8683-8722`, instead of relying only on the fixed representative phrase list. `.tmp\verifier-lobby-dynamic-core.log` passes the focused lobby/start-screen checks.
 - `system-settings-mixed-scale-layouts` now verifies the exact high-resolution UI option strings shown in the start-screen system settings, including `150%(FHD): 1728x972 이상 권장`, with ASCII metrics/texture padding and Hangul advance checks.
 - Current output passes `.tmp\verifier-ja-regression-with-reported-phrases.log` for data-center rows/language slots, start-screen system settings, configuration sharing, Bozja, Occult Crescent support jobs, clean ASCII font routes, 4K lobby phrase/layout, Hangul source preservation, reported in-game Hangul phrases, and lobby Hangul visibility.
