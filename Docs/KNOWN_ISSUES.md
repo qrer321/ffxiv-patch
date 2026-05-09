@@ -17,7 +17,8 @@
 - 데이터 센터 선택 화면을 나가는 버튼이 `-로?` / `-료?`처럼 깨져 보임
 - 시작 화면 시스템 설정에서 UI 배율을 150/200/300%로 키우면 한글이 `=`로 깨지고 문자 간격이 침범함
 - `데이터 센터 Mana에 입장합니다` 계열 팝업 문구가 베이스 클라이언트 언어로 나옴
-- 인게임 `즉시 발동` 같은 짧은 한글 UI 문구가 기존보다 크게 보일 가능성이 있음
+- 인게임 `즉시 발동` 같은 짧은 한글 UI 문구가 다른 인게임 UI 폰트보다 상대적으로 크게 보일 가능성이 있음. 단, 현재 보고는 깨짐/잘못된 폰트 문제가 아니라 시각적 크기 확인 요청임
+- 스토리 종료 후 컷씬/이벤트 이미지 설명문이 베이스 클라이언트 언어로 표시됨. 폰트 패치가 아니라 지역 이동 타이틀처럼 실제 표시 리소스를 한국 클라이언트 리소스로 교체해야 할 가능성이 높음. 단, 아직 scene 리소스로 단정하지 않고 `EventImage` 등 sheet 기반 이미지 가능성부터 확인해야 함
 
 필요 작업:
 
@@ -26,7 +27,9 @@
 - 데이터센터 화면 서버명과 DC명은 단어 단위가 아니라 실제 리스트 문자열 기준으로 layout 검증
 - 흐림 문제는 clean global ASCII glyph의 픽셀/metrics뿐 아니라 실제 texture cell alpha 차이까지 비교
 - 시작 화면 시스템 설정은 인게임 font route와 분리해서, 해당 route의 한글 glyph fallback/spacing만 검증
-- `즉시 발동` 계열 문구는 TTMP 원본과 patched glyph size/metrics가 같은지 확인
+- `즉시 발동` 계열 문구는 TTMP 원본과 patched glyph size/metrics가 같은지 확인. TTMP 원본과 같으면 패치 깨짐이 아니라 UI route의 원래 크기 문제로 분리
+- story 완료 설명문이 `EventImage`, `CutScreenImage`, `ScreenImage`, `DynamicEventScreenImage`, `LoadingImage`, event/cutscene texture/ULD bundle 중 어디에서 오는지 추적
+- 설명문이 이미지형 리소스라면 global target 리소스와 Korean source 리소스의 hash를 비교하고, 한국 서버 리소스가 존재하는 경우 output UI index에 Korean packed texture가 매핑됐는지 verifier에 추가
 
 검증 기준:
 
@@ -35,6 +38,7 @@
 - 데이터센터 시작 화면의 영어/숫자/특수문자는 clean global 대비 흐림, 간격 침범, fallback 동일 픽셀이 없어야 함
 - 시작 화면 시스템 설정의 한글은 `=`/`-` fallback과 같으면 실패
 - 인게임 한글 TTMP source preservation은 계속 유지해야 함
+- story 완료 설명문은 EXD 문자열만 한국어인데 실제 화면이 base client 언어로 남으면 실패. 이미지/event/cutscene 리소스까지 Korean source로 교체되었는지 확인해야 함
 
 ### 1. 150% / 200% / 300% UI 대응 부족
 
@@ -158,6 +162,28 @@
 - 크레센트 레벨 glyph가 `=` fallback과 픽셀 동일하면 실패
 - 모든 관련 FDT에서 해당 glyph가 visible이고 clean global 또는 의도한 source와 일치해야 함
 - 일반 파티 리스트 번호와 본인 번호 표시가 다시 깨지면 실패
+
+### 7. 스토리 종료 컷씬/이벤트 이미지 설명문이 베이스 클라이언트 언어로 표시됨
+
+상태: 작업 필요
+
+각 스토리 구간이 끝났을 때 컷씬 또는 이벤트 화면 안에 표시되는 설명문/타이틀 카드가 한국어가 아니라 베이스 클라이언트 언어로 표시됩니다. 이 항목은 폰트 FDT나 일반 EXD 문자열만 고쳐서는 해결되지 않을 가능성이 높습니다. 다만 아직 scene 리소스라고 단정하지 않습니다. `EventImage` 같은 sheet 기반 이미지일 수 있으므로, 지역 이동 시 표시되는 이미지형 지역명처럼 실제 표시 리소스가 어디에서 오는지 먼저 판별한 뒤 한국 클라이언트 리소스로 교체해야 합니다.
+
+패치 가능 방향:
+
+- 먼저 해당 설명문이 실제 텍스트 렌더링인지, 이미지형 texture인지 판별
+- 현재 `UiPatchGenerator`가 처리하는 `EventImage`, `CutScreenImage`, `ScreenImage`, `DynamicEventScreenImage`, `TradeScreenImage`, `LoadingImage`, `TerritoryType` 후보 중 어느 sheet/row/icon ID를 참조하는지 diagnostics 추가
+- global EXD row의 image ID만 그대로 쓰는 방식으로 부족하면, Korean EXD의 같은 row 또는 대응 row가 다른 image ID를 쓰는지 비교
+- 언어 폴더형 리소스는 `ui/icon/<folder>/<target-language>/<id>.tex`에 Korean `ko` 리소스를 복사
+- 언어 폴더가 없는 리소스는 현재 `EventImage`/`LoadingImage`처럼 동일 path의 global/Korean packed bytes를 비교하고 다를 때만 Korean source를 복사
+- sheet 기반으로 잡히지 않으면 event/cutscene bundle, ULD, texture path를 hash 비교 대상으로 확장하고, 안전하게 Korean source로 교체 가능한 최소 파일만 패치
+
+검증 기준:
+
+- story 완료 설명문이 base client 언어로 남으면 실패
+- 관련 image ID/path, global hash, Korean hash, output hash가 diagnostics에 남아야 함
+- Korean source가 없는 글로벌 전용 리소스면 “원문 유지”로 진단에 남기고 임의 번역/하드코딩하지 않음
+- 일반 자막/대사 텍스트와 혼동하지 않고, 이미지형 타이틀/설명문만 image/event resource localization으로 처리
 
 ## 검증 체계 개선 필요
 
