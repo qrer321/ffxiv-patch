@@ -37,6 +37,15 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
         private const ushort MkdSupportJobFullNameColumnOffset = 0;
         private const ushort MkdSupportJobShortNameColumnOffset = 4;
         private const ushort MkdSupportJobEnglishFullNameColumnOffset = 16;
+        private static readonly KeyValuePair<uint, string>[] KoreanLobbyActionRows = new KeyValuePair<uint, string>[]
+        {
+            new KeyValuePair<uint, string>(2002, "\uC885\uB8CC"),
+            new KeyValuePair<uint, string>(2009, "\uB4A4\uB85C"),
+            new KeyValuePair<uint, string>(2047, "\uC774\uC804 \uB2E8\uACC4\uB85C \uB418\uB3CC\uC544\uAC00\uAE30"),
+            new KeyValuePair<uint, string>(2050, "\uD655\uC778"),
+            new KeyValuePair<uint, string>(2051, "\uCDE8\uC18C"),
+            new KeyValuePair<uint, string>(2052, "\uB4A4\uB85C")
+        };
         private static readonly RowRange[] GlobalLobbyDataCenterRowRanges = new RowRange[]
         {
             new RowRange(791, 794),
@@ -44,7 +53,6 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
             new RowRange(809, 816)
         };
         private const uint LobbyDataCenterConnectingRow = 808;
-        private const uint LobbyExitButtonRow = 2002;
         private static readonly uint[] GlobalDataCenterTravelAddonRows = new uint[] { 12514, 12525 };
 
         private readonly HashSet<string> _deleteFiles = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
@@ -122,7 +130,7 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
                 ColumnRemap.TemplateAroundFirstPayload(
                     "\uB370\uC774\uD130 \uC13C\uD130 ",
                     "\uC5D0 \uC811\uC18D \uC911\uC785\uB2C8\uB2E4."));
-            lobbyPolicy.SetRowColumnRemap(LobbyExitButtonRow, 0, ColumnRemap.Literal("\uC885\uB8CC"));
+            ApplyLiteralRows(lobbyPolicy, KoreanLobbyActionRows);
 
             // Most Addon rows in this range are the normal World Visit UI and have
             // Korean source text. Keep only known global-client-only rows global;
@@ -222,6 +230,15 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
                         break;
                     }
                 }
+            }
+        }
+
+        private static void ApplyLiteralRows(PatchSheetPolicy sheetPolicy, KeyValuePair<uint, string>[] rows)
+        {
+            for (int i = 0; i < rows.Length; i++)
+            {
+                KeyValuePair<uint, string> row = rows[i];
+                sheetPolicy.SetRowColumnRemap(row.Key, 0, ColumnRemap.Literal(row.Value));
             }
         }
 

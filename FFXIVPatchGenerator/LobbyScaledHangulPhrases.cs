@@ -19,6 +19,7 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
             "\uC885\uB8CC",
             "\uB098\uAC00\uAE30",
             "\uB4A4\uB85C",
+            "\uC774\uC804 \uB2E8\uACC4\uB85C \uB418\uB3CC\uC544\uAC00\uAE30",
             "\uB3CC\uC544\uAC00\uAE30",
             "\uCDE8\uC18C",
             "\uD655\uC778",

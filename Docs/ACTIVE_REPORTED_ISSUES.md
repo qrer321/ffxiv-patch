@@ -24,10 +24,11 @@
   - 수정 방향: 월드/데이터센터 ASCII 라벨의 advance/kerning을 clean global과 일치시키고, TTMP texture cell에 덮어쓴 ASCII가 흐리거나 좁게 나오지 않게 한다.
   - 2026-05-09 보강: 데이터센터 ULD route별 핵심 라벨 문장 픽셀 비교를 추가했다. 현재 산출물은 clean global 대비 라벨 문장 폭과 픽셀이 일치한다.
 
-- [ ] Data center select: 화면을 나가는 버튼이 `-로?` / `-료?`처럼 잘못 표시됨
+- [x] Data center select: 화면을 나가는 버튼이 `-로?` / `-료?`처럼 잘못 표시됨
   - 재보고일: 2026-05-09
-  - 검증 보강: 데이터센터 선택 화면 종료/뒤로가기/취소 버튼 row를 찾아 base client 언어 슬롯별로 확인하고, 실제 버튼 문자열 glyph를 fallback `-`/`=`와 비교한다.
-  - 수정 방향: 시작 화면 전용 버튼은 한국어가 아니라 base client 원문을 유지하거나, 한글을 유지할 경우 해당 route font가 한글을 정상 렌더링해야 한다.
+  - 원인: 시작 화면의 `종료`는 `Lobby#2002`지만 데이터센터 화면의 `뒤로` 계열은 `Lobby#2009`, `Lobby#2052` 등 별도 row였다. 기존 검증은 `Lobby#2002`만 확인해 `-로?` 재발을 놓칠 수 있었다.
+  - 검증 보강: `data-center-rows`/`data-center-language-slots`가 `Lobby#2009`, `Lobby#2047`, `Lobby#2050`, `Lobby#2051`, `Lobby#2052`를 각 언어 슬롯에서 확인한다. `data-center-title-uld`/`data-center-worldmap-uld`는 `뒤로`, `이전 단계로 되돌아가기` 문구의 glyph fallback/overlap도 검사한다.
+  - 처리: 로비 액션 row를 정책 테이블로 묶고 `종료`/`뒤로`/`확인`/`취소`를 literal remap으로 고정했다. 이 remap row는 secondary language safety patch에도 들어가므로 `ja/en/de/fr` 슬롯이 서로 다른 언어로 갈라지지 않는다.
 
 - [x] Start screen system settings: UI 배율을 키우면 한글이 `=`로 깨지고 문자 간격이 침범함
   - 재보고일: 2026-05-09

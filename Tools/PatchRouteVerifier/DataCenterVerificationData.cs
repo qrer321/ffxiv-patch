@@ -91,6 +91,8 @@ namespace FfxivKoreanPatch.PatchRouteVerifier
             "\uC811\uC18D\uD558\uC2DC\uACA0\uC2B5\uB2C8\uAE4C?",
             "\uB098\uAC00\uAE30",
             "\uC885\uB8CC",
+            "\uB4A4\uB85C",
+            "\uC774\uC804 \uB2E8\uACC4\uB85C \uB418\uB3CC\uC544\uAC00\uAE30",
             "\uCDE8\uC18C",
             "\uD655\uC778"
         };
@@ -100,6 +102,11 @@ namespace FfxivKoreanPatch.PatchRouteVerifier
             "Proceed",
             "Cancel",
             "Exit",
+            "Back",
+            "BACK",
+            "Return",
+            "Confirm",
+            "Quit",
             "Data Center"
         };
         private static readonly string[] DataCenterCriticalRenderLabels = new string[]
