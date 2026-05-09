@@ -72,6 +72,7 @@
     <Compile Include="GlyphVisibilityAssertions.cs" />
     <Compile Include="LabelPreviewDumpOutput.cs" />
     <Compile Include="LobbyGlyphDiagnostics.cs" />
+    <Compile Include="LobbyDataCenterLabels.cs" />
     <Compile Include="NumericGlyphVerification.cs" />
     <Compile Include="OccultCrescentSupportJobVerification.cs" />
     <Compile Include="PatchRouteVerifier.cs" />
