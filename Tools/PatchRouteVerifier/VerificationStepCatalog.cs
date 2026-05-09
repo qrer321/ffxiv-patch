@@ -12,6 +12,7 @@ namespace FfxivKoreanPatch.PatchRouteVerifier
                     new VerificationStep("data-center-language-slots", VerifyDataCenterRowsAllGlobalLanguageSlots),
                     new VerificationStep("data-center-title-uld", VerifyDataCenterTitleUldRoute),
                     new VerificationStep("data-center-worldmap-uld", VerifyDataCenterWorldmapUldRoute),
+                    new VerificationStep("start-system-settings-uld", VerifyStartScreenSystemSettingsUldRoutes),
                     new VerificationStep("compact-time", VerifyCompactTimeRows),
                     new VerificationStep("world-visit", VerifyWorldVisitRows),
                     new VerificationStep("configuration-sharing", VerifyConfigurationSharingRows),

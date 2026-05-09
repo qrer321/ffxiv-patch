@@ -24,11 +24,48 @@ namespace FfxivKoreanPatch.PatchRouteVerifier
                 for (int i = 0; i < Derived4kLobbyFontPairs.GetLength(0); i++)
                 {
                     string fontPath = Derived4kLobbyFontPairs[i, 0];
+                    string sourceFontPath = Derived4kLobbyFontPairs[i, 1];
                     for (int phraseIndex = 0; phraseIndex < FourKLobbyPhrases.Length; phraseIndex++)
                     {
-                        VerifyNoPhraseOverlap(fontPath, FourKLobbyPhrases[phraseIndex]);
+                        VerifyNoDerived4kLobbyPhraseOverlap(fontPath, sourceFontPath, FourKLobbyPhrases[phraseIndex]);
                     }
                 }
+            }
+
+            private void VerifyNoDerived4kLobbyPhraseOverlap(string fontPath, string sourceFontPath, string phrase)
+            {
+                PhraseLayoutResult layout;
+                string error;
+                if (!TryMeasurePhraseLayout(_patchedFont, fontPath, phrase, true, out layout, out error))
+                {
+                    Fail("{0} phrase [{1}] layout error: {2}", fontPath, Escape(phrase), error);
+                    return;
+                }
+
+                if (layout.OverlapPixels == 0)
+                {
+                    Pass("{0} phrase [{1}] layout glyphs={2}, width={3}", fontPath, Escape(phrase), layout.Glyphs, layout.Width);
+                    return;
+                }
+
+                PhraseLayoutResult sourceLayout;
+                string sourceError;
+                if (TryMeasurePhraseLayout(_patchedFont, sourceFontPath, phrase, true, out sourceLayout, out sourceError) &&
+                    layout.OverlapPixels <= sourceLayout.OverlapPixels)
+                {
+                    Pass(
+                        "{0} phrase [{1}] layout glyphs={2}, width={3}, overlap={4} matches source {5} baseline={6}",
+                        fontPath,
+                        Escape(phrase),
+                        layout.Glyphs,
+                        layout.Width,
+                        layout.OverlapPixels,
+                        sourceFontPath,
+                        sourceLayout.OverlapPixels);
+                    return;
+                }
+
+                Fail("{0} phrase [{1}] has overlap pixels={2}", fontPath, Escape(phrase), layout.OverlapPixels);
             }
 
             private void VerifyNoPhraseOverlap(string fontPath, string phrase)
@@ -43,6 +80,28 @@ namespace FfxivKoreanPatch.PatchRouteVerifier
 
                 if (layout.OverlapPixels > 0)
                 {
+                    if (IsAsciiPhrase(phrase))
+                    {
+                        PhraseLayoutResult cleanLayout;
+                        string cleanError;
+                        if (TryMeasurePhraseLayout(_cleanFont, fontPath, phrase, false, out cleanLayout, out cleanError) &&
+                            layout.OverlapPixels <= cleanLayout.OverlapPixels)
+                        {
+                            Pass(
+                                "{0} phrase [{1}] layout glyphs={2}, width={3}, overlap={4} matches clean baseline={5}",
+                                fontPath,
+                                Escape(phrase),
+                                layout.Glyphs,
+                                layout.Width,
+                                layout.OverlapPixels,
+                                cleanLayout.OverlapPixels);
+                            return;
+                        }
+
+                        Fail("{0} phrase [{1}] has ASCII overlap pixels={2}", fontPath, Escape(phrase), layout.OverlapPixels);
+                        return;
+                    }
+
                     PhraseLayoutResult sourceLayout;
                     string sourceError;
                     if (_ttmpFont != null &&
@@ -58,23 +117,6 @@ namespace FfxivKoreanPatch.PatchRouteVerifier
                             layout.Width,
                             layout.OverlapPixels,
                             sourceLayout.OverlapPixels);
-                        return;
-                    }
-
-                    PhraseLayoutResult cleanLayout;
-                    string cleanError;
-                    if (IsAsciiPhrase(phrase) &&
-                        TryMeasurePhraseLayout(_cleanFont, fontPath, phrase, false, out cleanLayout, out cleanError) &&
-                        layout.OverlapPixels <= cleanLayout.OverlapPixels)
-                    {
-                        Pass(
-                            "{0} phrase [{1}] layout glyphs={2}, width={3}, overlap={4} matches clean baseline={5}",
-                            fontPath,
-                            Escape(phrase),
-                            layout.Glyphs,
-                            layout.Width,
-                            layout.OverlapPixels,
-                            cleanLayout.OverlapPixels);
                         return;
                     }
 

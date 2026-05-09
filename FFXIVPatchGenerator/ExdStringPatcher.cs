@@ -456,6 +456,18 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
                     {
                         replacement = columnRemap.LiteralBytes;
                     }
+                    else if (columnRemap.Mode == ColumnRemapMode.TemplateAroundFirstPayload)
+                    {
+                        byte[] templatedReplacement;
+                        if (TryBuildTemplateAroundFirstPayload(
+                            original,
+                            columnRemap.TemplatePrefixBytes,
+                            columnRemap.TemplateSuffixBytes,
+                            out templatedReplacement))
+                        {
+                            replacement = templatedReplacement;
+                        }
+                    }
 
                     if (replacement != null &&
                         (replacement.Length > 0 || sheetPolicy.ShouldUseGlobalFallbackRow(targetRow.RowId)))
@@ -585,6 +597,165 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
             }
 
             return IsShortNonKoreanUiToken(original);
+        }
+
+        private static bool TryBuildTemplateAroundFirstPayload(
+            byte[] original,
+            byte[] prefix,
+            byte[] suffix,
+            out byte[] replacement)
+        {
+            replacement = null;
+            if (original == null || original.Length == 0)
+            {
+                return false;
+            }
+
+            prefix = prefix ?? new byte[0];
+            suffix = suffix ?? new byte[0];
+
+            int cursor = 0;
+            while (cursor < original.Length)
+            {
+                int tokenOffset;
+                int tokenLength;
+                if (TryFindFirstSeStringToken(original, cursor, out tokenOffset, out tokenLength))
+                {
+                    MemoryStream output = new MemoryStream(prefix.Length + tokenLength + suffix.Length);
+                    output.Write(prefix, 0, prefix.Length);
+                    output.Write(original, tokenOffset, tokenLength);
+                    output.Write(suffix, 0, suffix.Length);
+                    replacement = output.ToArray();
+                    return true;
+                }
+
+                cursor++;
+            }
+
+            return false;
+        }
+
+        private static bool TryFindFirstSeStringToken(byte[] bytes, int offset, out int tokenOffset, out int tokenLength)
+        {
+            tokenOffset = 0;
+            tokenLength = 0;
+            for (int cursor = Math.Max(0, offset); cursor < bytes.Length; cursor++)
+            {
+                if (bytes[cursor] != 0x02)
+                {
+                    continue;
+                }
+
+                int tokenEnd = cursor;
+                int controlSegments = 0;
+                while (tokenEnd < bytes.Length)
+                {
+                    if (bytes[tokenEnd] == 0x02)
+                    {
+                        SePayloadBounds payload;
+                        if (TryReadSePayload(bytes, tokenEnd, bytes.Length, out payload))
+                        {
+                            tokenEnd = payload.NextOffset;
+                            controlSegments++;
+                            continue;
+                        }
+
+                        int terminator = IndexOfByte(bytes, 0x03, tokenEnd + 1, Math.Min(bytes.Length, tokenEnd + 32));
+                        if (terminator < 0)
+                        {
+                            break;
+                        }
+
+                        tokenEnd = terminator + 1;
+                        controlSegments++;
+                        continue;
+                    }
+
+                    if (controlSegments > 0 && !IsTextBoundary(bytes, tokenEnd))
+                    {
+                        tokenEnd++;
+                        continue;
+                    }
+
+                    break;
+                }
+
+                if (controlSegments > 0 && tokenEnd > cursor)
+                {
+                    tokenOffset = cursor;
+                    tokenLength = tokenEnd - cursor;
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
+        private static int IndexOfByte(byte[] bytes, byte value, int start, int end)
+        {
+            for (int i = start; i < end; i++)
+            {
+                if (bytes[i] == value)
+                {
+                    return i;
+                }
+            }
+
+            return -1;
+        }
+
+        private static bool IsTextBoundary(byte[] bytes, int offset)
+        {
+            byte value = bytes[offset];
+            if (value >= 0x20 && value <= 0x7E)
+            {
+                return true;
+            }
+
+            int length;
+            return TryReadUtf8Scalar(bytes, offset, out length);
+        }
+
+        private static bool TryReadUtf8Scalar(byte[] bytes, int offset, out int length)
+        {
+            length = 0;
+            byte first = bytes[offset];
+            if (first < 0x80)
+            {
+                return false;
+            }
+
+            if (first >= 0xC2 && first <= 0xDF)
+            {
+                length = 2;
+            }
+            else if (first >= 0xE0 && first <= 0xEF)
+            {
+                length = 3;
+            }
+            else if (first >= 0xF0 && first <= 0xF4)
+            {
+                length = 4;
+            }
+            else
+            {
+                return false;
+            }
+
+            if (offset + length > bytes.Length)
+            {
+                return false;
+            }
+
+            for (int i = 1; i < length; i++)
+            {
+                if ((bytes[offset + i] & 0xC0) != 0x80)
+                {
+                    return false;
+                }
+            }
+
+            return true;
         }
 
         private static bool IsShortNonKoreanUiToken(byte[] bytes)

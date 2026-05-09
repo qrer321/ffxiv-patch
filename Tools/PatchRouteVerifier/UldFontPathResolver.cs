@@ -4,6 +4,7 @@ namespace FfxivKoreanPatch.PatchRouteVerifier
     {
         private const byte UldAxisFontId = 0;
         private const byte UldMiedingerMedFontId = 1;
+        private const byte UldMeidingerFontId = 2;
         private const byte UldTrumpGothicFontId = 3;
         private const byte UldJupiterFontId = 4;
 
@@ -20,6 +21,11 @@ namespace FfxivKoreanPatch.PatchRouteVerifier
                 UldMiedingerMedFontId,
                 "common/font/MiedingerMid_",
                 new byte[] { 10, 12, 14, 18, 36 },
+                EmptyUldFontSizeAliases),
+            new UldFontFamilyRoute(
+                UldMeidingerFontId,
+                "common/font/Meidinger_",
+                new byte[] { 16, 20, 40 },
                 EmptyUldFontSizeAliases),
             new UldFontFamilyRoute(
                 UldTrumpGothicFontId,

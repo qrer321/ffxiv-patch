@@ -48,6 +48,52 @@ namespace FfxivKoreanPatch.PatchRouteVerifier
             "Shadow",
             "NA Cloud DC (Beta)"
         };
+        private static readonly string[] DataCenterWorldLabels = new string[]
+        {
+            "Aegis",
+            "Atomos",
+            "Carbuncle",
+            "Garuda",
+            "Gungnir",
+            "Kujata",
+            "Tonberry",
+            "Typhon",
+            "Alexander",
+            "Bahamut",
+            "Durandal",
+            "Fenrir",
+            "Ifrit",
+            "Ridill",
+            "Tiamat",
+            "Ultima",
+            "Anima",
+            "Asura",
+            "Chocobo",
+            "Hades",
+            "Ixion",
+            "Masamune",
+            "Pandaemonium",
+            "Titan",
+            "Belias",
+            "Mandragora",
+            "Ramuh",
+            "Shinryu",
+            "Unicorn",
+            "Valefor",
+            "Yojimbo",
+            "Zeromus"
+        };
+        private static readonly string[] DataCenterKoreanRoutePhrases = new string[]
+        {
+            "\uB370\uC774\uD130 \uC13C\uD130 Mana\uC5D0 \uC811\uC18D \uC911\uC785\uB2C8\uB2E4.",
+            "\uD604\uC7AC \uC811\uC18D \uC911\uC778 \uB370\uC774\uD130 \uC13C\uD130",
+            "\uB2E4\uB978 \uB370\uC774\uD130 \uC13C\uD130",
+            "\uC811\uC18D\uD558\uC2DC\uACA0\uC2B5\uB2C8\uAE4C?",
+            "\uB098\uAC00\uAE30",
+            "\uC885\uB8CC",
+            "\uCDE8\uC18C",
+            "\uD655\uC778"
+        };
         private static readonly string[] DataCenterActionLabels = new string[]
         {
             "OK",
@@ -89,6 +135,7 @@ namespace FfxivKoreanPatch.PatchRouteVerifier
             AddLabels(labels, WorldRegionGroupLabels);
             AddLabels(labels, WorldPhysicalDcLabels);
             AddLabels(labels, WorldDcGroupTypeLabels);
+            AddLabels(labels, DataCenterWorldLabels);
             return labels.ToArray();
         }
 

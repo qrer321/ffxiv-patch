@@ -51,14 +51,37 @@ namespace FfxivKoreanPatch.PatchRouteVerifier
             { "common/font/TrumpGothic_68_lobby.fdt", "common/font/TrumpGothic_68.fdt" }
         };
 
-        private static readonly uint[] Derived4kLobbyRequiredHangulCodepoints = new uint[]
+        private static readonly string[] Derived4kLobbyRequiredHangulPhrases = new string[]
         {
-            0xCE90, 0xB9AD, 0xD130, 0xC815, 0xBCF4, 0xB97C, 0xBCC0, 0xACBD,
-            0xD558, 0xAE30, 0xC704, 0xD574, 0xB85C, 0xC2A4, 0xAC00, 0xB974,
-            0xD2B8, 0xB2C8, 0xBA54, 0xC774, 0xC544, 0xADF8, 0xB9BC, 0xC790,
-            0xB370, 0xC13C, 0xC2DC, 0xD15C, 0xC124, 0xAE00, 0xAF34, 0xD06C,
-            0xD45C, 0xD30C, 0xD2F0, 0xBAA9, 0xB85D, 0xC785, 0xC7A5, 0xC548,
-            0xB0B4, 0xCD08, 0xC2B9, 0xB2EC, 0xB808, 0xBCA8
+            "\uCE90\uB9AD\uD130 \uC815\uBCF4\uB97C \uBCC0\uACBD\uD558\uAE30 \uC704\uD574",
+            "\uC2DC\uC2A4\uD15C \uC124\uC815",
+            "\uAE00\uAF34 \uD06C\uAE30",
+            "\uD30C\uD2F0 \uBAA9\uB85D",
+            "\uB370\uC774\uD130 \uC13C\uD130",
+            "\uB370\uC774\uD130 \uC13C\uD130 Mana\uC5D0 \uC811\uC18D \uC911\uC785\uB2C8\uB2E4.",
+            "\uC885\uB8CC",
+            "\uB098\uAC00\uAE30",
+            "\uCDE8\uC18C",
+            "\uD655\uC778",
+            "\uC989\uC2DC \uBC1C\uB3D9",
+            "\uCD08\uC2B9\uB2EC \uB808\uBCA8"
+        };
+
+        private static readonly uint[] Derived4kLobbyRequiredHangulCodepoints = CreateHangulCodepoints(Derived4kLobbyRequiredHangulPhrases);
+
+        private static readonly UldRouteCandidate[] StartScreenSystemSettingsUldCandidates = new UldRouteCandidate[]
+        {
+            new UldRouteCandidate("ui/uld/Config.uld", false),
+            new UldRouteCandidate("ui/uld/ConfigSystem.uld", false),
+            new UldRouteCandidate("ui/uld/ConfigCharacter.uld", false),
+            new UldRouteCandidate("ui/uld/ConfigControl.uld", false),
+            new UldRouteCandidate("ui/uld/ConfigLog.uld", false),
+            new UldRouteCandidate("ui/uld/ConfigKey.uld", false),
+            new UldRouteCandidate("ui/uld/ConfigPad.uld", false),
+            new UldRouteCandidate("ui/uld/ConfigHud.uld", false),
+            new UldRouteCandidate("ui/uld/SystemConfig.uld", false),
+            new UldRouteCandidate("ui/uld/TitleConfig.uld", true),
+            new UldRouteCandidate("ui/uld/TitleSystemConfig.uld", true)
         };
 
         private static readonly uint[] PartyListProtectedPuaGlyphs = new uint[]
@@ -98,5 +121,17 @@ namespace FfxivKoreanPatch.PatchRouteVerifier
             "common/font/TrumpGothic_68.fdt",
             "common/font/TrumpGothic_184.fdt"
         };
+
+        private struct UldRouteCandidate
+        {
+            public readonly string Path;
+            public readonly bool UsesLobbyFonts;
+
+            public UldRouteCandidate(string path, bool usesLobbyFonts)
+            {
+                Path = path;
+                UsesLobbyFonts = usesLobbyFonts;
+            }
+        }
     }
 }

@@ -817,7 +817,7 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
             {
                 foreach (KeyValuePair<uint, ColumnRemap> remapByRow in remapsByRow)
                 {
-                    if (remapByRow.Value.Mode == ColumnRemapMode.Literal)
+                    if (RequiresCrossLanguageSafetySource(remapByRow.Value))
                     {
                         return true;
                     }
@@ -838,20 +838,26 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
             AddGlobalRowsToSourceMaps(sheetName, globalHeader, globalArchive, _options.TargetLanguage, sheetPolicy.GlobalTargetRows, maps, diagnostics, "global-target-safety");
             AddGlobalRowsToSourceMaps(sheetName, globalHeader, globalArchive, "en", sheetPolicy.GlobalEnglishRows, maps, diagnostics, "global-english-safety");
 
-            HashSet<uint> literalRows = new HashSet<uint>();
+            HashSet<uint> remapRows = new HashSet<uint>();
             foreach (Dictionary<uint, ColumnRemap> remapsByRow in sheetPolicy.RowColumnRemaps.Values)
             {
                 foreach (KeyValuePair<uint, ColumnRemap> remapByRow in remapsByRow)
                 {
-                    if (remapByRow.Value.Mode == ColumnRemapMode.Literal)
+                    if (RequiresCrossLanguageSafetySource(remapByRow.Value))
                     {
-                        literalRows.Add(remapByRow.Key);
+                        remapRows.Add(remapByRow.Key);
                     }
                 }
             }
 
-            AddGlobalRowsToSourceMaps(sheetName, globalHeader, globalArchive, _options.TargetLanguage, literalRows, maps, diagnostics, "global-target-literal-safety");
+            AddGlobalRowsToSourceMaps(sheetName, globalHeader, globalArchive, _options.TargetLanguage, remapRows, maps, diagnostics, "global-target-remap-safety");
             return maps;
+        }
+
+        private static bool RequiresCrossLanguageSafetySource(ColumnRemap remap)
+        {
+            return remap.Mode == ColumnRemapMode.Literal ||
+                   remap.Mode == ColumnRemapMode.TemplateAroundFirstPayload;
         }
 
         private void AddGlobalRowsToSourceMaps(

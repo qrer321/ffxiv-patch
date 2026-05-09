@@ -50,6 +50,28 @@ namespace FfxivKoreanPatch.PatchRouteVerifier
             return false;
         }
 
+        private static uint[] CreateHangulCodepoints(string[] phrases)
+        {
+            System.Collections.Generic.HashSet<uint> codepoints = new System.Collections.Generic.HashSet<uint>();
+            for (int phraseIndex = 0; phraseIndex < phrases.Length; phraseIndex++)
+            {
+                string phrase = phrases[phraseIndex] ?? string.Empty;
+                for (int charIndex = 0; charIndex < phrase.Length; charIndex++)
+                {
+                    uint codepoint = ReadCodepoint(phrase, ref charIndex);
+                    if (IsHangulCodepoint(codepoint))
+                    {
+                        codepoints.Add(codepoint);
+                    }
+                }
+            }
+
+            uint[] values = new uint[codepoints.Count];
+            codepoints.CopyTo(values);
+            System.Array.Sort(values);
+            return values;
+        }
+
         private static bool IsHangulCodepoint(uint codepoint)
         {
             return (codepoint >= 0xAC00 && codepoint <= 0xD7A3) ||

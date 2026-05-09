@@ -150,15 +150,24 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
             new DerivedLobbyFontSpec("common/font/TrumpGothic_68_lobby.fdt", "common/font/TrumpGothic_68.fdt")
         };
 
-        private static readonly uint[] Derived4kLobbyRequiredHangulCodepoints = new uint[]
+        private static readonly string[] Derived4kLobbyRequiredHangulPhrases = new string[]
         {
-            0xCE90, 0xB9AD, 0xD130, 0xC815, 0xBCF4, 0xB97C, 0xBCC0, 0xACBD,
-            0xD558, 0xAE30, 0xC704, 0xD574, 0xB85C, 0xC2A4, 0xAC00, 0xB974,
-            0xD2B8, 0xB2C8, 0xBA54, 0xC774, 0xC544, 0xADF8, 0xB9BC, 0xC790,
-            0xB370, 0xC13C, 0xC2DC, 0xD15C, 0xC124, 0xAE00, 0xAF34, 0xD06C,
-            0xD45C, 0xD30C, 0xD2F0, 0xBAA9, 0xB85D, 0xC785, 0xC7A5, 0xC548,
-            0xB0B4, 0xCD08, 0xC2B9, 0xB2EC, 0xB808, 0xBCA8
+            "\uCE90\uB9AD\uD130 \uC815\uBCF4\uB97C \uBCC0\uACBD\uD558\uAE30 \uC704\uD574",
+            "\uC2DC\uC2A4\uD15C \uC124\uC815",
+            "\uAE00\uAF34 \uD06C\uAE30",
+            "\uD30C\uD2F0 \uBAA9\uB85D",
+            "\uB370\uC774\uD130 \uC13C\uD130",
+            "\uB370\uC774\uD130 \uC13C\uD130 Mana\uC5D0 \uC811\uC18D \uC911\uC785\uB2C8\uB2E4.",
+            "\uC885\uB8CC",
+            "\uB098\uAC00\uAE30",
+            "\uCDE8\uC18C",
+            "\uD655\uC778",
+            "\uC989\uC2DC \uBC1C\uB3D9",
+            "\uCD08\uC2B9\uB2EC \uB808\uBCA8"
         };
+
+        private static readonly uint[] Derived4kLobbyRequiredPhraseCodepoints = CreatePhraseCodepoints(Derived4kLobbyRequiredHangulPhrases);
+        private static readonly uint[] Derived4kLobbyRequiredHangulCodepoints = CreateHangulCodepoints(Derived4kLobbyRequiredHangulPhrases);
 
         private readonly BuildOptions _options;
         private readonly BuildReport _report;
@@ -493,7 +502,7 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
                     continue;
                 }
 
-                int derivedGlyphCells = QueueDerived4kLobbyHangulTextureCells(
+                int derivedGlyphCells = QueueDerived4kLobbyPhraseTextureCells(
                     targetPath,
                     sourcePath,
                     sourceFdt,
@@ -506,7 +515,7 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
                 long datOffset = WritePreparedFontFdtPayload(datWriter, targetPath, fdt, null, derivedGlyphCells, mpdStream, payloadsByPath, lobbyHangulRepair, dialogueGlyphRepair, glyphRepair, globalArchive, texturePatches, out normalized);
                 if (derivedGlyphCells > 0)
                 {
-                    Console.WriteLine("  Queued derived 4K lobby Hangul glyph cells: {0} ({1})", derivedGlyphCells, targetPath);
+                    Console.WriteLine("  Queued derived 4K lobby phrase glyph cells: {0} ({1})", derivedGlyphCells, targetPath);
                 }
 
                 LogFontPayloadAdjustments(targetPath, normalized);
@@ -514,11 +523,11 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
                 mutableIndex2.SetFileOffset(targetPath, 1, datOffset);
                 writtenPaths.Add(targetPath);
                 _report.FontFilesPatched++;
-                Console.WriteLine("  Patched clean 4K lobby font FDT: {0} <= Hangul glyphs from {1}", targetPath, sourcePath);
+                Console.WriteLine("  Patched clean 4K lobby font FDT: {0} <= phrase glyphs from {1}", targetPath, sourcePath);
             }
         }
 
-        private int QueueDerived4kLobbyHangulTextureCells(
+        private int QueueDerived4kLobbyPhraseTextureCells(
             string targetPath,
             string sourcePath,
             byte[] sourceFdt,
@@ -542,7 +551,7 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
             }
 
             int glyphEnd = checked(glyphStart + checked((int)glyphCount) * FdtGlyphEntrySize);
-            List<byte[]> targetEntries = new List<byte[]>(checked((int)glyphCount + Derived4kLobbyRequiredHangulCodepoints.Length));
+            List<byte[]> targetEntries = new List<byte[]>(checked((int)glyphCount + Derived4kLobbyRequiredPhraseCodepoints.Length));
             Dictionary<uint, int> targetEntryIndexes = new Dictionary<uint, int>();
             for (int glyphIndex = 0; glyphIndex < glyphCount; glyphIndex++)
             {
@@ -568,9 +577,9 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
             int missingTextures = 0;
             int allocationFailures = 0;
             int extractionFailures = 0;
-            for (int requiredIndex = 0; requiredIndex < Derived4kLobbyRequiredHangulCodepoints.Length; requiredIndex++)
+            for (int requiredIndex = 0; requiredIndex < Derived4kLobbyRequiredPhraseCodepoints.Length; requiredIndex++)
             {
-                uint codepoint = Derived4kLobbyRequiredHangulCodepoints[requiredIndex];
+                uint codepoint = Derived4kLobbyRequiredPhraseCodepoints[requiredIndex];
                 uint utf8Value = PackFdtUtf8Value(codepoint);
                 byte[] sourceEntryBytes;
                 if (!sourceEntries.TryGetValue(utf8Value, out sourceEntryBytes))
@@ -2521,6 +2530,73 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
             }
 
             return value;
+        }
+
+        private static uint[] CreateHangulCodepoints(string[] phrases)
+        {
+            HashSet<uint> codepoints = new HashSet<uint>();
+            for (int phraseIndex = 0; phraseIndex < phrases.Length; phraseIndex++)
+            {
+                string phrase = phrases[phraseIndex] ?? string.Empty;
+                for (int charIndex = 0; charIndex < phrase.Length; charIndex++)
+                {
+                    uint codepoint = ReadCodepoint(phrase, ref charIndex);
+                    if (IsHangulCodepoint(codepoint))
+                    {
+                        codepoints.Add(codepoint);
+                    }
+                }
+            }
+
+            uint[] values = new uint[codepoints.Count];
+            codepoints.CopyTo(values);
+            Array.Sort(values);
+            return values;
+        }
+
+        private static uint[] CreatePhraseCodepoints(string[] phrases)
+        {
+            HashSet<uint> codepoints = new HashSet<uint>();
+            for (int phraseIndex = 0; phraseIndex < phrases.Length; phraseIndex++)
+            {
+                string phrase = phrases[phraseIndex] ?? string.Empty;
+                for (int charIndex = 0; charIndex < phrase.Length; charIndex++)
+                {
+                    uint codepoint = ReadCodepoint(phrase, ref charIndex);
+                    if (codepoint > 0x20)
+                    {
+                        codepoints.Add(codepoint);
+                    }
+                }
+            }
+
+            uint[] values = new uint[codepoints.Count];
+            codepoints.CopyTo(values);
+            Array.Sort(values);
+            return values;
+        }
+
+        private static uint ReadCodepoint(string value, ref int index)
+        {
+            if (char.IsHighSurrogate(value[index]) &&
+                index + 1 < value.Length &&
+                char.IsLowSurrogate(value[index + 1]))
+            {
+                uint codepoint = (uint)char.ConvertToUtf32(value[index], value[index + 1]);
+                index++;
+                return codepoint;
+            }
+
+            return value[index];
+        }
+
+        private static bool IsHangulCodepoint(uint codepoint)
+        {
+            return (codepoint >= 0xAC00 && codepoint <= 0xD7A3) ||
+                   (codepoint >= 0x1100 && codepoint <= 0x11FF) ||
+                   (codepoint >= 0x3130 && codepoint <= 0x318F) ||
+                   (codepoint >= 0xA960 && codepoint <= 0xA97F) ||
+                   (codepoint >= 0xD7B0 && codepoint <= 0xD7FF);
         }
 
         private static bool TryDecodeFdtUtf8Value(uint value, out uint codepoint)

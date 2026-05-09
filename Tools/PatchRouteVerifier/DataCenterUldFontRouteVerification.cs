@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using FfxivKoreanPatch.FFXIVPatchGenerator;
 
 namespace FfxivKoreanPatch.PatchRouteVerifier
 {
@@ -9,8 +10,40 @@ namespace FfxivKoreanPatch.PatchRouteVerifier
         {
             private bool TryCollectPreservedUldFontRoutes(string uldPath, string label, out HashSet<string> routedFontPaths)
             {
+                return TryCollectPreservedUldFontRoutes(uldPath, label, true, out routedFontPaths);
+            }
+
+            private bool TryCollectPreservedUldFontRoutes(string uldPath, string label, bool lobby, out HashSet<string> routedFontPaths)
+            {
                 byte[] cleanUld = _cleanUi.ReadFile(uldPath);
                 byte[] patchedUld = _patchedUi.ReadFile(uldPath);
+                return TryCollectPreservedUldFontRoutes(uldPath, label, lobby, cleanUld, patchedUld, out routedFontPaths);
+            }
+
+            private bool TryCollectOptionalPreservedUldFontRoutes(string uldPath, string label, bool lobby, out HashSet<string> routedFontPaths)
+            {
+                routedFontPaths = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+                byte[] cleanPacked;
+                byte[] patchedPacked;
+                if (!_cleanUi.TryReadPackedFile(uldPath, out cleanPacked) ||
+                    !_patchedUi.TryReadPackedFile(uldPath, out patchedPacked))
+                {
+                    return false;
+                }
+
+                byte[] cleanUld = SqPackArchive.UnpackStandardFile(cleanPacked);
+                byte[] patchedUld = SqPackArchive.UnpackStandardFile(patchedPacked);
+                return TryCollectPreservedUldFontRoutes(uldPath, label, lobby, cleanUld, patchedUld, out routedFontPaths);
+            }
+
+            private bool TryCollectPreservedUldFontRoutes(
+                string uldPath,
+                string label,
+                bool lobby,
+                byte[] cleanUld,
+                byte[] patchedUld,
+                out HashSet<string> routedFontPaths)
+            {
                 List<UldTextNodeFont> cleanFonts = GetUldTextNodeFonts(cleanUld);
                 List<UldTextNodeFont> patchedFonts = GetUldTextNodeFonts(patchedUld);
                 Dictionary<int, UldTextNodeFont> patchedByOffset = GetUldTextNodeFontsByOffset(patchedUld);
@@ -23,7 +56,7 @@ namespace FfxivKoreanPatch.PatchRouteVerifier
                 }
 
                 VerifyUldTextNodeCount(uldPath, cleanFonts, patchedFonts);
-                CollectPreservedUldFontRoutes(uldPath, cleanFonts, patchedByOffset, routedFontPaths);
+                CollectPreservedUldFontRoutes(uldPath, lobby, cleanFonts, patchedByOffset, routedFontPaths);
                 if (routedFontPaths.Count == 0)
                 {
                     Fail("{0} did not route any {1} node to a verifiable font", uldPath, label);
@@ -49,18 +82,20 @@ namespace FfxivKoreanPatch.PatchRouteVerifier
 
             private void CollectPreservedUldFontRoutes(
                 string uldPath,
+                bool lobby,
                 List<UldTextNodeFont> cleanFonts,
                 Dictionary<int, UldTextNodeFont> patchedByOffset,
                 HashSet<string> routedFontPaths)
             {
                 for (int i = 0; i < cleanFonts.Count; i++)
                 {
-                    AddPreservedUldFontRoute(uldPath, cleanFonts[i], patchedByOffset, routedFontPaths);
+                    AddPreservedUldFontRoute(uldPath, lobby, cleanFonts[i], patchedByOffset, routedFontPaths);
                 }
             }
 
             private void AddPreservedUldFontRoute(
                 string uldPath,
+                bool lobby,
                 UldTextNodeFont cleanNode,
                 Dictionary<int, UldTextNodeFont> patchedByOffset,
                 HashSet<string> routedFontPaths)
@@ -85,7 +120,7 @@ namespace FfxivKoreanPatch.PatchRouteVerifier
                     return;
                 }
 
-                string resolvedFont = ResolveUldFontPath(patchedNode.FontId, patchedNode.FontSize, true);
+                string resolvedFont = ResolveUldFontPath(patchedNode.FontId, patchedNode.FontSize, lobby);
                 if (resolvedFont == null)
                 {
                     Fail(

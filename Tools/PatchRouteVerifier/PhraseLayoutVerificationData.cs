@@ -1,3 +1,5 @@
+using System.Collections.Generic;
+
 namespace FfxivKoreanPatch.PatchRouteVerifier
 {
     internal static partial class PatchRouteVerifier
@@ -35,30 +37,7 @@ namespace FfxivKoreanPatch.PatchRouteVerifier
                 new FontPair("common/font/TrumpGothic_184_lobby.fdt", "common/font/TrumpGothic_184_lobby.fdt")
             };
 
-            private static readonly string[] HighScaleAsciiPhrases = new string[]
-            {
-                "DATA CENTER SELECT",
-                "INFORMATION",
-                "Elemental",
-                "Gaia",
-                "Mana",
-                "Aether",
-                "Primal",
-                "Chaos",
-                "Light",
-                "Crystal",
-                "Materia",
-                "Meteor",
-                "Dynamis",
-                "Shadow",
-                "NA Cloud DC (Beta)",
-                "Proceed",
-                "Cancel",
-                "Exit",
-                "HP 100%",
-                "Lv. 100",
-                "150%"
-            };
+            private static readonly string[] HighScaleAsciiPhrases = CreateHighScaleAsciiPhrases();
 
             private static readonly string[] SystemSettingsScaledFonts = new string[]
             {
@@ -85,15 +64,28 @@ namespace FfxivKoreanPatch.PatchRouteVerifier
                 "\uD0D0\uC0AC\uB300 \uD638\uC704\uB300\uC6D0"
             };
 
-            private static readonly string[] FourKLobbyPhrases = new string[]
+            private static readonly string[] FourKLobbyPhrases = Derived4kLobbyRequiredHangulPhrases;
+
+            private static string[] CreateHighScaleAsciiPhrases()
             {
-                "\uCE90\uB9AD\uD130 \uC815\uBCF4\uB97C \uBCC0\uACBD\uD558\uAE30 \uC704\uD574",
-                "\uC2DC\uC2A4\uD15C \uC124\uC815",
-                "\uAE00\uAF34 \uD06C\uAE30",
-                "\uD30C\uD2F0 \uBAA9\uB85D",
-                "\uB370\uC774\uD130 \uC13C\uD130",
-                "\uCD08\uC2B9\uB2EC \uB808\uBCA8"
-            };
+                List<string> phrases = new List<string>();
+                phrases.Add("DATA CENTER SELECT");
+                phrases.Add("INFORMATION");
+                phrases.Add("Data Center Selection");
+                phrases.Add("Information");
+                phrases.Add("NA Cloud DC (Beta)");
+                phrases.Add("NA Cloud Data Center (Beta)");
+                phrases.Add("Proceed");
+                phrases.Add("Cancel");
+                phrases.Add("Exit");
+                phrases.Add("EXIT");
+                phrases.Add("HP 100%");
+                phrases.Add("Lv. 100");
+                phrases.Add("FHD 150% QHD 200% UHD 300%");
+                AddLabels(phrases, WorldDcGroupTypeLabels);
+                AddLabels(phrases, DataCenterWorldLabels);
+                return phrases.ToArray();
+            }
 
             private struct FontPair
             {

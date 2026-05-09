@@ -30,8 +30,10 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
         {
             new RowRange(791, 794),
             new RowRange(800, 806),
-            new RowRange(808, 816)
+            new RowRange(809, 816)
         };
+        private const uint LobbyDataCenterConnectingRow = 808;
+        private const uint LobbyExitButtonRow = 2002;
         private static readonly uint[] GlobalDataCenterTravelAddonRows = new uint[] { 12514, 12525 };
 
         private readonly HashSet<string> _deleteFiles = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
@@ -102,6 +104,13 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
             // INFORMATION and region messages do not fall back through Korean
             // proxy glyphs in this font route.
             AddGlobalTargetRows(lobbyPolicy, GlobalLobbyDataCenterRowRanges);
+            lobbyPolicy.SetRowColumnRemap(
+                LobbyDataCenterConnectingRow,
+                0,
+                ColumnRemap.TemplateAroundFirstPayload(
+                    "\uB370\uC774\uD130 \uC13C\uD130 ",
+                    "\uC5D0 \uC811\uC18D \uC911\uC785\uB2C8\uB2E4."));
+            lobbyPolicy.UseGlobalTargetLanguageRow(LobbyExitButtonRow);
 
             // Most Addon rows in this range are the normal World Visit UI and have
             // Korean source text. Keep only known global-client-only rows global;
@@ -644,28 +653,48 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
 
     internal struct ColumnRemap
     {
-        public static readonly ColumnRemap Default = new ColumnRemap(ColumnRemapMode.Default, null, null);
-        public static readonly ColumnRemap KeepGlobal = new ColumnRemap(ColumnRemapMode.KeepGlobal, null, null);
+        public static readonly ColumnRemap Default = new ColumnRemap(ColumnRemapMode.Default, null, null, null, null);
+        public static readonly ColumnRemap KeepGlobal = new ColumnRemap(ColumnRemapMode.KeepGlobal, null, null, null, null);
 
         public readonly ColumnRemapMode Mode;
         public readonly ushort? SourceColumnOffset;
         public readonly byte[] LiteralBytes;
+        public readonly byte[] TemplatePrefixBytes;
+        public readonly byte[] TemplateSuffixBytes;
 
-        private ColumnRemap(ColumnRemapMode mode, ushort? sourceColumnOffset, byte[] literalBytes)
+        private ColumnRemap(
+            ColumnRemapMode mode,
+            ushort? sourceColumnOffset,
+            byte[] literalBytes,
+            byte[] templatePrefixBytes,
+            byte[] templateSuffixBytes)
         {
             Mode = mode;
             SourceColumnOffset = sourceColumnOffset;
             LiteralBytes = literalBytes;
+            TemplatePrefixBytes = templatePrefixBytes;
+            TemplateSuffixBytes = templateSuffixBytes;
         }
 
         public static ColumnRemap SourceColumn(ushort sourceColumnOffset)
         {
-            return new ColumnRemap(ColumnRemapMode.SourceColumn, sourceColumnOffset, null);
+            return new ColumnRemap(ColumnRemapMode.SourceColumn, sourceColumnOffset, null, null, null);
         }
 
         public static ColumnRemap Literal(string value)
         {
-            return new ColumnRemap(ColumnRemapMode.Literal, null, new UTF8Encoding(false).GetBytes(value ?? string.Empty));
+            return new ColumnRemap(ColumnRemapMode.Literal, null, new UTF8Encoding(false).GetBytes(value ?? string.Empty), null, null);
+        }
+
+        public static ColumnRemap TemplateAroundFirstPayload(string prefix, string suffix)
+        {
+            UTF8Encoding encoding = new UTF8Encoding(false);
+            return new ColumnRemap(
+                ColumnRemapMode.TemplateAroundFirstPayload,
+                null,
+                null,
+                encoding.GetBytes(prefix ?? string.Empty),
+                encoding.GetBytes(suffix ?? string.Empty));
         }
 
         public static ColumnRemap Parse(object value)
@@ -693,6 +722,7 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
         Default,
         KeepGlobal,
         SourceColumn,
-        Literal
+        Literal,
+        TemplateAroundFirstPayload
     }
 }
