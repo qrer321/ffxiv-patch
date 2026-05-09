@@ -102,6 +102,22 @@ namespace FfxivKoreanPatch.PatchRouteVerifier
             "Exit",
             "Data Center"
         };
+        private static readonly string[] DataCenterCriticalRenderLabels = new string[]
+        {
+            "DATA CENTER SELECT",
+            "INFORMATION",
+            "Data Center Selection",
+            "Information",
+            "Elemental",
+            "Gaia",
+            "Mana",
+            "Meteor",
+            "Aegis",
+            "Tonberry",
+            "Chocobo",
+            "Pandaemonium",
+            "NA Cloud DC (Beta)"
+        };
         private static readonly string[] DataCenterWorldmapLabels = CreateDataCenterGlyphLabels();
 
         private static string[] CreateDataCenterGlyphLabels()
@@ -164,13 +180,15 @@ namespace FfxivKoreanPatch.PatchRouteVerifier
             public readonly uint RowId;
             public readonly string Expected;
             public readonly bool AllowSubstring;
+            public readonly bool AllowHangul;
 
-            public DataCenterLabelExpectation(string sheet, uint rowId, string expected, bool allowSubstring = false)
+            public DataCenterLabelExpectation(string sheet, uint rowId, string expected, bool allowSubstring = false, bool allowHangul = false)
             {
                 Sheet = sheet;
                 RowId = rowId;
                 Expected = expected;
                 AllowSubstring = allowSubstring;
+                AllowHangul = allowHangul;
             }
         }
 

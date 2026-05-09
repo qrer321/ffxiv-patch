@@ -39,7 +39,7 @@ namespace FfxivKoreanPatch.PatchRouteVerifier
                     }
                 }
 
-                if (found && !fallback && !hangul && !unexpectedNonEmpty)
+                if (found && !fallback && (expectation.AllowHangul || !hangul) && !unexpectedNonEmpty)
                 {
                     Pass("{0}#{1}/{2} contains [{3}]", expectation.Sheet, expectation.RowId, language, expectation.Expected);
                     return;

@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using FfxivKoreanPatch.FFXIVPatchGenerator;
 
 namespace FfxivKoreanPatch.PatchRouteVerifier
 {
@@ -55,14 +56,7 @@ namespace FfxivKoreanPatch.PatchRouteVerifier
                 "common/font/TrumpGothic_184.fdt"
             };
 
-            private static readonly string[] SystemSettingsScaledPhrases = new string[]
-            {
-                "\uC2DC\uC2A4\uD15C \uC124\uC815 150%",
-                "\uC2DC\uC2A4\uD15C \uC124\uC815 200%",
-                "\uC2DC\uC2A4\uD15C \uC124\uC815 300%",
-                "FHD 150% QHD 200% UHD 300%",
-                "\uD0D0\uC0AC\uB300 \uD638\uC704\uB300\uC6D0"
-            };
+            private static readonly string[] SystemSettingsScaledPhrases = LobbyScaledHangulPhrases.StartScreenSystemSettings;
 
             private static readonly string[] FourKLobbyPhrases = Derived4kLobbyRequiredHangulPhrases;
 
@@ -78,7 +72,6 @@ namespace FfxivKoreanPatch.PatchRouteVerifier
                 phrases.Add("Proceed");
                 phrases.Add("Cancel");
                 phrases.Add("Exit");
-                phrases.Add("EXIT");
                 phrases.Add("HP 100%");
                 phrases.Add("Lv. 100");
                 phrases.Add("FHD 150% QHD 200% UHD 300%");

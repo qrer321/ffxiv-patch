@@ -21,7 +21,7 @@ namespace FfxivKoreanPatch.PatchRouteVerifier
                 expectations.Add(new DataCenterLabelExpectation("Lobby", 811, IsEnglishTargetLanguage() ? "Cancel" : "\u30AD\u30E3\u30F3\u30BB\u30EB"));
                 AddLobbyRegionLabels(expectations, 812, true);
                 expectations.Add(new DataCenterLabelExpectation("Lobby", 816, "NA Cloud Data Center (Beta)"));
-                expectations.Add(new DataCenterLabelExpectation("Lobby", 2002, "EXIT"));
+                expectations.Add(new DataCenterLabelExpectation("Lobby", 2002, "\uC885\uB8CC", false, true));
                 AddOneBasedLabelExpectations(expectations, "WorldRegionGroup", WorldRegionGroupLabels);
                 AddOneBasedLabelExpectations(expectations, "WorldPhysicalDC", WorldPhysicalDcLabels);
                 AddOneBasedLabelExpectations(expectations, "WorldDCGroupType", WorldDcGroupTypeLabels);

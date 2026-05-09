@@ -114,7 +114,7 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
                 ColumnRemap.TemplateAroundFirstPayload(
                     "\uB370\uC774\uD130 \uC13C\uD130 ",
                     "\uC5D0 \uC811\uC18D \uC911\uC785\uB2C8\uB2E4."));
-            lobbyPolicy.UseGlobalTargetLanguageRow(LobbyExitButtonRow);
+            lobbyPolicy.SetRowColumnRemap(LobbyExitButtonRow, 0, ColumnRemap.Literal("\uC885\uB8CC"));
 
             // Most Addon rows in this range are the normal World Visit UI and have
             // Korean source text. Keep only known global-client-only rows global;

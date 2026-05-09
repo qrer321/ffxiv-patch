@@ -113,6 +113,9 @@
     <Compile Include="VerificationStepCatalog.cs" />
     <Compile Include="VerificationStepSelection.cs" />
     <Compile Include="VerificationSteps.cs" />
+    <Compile Include="..\..\FFXIVPatchGenerator\LobbyScaledHangulPhrases.cs">
+      <Link>Generator\LobbyScaledHangulPhrases.cs</Link>
+    </Compile>
     <Compile Include="..\..\FFXIVPatchGenerator\SqPack.cs">
       <Link>Generator\SqPack.cs</Link>
     </Compile>
