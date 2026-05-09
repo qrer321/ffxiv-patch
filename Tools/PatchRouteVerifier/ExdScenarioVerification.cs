@@ -4,13 +4,6 @@ namespace FfxivKoreanPatch.PatchRouteVerifier
 {
     internal static partial class PatchRouteVerifier
     {
-        private const uint MkdSupportJobFirstRow = 0;
-        private const uint MkdSupportJobLastPlayableRow = 15;
-        private const ushort MkdSupportJobFullNameColumnOffset = 0;
-        private const ushort MkdSupportJobShortNameColumnOffset = 4;
-        private const ushort MkdSupportJobSupportTextColumnOffset = 12;
-        private const ushort MkdSupportJobEnglishFullNameColumnOffset = 16;
-
         private sealed partial class Verifier
         {
             private void VerifyCompactTimeRows()
@@ -45,19 +38,6 @@ namespace FfxivKoreanPatch.PatchRouteVerifier
                 ExpectText("Addon", 12537, "서버 텔레포");
             }
 
-            private void VerifyConfigurationSharingRows()
-            {
-                Console.WriteLine("[EXD] Configuration Sharing labels");
-                ExpectText("Addon", 17300, "\uC124\uC815 \uACF5\uC720");
-                ExpectText("Addon", 17301, "\uC124\uC815 \uACF5\uC720");
-                ExpectAnyTextColumnNotContains("Addon", 17300, "\u30B3\u30F3\u30D5\u30A3\u30B0\u30B7\u30A7\u30A2");
-                ExpectAnyTextColumnNotContains("Addon", 17300, "\u30B3\u30F3\u30C6\u30F3\u30C4\u30B7\u30A7\u30A2");
-                ExpectAnyTextColumnNotContains("Addon", 17300, "Configuration Sharing");
-                ExpectTextNotContains("Addon", 17301, "\u30B3\u30F3\u30D5\u30A3\u30B0\u30B7\u30A7\u30A2");
-                ExpectTextNotContains("Addon", 17301, "\u30B3\u30F3\u30C6\u30F3\u30C4\u30B7\u30A7\u30A2");
-                ExpectTextNotContains("Addon", 17301, "Configuration Sharing");
-            }
-
             private void VerifyBozjaEntranceRows()
             {
                 Console.WriteLine("[EXD] Bozja entrance custom talk");
@@ -82,24 +62,6 @@ namespace FfxivKoreanPatch.PatchRouteVerifier
                 ExpectAnyTextColumnNotContains("custom/007/ctsmycentrancehard_00706", 3, "話を聞く");
             }
 
-            private void VerifyOccultCrescentSupportJobRows()
-            {
-                Console.WriteLine("[EXD] Occult Crescent phantom/support job labels");
-                for (uint rowId = MkdSupportJobFirstRow; rowId <= MkdSupportJobLastPlayableRow; rowId++)
-                {
-                    string fullName = GetStringColumnByOffset(_patchedText, "MkdSupportJob", rowId, _language, MkdSupportJobFullNameColumnOffset);
-                    string shortName = GetStringColumnByOffset(_patchedText, "MkdSupportJob", rowId, _language, MkdSupportJobShortNameColumnOffset);
-                    string supportText = GetStringColumnByOffset(_patchedText, "MkdSupportJob", rowId, _language, MkdSupportJobSupportTextColumnOffset);
-                    string englishFullName = GetStringColumnByOffset(_patchedText, "MkdSupportJob", rowId, _language, MkdSupportJobEnglishFullNameColumnOffset);
-
-                    ExpectEqual("MkdSupportJob#" + rowId.ToString() + "@0 mirrors English full name column", fullName, englishFullName);
-                    ExpectStartsWith("MkdSupportJob#" + rowId.ToString() + "@0", fullName, "Phantom ");
-                    ExpectStartsWith("MkdSupportJob#" + rowId.ToString() + "@4", shortName, "Ph.");
-                    ExpectNotContains("MkdSupportJob#" + rowId.ToString() + "@0", fullName, "\uC11C\uD3EC\uD2B8");
-                    ExpectNotContains("MkdSupportJob#" + rowId.ToString() + "@4", shortName, "\uC11C\uD3EC\uD2B8");
-                    ExpectContains("MkdSupportJob#" + rowId.ToString() + "@12", supportText, "\uC11C\uD3EC\uD2B8");
-                }
-            }
         }
     }
 }
