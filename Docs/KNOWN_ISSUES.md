@@ -42,8 +42,8 @@
 - 로비 시작화면 설정 완료 메시지 `설정을 변경했습니다.`도 같은 고배율 로비 폰트 검증에 포함한다. 이전 산출물은 `U+D588`(`했`) 누락으로 실패했고, 새 산출물은 fallback `=`/`-`가 아님을 확인한다.
 - 4K lobby 파생 폰트 생성은 Hangul만 한국 TTMP source에서 가져오고, ASCII/숫자/기호는 clean global lobby route를 유지한다. clean target에 없는 ASCII만 기존 파생 source pair의 clean lobby font에서 보충한다.
 - 2026-05-10 보강: 기존 verifier는 FDT byte 14를 draw 시작 offset처럼 해석해 ASCII 간격 문제를 놓쳤다. 렌더링 기준을 `drawX = 32`, `advance = width + OffsetX`로 바꾸고, 인접 glyph의 실제 alpha bounds 기준 최소 visual gap을 검사하도록 수정했다.
-- 2026-05-10 처리: `_lobby.fdt` ASCII/숫자/기호에 한해서 clean glyph/texture는 보존하되 negative advance와 negative ASCII kerning은 로비용 safe spacing으로 완화한다. 비로비 FDT는 clean metric을 그대로 보존한다.
-- 2026-05-10 검증: 현재 설치된 이전 산출물은 새 verifier에서 `DATA CENTER SELECT`, `Elemental`, `150%(FHD): 1728x972 이상 권장` 등으로 FAIL한다. 새 ja 산출물 `.tmp\lobby-visual-spacing-final-ja`는 `data-center-title-uld`, `system-settings-mixed-scale-layouts`, `clean-ascii-font-routes`와 넓은 회귀 묶음에서 PASS한다.
+- 2026-05-10 재처리: 로비용 safe spacing은 100%에서 간격이 과하게 벌어지고 150% 이상에서도 일부 겹침을 남겼다. `_lobby.fdt` ASCII/숫자/기호는 동일 이름의 비로비 인게임 FDT를 clean reference로 사용하도록 바꿨다. 예: `AXIS_12_lobby.fdt` -> `AXIS_12.fdt`.
+- 2026-05-10 검증: 현재 설치된 이전 산출물은 새 verifier에서 `DATA CENTER SELECT`, `Elemental`, `150%(FHD): 1728x972 이상 권장` 등으로 FAIL한다. 새 ja 산출물 `.tmp\lobby-ingame-reference-fallback-ja`는 `data-center-title-uld`, `system-settings-mixed-scale-layouts`, `clean-ascii-font-routes`와 넓은 회귀 묶음에서 PASS한다.
 
 재보고 항목:
 
@@ -53,7 +53,7 @@
 - 데이터 센터 선택 화면의 서버명/데이터센터명은 영어로 나오지만 문자 간격이 서로 침범함. clean glyph/metrics/kerning/phrase pixel/padding verifier 기준 처리됨
 - 시작 화면 시스템 설정에서 UI 배율을 150/200/300%로 키우면 한글이 `=`로 깨지고 문자 간격이 침범함. 코드 검증 기준 처리됨
 - `데이터 센터 Mana에 입장합니다` 계열 팝업 문구는 처리됨. 재발 시 sheet/row/column 추적 verifier를 먼저 보강
-- 인게임 `즉시 발동` 같은 짧은 한글 UI 문구가 다른 인게임 UI 폰트보다 상대적으로 크게 보일 가능성이 있음. 단, 현재 보고는 깨짐/잘못된 폰트 문제가 아니라 시각적 크기 확인 요청임. TTMP 원본 대비 문장 pixel/layout/metrics 검증 기준으로는 patched output과 원본이 같음
+- 인게임 `즉시 발동`/`초`가 UI 배율별 상대 크기를 제대로 따라가지 않는 문제가 추가 보고됨. 100%/150%에서는 주변 문자보다 커 보이고, 200%/300%에서는 작게 보임. 기존 TTMP 원본 대비 문장 pixel/layout/metrics 검증은 patched output과 원본 동일성만 확인하므로 이 상대 크기 문제를 잡지 못함
 - 스토리 종료 후 컷씬/이벤트 이미지 설명문이 베이스 클라이언트 언어로 표시됨. 폰트 패치가 아니라 지역 이동 타이틀처럼 실제 표시 리소스를 한국 클라이언트 리소스로 교체해야 할 가능성이 높음. 단, 아직 scene 리소스로 단정하지 않고 `EventImage` 등 sheet 기반 이미지 가능성부터 확인해야 함
 
 필요 작업:
@@ -64,7 +64,7 @@
 - 흐림 문제는 clean global ASCII glyph의 픽셀/metrics뿐 아니라 실제 texture cell alpha 차이까지 비교. 현재 non-space ASCII glyph 주변 2px padding 기준으로 수행
 - 흐림 문제는 clean global ASCII glyph의 픽셀/metrics뿐 아니라 실제 texture cell alpha 차이까지 비교. 현재 non-space ASCII glyph 주변 4px padding 기준으로 수행
 - 시작 화면 시스템 설정은 인게임 font route와 분리해서, 해당 route의 한글 glyph fallback/spacing만 검증
-- `즉시 발동` 계열 문구는 TTMP 원본과 patched glyph size/metrics가 같은지 확인. `reported-ingame-hangul-phrases`에서 `즉시 발동`, `시전 시간`, `재사용 대기 시간`, `발동 조건`을 문장 단위로 비교하며 현재 ja 산출물은 통과
+- `즉시 발동`/`초` 계열 문구는 TTMP 원본과 patched glyph size/metrics가 같은지 확인하는 기존 `reported-ingame-hangul-phrases`만으로 닫지 않는다. action detail/help UI의 실제 ULD/font route를 찾고, 100/150/200/300%에서 한글 라벨과 시간 단위 glyph bounds/advance가 주변 숫자/라벨과 같은 비율로 스케일되는지 별도 verifier를 추가한다
 - story 완료 설명문이 `EventImage`, `CutScreenImage`, `ScreenImage`, `DynamicEventScreenImage`, `LoadingImage`, event/cutscene texture/ULD bundle 중 어디에서 오는지 추적
 - 설명문이 이미지형 리소스라면 global target 리소스와 Korean source 리소스의 hash를 비교하고, 한국 서버 리소스가 존재하는 경우 output UI index에 Korean packed texture가 매핑됐는지 verifier에 추가
 

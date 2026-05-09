@@ -223,7 +223,7 @@
 - `Map` sheet의 `ui/map/.../*_m.tex` 지도 텍스처를 한국 서버 텍스처와 비교해, 지도 이미지에 포함된 지역명 표기 보정
 - `DynamicEventScreenImage`, `EventImage`, `TradeScreenImage`, `LoadingImage`는 언어 폴더가 없는 동일 경로 리소스를 비교하고 실제 파일이 다른 경우에만 한국 서버 리소스로 교체
 - 지역/컨텐츠 입장 시 표시되는 타이틀 이미지처럼 텍스트가 아니라 이미지로 렌더링되는 UI 요소 보정
-- 데이터 센터 선택 화면의 `Title_DataCenter.uld`와 `Title_Worldmap.uld`는 clean global 폰트 슬롯을 그대로 유지하고, 데이터센터 라벨에 쓰이는 ASCII glyph/texture를 clean font와 비교한다. `_lobby.fdt` ASCII는 로비 렌더링용 safe advance/kerning 보정을 허용하되 인접 glyph visual gap 검증을 통과해야 한다
+- 데이터 센터 선택 화면의 `Title_DataCenter.uld`와 `Title_Worldmap.uld`는 clean global 폰트 슬롯을 그대로 유지하고, 데이터센터 라벨에 쓰이는 ASCII glyph/texture를 clean route와 비교한다. `_lobby.fdt` ASCII/숫자/기호는 동일 이름의 비로비 인게임 FDT를 기준으로 glyph/metrics/kerning을 맞춘다
 - TTMP 패키지가 제공하는 원래 폰트군 조합을 사용해 렌더링하며, `AXIS_20_lobby`처럼 패키지에 없는 크기/로비용 폰트 경로로 잘못 라우팅되는 것을 방지
 - `Lobby`, `WorldRegionGroup`, `WorldPhysicalDC`, `WorldDCGroupType`, `Addon` 12510번대 서버/데이터센터 이동 안내 row는 대상 글로벌 언어 row를 사용해 읽을 수 없는 proxy glyph 노출을 방지
 - `--base-ui-index`, `--base-ui-index2`로 clean `060000` index/index2 지정
