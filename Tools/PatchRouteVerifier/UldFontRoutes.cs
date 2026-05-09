@@ -6,16 +6,42 @@ namespace FfxivKoreanPatch.PatchRouteVerifier
 {
     internal static partial class PatchRouteVerifier
     {
+        private const string UldHeaderMagic = "uldh";
+        private const string UldAtkHeaderMagic = "atkh";
+        private const string UldComponentHeaderMagic = "cohd";
+        private const string UldWidgetHeaderMagic = "wdhd";
+        private const int UldHeaderSize = 16;
+        private const int UldComponentAtkOffset = 8;
+        private const int UldWidgetAtkOffset = 12;
+        private const int AtkHeaderMinSize = 36;
+        private const int AtkComponentListRelativeOffset = 16;
+        private const int AtkWidgetListRelativeOffset = 24;
+        private const int UldListHeaderSize = 16;
+        private const int UldListCountOffset = 8;
+        private const int ComponentEntryNodeCountOffset = 8;
+        private const int ComponentEntrySizeOffset = 12;
+        private const int ComponentEntryNodeOffsetOffset = 14;
+        private const int ComponentEntryMinNodeOffset = 16;
+        private const int WidgetEntryNodeCountOffset = 12;
+        private const int UldTextNodeMinSize = 28;
+        private const int UldNodeTypeOffset = 20;
+        private const int UldNodeSizeOffset = 24;
+        private const int UldTextNodeHeaderSize = 88;
+        private const int UldTextExtraMinSize = 24;
+        private const int UldTextFontOffsetInExtra = 10;
+        private const int UldTextFontSizeOffsetInExtra = 11;
+        private const int UldTextNodeType = 3;
+
         private static List<UldTextNodeFont> GetUldTextNodeFonts(byte[] uld)
         {
             List<UldTextNodeFont> results = new List<UldTextNodeFont>();
-            if (!HasRange(uld, 0, 16) || !HasAsciiMagic(uld, 0, "uldh"))
+            if (!HasRange(uld, 0, UldHeaderSize) || !HasAsciiMagic(uld, 0, UldHeaderMagic))
             {
                 return results;
             }
 
-            WalkUldAtkTextNodes(uld, Endian.ReadUInt32LE(uld, 8), true, results);
-            WalkUldAtkTextNodes(uld, Endian.ReadUInt32LE(uld, 12), false, results);
+            WalkUldAtkTextNodes(uld, Endian.ReadUInt32LE(uld, UldComponentAtkOffset), true, results);
+            WalkUldAtkTextNodes(uld, Endian.ReadUInt32LE(uld, UldWidgetAtkOffset), false, results);
             return results;
         }
 
@@ -39,7 +65,7 @@ namespace FfxivKoreanPatch.PatchRouteVerifier
             }
 
             int atkOffset = (int)atkOffsetValue;
-            if (!HasRange(uld, atkOffset, 36) || !HasAsciiMagic(uld, atkOffset, "atkh"))
+            if (!HasRange(uld, atkOffset, AtkHeaderMinSize) || !HasAsciiMagic(uld, atkOffset, UldAtkHeaderMagic))
             {
                 return;
             }
@@ -56,35 +82,35 @@ namespace FfxivKoreanPatch.PatchRouteVerifier
 
         private static void WalkUldComponentTextNodes(byte[] uld, int atkOffset, List<UldTextNodeFont> results)
         {
-            uint componentListRelativeOffset = Endian.ReadUInt32LE(uld, atkOffset + 16);
+            uint componentListRelativeOffset = Endian.ReadUInt32LE(uld, atkOffset + AtkComponentListRelativeOffset);
             if (componentListRelativeOffset == 0 || componentListRelativeOffset > int.MaxValue)
             {
                 return;
             }
 
             int componentListOffset = atkOffset + (int)componentListRelativeOffset;
-            if (!HasRange(uld, componentListOffset, 16) || !HasAsciiMagic(uld, componentListOffset, "cohd"))
+            if (!HasRange(uld, componentListOffset, UldListHeaderSize) || !HasAsciiMagic(uld, componentListOffset, UldComponentHeaderMagic))
             {
                 return;
             }
 
-            uint componentCount = Endian.ReadUInt32LE(uld, componentListOffset + 8);
-            int entryOffset = componentListOffset + 16;
-            for (uint i = 0; i < componentCount && HasRange(uld, entryOffset, 16); i++)
+            uint componentCount = Endian.ReadUInt32LE(uld, componentListOffset + UldListCountOffset);
+            int entryOffset = componentListOffset + UldListHeaderSize;
+            for (uint i = 0; i < componentCount && HasRange(uld, entryOffset, UldListHeaderSize); i++)
             {
-                uint nodeCount = Endian.ReadUInt32LE(uld, entryOffset + 8);
-                ushort componentSize = Endian.ReadUInt16LE(uld, entryOffset + 12);
-                ushort nodeOffset = Endian.ReadUInt16LE(uld, entryOffset + 14);
+                uint nodeCount = Endian.ReadUInt32LE(uld, entryOffset + ComponentEntryNodeCountOffset);
+                ushort componentSize = Endian.ReadUInt16LE(uld, entryOffset + ComponentEntrySizeOffset);
+                ushort nodeOffset = Endian.ReadUInt16LE(uld, entryOffset + ComponentEntryNodeOffsetOffset);
                 int nodeStart = entryOffset + nodeOffset;
-                if (nodeOffset < 16 || !HasRange(uld, nodeStart, 28))
+                if (nodeOffset < ComponentEntryMinNodeOffset || !HasRange(uld, nodeStart, UldTextNodeMinSize))
                 {
-                    nodeStart = entryOffset + 16;
+                    nodeStart = entryOffset + ComponentEntryMinNodeOffset;
                 }
 
                 int cursor = nodeStart;
-                for (uint nodeIndex = 0; nodeIndex < nodeCount && HasRange(uld, cursor, 28); nodeIndex++)
+                for (uint nodeIndex = 0; nodeIndex < nodeCount && HasRange(uld, cursor, UldTextNodeMinSize); nodeIndex++)
                 {
-                    int nodeSize = Endian.ReadUInt16LE(uld, cursor + 24);
+                    int nodeSize = Endian.ReadUInt16LE(uld, cursor + UldNodeSizeOffset);
                     AddUldTextNodeFont(uld, cursor, results);
                     if (nodeSize <= 0)
                     {
@@ -107,27 +133,27 @@ namespace FfxivKoreanPatch.PatchRouteVerifier
 
         private static void WalkUldWidgetTextNodes(byte[] uld, int atkOffset, List<UldTextNodeFont> results)
         {
-            uint widgetRelativeOffset = Endian.ReadUInt32LE(uld, atkOffset + 24);
+            uint widgetRelativeOffset = Endian.ReadUInt32LE(uld, atkOffset + AtkWidgetListRelativeOffset);
             if (widgetRelativeOffset == 0 || widgetRelativeOffset > int.MaxValue)
             {
                 return;
             }
 
             int widgetOffset = atkOffset + (int)widgetRelativeOffset;
-            if (!HasRange(uld, widgetOffset, 16) || !HasAsciiMagic(uld, widgetOffset, "wdhd"))
+            if (!HasRange(uld, widgetOffset, UldListHeaderSize) || !HasAsciiMagic(uld, widgetOffset, UldWidgetHeaderMagic))
             {
                 return;
             }
 
-            uint widgetCount = Endian.ReadUInt32LE(uld, widgetOffset + 8);
-            int cursor = widgetOffset + 16;
-            for (uint i = 0; i < widgetCount && HasRange(uld, cursor, 16); i++)
+            uint widgetCount = Endian.ReadUInt32LE(uld, widgetOffset + UldListCountOffset);
+            int cursor = widgetOffset + UldListHeaderSize;
+            for (uint i = 0; i < widgetCount && HasRange(uld, cursor, UldListHeaderSize); i++)
             {
-                uint nodeCount = Endian.ReadUInt16LE(uld, cursor + 12);
-                cursor += 16;
-                for (uint nodeIndex = 0; nodeIndex < nodeCount && HasRange(uld, cursor, 28); nodeIndex++)
+                uint nodeCount = Endian.ReadUInt16LE(uld, cursor + WidgetEntryNodeCountOffset);
+                cursor += UldListHeaderSize;
+                for (uint nodeIndex = 0; nodeIndex < nodeCount && HasRange(uld, cursor, UldTextNodeMinSize); nodeIndex++)
                 {
-                    int nodeSize = Endian.ReadUInt16LE(uld, cursor + 24);
+                    int nodeSize = Endian.ReadUInt16LE(uld, cursor + UldNodeSizeOffset);
                     AddUldTextNodeFont(uld, cursor, results);
                     if (nodeSize <= 0)
                     {
@@ -141,32 +167,25 @@ namespace FfxivKoreanPatch.PatchRouteVerifier
 
         private static void AddUldTextNodeFont(byte[] uld, int nodeOffset, List<UldTextNodeFont> results)
         {
-            const int NodeTypeOffset = 20;
-            const int NodeSizeOffset = 24;
-            const int NodeHeaderSize = 88;
-            const int TextExtraMinSize = 24;
-            const int TextFontOffsetInExtra = 10;
-            const int TextFontSizeOffsetInExtra = 11;
-
-            if (!HasRange(uld, nodeOffset, NodeHeaderSize + TextExtraMinSize))
+            if (!HasRange(uld, nodeOffset, UldTextNodeHeaderSize + UldTextExtraMinSize))
             {
                 return;
             }
 
-            int nodeType = unchecked((int)Endian.ReadUInt32LE(uld, nodeOffset + NodeTypeOffset));
-            int nodeSize = Endian.ReadUInt16LE(uld, nodeOffset + NodeSizeOffset);
-            if (nodeType != 3 || nodeSize < NodeHeaderSize + TextExtraMinSize)
+            int nodeType = unchecked((int)Endian.ReadUInt32LE(uld, nodeOffset + UldNodeTypeOffset));
+            int nodeSize = Endian.ReadUInt16LE(uld, nodeOffset + UldNodeSizeOffset);
+            if (nodeType != UldTextNodeType || nodeSize < UldTextNodeHeaderSize + UldTextExtraMinSize)
             {
                 return;
             }
 
-            int fontOffset = nodeOffset + NodeHeaderSize + TextFontOffsetInExtra;
+            int fontOffset = nodeOffset + UldTextNodeHeaderSize + UldTextFontOffsetInExtra;
             if (!HasRange(uld, fontOffset, 1))
             {
                 return;
             }
 
-            int fontSizeOffset = nodeOffset + NodeHeaderSize + TextFontSizeOffsetInExtra;
+            int fontSizeOffset = nodeOffset + UldTextNodeHeaderSize + UldTextFontSizeOffsetInExtra;
             results.Add(new UldTextNodeFont
             {
                 NodeOffset = nodeOffset,
