@@ -41,6 +41,9 @@
 - 시작화면 시스템 설정은 스크린샷에 나온 실제 혼합 문장(`150%(FHD): 1728x972 이상 권장` 등)을 `system-settings-mixed-scale-layouts`로 검증한다. 이 검증은 ASCII/숫자/기호의 clean metrics/texture padding, Hangul advance, 문장 overlap을 함께 확인한다.
 - 로비 시작화면 설정 완료 메시지 `설정을 변경했습니다.`도 같은 고배율 로비 폰트 검증에 포함한다. 이전 산출물은 `U+D588`(`했`) 누락으로 실패했고, 새 산출물은 fallback `=`/`-`가 아님을 확인한다.
 - 4K lobby 파생 폰트 생성은 Hangul만 한국 TTMP source에서 가져오고, ASCII/숫자/기호는 clean global lobby route를 유지한다. clean target에 없는 ASCII만 기존 파생 source pair의 clean lobby font에서 보충한다.
+- 2026-05-10 보강: 기존 verifier는 FDT byte 14를 draw 시작 offset처럼 해석해 ASCII 간격 문제를 놓쳤다. 렌더링 기준을 `drawX = 32`, `advance = width + OffsetX`로 바꾸고, 인접 glyph의 실제 alpha bounds 기준 최소 visual gap을 검사하도록 수정했다.
+- 2026-05-10 처리: `_lobby.fdt` ASCII/숫자/기호에 한해서 clean glyph/texture는 보존하되 negative advance와 negative ASCII kerning은 로비용 safe spacing으로 완화한다. 비로비 FDT는 clean metric을 그대로 보존한다.
+- 2026-05-10 검증: 현재 설치된 이전 산출물은 새 verifier에서 `DATA CENTER SELECT`, `Elemental`, `150%(FHD): 1728x972 이상 권장` 등으로 FAIL한다. 새 ja 산출물 `.tmp\lobby-visual-spacing-final-ja`는 `data-center-title-uld`, `system-settings-mixed-scale-layouts`, `clean-ascii-font-routes`와 넓은 회귀 묶음에서 PASS한다.
 
 재보고 항목:
 
