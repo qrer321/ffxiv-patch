@@ -1269,8 +1269,10 @@ namespace FFXIVKoreanPatch.Main
             {
                 bool hasGlobalClient = HasValidGlobalClient();
                 bool hasKoreaClient = HasValidKoreaClient();
-                bool targetAlreadyPatched = hasGlobalClient && HasPatchedTargetIndexes();
-                bool canApplyToRealClient = enabled && hasGlobalClient && hasKoreaClient && lastPreflightPassed && !targetAlreadyPatched;
+                bool canApplyFullPatch = enabled && hasGlobalClient && hasKoreaClient && lastPreflightPassed &&
+                    CanApplyPatchFilesWithCurrentIndexState(GetPatchFilesForSelection(true, true));
+                bool canApplyFontPatch = enabled && hasGlobalClient && hasKoreaClient && lastPreflightPassed &&
+                    CanApplyPatchFilesWithCurrentIndexState(GetPatchFilesForSelection(false, true));
 
                 globalPathBrowseButton.Enabled = enabled;
                 koreaPathBrowseButton.Enabled = enabled;
@@ -1295,8 +1297,8 @@ namespace FFXIVKoreanPatch.Main
 #else
                 debugBuildReleaseButton.Enabled = false;
                 buildReleaseButton.Enabled = false;
-                installButton.Enabled = canApplyToRealClient;
-                chatOnlyInstallButton.Enabled = canApplyToRealClient;
+                installButton.Enabled = canApplyFullPatch;
+                chatOnlyInstallButton.Enabled = canApplyFontPatch;
                 removeButton.Enabled = enabled && hasGlobalClient;
 #endif
             };
@@ -1591,6 +1593,79 @@ namespace FFXIVKoreanPatch.Main
         private static bool HasAnyPatchFile(IEnumerable<string> selectedPatchFiles, IEnumerable<string> candidatePatchFiles)
         {
             return selectedPatchFiles.Any(fileName => candidatePatchFiles.Contains(fileName, StringComparer.OrdinalIgnoreCase));
+        }
+
+        private string[] GetRequiredRestoreFilesForPatchFiles(IEnumerable<string> selectedPatchFiles)
+        {
+            string[] selected = selectedPatchFiles.Distinct(StringComparer.OrdinalIgnoreCase).ToArray();
+            List<string> files = new List<string>();
+
+            if (HasAnyPatchFile(selected, fontPatchFiles))
+            {
+                files.Add("000000.win32.index");
+                files.Add("000000.win32.index2");
+            }
+
+            if (HasAnyPatchFile(selected, uiPatchFiles))
+            {
+                files.Add("060000.win32.index");
+                files.Add("060000.win32.index2");
+            }
+
+            if (HasAnyPatchFile(selected, textPatchFiles))
+            {
+                files.Add("0a0000.win32.index");
+                files.Add("0a0000.win32.index2");
+            }
+
+            return files.Distinct(StringComparer.OrdinalIgnoreCase).ToArray();
+        }
+
+        private bool HasCleanIndexAtPath(string indexPath)
+        {
+            if (string.IsNullOrEmpty(indexPath) || !File.Exists(indexPath))
+            {
+                return false;
+            }
+
+            int dat1Count;
+            string error;
+            return IsCleanIndexFile(indexPath, out dat1Count, out error);
+        }
+
+        private bool HasUsableCleanBaseIndex(string sqpackDir, string fileName)
+        {
+            if (HasCleanIndexAtPath(Path.Combine(sqpackDir, fileName)))
+            {
+                return true;
+            }
+
+            if (HasCleanIndexAtPath(Path.Combine(sqpackDir, "orig." + fileName)))
+            {
+                return true;
+            }
+
+            string baselineDir = GetRestoreBaselineBaseDir();
+            return HasCleanIndexAtPath(GetRestoreBaselineOrigPath(baselineDir, fileName));
+        }
+
+        private bool CanApplyPatchFilesWithCurrentIndexState(IEnumerable<string> selectedPatchFiles)
+        {
+            string sqpackDir = GetTargetSqpackDir();
+            if (string.IsNullOrEmpty(sqpackDir) || !Directory.Exists(sqpackDir))
+            {
+                return false;
+            }
+
+            foreach (string fileName in GetRequiredRestoreFilesForPatchFiles(selectedPatchFiles))
+            {
+                if (!HasUsableCleanBaseIndex(sqpackDir, fileName))
+                {
+                    return false;
+                }
+            }
+
+            return true;
         }
 
         private void AppendCleanBaseIndexArguments(
@@ -3825,7 +3900,6 @@ namespace FFXIVKoreanPatch.Main
                 {
                     bool hasGlobalClient = HasValidGlobalClient();
                     bool hasKoreaClient = HasValidKoreaClient();
-                    bool targetAlreadyPatched = hasGlobalClient && HasPatchedTargetIndexes();
 
                     globalPathBrowseButton.Enabled = true;
                     koreaPathBrowseButton.Enabled = true;
@@ -3848,8 +3922,10 @@ namespace FFXIVKoreanPatch.Main
                     preflightCheckButton.Enabled = true;
                     restoreBackupButton.Enabled = true;
                     buildReleaseButton.Enabled = false;
-                    installButton.Enabled = hasGlobalClient && hasKoreaClient && lastPreflightPassed && !targetAlreadyPatched;
-                    chatOnlyInstallButton.Enabled = hasGlobalClient && hasKoreaClient && lastPreflightPassed && !targetAlreadyPatched;
+                    installButton.Enabled = hasGlobalClient && hasKoreaClient && lastPreflightPassed &&
+                        CanApplyPatchFilesWithCurrentIndexState(GetPatchFilesForSelection(true, true));
+                    chatOnlyInstallButton.Enabled = hasGlobalClient && hasKoreaClient && lastPreflightPassed &&
+                        CanApplyPatchFilesWithCurrentIndexState(GetPatchFilesForSelection(false, true));
                     removeButton.Enabled = hasGlobalClient;
 #endif
                     progressBar.Value = 0;
@@ -4112,6 +4188,8 @@ namespace FFXIVKoreanPatch.Main
                 return;
             }
 
+            string[] selectedPatchFiles = GetPatchFilesForSelection(includeTextPatch, includeFontPatch);
+
 #if !TEST_BUILD
             if (!debugApply && !lastPreflightPassed)
             {
@@ -4120,9 +4198,9 @@ namespace FFXIVKoreanPatch.Main
                 return;
             }
 
-            if (!debugApply && HasPatchedTargetIndexes())
+            if (!debugApply && !CanApplyPatchFilesWithCurrentIndexState(selectedPatchFiles))
             {
-                MessageBox.Show("이미 한글 패치가 적용된 index 상태입니다. 먼저 [한글 패치 제거]로 clean index를 복구한 뒤 다시 진행해주세요.", Text, MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                MessageBox.Show("clean base index를 찾을 수 없습니다. 기존 패치를 제거하거나 orig.* index 파일을 복구한 뒤 다시 진행해주세요.", Text, MessageBoxButtons.OK, MessageBoxIcon.Warning);
                 SetActionButtonsEnabled(true);
                 return;
             }
@@ -4231,21 +4309,26 @@ namespace FFXIVKoreanPatch.Main
             StartPreflightCheck();
         }
 
-        private string[] GetSelectedPatchFiles()
+        private string[] GetPatchFilesForSelection(bool includeTextPatch, bool includeFontPatch)
         {
             List<string> files = new List<string>();
-            if (buildTextPatch)
+            if (includeTextPatch)
             {
                 files.AddRange(textPatchFiles);
             }
 
-            if (buildFontPatch)
+            if (includeFontPatch)
             {
                 files.AddRange(fontPatchFiles);
                 files.AddRange(uiPatchFiles);
             }
 
             return files.Distinct(StringComparer.OrdinalIgnoreCase).ToArray();
+        }
+
+        private string[] GetSelectedPatchFiles()
+        {
+            return GetPatchFilesForSelection(buildTextPatch, buildFontPatch);
         }
 
         private string GetSelectedFontPatchProfile()
