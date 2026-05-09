@@ -11,6 +11,7 @@ namespace FfxivKoreanPatch.PatchRouteVerifier
             public string GlobalGamePath;
             public string TargetLanguage = "ja";
             public string GlyphDumpDir;
+            public string[] Checks;
             public bool NoGlyphDump;
             public bool ShowHelp;
 
@@ -45,6 +46,10 @@ namespace FfxivKoreanPatch.PatchRouteVerifier
                     {
                         options.GlyphDumpDir = RequireValue(args, ref i, arg);
                     }
+                    else if (string.Equals(arg, "--checks", StringComparison.OrdinalIgnoreCase))
+                    {
+                        options.Checks = ParseChecks(RequireValue(args, ref i, arg));
+                    }
                     else if (string.Equals(arg, "--no-glyph-dump", StringComparison.OrdinalIgnoreCase))
                     {
                         options.NoGlyphDump = true;
@@ -67,6 +72,17 @@ namespace FfxivKoreanPatch.PatchRouteVerifier
 
                 index++;
                 return args[index];
+            }
+
+            private static string[] ParseChecks(string value)
+            {
+                string[] parts = value.Split(new char[] { ',' }, StringSplitOptions.RemoveEmptyEntries);
+                for (int i = 0; i < parts.Length; i++)
+                {
+                    parts[i] = parts[i].Trim();
+                }
+
+                return parts;
             }
         }
     }

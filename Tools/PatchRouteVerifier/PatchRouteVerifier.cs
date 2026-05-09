@@ -42,7 +42,7 @@ namespace FfxivKoreanPatch.PatchRouteVerifier
                         ? Path.Combine(output, DefaultGlyphDumpFolderName)
                         : Path.GetFullPath(options.GlyphDumpDir));
 
-                Verifier verifier = new Verifier(output, appliedSqpack, globalSqpack, language, glyphDumpDir);
+                Verifier verifier = new Verifier(output, appliedSqpack, globalSqpack, language, glyphDumpDir, options.Checks);
                 verifier.Run();
                 return verifier.Failed ? 1 : 0;
             }
@@ -56,7 +56,7 @@ namespace FfxivKoreanPatch.PatchRouteVerifier
 
         private static void PrintUsage()
         {
-            Console.WriteLine("PatchRouteVerifier.exe --output <patch-output-dir> --global <global-game-dir> [--applied-game <game-dir>] [--target-language ja] [--glyph-dump-dir <dir>] [--no-glyph-dump]");
+            Console.WriteLine("PatchRouteVerifier.exe --output <patch-output-dir> --global <global-game-dir> [--applied-game <game-dir>] [--target-language ja] [--glyph-dump-dir <dir>] [--no-glyph-dump] [--checks <name[,name]>]");
         }
 
         private sealed partial class Verifier
@@ -72,16 +72,18 @@ namespace FfxivKoreanPatch.PatchRouteVerifier
             private readonly CompositeArchive _cleanUi;
             private readonly Dictionary<string, byte[]> _textureCache = new Dictionary<string, byte[]>(StringComparer.OrdinalIgnoreCase);
             private readonly string _glyphDumpDir;
+            private readonly string[] _selectedChecks;
 
             public bool Failed { get; private set; }
 
-            public Verifier(string output, string patchedSqpack, string globalSqpack, string language, string glyphDumpDir)
+            public Verifier(string output, string patchedSqpack, string globalSqpack, string language, string glyphDumpDir, string[] selectedChecks)
             {
                 _output = output;
                 _patchedSqpack = patchedSqpack;
                 _globalSqpack = globalSqpack;
                 _language = language;
                 _glyphDumpDir = glyphDumpDir;
+                _selectedChecks = selectedChecks;
 
                 _patchedText = new CompositeArchive(
                     Path.Combine(patchedSqpack, TextPrefix + ".index"),
@@ -138,27 +140,7 @@ namespace FfxivKoreanPatch.PatchRouteVerifier
 
                     Console.WriteLine();
 
-                    VerifyDataCenterRows();
-                    VerifyDataCenterRowsAllGlobalLanguageSlots();
-                    VerifyDataCenterTitleUldRoute();
-                    VerifyDataCenterWorldmapUldRoute();
-                    VerifyCompactTimeRows();
-                    VerifyWorldVisitRows();
-                    VerifyConfigurationSharingRows();
-                    VerifyBozjaEntranceRows();
-                    VerifyOccultCrescentSupportJobRows();
-                    VerifyDataCenterTitleGlyphs();
-                    VerifyCleanAsciiFontRoutes();
-                    VerifyHighScaleAsciiPhraseLayouts();
-                    VerifySystemSettingsScaledPhraseLayouts();
-                    Verify4kLobbyFontDerivations();
-                    Verify4kLobbyPhraseLayouts();
-                    VerifyNumericGlyphs();
-                    VerifyProtectedHangulGlyphs();
-                    VerifyPartyListSelfMarker();
-                    VerifyLobbyHangulVisibility();
-                    VerifyLobbyPhraseGlyphDiagnostics();
-                    VerifyDialoguePhraseGlyphDiagnostics();
+                    RunVerificationSteps();
 
                     Console.WriteLine();
                     Console.WriteLine(Failed ? "RESULT: FAIL" : "RESULT: PASS");

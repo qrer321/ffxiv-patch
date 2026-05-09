@@ -77,6 +77,7 @@
     <Compile Include="VerifierTextAssertions.cs" />
     <Compile Include="VerifierUtilities.cs" />
     <Compile Include="VerificationData.cs" />
+    <Compile Include="VerificationSteps.cs" />
     <Compile Include="..\..\FFXIVPatchGenerator\SqPack.cs">
       <Link>Generator\SqPack.cs</Link>
     </Compile>
