@@ -60,11 +60,14 @@
     <Compile Include="GlyphAnalysis.cs" />
     <Compile Include="GlyphBitmapDiff.cs" />
     <Compile Include="GlyphBitmapWriter.cs" />
+    <Compile Include="GlyphEqualityAssertions.cs" />
+    <Compile Include="GlyphFallbackAssertions.cs" />
     <Compile Include="GlyphDiagnosticsData.cs" />
     <Compile Include="GlyphDiagnostics.cs" />
     <Compile Include="GlyphDumpFormatting.cs" />
     <Compile Include="GlyphDumpOutput.cs" />
     <Compile Include="GlyphSheetDumpOutput.cs" />
+    <Compile Include="GlyphVisibilityAssertions.cs" />
     <Compile Include="LabelPreviewDumpOutput.cs" />
     <Compile Include="LobbyGlyphDiagnostics.cs" />
     <Compile Include="NumericGlyphVerification.cs" />
