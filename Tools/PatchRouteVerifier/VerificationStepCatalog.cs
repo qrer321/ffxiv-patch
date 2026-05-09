@@ -8,6 +8,7 @@ namespace FfxivKoreanPatch.PatchRouteVerifier
             {
                 return new VerificationStep[]
                 {
+                    new VerificationStep("applied-output-files", VerifyAppliedOutputFiles),
                     new VerificationStep("data-center-rows", VerifyDataCenterRows),
                     new VerificationStep("data-center-language-slots", VerifyDataCenterRowsAllGlobalLanguageSlots),
                     new VerificationStep("data-center-title-uld", VerifyDataCenterTitleUldRoute),

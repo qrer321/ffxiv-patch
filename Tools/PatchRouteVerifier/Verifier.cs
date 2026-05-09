@@ -17,16 +17,19 @@ namespace FfxivKoreanPatch.PatchRouteVerifier
             private readonly CompositeArchive _patchedText;
             private readonly CompositeArchive _patchedFont;
             private readonly CompositeArchive _patchedUi;
+            private readonly CompositeArchive _generatedFont;
+            private readonly CompositeArchive _generatedUi;
             private readonly CompositeArchive _cleanFont;
             private readonly CompositeArchive _cleanUi;
             private readonly TtmpFontPackage _ttmpFont;
             private readonly Dictionary<string, byte[]> _textureCache = new Dictionary<string, byte[]>(StringComparer.OrdinalIgnoreCase);
             private readonly string _glyphDumpDir;
             private readonly string[] _selectedChecks;
+            private readonly bool _compareAppliedOutput;
 
             public bool Failed { get; private set; }
 
-            public Verifier(string output, string patchedSqpack, string globalSqpack, string language, string glyphDumpDir, string[] selectedChecks, string fontPackDir)
+            public Verifier(string output, string patchedSqpack, string globalSqpack, string language, string glyphDumpDir, string[] selectedChecks, string fontPackDir, bool compareAppliedOutput)
             {
                 _output = output;
                 _patchedSqpack = patchedSqpack;
@@ -34,6 +37,7 @@ namespace FfxivKoreanPatch.PatchRouteVerifier
                 _language = language;
                 _glyphDumpDir = glyphDumpDir;
                 _selectedChecks = selectedChecks;
+                _compareAppliedOutput = compareAppliedOutput;
 
                 _patchedText = new CompositeArchive(
                     Path.Combine(patchedSqpack, TextPrefix + ".index"),
@@ -50,6 +54,20 @@ namespace FfxivKoreanPatch.PatchRouteVerifier
                     patchedSqpack,
                     globalSqpack,
                     UiPrefix);
+                if (_compareAppliedOutput)
+                {
+                    _generatedFont = new CompositeArchive(
+                        Path.Combine(output, FontPrefix + ".index"),
+                        output,
+                        globalSqpack,
+                        FontPrefix);
+                    _generatedUi = new CompositeArchive(
+                        Path.Combine(output, UiPrefix + ".index"),
+                        output,
+                        globalSqpack,
+                        UiPrefix);
+                }
+
                 _cleanFont = new CompositeArchive(
                     Path.Combine(output, "orig." + FontPrefix + ".index"),
                     globalSqpack,
@@ -77,6 +95,8 @@ namespace FfxivKoreanPatch.PatchRouteVerifier
                 using (_patchedText)
                 using (_patchedFont)
                 using (_patchedUi)
+                using (_generatedFont)
+                using (_generatedUi)
                 using (_cleanFont)
                 using (_cleanUi)
                 using (_ttmpFont)

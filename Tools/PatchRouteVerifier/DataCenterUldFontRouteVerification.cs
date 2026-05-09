@@ -120,6 +120,11 @@ namespace FfxivKoreanPatch.PatchRouteVerifier
                     return;
                 }
 
+                if (!VerifyUldTextNodeRenderBytesPreserved(uldPath, cleanNode, patchedNode))
+                {
+                    return;
+                }
+
                 string resolvedFont = ResolveUldFontPath(patchedNode.FontId, patchedNode.FontSize, lobby);
                 if (resolvedFont == null)
                 {
@@ -134,12 +139,80 @@ namespace FfxivKoreanPatch.PatchRouteVerifier
 
                 routedFontPaths.Add(resolvedFont);
                 Pass(
-                    "{0} node 0x{1:X} preserves font {2}/{3} routes to {4}",
+                    "{0} node 0x{1:X} preserves font/render state {2}/{3} routes to {4}",
                     uldPath,
                     cleanNode.NodeOffset,
                     patchedNode.FontId,
                     patchedNode.FontSize,
                     resolvedFont);
+            }
+
+            private bool VerifyUldTextNodeRenderBytesPreserved(string uldPath, UldTextNodeFont cleanNode, UldTextNodeFont patchedNode)
+            {
+                if (cleanNode.NodeSize != patchedNode.NodeSize)
+                {
+                    Fail(
+                        "{0} node 0x{1:X} size changed: clean={2}, patched={3}",
+                        uldPath,
+                        cleanNode.NodeOffset,
+                        cleanNode.NodeSize,
+                        patchedNode.NodeSize);
+                    return false;
+                }
+
+                if (!BytesEqual(cleanNode.HeaderBytes, patchedNode.HeaderBytes))
+                {
+                    Fail(
+                        "{0} node 0x{1:X} base render header changed: {2}",
+                        uldPath,
+                        cleanNode.NodeOffset,
+                        FormatByteDifference(cleanNode.HeaderBytes, patchedNode.HeaderBytes));
+                    return false;
+                }
+
+                if (!BytesEqual(cleanNode.TextExtraBytes, patchedNode.TextExtraBytes))
+                {
+                    Fail(
+                        "{0} node 0x{1:X} text render extra changed: {2}",
+                        uldPath,
+                        cleanNode.NodeOffset,
+                        FormatByteDifference(cleanNode.TextExtraBytes, patchedNode.TextExtraBytes));
+                    return false;
+                }
+
+                return true;
+            }
+
+            private static string FormatByteDifference(byte[] clean, byte[] patched)
+            {
+                int index = FindFirstByteDifference(clean, patched);
+                if (index < 0)
+                {
+                    return "no byte difference";
+                }
+
+                string cleanValue = index < clean.Length ? "0x" + clean[index].ToString("X2") : "<missing>";
+                string patchedValue = index < patched.Length ? "0x" + patched[index].ToString("X2") : "<missing>";
+                return "relative=0x" + index.ToString("X") + ", clean=" + cleanValue + ", patched=" + patchedValue;
+            }
+
+            private static int FindFirstByteDifference(byte[] clean, byte[] patched)
+            {
+                int sharedLength = Math.Min(clean.Length, patched.Length);
+                for (int i = 0; i < sharedLength; i++)
+                {
+                    if (clean[i] != patched[i])
+                    {
+                        return i;
+                    }
+                }
+
+                if (clean.Length != patched.Length)
+                {
+                    return sharedLength;
+                }
+
+                return -1;
             }
         }
     }

@@ -87,3 +87,5 @@
 - Data center phrase layout and pixel rendering checks now apply FDT kerning before each glyph/space advance.
 - Data center ASCII pixel checks now run against every `DataCenterWorldmapLabels` entry, including DC group names and server/world names.
 - Current output passes `.tmp\verifier-dc-kerning-full.log`; if the live client still fails, the next check must move beyond FDT glyph/kerning equality and inspect ULD render attributes, runtime scale behavior, or the actually applied game folder.
+- ULD font route checks now also assert text node header and text extra render-state bytes match clean global. Current output passes `.tmp\verifier-uld-render-state.log`.
+- `applied-output-files` compares generated output packed bytes against `--applied-game`; use it to rule out an installed-folder mismatch before live client retesting.

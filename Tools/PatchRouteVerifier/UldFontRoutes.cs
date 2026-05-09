@@ -191,8 +191,17 @@ namespace FfxivKoreanPatch.PatchRouteVerifier
                 NodeOffset = nodeOffset,
                 NodeSize = nodeSize,
                 FontId = uld[fontOffset],
-                FontSize = uld[fontSizeOffset]
+                FontSize = uld[fontSizeOffset],
+                HeaderBytes = CopyBytes(uld, nodeOffset, UldTextNodeHeaderSize),
+                TextExtraBytes = CopyBytes(uld, nodeOffset + UldTextNodeHeaderSize, UldTextExtraMinSize)
             });
+        }
+
+        private static byte[] CopyBytes(byte[] data, int offset, int length)
+        {
+            byte[] bytes = new byte[length];
+            Buffer.BlockCopy(data, offset, bytes, 0, length);
+            return bytes;
         }
 
         private struct UldTextNodeFont
@@ -201,6 +210,8 @@ namespace FfxivKoreanPatch.PatchRouteVerifier
             public int NodeSize;
             public byte FontId;
             public byte FontSize;
+            public byte[] HeaderBytes;
+            public byte[] TextExtraBytes;
         }
     }
 }

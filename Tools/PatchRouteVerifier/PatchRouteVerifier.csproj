@@ -38,6 +38,7 @@
   </ItemGroup>
   <ItemGroup>
     <Compile Include="ArchiveAccess.cs" />
+    <Compile Include="AppliedOutputVerification.cs" />
     <Compile Include="CliOptions.cs" />
     <Compile Include="CleanAsciiKerningRouteVerification.cs" />
     <Compile Include="CleanAsciiFontRouteVerification.cs" />
