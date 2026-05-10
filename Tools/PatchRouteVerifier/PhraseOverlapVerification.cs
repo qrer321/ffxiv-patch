@@ -390,12 +390,6 @@ namespace FfxivKoreanPatch.PatchRouteVerifier
 
                 if (layout.MinimumGapPixels < 1)
                 {
-                    if (ScaledLobbyGapMatchesCleanAsciiBaseline(fontPath, phrase, layout))
-                    {
-                        Pass("{0} system-settings phrase [{1}] scaled-lobby layout glyphs={2}, width={3}, minGap={4} matches clean ASCII baseline", fontPath, Escape(phrase), layout.Glyphs, layout.Width, layout.MinimumGapPixels);
-                        return;
-                    }
-
                     string pairDetail = DescribeScaledLobbyPairSpacing(
                         fontPath,
                         layout.MinimumGapLeftCodepoint,
@@ -412,23 +406,6 @@ namespace FfxivKoreanPatch.PatchRouteVerifier
                 }
 
                 Pass("{0} system-settings phrase [{1}] scaled-lobby layout glyphs={2}, width={3}, minGap={4}", fontPath, Escape(phrase), layout.Glyphs, layout.Width, layout.MinimumGapPixels);
-            }
-
-            private bool ScaledLobbyGapMatchesCleanAsciiBaseline(string fontPath, string phrase, PhraseLayoutResult layout)
-            {
-                if (layout.MinimumGapLeftCodepoint > 0x7Eu ||
-                    layout.MinimumGapRightCodepoint > 0x7Eu)
-                {
-                    return false;
-                }
-
-                PhraseLayoutResult cleanLayout;
-                string error;
-                string sourceFontPath = ResolveCleanAsciiReferenceFontPath(fontPath);
-                return !string.IsNullOrEmpty(sourceFontPath) &&
-                       TryMeasurePhraseLayout(_cleanFont, sourceFontPath, ToAsciiOnlyPhrase(phrase), false, out cleanLayout, out error) &&
-                       cleanLayout.Glyphs > 1 &&
-                       layout.MinimumGapPixels >= cleanLayout.MinimumGapPixels;
             }
 
             private string DescribeScaledLobbyPairSpacing(string fontPath, uint leftCodepoint, uint rightCodepoint)
@@ -508,29 +485,24 @@ namespace FfxivKoreanPatch.PatchRouteVerifier
                     return true;
                 }
 
-                PhraseLayoutResult sourceLayout;
-                string sourceError;
-                string sourcePhrase = IsAsciiPhrase(phrase) ? phrase : ToAsciiOnlyPhrase(phrase);
-                if (!string.IsNullOrEmpty(sourceFontPath) &&
-                    TryMeasurePhraseLayout(_cleanFont, sourceFontPath, sourcePhrase, false, out sourceLayout, out sourceError) &&
-                    sourceLayout.Glyphs > 1)
+                if (layout.MinimumGapPixels >= 1)
                 {
-                    if (layout.MinimumGapPixels >= sourceLayout.MinimumGapPixels)
-                    {
-                        return true;
-                    }
-
-                    Fail(
-                        "{0} phrase [{1}] min visual gap {2} is narrower than clean {3} baseline {4}",
-                        fontPath,
-                        Escape(phrase),
-                        layout.MinimumGapPixels,
-                        sourceFontPath,
-                        sourceLayout.MinimumGapPixels);
-                    return false;
+                    return true;
                 }
 
-                return true;
+                string pairDetail = DescribeScaledLobbyPairSpacing(
+                    fontPath,
+                    layout.MinimumGapLeftCodepoint,
+                    layout.MinimumGapRightCodepoint);
+                Fail(
+                    "{0} phrase [{1}] min visual gap {2} is below lobby floor 1, pair=U+{3:X4}/U+{4:X4}{5}",
+                    fontPath,
+                    Escape(phrase),
+                    layout.MinimumGapPixels,
+                    layout.MinimumGapLeftCodepoint,
+                    layout.MinimumGapRightCodepoint,
+                    pairDetail);
+                return false;
             }
 
             private static bool ShouldVerifyLobbyAsciiVisualGap(string fontPath, string phrase)

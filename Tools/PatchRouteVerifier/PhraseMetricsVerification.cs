@@ -105,6 +105,12 @@ namespace FfxivKoreanPatch.PatchRouteVerifier
 
                     if (targetAdvance != sourceAdvance)
                     {
+                        if (IsLobbyFontPath(targetFontPath) && targetAdvance > sourceAdvance)
+                        {
+                            Pass("{0} phrase [{1}] metrics match {2} with lobby-safe spacing, glyphs={3}, width={4}/{5}", targetFontPath, Escape(phrase), sourceFontPath, glyphs, targetAdvance, sourceAdvance);
+                            return;
+                        }
+
                         Fail(
                             "{0} phrase [{1}] width differs from {2}: target={3}, clean={4}",
                             targetFontPath,

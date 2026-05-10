@@ -157,6 +157,18 @@ namespace FfxivKoreanPatch.PatchRouteVerifier
                     return false;
                 }
 
+                string error;
+                if (!VerifyGlyphTextureNeighborhoodMatchesTtmpSource(route.SourceFontPath, route.TargetFontPath, codepoint, DataCenterGlyphTexturePadding, out error))
+                {
+                    Fail(
+                        "{0} U+{1:X4} scaled lobby glyph texture padding differs from {2}: {3}",
+                        route.TargetFontPath,
+                        codepoint,
+                        route.SourceFontPath,
+                        error);
+                    return false;
+                }
+
                 return true;
             }
 
