@@ -58,6 +58,7 @@ namespace FfxivKoreanPatch.PatchRouteVerifier
 
             private static readonly string[] SystemSettingsScaledPhrases = CombinePhraseGroups(
                 LobbyScaledHangulPhrases.StartScreenSystemSettings,
+                LobbyScaledHangulPhrases.HighResolutionUiScaleOptions,
                 LobbyScaledHangulPhrases.StartScreenSystemSettingsResultMessages);
 
             private static readonly string[] SystemSettingsMixedScalePhrases = CombinePhraseGroups(

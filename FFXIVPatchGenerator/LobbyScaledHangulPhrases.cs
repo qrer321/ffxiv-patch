@@ -82,7 +82,8 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
 
         public static readonly string[] StartScreenSystemSettingsResultMessages = new string[]
         {
-            "\uC124\uC815\uC744 \uBCC0\uACBD\uD588\uC2B5\uB2C8\uB2E4."
+            "\uC124\uC815\uC744 \uBCC0\uACBD\uD588\uC2B5\uB2C8\uB2E4.",
+            "\uC77C\uBD80 \uC124\uC815\uC740 \uC801\uC6A9\uC744 \uB20C\uB7EC\uC57C \uBC18\uC601\uB429\uB2C8\uB2E4."
         };
 
         public static readonly string[] All = Combine(
