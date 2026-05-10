@@ -117,6 +117,16 @@
   - 2026-05-09 처리: `hangul-source-preservation` verifier 추가, 전역 Hangul offset 정규화 제거.
   - 남은 방향: 새로 보고된 `즉시 발동`/`초` 배율별 상대 크기 문제는 TTMP 원본 동일성 검증이 아니라 UI route별 scale-ratio 검증으로 확인한다.
 
+## 2026-05-10 lobby high-scale font follow-up
+
+- 사용자 지시: 사용자가 OK하기 전까지 시작화면/로비 150% 이상 폰트 문제는 `수정 완료`로 판단하지 않는다. 코드상 조치와 verifier 산출물은 남기되, 상태는 열린 이슈로 유지한다.
+- 재검증 공백: 기존 `lobby-scale-font-sources`는 patched lobby font가 TTMP font package source와 같은지만 봤다. TTMP 재조합 source 자체가 한국 클라이언트의 배율별 원본 glyph와 다른 경우를 놓칠 수 있었다.
+- 원인 후보 확인: 기존 산출물의 `AXIS_12/14/18/36_lobby` Hangul glyph는 한국 클라이언트 `KrnAXIS_120/140/180/360`보다 높이가 컸다. 예: `AXIS_36_lobby` target `41x50` vs Korean `KrnAXIS_360` source `41x41`.
+- 코드상 조치: TTMP package가 있더라도 lobby AXIS Hangul은 한국 클라이언트 `KrnAXIS_120/140/180/360` source glyph shape를 복사한다. advance는 겹침 방지를 위해 source advance가 glyph width보다 좁을 때 glyph width로만 정규화한다. 이 경로는 `_lobby` AXIS font와 scale-sensitive Hangul codepoint에 한정한다.
+- 검증 보강: `--korea`를 받는 `korean-lobby-font-sources` verifier를 추가했다. 한국 클라이언트 source glyph의 width/height/offsetY/pixel alpha와 patched target을 비교하고, advance는 기대 정규화 값과 정확히 일치해야 한다.
+- 현재 산출물 기준: `.tmp\lobby-krnaxis-advance-ja`는 `korean-lobby-font-sources,system-settings-mixed-scale-layouts,lobby-scale-font-sources,clean-ascii-font-routes` focused verifier PASS(`.tmp\verifier-lobby-krnaxis-advance-focused-r2.log`). `start-system-settings-uld`도 실제 ULD route가 AXIS 계열임을 확인하고 PASS(`.tmp\verifier-lobby-krnaxis-start-system-settings-uld.log`).
+- 열린 이슈: 데이터센터 영어 서버명 spacing/blur는 이번 KrnAXIS Hangul route 조치와 별개로 계속 열린 항목이다. 실제 로비 150%+ 픽셀 번짐도 사용자 OK 전까지 열린 항목으로 유지한다.
+
 ## Verification Rule
 
 - 재보고된 항목은 먼저 verifier가 실패하도록 만든다.
