@@ -86,12 +86,14 @@
   - 처리: `reported-ingame-hangul-phrases` verifier를 추가해 `즉시 발동`, `시전 시간`, `재사용 대기 시간`, `발동 조건`을 모든 TTMP-covered in-game font route에서 문장 단위 pixel/layout/metrics로 비교한다.
   - 검증 결과: `.tmp\verifier-ja-reported-ingame-phrases.log`와 `.tmp\verifier-ja-regression-with-reported-phrases.log` PASS. patched output이 TTMP 원본과 같으므로 패치가 glyph를 키운 문제는 아닌 것으로 분리한다.
 
-- [ ] In-game: `즉시 발동`/`초`가 UI 배율별 상대 크기를 제대로 따라가지 않음
+- [x] In-game: `즉시 발동`/`초`가 UI 배율별 상대 크기를 제대로 따라가지 않음
   - 재보고일: 2026-05-10
   - 증상: 100%/150%에서는 `즉시 발동`과 `초`가 주변 문자보다 크게 보이고, 200%/300%에서는 주변 문자보다 작게 보임. 깨짐이 아니라 같은 UI 안에서 상대 크기가 어긋나는 문제다.
   - 검증 공백: 기존 `reported-ingame-hangul-phrases`는 patched glyph가 TTMP 원본과 같은지만 확인하므로, UI 배율별 font route와 주변 숫자/라벨 대비 상대 크기 차이를 잡지 못한다.
-  - 다음 검증 보강: action detail/help 계열 UI가 실제로 참조하는 ULD/font route를 찾고, 100/150/200/300% 배율에서 한글 라벨(`즉시 발동`)과 시간 단위(`초`)의 glyph bounds/advance 비율이 주변 라벨/숫자와 함께 스케일되는지 비교한다.
-  - 수정 방향: `초` 같은 특정 문자 보호 배열로 처리하지 않는다. 실제 row/source와 font category를 추적한 뒤, route 단위 또는 font family 단위 규칙으로 맞춘다.
+  - 검증 보강: `ActionDetail.uld`의 실제 font route를 수집하고, `즉시 발동`, `초`, `120.00초`, `1.50초`를 숫자 baseline과 함께 렌더링해 한글/숫자 시각 높이 비율 및 `TrumpGothic_34 -> TrumpGothic_68` 스케일 비율을 검사하는 `action-detail-scale-layouts` verifier를 추가했다.
+  - 처리: `TrumpGothic_68.fdt`의 action-detail 고배율 Hangul glyph를 `Addon#699-714`와 fallback 문구에서 자동 수집한 codepoint 기준으로 보정한다. 특정 글자 보호 배열이 아니라 route/font category 단위 수리이며, atlas cell은 새로 할당해 기존 glyph cell을 덮어쓰지 않는다.
+  - 검증 결과: `.tmp\action-detail-scale-ja4` 및 `.tmp\action-detail-scale-ja4-apply` 산출물이 `action-detail-scale-layouts` PASS. `reported-ingame-hangul-phrases`, `4k-lobby-font-derivations`, `hangul-source-preservation`도 새 기준으로 PASS.
+  - 적용 상태: 실제 `D:\SquareEnix\FINAL FANTASY XIV - A Realm Reborn\game` 복사는 실행 중인 `ffxiv_dx11`/`XIVLauncher` 파일 잠금으로 차단됨. 생성 산출물 자체는 검증 완료.
 
 - [x] In-game: `탐사대 호위대원`의 `호` glyph 깨짐
   - 검증 보강: `탐사대 호위대원` 문장을 glyph visibility/fallback/layout 검사에 포함한다.

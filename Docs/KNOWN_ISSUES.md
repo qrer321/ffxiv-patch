@@ -46,6 +46,7 @@
 - 2026-05-10 검증: 현재 설치된 이전 산출물은 새 verifier에서 `DATA CENTER SELECT`, `Elemental`, `150%(FHD): 1728x972 이상 권장` 등으로 FAIL한다. 새 ja 산출물 `.tmp\lobby-ingame-reference-fallback-ja`는 `data-center-title-uld`, `system-settings-mixed-scale-layouts`, `clean-ascii-font-routes`와 넓은 회귀 묶음에서 PASS한다.
 - 2026-05-10 추가 검증: 실제 UI 배율에서 12/14가 아니라 큰 로비 폰트로 치환되는 경로를 잡기 위해 `lobby-scale-font-sources` verifier를 추가했다. 이 검증은 `AXIS_12/14/18_lobby`와 `AXIS_36_lobby` 등 고배율 파생 로비 폰트가 각 배율에 대응되는 TTMP source glyph를 쓰는지, 100% glyph를 억지 확대하지 않는지 width/height 및 alpha pixel 단위로 확인한다.
 - 2026-05-10 최신 산출물: `.tmp\lobby-scale-source-ja`는 `start-system-settings-uld,lobby-scale-font-sources,system-settings-mixed-scale-layouts` PASS. `start-system-settings-uld`는 이제 `150%(FHD): ...` 계열 고해상도 UI 옵션 문구도 `AXIS_12/14/18_lobby` route에서 검사한다.
+- 2026-05-10 인게임 ActionDetail 배율 보강: `ActionDetail.uld` route를 추적하고 `즉시 발동`, `초`, `120.00초`, `1.50초`를 숫자 baseline과 비교하는 `action-detail-scale-layouts` verifier를 추가했다. `TrumpGothic_68.fdt`의 고배율 Hangul glyph는 `Addon#699-714`와 fallback 문구에서 자동 수집한 codepoint만 route 단위로 보정하며, 기존 glyph atlas cell은 덮어쓰지 않는다. `.tmp\action-detail-scale-ja4`와 `.tmp\action-detail-scale-ja4-apply` 산출물은 ActionDetail/reported-ingame/4K lobby derivation/Hangul preservation 검증을 통과했다. 실제 일본어 클라이언트 폴더 복사는 실행 중인 `ffxiv_dx11`/`XIVLauncher` 잠금으로 차단되어 산출물 검증 상태로 남긴다.
 
 재보고 항목:
 
@@ -55,7 +56,7 @@
 - 데이터 센터 선택 화면의 서버명/데이터센터명은 영어로 나오지만 문자 간격이 서로 침범함. clean glyph/metrics/kerning/phrase pixel/padding verifier 기준 처리됨
 - 시작 화면 시스템 설정에서 UI 배율을 150/200/300%로 키우면 한글이 `=`로 깨지고 문자 간격이 침범함. `=` fallback은 처리됐고, 간격/번짐은 배율별 대응 로비 폰트 source 검증까지 추가됨
 - `데이터 센터 Mana에 입장합니다` 계열 팝업 문구는 처리됨. 재발 시 sheet/row/column 추적 verifier를 먼저 보강
-- 인게임 `즉시 발동`/`초`가 UI 배율별 상대 크기를 제대로 따라가지 않는 문제가 추가 보고됨. 100%/150%에서는 주변 문자보다 커 보이고, 200%/300%에서는 작게 보임. 기존 TTMP 원본 대비 문장 pixel/layout/metrics 검증은 patched output과 원본 동일성만 확인하므로 이 상대 크기 문제를 잡지 못함
+- 인게임 `즉시 발동`/`초`가 UI 배율별 상대 크기를 제대로 따라가지 않는 문제는 `action-detail-scale-layouts` verifier와 `TrumpGothic_68.fdt` route 단위 glyph 보정으로 처리됨. 실제 클라이언트 복사는 파일 잠금 해제 후 재적용 필요
 - 스토리 종료 후 컷씬/이벤트 이미지 설명문이 베이스 클라이언트 언어로 표시됨. 폰트 패치가 아니라 지역 이동 타이틀처럼 실제 표시 리소스를 한국 클라이언트 리소스로 교체해야 할 가능성이 높음. 단, 아직 scene 리소스로 단정하지 않고 `EventImage` 등 sheet 기반 이미지 가능성부터 확인해야 함
 
 필요 작업:
@@ -66,7 +67,7 @@
 - 흐림 문제는 clean global ASCII glyph의 픽셀/metrics뿐 아니라 실제 texture cell alpha 차이까지 비교. 현재 non-space ASCII glyph 주변 2px padding 기준으로 수행
 - 흐림 문제는 clean global ASCII glyph의 픽셀/metrics뿐 아니라 실제 texture cell alpha 차이까지 비교. 현재 non-space ASCII glyph 주변 4px padding 기준으로 수행
 - 시작 화면 시스템 설정은 인게임 font route와 분리해서, 해당 route의 한글 glyph fallback/spacing과 배율별 대응 로비 폰트 source glyph 일치 여부를 함께 검증
-- `즉시 발동`/`초` 계열 문구는 TTMP 원본과 patched glyph size/metrics가 같은지 확인하는 기존 `reported-ingame-hangul-phrases`만으로 닫지 않는다. action detail/help UI의 실제 ULD/font route를 찾고, 100/150/200/300%에서 한글 라벨과 시간 단위 glyph bounds/advance가 주변 숫자/라벨과 같은 비율로 스케일되는지 별도 verifier를 추가한다
+- `즉시 발동`/`초` 계열 문구는 `action-detail-scale-layouts`로 실제 ULD/font route, 숫자 대비 시각 높이, `TrumpGothic_34 -> TrumpGothic_68` 상대 스케일을 검증한다
 - story 완료 설명문이 `EventImage`, `CutScreenImage`, `ScreenImage`, `DynamicEventScreenImage`, `LoadingImage`, event/cutscene texture/ULD bundle 중 어디에서 오는지 추적
 - 설명문이 이미지형 리소스라면 global target 리소스와 Korean source 리소스의 hash를 비교하고, 한국 서버 리소스가 존재하는 경우 output UI index에 Korean packed texture가 매핑됐는지 verifier에 추가
 
