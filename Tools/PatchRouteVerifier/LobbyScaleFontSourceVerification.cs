@@ -44,7 +44,10 @@ namespace FfxivKoreanPatch.PatchRouteVerifier
                 AddDynamicHangulCodepoints(codepoints, LobbyScaledHangulPhrases.HighResolutionUiScaleOptions);
                 AddDynamicHangulCodepoints(codepoints, LobbyScaledHangulPhrases.StartScreenSystemSettingsResultMessages);
                 int staticCount = codepoints.Count;
-                int addonDerived = AddPatchedAddonRangeHangulCodepoints(codepoints);
+                int addonDerived = AddPatchedAddonRangeHangulCodepoints(
+                    codepoints,
+                    LobbyScaledHangulPhrases.StartScreenSystemSettingsAddonRowRanges,
+                    "lobby scale source verification");
                 uint[] values = new uint[codepoints.Count];
                 codepoints.CopyTo(values);
                 Array.Sort(values);

@@ -13,6 +13,7 @@ namespace FfxivKoreanPatch.PatchRouteVerifier
             {
                 Console.WriteLine("[FDT] 4K lobby font derivations");
                 uint[] requiredHangulCodepoints = Collect4kLobbyRequiredHangulCodepoints();
+                HashSet<uint> actionDetailHighScaleCodepoints = CollectActionDetailHighScaleHangulCodepointSet();
 
                 for (int i = 0; i < Derived4kLobbyFontPairs.GetLength(0); i++)
                 {
@@ -51,7 +52,12 @@ namespace FfxivKoreanPatch.PatchRouteVerifier
                         ExpectGlyphVisibleAtLeast(_patchedFont, targetFontPath, codepoint, 10);
                         ExpectGlyphNotEqualToFallback(targetFontPath, codepoint, '-');
                         ExpectGlyphNotEqualToFallback(targetFontPath, codepoint, '=');
-                        VerifyDerived4kGlyphMetrics(targetFontPath, codepoint, sourceGlyph);
+                        VerifyDerived4kGlyphMetrics(
+                            targetFontPath,
+                            sourceFontPath,
+                            codepoint,
+                            sourceGlyph,
+                            actionDetailHighScaleCodepoints);
                         checkedHangulCount++;
                     }
 
@@ -71,7 +77,10 @@ namespace FfxivKoreanPatch.PatchRouteVerifier
                 HashSet<uint> codepoints = new HashSet<uint>();
                 AddDynamicHangulCodepoints(codepoints, Derived4kLobbyRequiredHangulPhrases);
                 int staticCount = codepoints.Count;
-                int addonDerived = AddPatchedAddonRangeHangulCodepoints(codepoints);
+                int addonDerived = AddPatchedAddonRangeHangulCodepoints(
+                    codepoints,
+                    LobbyScaledHangulPhrases.StartScreenSystemSettingsAddonRowRanges,
+                    "dynamic 4K lobby glyph verification");
                 uint[] values = new uint[codepoints.Count];
                 codepoints.CopyTo(values);
                 Array.Sort(values);
@@ -79,7 +88,7 @@ namespace FfxivKoreanPatch.PatchRouteVerifier
                 return values;
             }
 
-            private int AddPatchedAddonRangeHangulCodepoints(HashSet<uint> codepoints)
+            private int AddPatchedAddonRangeHangulCodepoints(HashSet<uint> codepoints, AddonRowRange[] ranges, string label)
             {
                 int before = codepoints.Count;
                 try
@@ -87,7 +96,7 @@ namespace FfxivKoreanPatch.PatchRouteVerifier
                     ExcelHeader header = ExcelHeader.Parse(_patchedText.ReadFile("exd/Addon.exh"));
                     if (header.Variant != ExcelVariant.Default)
                     {
-                        Warn("Addon header variant is not supported for dynamic 4K lobby glyph verification: {0}", header.Variant);
+                        Warn("Addon header variant is not supported for {0}: {1}", label, header.Variant);
                         return 0;
                     }
 
@@ -97,7 +106,7 @@ namespace FfxivKoreanPatch.PatchRouteVerifier
                     for (int pageIndex = 0; pageIndex < header.Pages.Count; pageIndex++)
                     {
                         ExcelPageDefinition page = header.Pages[pageIndex];
-                        if (!AddonPageOverlaps(page, LobbyScaledHangulPhrases.StartScreenSystemSettingsAddonRowRanges))
+                        if (!AddonPageOverlaps(page, ranges))
                         {
                             continue;
                         }
@@ -107,7 +116,7 @@ namespace FfxivKoreanPatch.PatchRouteVerifier
                         for (int rowIndex = 0; rowIndex < file.Rows.Count; rowIndex++)
                         {
                             ExcelDataRow row = file.Rows[rowIndex];
-                            if (!RowInRanges(row.RowId, LobbyScaledHangulPhrases.StartScreenSystemSettingsAddonRowRanges))
+                            if (!RowInRanges(row.RowId, ranges))
                             {
                                 continue;
                             }
@@ -122,7 +131,7 @@ namespace FfxivKoreanPatch.PatchRouteVerifier
                 }
                 catch (Exception ex)
                 {
-                    Warn("Could not collect Addon glyph coverage for 4K lobby verification: {0}", ex.Message);
+                    Warn("Could not collect Addon glyph coverage for {0}: {1}", label, ex.Message);
                     return 0;
                 }
 
@@ -187,7 +196,12 @@ namespace FfxivKoreanPatch.PatchRouteVerifier
                 }
             }
 
-            private void VerifyDerived4kGlyphMetrics(string fontPath, uint codepoint, FdtGlyphEntry sourceGlyph)
+            private void VerifyDerived4kGlyphMetrics(
+                string fontPath,
+                string sourceFontPath,
+                uint codepoint,
+                FdtGlyphEntry sourceGlyph,
+                HashSet<uint> actionDetailHighScaleCodepoints)
             {
                 try
                 {
@@ -201,6 +215,18 @@ namespace FfxivKoreanPatch.PatchRouteVerifier
 
                     if (!GlyphSpacingMetricsMatch(sourceGlyph, targetGlyph))
                     {
+                        if (IsActionDetailHighScaleRepairedCodepoint(actionDetailHighScaleCodepoints, sourceFontPath, codepoint))
+                        {
+                            Pass(
+                                "{0} U+{1:X4} keeps pre-repair lobby metrics while {2} is action-detail high-scale repaired: target={3}, source={4}",
+                                fontPath,
+                                codepoint,
+                                sourceFontPath,
+                                FormatGlyphSpacing(targetGlyph),
+                                FormatGlyphSpacing(sourceGlyph));
+                            return;
+                        }
+
                         Fail(
                             "{0} U+{1:X4} metrics differ from derived lobby source: target={2}, source={3}",
                             fontPath,

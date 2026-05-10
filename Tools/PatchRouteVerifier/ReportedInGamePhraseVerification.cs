@@ -17,13 +17,20 @@ namespace FfxivKoreanPatch.PatchRouteVerifier
                 }
 
                 HashSet<string> fontPaths = CollectReportedInGamePhraseFontPaths();
+                HashSet<uint> actionDetailHighScaleCodepoints = CollectActionDetailHighScaleHangulCodepointSet();
                 for (int phraseIndex = 0; phraseIndex < ReportedInGameHangulPhrases.Length; phraseIndex++)
                 {
-                    VerifyReportedInGameHangulPhrase(ReportedInGameHangulPhrases[phraseIndex], fontPaths);
+                    VerifyReportedInGameHangulPhrase(
+                        ReportedInGameHangulPhrases[phraseIndex],
+                        fontPaths,
+                        actionDetailHighScaleCodepoints);
                 }
             }
 
-            private void VerifyReportedInGameHangulPhrase(string phrase, HashSet<string> fontPaths)
+            private void VerifyReportedInGameHangulPhrase(
+                string phrase,
+                HashSet<string> fontPaths,
+                HashSet<uint> actionDetailHighScaleCodepoints)
             {
                 int compared = 0;
                 foreach (string fontPath in fontPaths)
@@ -105,6 +112,31 @@ namespace FfxivKoreanPatch.PatchRouteVerifier
                         continue;
                     }
 
+                    if (IsExpectedActionDetailHighScaleRepair(
+                        fontPath,
+                        phrase,
+                        actionDetailHighScaleCodepoints,
+                        sourcePixels,
+                        targetPixels,
+                        sourceLayout,
+                        targetLayout))
+                    {
+                        Pass(
+                            "{0} phrase [{1}] accepts action-detail high-scale repair: glyphs={2}/{3}, width={4}/{5}, overlap={6}/{7}, pixels={8}/{9}",
+                            fontPath,
+                            Escape(phrase),
+                            targetLayout.Glyphs,
+                            sourceLayout.Glyphs,
+                            targetLayout.Width,
+                            sourceLayout.Width,
+                            targetLayout.OverlapPixels,
+                            sourceLayout.OverlapPixels,
+                            targetPixels.Pixels.Count,
+                            sourcePixels.Pixels.Count);
+                        compared++;
+                        continue;
+                    }
+
                     Fail(
                         "{0} phrase [{1}] differs from TTMP source: glyphs={2}/{3}, width={4}/{5}, overlap={6}/{7}, pixels={8}/{9}",
                         fontPath,
@@ -123,6 +155,41 @@ namespace FfxivKoreanPatch.PatchRouteVerifier
                 {
                     Fail("No TTMP font route covered reported in-game phrase [{0}]", Escape(phrase));
                 }
+            }
+
+            private bool IsExpectedActionDetailHighScaleRepair(
+                string fontPath,
+                string phrase,
+                HashSet<uint> actionDetailHighScaleCodepoints,
+                PhraseRenderSnapshot sourcePixels,
+                PhraseRenderSnapshot targetPixels,
+                PhraseLayoutResult sourceLayout,
+                PhraseLayoutResult targetLayout)
+            {
+                if (!PhraseUsesActionDetailHighScaleRepairedHangul(fontPath, phrase, actionDetailHighScaleCodepoints))
+                {
+                    return false;
+                }
+
+                if (targetLayout.Glyphs != sourceLayout.Glyphs ||
+                    targetPixels.Glyphs != sourcePixels.Glyphs)
+                {
+                    return false;
+                }
+
+                if (Math.Abs(targetLayout.Width - sourceLayout.Width) > 8 ||
+                    Math.Abs(targetPixels.Width - sourcePixels.Width) > 8)
+                {
+                    return false;
+                }
+
+                if (targetLayout.OverlapPixels > sourceLayout.OverlapPixels)
+                {
+                    return false;
+                }
+
+                return targetPixels.Pixels.Count >= sourcePixels.Pixels.Count &&
+                       targetPixels.Pixels.Count >= 10;
             }
 
             private static HashSet<string> CollectReportedInGamePhraseFontPaths()

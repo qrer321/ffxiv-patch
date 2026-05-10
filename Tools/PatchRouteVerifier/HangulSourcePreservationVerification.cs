@@ -26,6 +26,7 @@ namespace FfxivKoreanPatch.PatchRouteVerifier
                 int skippedIntentional = 0;
                 int skippedMissing = 0;
                 int lobbyAxisAdvanceEntriesChecked = 0;
+                HashSet<uint> actionDetailHighScaleCodepoints = CollectActionDetailHighScaleHangulCodepointSet();
 
                 foreach (string fontPath in fontPaths)
                 {
@@ -70,7 +71,7 @@ namespace FfxivKoreanPatch.PatchRouteVerifier
                             continue;
                         }
 
-                        if (IsIntentionalHangulSourceChange(fontPath, codepoint))
+                        if (IsIntentionalHangulSourceChange(fontPath, codepoint, actionDetailHighScaleCodepoints))
                         {
                             skippedIntentional++;
                             continue;
@@ -188,9 +189,16 @@ namespace FfxivKoreanPatch.PatchRouteVerifier
                 return result;
             }
 
-            private static bool IsIntentionalHangulSourceChange(string fontPath, uint codepoint)
+            private static bool IsIntentionalHangulSourceChange(string fontPath, uint codepoint, HashSet<uint> actionDetailHighScaleCodepoints)
             {
                 string normalized = fontPath.Replace('\\', '/');
+                if (actionDetailHighScaleCodepoints != null &&
+                    actionDetailHighScaleCodepoints.Contains(codepoint) &&
+                    ActionDetailHighScaleHangulGlyphs.IsTargetFontPath(normalized))
+                {
+                    return true;
+                }
+
                 if (codepoint == 0xBCC0 &&
                     (string.Equals(normalized, "common/font/AXIS_18.fdt", StringComparison.OrdinalIgnoreCase) ||
                      string.Equals(normalized, "common/font/MiedingerMid_18.fdt", StringComparison.OrdinalIgnoreCase) ||

@@ -39,6 +39,7 @@
     <Compile Include="Program.cs" />
     <Compile Include="TextPatchGenerator.cs" />
     <Compile Include="FontPatchGenerator.cs" />
+    <Compile Include="ActionDetailHighScaleHangulGlyphs.cs" />
     <Compile Include="LobbyScaledHangulPhrases.cs" />
     <Compile Include="UiPatchGenerator.cs" />
     <Compile Include="SqPack.cs" />

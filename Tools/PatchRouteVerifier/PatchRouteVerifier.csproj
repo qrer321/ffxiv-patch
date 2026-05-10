@@ -38,6 +38,7 @@
   </ItemGroup>
   <ItemGroup>
     <Compile Include="ArchiveAccess.cs" />
+    <Compile Include="ActionDetailScaleVerification.cs" />
     <Compile Include="AppliedOutputVerification.cs" />
     <Compile Include="CliOptions.cs" />
     <Compile Include="CleanAsciiKerningRouteVerification.cs" />
@@ -117,6 +118,9 @@
     <Compile Include="VerificationStepCatalog.cs" />
     <Compile Include="VerificationStepSelection.cs" />
     <Compile Include="VerificationSteps.cs" />
+    <Compile Include="..\..\FFXIVPatchGenerator\ActionDetailHighScaleHangulGlyphs.cs">
+      <Link>Generator\ActionDetailHighScaleHangulGlyphs.cs</Link>
+    </Compile>
     <Compile Include="..\..\FFXIVPatchGenerator\LobbyScaledHangulPhrases.cs">
       <Link>Generator\LobbyScaledHangulPhrases.cs</Link>
     </Compile>
