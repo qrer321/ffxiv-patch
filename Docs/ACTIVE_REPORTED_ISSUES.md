@@ -23,8 +23,8 @@
   - 2026-05-09 재검증 보강: 사용자가 계속 보고한 번짐은 2px 주변 비교로 부족할 수 있으므로 clean global ASCII texture neighborhood 기준을 4px로 올렸다. 이전 산출물은 새 4px verifier에서 실패했고, 새 산출물은 `data-center-title-uld,data-center-worldmap-uld`를 포함한 `.tmp\verifier-reported-font-routes-after-fix2.log`에서 PASS한다.
   - 2026-05-09 재보고 후 확인: 실제 적용 폴더는 여전히 최신 산출물과 달랐다. `ffxiv_dx11.exe`/`XIVLauncher.exe` 실행 중인 상태에서 `.tmp\verifier-applied-after-user-report.log`가 `applied-output-files` 및 lobby ASCII padding FAIL을 보고했다. 또한 `Release\Public\FFXIVKoreanPatch.exe`가 오래된 embedded generator를 포함하고 있었으므로 release build script에 embedded generator SHA-256 검증을 추가했다.
   - 2026-05-10 검증 보강: FDT `OffsetX`를 draw 시작 위치가 아니라 advance 조정값으로 해석하도록 verifier 렌더링을 수정했다. 이전 설치 산출물은 새 기준에서 `DATA CENTER SELECT`, `Elemental`, `Tonberry` 등 데이터센터 라벨 visual gap FAIL을 재현한다.
-  - 2026-05-10 재처리: safe spacing 보정은 100% 로비에서 글자 간격을 과하게 벌리고 150% 이상에서도 일부 겹침을 남겼다. `_lobby.fdt` ASCII/숫자/기호는 이제 동일 이름의 비로비 인게임 FDT를 clean reference로 사용한다. 예: `AXIS_12_lobby.fdt` -> `AXIS_12.fdt`. 파생 4K lobby font에서 reference에 없는 ASCII만 기존 파생 source pair에서 codepoint 단위로 보충한다.
-  - 2026-05-10 검증 결과: `.tmp\lobby-ingame-reference-fallback-ja`는 `data-center-title-uld,system-settings-mixed-scale-layouts,clean-ascii-font-routes` 및 넓은 회귀 묶음 PASS. `DATA CENTER SELECT` width `139/139`, `Elemental` width `63/63`처럼 로비 라벨 metric이 인게임 reference와 정확히 일치한다. 기존 설치 산출물은 `--applied-game` 기준 동일 verifier에서 FAIL한다.
+  - 2026-05-10 재처리 정정: safe spacing 보정은 100% 로비에서 글자 간격을 과하게 벌렸고, 비로비 인게임 FDT를 clean reference로 쓰는 방식도 로비 렌더러의 실제 기본 폰트와 달라 번짐/간격 판단을 흐렸다. `_lobby.fdt` ASCII/숫자/기호는 이제 동일 이름의 clean lobby FDT를 기준으로 복원한다. 예: `AXIS_12_lobby.fdt` -> clean `AXIS_12_lobby.fdt`.
+  - 2026-05-10 검증 결과: `.tmp\lobby-axis-hangul-advance-ja`는 `data-center-title-uld,data-center-worldmap-uld,clean-ascii-font-routes,high-scale-ascii-phrase-layouts`와 전체 broad verifier PASS. 로비 ASCII는 clean lobby FDT의 glyph/kerning/texture 기준과 일치해야 하며, 비로비 인게임 metric으로 강제하지 않는다.
   - 다음 처리: 클라이언트/런처 종료 후 최신 `Release\Public\FFXIVKoreanPatch.exe` 또는 산출물로 font patch를 재적용하고, `applied-output-files,data-center-title-uld,data-center-worldmap-uld`를 실제 적용 폴더 기준으로 PASS시킨다.
 
 - [ ] Data center select: 서버명은 영어로 나오지만 문자 간격이 서로 침범함
@@ -37,7 +37,7 @@
   - 2026-05-09 재보고 후 확인: 실제 적용 폴더 기준 verifier에서 lobby ASCII texture padding이 실패하므로, 서버명 간격/번짐 문제도 산출물 수정 미적용 상태로 추적한다.
   - 2026-05-09 재검증 보강: 서버/데이터센터 ASCII도 4px texture neighborhood로 올려 검증한다. 새 산출물은 데이터센터 전체 라벨 metrics/pixels/padding route 검증을 PASS한다.
   - 2026-05-10 검증 보강: clean과 픽셀만 같으면 통과하던 기존 phrase 검증을 인접 glyph alpha bounds 기반 최소 visual gap 검사로 교체했다. 이전 설치 산출물은 서버명/데이터센터명에서 negative advance 및 negative kerning으로 FAIL한다.
-  - 2026-05-10 재처리/검증: 로비 전용 advance/kerning 강제 보정을 제거하고, `_lobby.fdt` ASCII/숫자/기호를 동일 이름의 비로비 인게임 FDT metric/kerning/texture 기준으로 복원했다. `.tmp\lobby-ingame-reference-fallback-ja`는 데이터센터 route와 회귀 검증을 PASS한다.
+  - 2026-05-10 재처리/검증 정정: 로비 전용 advance/kerning 강제 보정을 제거하고, `_lobby.fdt` ASCII/숫자/기호를 동일 이름의 clean lobby FDT metric/kerning/texture 기준으로 복원했다. `.tmp\lobby-axis-hangul-advance-ja`는 데이터센터 route, high-scale ASCII phrase, clean ASCII route, broad verifier를 PASS한다.
 
 - [x] Data center select: 화면을 나가는 버튼이 `-로?` / `-료?`처럼 잘못 표시됨
   - 재보고일: 2026-05-09
@@ -58,8 +58,9 @@
   - 검증 결과: 이전 산출물은 `system-settings-mixed-scale-layouts`에서 ASCII texture padding/overlap/missing glyph로 FAIL했고, 새 산출물 `.tmp\mixed-scale-spacing-fix-ja9`는 `.tmp\verifier-reported-font-routes-after-fix2.log`에서 `data-center-title-uld,data-center-worldmap-uld,start-system-settings-uld,system-settings-mixed-scale-layouts,high-scale-ascii-phrase-layouts,clean-ascii-font-routes,4k-lobby-font-derivations,4k-lobby-phrase-layouts` PASS.
   - 2026-05-09 재보고 후 확인: 생성 산출물 PASS만으로 닫으면 안 된다. 실제 적용 폴더는 최신 font output과 다르고, 기존 `Release\Public` exe도 오래된 embedded generator를 포함하고 있었다. `Scripts\build-release.ps1`가 배포 exe의 embedded `FFXIVPatchGenerator.exe` SHA-256을 최신 빌드 산출물과 비교하도록 보강했다.
   - 2026-05-10 검증 보강: `system-settings-mixed-scale-layouts`가 인접 glyph pair의 실제 alpha bounds로 visual gap을 측정하고, 실패 시 문자쌍/kerning/glyph metrics를 출력한다. 이전 설치 산출물은 `150%(FHD)`, `200%(WQHD)`, `300%(4K)`에서 FAIL한다.
-  - 2026-05-10 재처리: 4K lobby 파생 폰트와 lobby ASCII route의 safe advance/negative kerning 정규화를 제거했다. ASCII/숫자/기호는 동일 이름의 비로비 인게임 FDT를 기준으로 정확히 맞추고, 해당 reference에 없는 문장 기호만 fallback source에서 보충한다. 이 변경은 `_lobby.fdt` 경로에만 제한해 인게임/대사 폰트 metrics 오염을 막는다.
-  - 2026-05-10 검증 결과: `.tmp\lobby-ingame-reference-fallback-ja`는 `system-settings-mixed-scale-layouts`, `clean-ascii-font-routes`, `protected-hangul-glyphs`, `hangul-source-preservation`, `reported-ingame-hangul-phrases` 포함 넓은 회귀 묶음 PASS.
+  - 2026-05-10 재처리 정정: 4K lobby 파생 폰트와 lobby ASCII route의 safe advance/negative kerning 정규화를 제거했다. ASCII/숫자/기호는 동일 이름의 clean lobby FDT를 기준으로 복원하고, 해당 reference에 없는 문장 기호만 fallback source에서 보충한다. 이 변경은 `_lobby.fdt` 경로에만 제한해 인게임/대사 폰트 metrics 오염을 막는다.
+  - 2026-05-10 원인 추가: 한글 `=` fallback은 해결됐지만, `AXIS_12_lobby`/`AXIS_14_lobby`/`AXIS_18_lobby`의 TTMP 한글 glyph가 `OffsetX=-3` 계열로 들어와 advance가 glyph width보다 좁아지는 경우가 있었다. 로비 고배율 문장에서는 이 값이 인접 한글 alpha bounds를 침범시키므로, 픽셀은 그대로 두고 위 세 로비 AXIS 폰트의 한글에 한해 `source advance < glyph width`일 때만 `OffsetX=0`으로 정규화한다.
+  - 2026-05-10 검증 결과: `.tmp\lobby-axis-hangul-advance-ja`는 `start-system-settings-uld,clean-ascii-font-routes,system-settings-mixed-scale-layouts` PASS, `data-center-title-uld,data-center-worldmap-uld,system-settings-scaled-phrase-layouts,high-scale-ascii-phrase-layouts,lobby-hangul-visibility` PASS, 전체 broad verifier PASS. `hangul-source-preservation`은 대표 문구 5,072개 TTMP 한글 glyph 렌더를 비교하고, 별도 전수 스캔으로 로비 AXIS 한글 table 34,437개 중 33,779개의 advance-only 정규화가 규칙과 맞는지 확인한다.
   - 다음 처리: font patch 재적용 후 `applied-output-files,start-system-settings-uld,4k-lobby-phrase-layouts,lobby-hangul-visibility`를 실제 적용 폴더 기준으로 PASS시킨다. 그래도 재현되면 시작화면 시스템 설정의 실제 scale별 font substitution을 별도 verifier로 추가한다.
 
 - [x] Data center select popup: `데이터 센터 Mana에 입장합니다` 계열 팝업 문구가 base client 언어로 나옴 - 처리됨
