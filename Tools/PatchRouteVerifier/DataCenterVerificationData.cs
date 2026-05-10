@@ -126,6 +126,7 @@ namespace FfxivKoreanPatch.PatchRouteVerifier
             "NA Cloud DC (Beta)"
         };
         private static readonly string[] DataCenterWorldmapLabels = CreateDataCenterGlyphLabels();
+        private static readonly string[] DataCenterStrictAsciiSpacingLabels = CreateDataCenterStrictAsciiSpacingLabels();
 
         private static string[] CreateDataCenterGlyphLabels()
         {
@@ -162,6 +163,17 @@ namespace FfxivKoreanPatch.PatchRouteVerifier
             return labels.ToArray();
         }
 
+        private static string[] CreateDataCenterStrictAsciiSpacingLabels()
+        {
+            List<string> labels = new List<string>();
+            AddLabels(labels, DataCenterCriticalRenderLabels);
+            AddLabels(labels, WorldDcGroupTypeLabels);
+            AddUppercaseLabels(labels, WorldDcGroupTypeLabels);
+            AddLabels(labels, DataCenterWorldLabels);
+            AddUppercaseLabels(labels, DataCenterWorldLabels);
+            return labels.ToArray();
+        }
+
         private static string[] CreateDataCenterRegions()
         {
             string[] regions = new string[DataCenterRegionLabels.Length];
@@ -178,6 +190,19 @@ namespace FfxivKoreanPatch.PatchRouteVerifier
             for (int i = 0; i < labels.Length; i++)
             {
                 target.Add(labels[i]);
+            }
+        }
+
+        private static void AddUppercaseLabels(List<string> target, string[] labels)
+        {
+            HashSet<string> seen = new HashSet<string>(target);
+            for (int i = 0; i < labels.Length; i++)
+            {
+                string upper = labels[i].ToUpperInvariant();
+                if (seen.Add(upper))
+                {
+                    target.Add(upper);
+                }
             }
         }
 

@@ -14,6 +14,7 @@ namespace FfxivKoreanPatch.PatchRouteVerifier
                     VerifyDataCenterRoutedAsciiPhraseMetrics(fontPath);
                     VerifyDataCenterRoutedAsciiPhrasePixels(fontPath);
                     VerifyDataCenterRoutedAsciiPhraseVisualSpacing(fontPath);
+                    VerifyDataCenterRoutedAsciiStrictSpacing(fontPath);
                     VerifyDataCenterRoutedAsciiTexturePadding(fontPath);
                     VerifyDataCenterRoutedKoreanPhraseLayouts(fontPath);
                     DumpLabelPreview(dumpGroup, fontPath, DataCenterWorldmapLabels);
@@ -43,6 +44,61 @@ namespace FfxivKoreanPatch.PatchRouteVerifier
                 for (int phraseIndex = 0; phraseIndex < DataCenterCriticalRenderLabels.Length; phraseIndex++)
                 {
                     VerifyPhraseMinimumVisualGap(fontPath, DataCenterCriticalRenderLabels[phraseIndex]);
+                }
+            }
+
+            private void VerifyDataCenterRoutedAsciiStrictSpacing(string fontPath)
+            {
+                const int failureReportLimit = 12;
+
+                if (!IsDataCenterStrictAsciiSpacingFont(fontPath))
+                {
+                    return;
+                }
+
+                int checkedPhrases = 0;
+                int failures = 0;
+                for (int phraseIndex = 0; phraseIndex < DataCenterStrictAsciiSpacingLabels.Length; phraseIndex++)
+                {
+                    string phrase = DataCenterStrictAsciiSpacingLabels[phraseIndex];
+                    PhraseLayoutResult layout;
+                    string error;
+                    if (!TryMeasurePhraseLayout(_patchedFont, fontPath, phrase, true, out layout, out error))
+                    {
+                        Fail("{0} data-center strict ASCII phrase [{1}] layout error: {2}", fontPath, Escape(phrase), error);
+                        failures++;
+                    }
+                    else if (layout.Glyphs > 1)
+                    {
+                        checkedPhrases++;
+                        if (layout.MinimumGapPixels < 0)
+                        {
+                            string pairDetail = DescribeScaledLobbyPairSpacing(
+                                fontPath,
+                                layout.MinimumGapLeftCodepoint,
+                                layout.MinimumGapRightCodepoint);
+                            Fail(
+                                "{0} data-center strict ASCII phrase [{1}] minGap={2} is below 0, pair=U+{3:X4}/U+{4:X4}{5}",
+                                fontPath,
+                                Escape(phrase),
+                                layout.MinimumGapPixels,
+                                layout.MinimumGapLeftCodepoint,
+                                layout.MinimumGapRightCodepoint,
+                                pairDetail);
+                            failures++;
+                        }
+                    }
+
+                    if (failures >= failureReportLimit)
+                    {
+                        Warn("{0} data-center strict ASCII spacing stopped after {1} reported failures", fontPath, failures);
+                        return;
+                    }
+                }
+
+                if (failures == 0)
+                {
+                    Pass("{0} data-center strict ASCII spacing checked: phrases={1}", fontPath, checkedPhrases);
                 }
             }
 
@@ -94,6 +150,12 @@ namespace FfxivKoreanPatch.PatchRouteVerifier
                 {
                     VerifyNoPhraseOverlap(fontPath, DataCenterKoreanRoutePhrases[phraseIndex]);
                 }
+            }
+
+            private static bool IsDataCenterStrictAsciiSpacingFont(string fontPath)
+            {
+                string normalized = (fontPath ?? string.Empty).Replace('\\', '/');
+                return IsLobbyFontPath(normalized);
             }
         }
     }

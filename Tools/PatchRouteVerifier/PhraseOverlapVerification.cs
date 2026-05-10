@@ -449,12 +449,23 @@ namespace FfxivKoreanPatch.PatchRouteVerifier
             {
                 if (!IsScaledLobbySystemSettingsFont(fontPath))
                 {
+                    if (IsSystemSettingsStrictVisualFont(fontPath) &&
+                        !VerifySystemSettingsStrictScaledRoutePhraseLayout(fontPath, phrase))
+                    {
+                        return;
+                    }
+
                     VerifyNoPhraseOverlap(fontPath, phrase);
                     return;
                 }
 
                 if (IsKoreanLobbyAxisSourceTarget(fontPath))
                 {
+                    if (!VerifySystemSettingsStrictScaledRoutePhraseLayout(fontPath, phrase))
+                    {
+                        return;
+                    }
+
                     VerifyNoPhraseOverlap(fontPath, phrase);
                     return;
                 }
@@ -521,6 +532,11 @@ namespace FfxivKoreanPatch.PatchRouteVerifier
                     return;
                 }
 
+                if (!VerifySystemSettingsStrictVisualGap(fontPath, phrase, layout))
+                {
+                    return;
+                }
+
                 Pass(
                     "{0} system-settings phrase [{1}] scaled-lobby layout glyphs={2}, width={3}/{4}, maxGap={5}/{6}, minGap={7}",
                     fontPath,
@@ -531,6 +547,46 @@ namespace FfxivKoreanPatch.PatchRouteVerifier
                     layout.MaximumGapPixels,
                     sourceLayout.MaximumGapPixels,
                     layout.MinimumGapPixels);
+            }
+
+            private bool VerifySystemSettingsStrictScaledRoutePhraseLayout(string fontPath, string phrase)
+            {
+                PhraseLayoutResult layout;
+                string error;
+                if (!TryMeasurePhraseLayout(_patchedFont, fontPath, phrase, true, out layout, out error))
+                {
+                    Fail("{0} system-settings strict phrase [{1}] layout error: {2}", fontPath, Escape(phrase), error);
+                    return false;
+                }
+
+                return VerifySystemSettingsStrictVisualGap(fontPath, phrase, layout);
+            }
+
+            private bool VerifySystemSettingsStrictVisualGap(string fontPath, string phrase, PhraseLayoutResult layout)
+            {
+                if (!IsSystemSettingsStrictVisualFont(fontPath) || layout.Glyphs <= 1)
+                {
+                    return true;
+                }
+
+                if (layout.MinimumGapPixels >= 0)
+                {
+                    return true;
+                }
+
+                string pairDetail = DescribeScaledLobbyPairSpacing(
+                    fontPath,
+                    layout.MinimumGapLeftCodepoint,
+                    layout.MinimumGapRightCodepoint);
+                Fail(
+                    "{0} system-settings strict phrase [{1}] minGap={2} is below 0, pair=U+{3:X4}/U+{4:X4}{5}",
+                    fontPath,
+                    Escape(phrase),
+                    layout.MinimumGapPixels,
+                    layout.MinimumGapLeftCodepoint,
+                    layout.MinimumGapRightCodepoint,
+                    pairDetail);
+                return false;
             }
 
             private string DescribeScaledLobbyPairSpacing(string fontPath, uint leftCodepoint, uint rightCodepoint)
@@ -728,6 +784,25 @@ namespace FfxivKoreanPatch.PatchRouteVerifier
                        string.Equals(normalized, "common/font/AXIS_14_lobby.fdt", StringComparison.OrdinalIgnoreCase) ||
                        string.Equals(normalized, "common/font/AXIS_18_lobby.fdt", StringComparison.OrdinalIgnoreCase) ||
                        string.Equals(normalized, "common/font/AXIS_36_lobby.fdt", StringComparison.OrdinalIgnoreCase);
+            }
+
+            private static bool IsSystemSettingsStrictVisualFont(string fontPath)
+            {
+                string normalized = (fontPath ?? string.Empty).Replace('\\', '/');
+                if (IsScaledLobbySystemSettingsFont(normalized))
+                {
+                    return true;
+                }
+
+                for (int i = 0; i < SystemSettingsScaledFonts.Length; i++)
+                {
+                    if (string.Equals(normalized, SystemSettingsScaledFonts[i], StringComparison.OrdinalIgnoreCase))
+                    {
+                        return true;
+                    }
+                }
+
+                return false;
             }
 
             private static string ResolveLobbyHangulSourceFontPath(string fontPath)
