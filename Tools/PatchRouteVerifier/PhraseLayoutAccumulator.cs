@@ -12,6 +12,7 @@ namespace FfxivKoreanPatch.PatchRouteVerifier
             private int _glyphs;
             private int _overlapPixels;
             private int _minimumGapPixels = int.MaxValue;
+            private int _maximumGapPixels = int.MinValue;
             private int _requiredMinimumGapPixels;
             private int _minimumRequiredGapDeficitPixels = int.MaxValue;
             private int _minimumRequiredGapActualPixels;
@@ -22,6 +23,8 @@ namespace FfxivKoreanPatch.PatchRouteVerifier
             private int _previousGlyphRequiredGapPixels;
             private uint _minimumGapLeftCodepoint;
             private uint _minimumGapRightCodepoint;
+            private uint _maximumGapLeftCodepoint;
+            private uint _maximumGapRightCodepoint;
             private uint _minimumRequiredGapLeftCodepoint;
             private uint _minimumRequiredGapRightCodepoint;
 
@@ -52,9 +55,12 @@ namespace FfxivKoreanPatch.PatchRouteVerifier
                 result.Width = _cursor;
                 result.OverlapPixels = _overlapPixels;
                 result.MinimumGapPixels = _minimumGapPixels == int.MaxValue ? 0 : _minimumGapPixels;
+                result.MaximumGapPixels = _maximumGapPixels == int.MinValue ? 0 : _maximumGapPixels;
                 result.RequiredMinimumGapPixels = _requiredMinimumGapPixels;
                 result.MinimumGapLeftCodepoint = _minimumGapLeftCodepoint;
                 result.MinimumGapRightCodepoint = _minimumGapRightCodepoint;
+                result.MaximumGapLeftCodepoint = _maximumGapLeftCodepoint;
+                result.MaximumGapRightCodepoint = _maximumGapRightCodepoint;
                 result.MinimumRequiredGapActualPixels = _minimumRequiredGapDeficitPixels == int.MaxValue ? 0 : _minimumRequiredGapActualPixels;
                 result.MinimumRequiredGapPixels = _minimumRequiredGapPixels;
                 result.MinimumRequiredGapLeftCodepoint = _minimumRequiredGapLeftCodepoint;
@@ -85,6 +91,13 @@ namespace FfxivKoreanPatch.PatchRouteVerifier
                         _minimumGapPixels = gap;
                         _minimumGapLeftCodepoint = _previousGlyphCodepoint;
                         _minimumGapRightCodepoint = glyph.Codepoint;
+                    }
+
+                    if (gap > _maximumGapPixels)
+                    {
+                        _maximumGapPixels = gap;
+                        _maximumGapLeftCodepoint = _previousGlyphCodepoint;
+                        _maximumGapRightCodepoint = glyph.Codepoint;
                     }
 
                     int pairRequiredGap = Math.Max(_previousGlyphRequiredGapPixels, requiredGap);

@@ -105,12 +105,6 @@ namespace FfxivKoreanPatch.PatchRouteVerifier
 
                     if (targetAdvance != sourceAdvance)
                     {
-                        if (IsLobbyFontPath(targetFontPath) && targetAdvance > sourceAdvance)
-                        {
-                            Pass("{0} phrase [{1}] metrics match {2} with lobby-safe spacing, glyphs={3}, width={4}/{5}", targetFontPath, Escape(phrase), sourceFontPath, glyphs, targetAdvance, sourceAdvance);
-                            return;
-                        }
-
                         Fail(
                             "{0} phrase [{1}] width differs from {2}: target={3}, clean={4}",
                             targetFontPath,
@@ -158,24 +152,6 @@ namespace FfxivKoreanPatch.PatchRouteVerifier
                         target.Glyphs,
                         target.Width,
                         target.Pixels.Count);
-                    return;
-                }
-
-                int checkedGlyphs;
-                if (IsLobbyFontPath(targetFontPath) &&
-                    target.Glyphs == source.Glyphs &&
-                    target.Width >= source.Width &&
-                    TryPhraseGlyphPixelsMatchClean(sourceFontPath, targetFontPath, phrase, out checkedGlyphs, out error))
-                {
-                    Pass(
-                        "{0} phrase [{1}] pixels match {2} with lobby-safe advances, glyphs={3}, width={4}/{5}, checkedGlyphs={6}",
-                        targetFontPath,
-                        Escape(phrase),
-                        sourceFontPath,
-                        target.Glyphs,
-                        target.Width,
-                        source.Width,
-                        checkedGlyphs);
                     return;
                 }
 

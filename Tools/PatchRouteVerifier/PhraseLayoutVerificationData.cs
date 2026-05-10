@@ -65,6 +65,19 @@ namespace FfxivKoreanPatch.PatchRouteVerifier
                 LobbyScaledHangulPhrases.HighResolutionUiScaleOptions,
                 LobbyScaledHangulPhrases.StartScreenSystemSettingsResultMessages);
 
+            private static readonly FontPair[] StartScreenMainMenuFontPairs = new FontPair[]
+            {
+                new FontPair("common/font/AXIS_12_lobby.fdt", "common/font/AXIS_12_lobby.fdt"),
+                new FontPair("common/font/AXIS_14_lobby.fdt", "common/font/AXIS_14_lobby.fdt"),
+                new FontPair("common/font/AXIS_18_lobby.fdt", "common/font/AXIS_18_lobby.fdt"),
+                new FontPair("common/font/AXIS_36.fdt", "common/font/AXIS_36_lobby.fdt"),
+                new FontPair("common/font/Jupiter_46.fdt", "common/font/Jupiter_46_lobby.fdt"),
+                new FontPair("common/font/Jupiter_46.fdt", "common/font/Jupiter_90_lobby.fdt"),
+                new FontPair("common/font/MiedingerMid_36.fdt", "common/font/Meidinger_40_lobby.fdt"),
+                new FontPair("common/font/MiedingerMid_36.fdt", "common/font/MiedingerMid_36_lobby.fdt"),
+                new FontPair("common/font/TrumpGothic_68.fdt", "common/font/TrumpGothic_68_lobby.fdt")
+            };
+
             private static readonly string[] FourKLobbyPhrases = Derived4kLobbyRequiredHangulPhrases;
 
             private static string[] CombinePhraseGroups(params string[][] groups)

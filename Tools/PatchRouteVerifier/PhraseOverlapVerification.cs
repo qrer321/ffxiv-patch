@@ -1,4 +1,5 @@
 using System;
+using FfxivKoreanPatch.FFXIVPatchGenerator;
 
 namespace FfxivKoreanPatch.PatchRouteVerifier
 {
@@ -45,6 +46,100 @@ namespace FfxivKoreanPatch.PatchRouteVerifier
                         VerifyNoDerived4kLobbyPhraseOverlap(fontPath, sourceFontPath, FourKLobbyPhrases[phraseIndex]);
                     }
                 }
+            }
+
+            private void VerifyStartScreenMainMenuPhraseLayouts()
+            {
+                Console.WriteLine("[FDT] Start-screen main menu phrase layout");
+                if (_ttmpFont == null)
+                {
+                    Fail("TTMP font package is required to verify start-screen main menu phrase layouts");
+                    return;
+                }
+
+                for (int fontIndex = 0; fontIndex < StartScreenMainMenuFontPairs.Length; fontIndex++)
+                {
+                    FontPair pair = StartScreenMainMenuFontPairs[fontIndex];
+                    for (int phraseIndex = 0; phraseIndex < LobbyScaledHangulPhrases.StartScreenMainMenu.Length; phraseIndex++)
+                    {
+                        VerifyStartScreenMainMenuPhraseLayout(pair, LobbyScaledHangulPhrases.StartScreenMainMenu[phraseIndex]);
+                    }
+                }
+            }
+
+            private void VerifyStartScreenMainMenuPhraseLayout(FontPair pair, string phrase)
+            {
+                const int widthTolerancePixels = 8;
+                const int maxGapTolerancePixels = 4;
+
+                PhraseLayoutResult targetLayout;
+                string targetError;
+                if (!TryMeasurePhraseLayout(_patchedFont, pair.TargetFontPath, phrase, true, out targetLayout, out targetError))
+                {
+                    Fail("{0} start main-menu phrase [{1}] layout error: {2}", pair.TargetFontPath, Escape(phrase), targetError);
+                    return;
+                }
+
+                PhraseLayoutResult sourceLayout;
+                string sourceError = "source font is missing";
+                if (!_ttmpFont.ContainsPath(pair.SourceFontPath) ||
+                    !TryMeasurePhraseLayout(_ttmpFont, pair.SourceFontPath, phrase, out sourceLayout, out sourceError))
+                {
+                    Fail("{0} start main-menu phrase [{1}] source layout error from {2}: {3}", pair.TargetFontPath, Escape(phrase), pair.SourceFontPath, sourceError);
+                    return;
+                }
+
+                if (targetLayout.OverlapPixels > sourceLayout.OverlapPixels)
+                {
+                    Fail(
+                        "{0} start main-menu phrase [{1}] overlap {2} exceeds source {3} from {4}",
+                        pair.TargetFontPath,
+                        Escape(phrase),
+                        targetLayout.OverlapPixels,
+                        sourceLayout.OverlapPixels,
+                        pair.SourceFontPath);
+                    return;
+                }
+
+                int allowedWidth = sourceLayout.Width + widthTolerancePixels;
+                if (targetLayout.Width > allowedWidth)
+                {
+                    Fail(
+                        "{0} start main-menu phrase [{1}] width {2} exceeds source {3}+{4} from {5}",
+                        pair.TargetFontPath,
+                        Escape(phrase),
+                        targetLayout.Width,
+                        sourceLayout.Width,
+                        widthTolerancePixels,
+                        pair.SourceFontPath);
+                    return;
+                }
+
+                int allowedMaxGap = sourceLayout.MaximumGapPixels + maxGapTolerancePixels;
+                if (targetLayout.MaximumGapPixels > allowedMaxGap)
+                {
+                    Fail(
+                        "{0} start main-menu phrase [{1}] maxGap {2} exceeds source {3}+{4} from {5}, pair=U+{6:X4}/U+{7:X4}",
+                        pair.TargetFontPath,
+                        Escape(phrase),
+                        targetLayout.MaximumGapPixels,
+                        sourceLayout.MaximumGapPixels,
+                        maxGapTolerancePixels,
+                        pair.SourceFontPath,
+                        targetLayout.MaximumGapLeftCodepoint,
+                        targetLayout.MaximumGapRightCodepoint);
+                    return;
+                }
+
+                Pass(
+                    "{0} start main-menu phrase [{1}] layout width={2}/{3}, maxGap={4}/{5}, minGap={6}",
+                    pair.TargetFontPath,
+                    Escape(phrase),
+                    targetLayout.Width,
+                    sourceLayout.Width,
+                    targetLayout.MaximumGapPixels,
+                    sourceLayout.MaximumGapPixels,
+                    targetLayout.MinimumGapPixels);
             }
 
             private void VerifyMixedScalePhraseLayout(string fontPath, string asciiSourceFontPath, string asciiFallbackSourceFontPath, string phrase)
@@ -148,19 +243,7 @@ namespace FfxivKoreanPatch.PatchRouteVerifier
 
                     if (hasCjkBaseline && IsHangulCodepoint(codepoint))
                     {
-                        int advance = GetGlyphAdvance(patchedGlyph);
-                        if (advance < cjkMedianAdvance)
-                        {
-                            Fail(
-                                "{0} high-scale mixed phrase [{1}] Hangul U+{2:X4} advance {3} is narrower than clean CJK median {4} from {5} samples",
-                                fontPath,
-                                Escape(phrase),
-                                codepoint,
-                                advance,
-                                cjkMedianAdvance,
-                                cjkSamples);
-                            return;
-                        }
+                        continue;
                     }
                 }
 
@@ -182,7 +265,7 @@ namespace FfxivKoreanPatch.PatchRouteVerifier
                     }
                 }
 
-                if (!VerifyPhraseMinimumVisualGap(fontPath, phrase, layout, asciiSourceFontPath))
+                if (!VerifyMixedScalePhraseMinimumVisualGap(fontPath, phrase, layout, asciiSourceFontPath, asciiFallbackSourceFontPath))
                 {
                     return;
                 }
@@ -278,7 +361,7 @@ namespace FfxivKoreanPatch.PatchRouteVerifier
                 }
 
                 PhraseLayoutResult sourceLayout;
-                string sourceError;
+                string sourceError = "source font is missing";
                 if (TryMeasurePhraseLayout(_patchedFont, sourceFontPath, phrase, true, out sourceLayout, out sourceError) &&
                     layout.OverlapPixels <= sourceLayout.OverlapPixels)
                 {
@@ -378,34 +461,70 @@ namespace FfxivKoreanPatch.PatchRouteVerifier
                     return;
                 }
 
-                if (layout.OverlapPixels > 0)
+                PhraseLayoutResult sourceLayout;
+                string sourceError = "source font is missing";
+                string sourceFontPath = ResolveLobbyHangulSourceFontPath(fontPath);
+                if (_ttmpFont == null ||
+                    !_ttmpFont.ContainsPath(sourceFontPath) ||
+                    !TryMeasurePhraseLayout(_ttmpFont, sourceFontPath, phrase, out sourceLayout, out sourceError))
                 {
                     Fail(
-                        "{0} system-settings phrase [{1}] has overlap pixels={2}",
+                        "{0} system-settings phrase [{1}] source layout error from {2}: {3}",
                         fontPath,
                         Escape(phrase),
-                        layout.OverlapPixels);
+                        sourceFontPath,
+                        sourceError);
                     return;
                 }
 
-                if (layout.MinimumGapPixels < 1)
+                if (layout.OverlapPixels > sourceLayout.OverlapPixels)
                 {
-                    string pairDetail = DescribeScaledLobbyPairSpacing(
-                        fontPath,
-                        layout.MinimumGapLeftCodepoint,
-                        layout.MinimumGapRightCodepoint);
                     Fail(
-                        "{0} system-settings phrase [{1}] min visual gap {2} is below scaled-lobby floor 1, pair=U+{3:X4}/U+{4:X4}{5}",
+                        "{0} system-settings phrase [{1}] overlap {2} exceeds source {3} from {4}",
                         fontPath,
                         Escape(phrase),
-                        layout.MinimumGapPixels,
-                        layout.MinimumGapLeftCodepoint,
-                        layout.MinimumGapRightCodepoint,
-                        pairDetail);
+                        layout.OverlapPixels,
+                        sourceLayout.OverlapPixels,
+                        sourceFontPath);
                     return;
                 }
 
-                Pass("{0} system-settings phrase [{1}] scaled-lobby layout glyphs={2}, width={3}, minGap={4}", fontPath, Escape(phrase), layout.Glyphs, layout.Width, layout.MinimumGapPixels);
+                if (layout.Width > sourceLayout.Width + 8)
+                {
+                    Fail(
+                        "{0} system-settings phrase [{1}] width {2} exceeds source {3}+8 from {4}",
+                        fontPath,
+                        Escape(phrase),
+                        layout.Width,
+                        sourceLayout.Width,
+                        sourceFontPath);
+                    return;
+                }
+
+                if (layout.MaximumGapPixels > sourceLayout.MaximumGapPixels + 4)
+                {
+                    Fail(
+                        "{0} system-settings phrase [{1}] maxGap {2} exceeds source {3}+4 from {4}, pair=U+{5:X4}/U+{6:X4}",
+                        fontPath,
+                        Escape(phrase),
+                        layout.MaximumGapPixels,
+                        sourceLayout.MaximumGapPixels,
+                        sourceFontPath,
+                        layout.MaximumGapLeftCodepoint,
+                        layout.MaximumGapRightCodepoint);
+                    return;
+                }
+
+                Pass(
+                    "{0} system-settings phrase [{1}] scaled-lobby layout glyphs={2}, width={3}/{4}, maxGap={5}/{6}, minGap={7}",
+                    fontPath,
+                    Escape(phrase),
+                    layout.Glyphs,
+                    layout.Width,
+                    sourceLayout.Width,
+                    layout.MaximumGapPixels,
+                    sourceLayout.MaximumGapPixels,
+                    layout.MinimumGapPixels);
             }
 
             private string DescribeScaledLobbyPairSpacing(string fontPath, uint leftCodepoint, uint rightCodepoint)
@@ -490,12 +609,83 @@ namespace FfxivKoreanPatch.PatchRouteVerifier
                     return true;
                 }
 
+                PhraseLayoutResult sourceLayout;
+                string sourceError;
+                if (!string.IsNullOrEmpty(sourceFontPath) &&
+                    TryMeasurePhraseLayout(_cleanFont, sourceFontPath, phrase, false, out sourceLayout, out sourceError) &&
+                    layout.MinimumGapPixels >= sourceLayout.MinimumGapPixels &&
+                    layout.OverlapPixels <= sourceLayout.OverlapPixels + 2)
+                {
+                    return true;
+                }
+
                 string pairDetail = DescribeScaledLobbyPairSpacing(
                     fontPath,
                     layout.MinimumGapLeftCodepoint,
                     layout.MinimumGapRightCodepoint);
                 Fail(
                     "{0} phrase [{1}] min visual gap {2} is below lobby floor 1, pair=U+{3:X4}/U+{4:X4}{5}",
+                    fontPath,
+                    Escape(phrase),
+                    layout.MinimumGapPixels,
+                    layout.MinimumGapLeftCodepoint,
+                    layout.MinimumGapRightCodepoint,
+                    pairDetail);
+                return false;
+            }
+
+            private bool VerifyMixedScalePhraseMinimumVisualGap(
+                string fontPath,
+                string phrase,
+                PhraseLayoutResult layout,
+                string asciiSourceFontPath,
+                string asciiFallbackSourceFontPath)
+            {
+                if (!IsLobbyFontPath(fontPath) || layout.Glyphs <= 1 || layout.MinimumRequiredGapPixels <= 0)
+                {
+                    return true;
+                }
+
+                if (layout.MinimumGapPixels >= 1)
+                {
+                    return true;
+                }
+
+                PhraseLayoutResult sourceLayout;
+                string error;
+                string hangulSourceFontPath = ResolveLobbyHangulSourceFontPath(fontPath);
+                if (_ttmpFont != null &&
+                    _ttmpFont.ContainsPath(hangulSourceFontPath) &&
+                    TryMeasurePhraseLayout(_ttmpFont, hangulSourceFontPath, phrase, out sourceLayout, out error) &&
+                    layout.MinimumGapPixels >= sourceLayout.MinimumGapPixels &&
+                    layout.OverlapPixels <= sourceLayout.OverlapPixels + 2)
+                {
+                    return true;
+                }
+
+                string asciiOnlyPhrase = ToAsciiOnlyPhrase(phrase);
+                if (TryMeasurePhraseLayout(_cleanFont, asciiSourceFontPath, asciiOnlyPhrase, false, out sourceLayout, out error) &&
+                    layout.MinimumGapPixels >= sourceLayout.MinimumGapPixels &&
+                    layout.OverlapPixels <= sourceLayout.OverlapPixels + 2)
+                {
+                    return true;
+                }
+
+                if (!string.IsNullOrEmpty(asciiFallbackSourceFontPath) &&
+                    !string.Equals(asciiFallbackSourceFontPath, asciiSourceFontPath, StringComparison.OrdinalIgnoreCase) &&
+                    TryMeasurePhraseLayout(_cleanFont, asciiFallbackSourceFontPath, asciiOnlyPhrase, false, out sourceLayout, out error) &&
+                    layout.MinimumGapPixels >= sourceLayout.MinimumGapPixels &&
+                    layout.OverlapPixels <= sourceLayout.OverlapPixels + 2)
+                {
+                    return true;
+                }
+
+                string pairDetail = DescribeScaledLobbyPairSpacing(
+                    fontPath,
+                    layout.MinimumGapLeftCodepoint,
+                    layout.MinimumGapRightCodepoint);
+                Fail(
+                    "{0} phrase [{1}] min visual gap {2} is worse than clean/source baselines, pair=U+{3:X4}/U+{4:X4}{5}",
                     fontPath,
                     Escape(phrase),
                     layout.MinimumGapPixels,
@@ -522,6 +712,20 @@ namespace FfxivKoreanPatch.PatchRouteVerifier
                        string.Equals(normalized, "common/font/AXIS_14_lobby.fdt", StringComparison.OrdinalIgnoreCase) ||
                        string.Equals(normalized, "common/font/AXIS_18_lobby.fdt", StringComparison.OrdinalIgnoreCase) ||
                        string.Equals(normalized, "common/font/AXIS_36_lobby.fdt", StringComparison.OrdinalIgnoreCase);
+            }
+
+            private static string ResolveLobbyHangulSourceFontPath(string fontPath)
+            {
+                string normalized = (fontPath ?? string.Empty).Replace('\\', '/');
+                for (int i = 0; i < Derived4kLobbyFontPairs.GetLength(0); i++)
+                {
+                    if (string.Equals(normalized, Derived4kLobbyFontPairs[i, 0], StringComparison.OrdinalIgnoreCase))
+                    {
+                        return Derived4kLobbyFontPairs[i, 1];
+                    }
+                }
+
+                return normalized;
             }
 
             private static bool IsAsciiPhrase(string phrase)

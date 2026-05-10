@@ -86,11 +86,22 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
             "\uC77C\uBD80 \uC124\uC815\uC740 \uC801\uC6A9\uC744 \uB20C\uB7EC\uC57C \uBC18\uC601\uB429\uB2C8\uB2E4."
         };
 
+        public static readonly string[] StartScreenMainMenu = new string[]
+        {
+            "\uAC8C\uC784 \uC2DC\uC791",
+            "\uB370\uC774\uD130 \uC13C\uD130",
+            "\uB3D9\uC601\uC0C1 \uBC0F \uD0C0\uC774\uD2C0",
+            "\uC124\uC815",
+            "\uB77C\uC774\uC120\uC2A4",
+            "\uC885\uB8CC"
+        };
+
         public static readonly string[] All = Combine(
             Core,
             StartScreenSystemSettings,
             HighResolutionUiScaleOptions,
-            StartScreenSystemSettingsResultMessages);
+            StartScreenSystemSettingsResultMessages,
+            StartScreenMainMenu);
 
         private static string[] Combine(params string[][] groups)
         {

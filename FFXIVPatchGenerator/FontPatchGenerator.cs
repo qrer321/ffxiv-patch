@@ -2344,7 +2344,7 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
 
         private static bool ShouldNormalizeCleanAsciiLobbySpacing(string path)
         {
-            return IsLobbyFontPath(path);
+            return false;
         }
 
         private static bool ShouldAllocateCleanAsciiInOriginalTargetTexture(string path)
@@ -2382,10 +2382,22 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
 
         private static string ResolveDerivedLobbyCleanAsciiSourceFdtPath(string targetPath)
         {
-            return NormalizeGamePath(targetPath);
+            string sourcePath = ResolveDerived4kLobbySourceFdtPath(targetPath);
+            return sourcePath ?? NormalizeGamePath(targetPath);
         }
 
         private static string ResolveDerivedLobbyFallbackCleanAsciiSourceFdtPath(string targetPath)
+        {
+            string sourcePath = ResolveDerived4kLobbySourceFdtPath(targetPath);
+            if (sourcePath != null)
+            {
+                return NormalizeGamePath(targetPath);
+            }
+
+            return null;
+        }
+
+        private static string ResolveDerived4kLobbySourceFdtPath(string targetPath)
         {
             string normalized = NormalizeGamePath(targetPath);
             for (int i = 0; i < Derived4kLobbyFonts.Length; i++)
@@ -2417,13 +2429,7 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
 
         private static sbyte NormalizeDerivedLobbyAdvanceAdjustment(byte glyphWidth, byte glyphHeight, sbyte sourceAdvanceAdjustment, int minimumCjkAdvance)
         {
-            int sourceAdvance = Math.Max(1, glyphWidth + sourceAdvanceAdjustment);
-            int baseAdvance = Math.Max(sourceAdvance, glyphWidth);
-            int visualGapAdvance = glyphWidth + ComputeLobbyMinimumVisualGap(glyphHeight);
-            int targetAdvance = minimumCjkAdvance > 0
-                ? Math.Max(Math.Max(baseAdvance, minimumCjkAdvance), visualGapAdvance)
-                : Math.Max(baseAdvance + ComputeNoCjkFallbackSafetyAdvance(glyphWidth), visualGapAdvance);
-            return ToAdvanceAdjustment(glyphWidth, targetAdvance);
+            return sourceAdvanceAdjustment;
         }
 
         private static int NormalizeLobbyAxisHangulAdvances(string path, byte[] fdt)
@@ -2473,10 +2479,7 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
 
         private static bool ShouldNormalizeLobbyAxisHangulAdvances(string path)
         {
-            string normalized = NormalizeGamePath(path);
-            return string.Equals(normalized, "common/font/AXIS_12_lobby.fdt", StringComparison.OrdinalIgnoreCase) ||
-                   string.Equals(normalized, "common/font/AXIS_14_lobby.fdt", StringComparison.OrdinalIgnoreCase) ||
-                   string.Equals(normalized, "common/font/AXIS_18_lobby.fdt", StringComparison.OrdinalIgnoreCase);
+            return false;
         }
 
         private static sbyte ToAdvanceAdjustment(byte glyphWidth, int targetAdvance)
@@ -2558,6 +2561,12 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
         private static string ResolveCleanAsciiSourceFdtPath(string path)
         {
             string normalized = NormalizeGamePath(path);
+            string derivedSource = ResolveDerived4kLobbySourceFdtPath(normalized);
+            if (derivedSource != null)
+            {
+                return derivedSource;
+            }
+
             if (normalized.IndexOf("/krnaxis_120.fdt", StringComparison.OrdinalIgnoreCase) >= 0)
             {
                 return "common/font/AXIS_12.fdt";

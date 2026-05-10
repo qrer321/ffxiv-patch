@@ -21,7 +21,7 @@ namespace FfxivKoreanPatch.PatchRouteVerifier
 
                     for (int latinIndex = 0; latinIndex < FourKLobbyLatinCodepoints.Length; latinIndex++)
                     {
-                        ExpectGlyphEqualIfSourceExists(_cleanFont, targetFontPath, FourKLobbyLatinCodepoints[latinIndex], _patchedFont, targetFontPath, FourKLobbyLatinCodepoints[latinIndex]);
+                        ExpectGlyphEqualIfSourceExists(_patchedFont, sourceFontPath, FourKLobbyLatinCodepoints[latinIndex], _patchedFont, targetFontPath, FourKLobbyLatinCodepoints[latinIndex]);
                     }
 
                     byte[] sourceFdt;
@@ -40,8 +40,8 @@ namespace FfxivKoreanPatch.PatchRouteVerifier
                     for (int codepointIndex = 0; codepointIndex < requiredHangulCodepoints.Length; codepointIndex++)
                     {
                         uint codepoint = requiredHangulCodepoints[codepointIndex];
-                        FdtGlyphEntry ignored;
-                        if (!TryFindGlyph(sourceFdt, codepoint, out ignored))
+                        FdtGlyphEntry sourceGlyph;
+                        if (!TryFindGlyph(sourceFdt, codepoint, out sourceGlyph))
                         {
                             Fail("{0} is missing required 4K lobby source glyph U+{1:X4}", sourceFontPath, codepoint);
                             continue;
@@ -51,7 +51,7 @@ namespace FfxivKoreanPatch.PatchRouteVerifier
                         ExpectGlyphVisibleAtLeast(_patchedFont, targetFontPath, codepoint, 10);
                         ExpectGlyphNotEqualToFallback(targetFontPath, codepoint, '-');
                         ExpectGlyphNotEqualToFallback(targetFontPath, codepoint, '=');
-                        VerifyDerived4kGlyphMetrics(targetFontPath, codepoint);
+                        VerifyDerived4kGlyphMetrics(targetFontPath, codepoint, sourceGlyph);
                         checkedHangulCount++;
                     }
 
@@ -187,25 +187,30 @@ namespace FfxivKoreanPatch.PatchRouteVerifier
                 }
             }
 
-            private void VerifyDerived4kGlyphMetrics(string fontPath, uint codepoint)
+            private void VerifyDerived4kGlyphMetrics(string fontPath, uint codepoint, FdtGlyphEntry sourceGlyph)
             {
                 try
                 {
                     byte[] fdt = _patchedFont.ReadFile(fontPath);
-                    FdtGlyphEntry glyph;
-                    if (!TryFindGlyph(fdt, codepoint, out glyph))
+                    FdtGlyphEntry targetGlyph;
+                    if (!TryFindGlyph(fdt, codepoint, out targetGlyph))
                     {
                         Fail("{0} U+{1:X4} is missing", fontPath, codepoint);
                         return;
                     }
 
-                    if (glyph.OffsetX < 0)
+                    if (!GlyphSpacingMetricsMatch(sourceGlyph, targetGlyph))
                     {
-                        Fail("{0} U+{1:X4} has negative advance adjustment {2}", fontPath, codepoint, glyph.OffsetX);
+                        Fail(
+                            "{0} U+{1:X4} metrics differ from derived lobby source: target={2}, source={3}",
+                            fontPath,
+                            codepoint,
+                            FormatGlyphSpacing(targetGlyph),
+                            FormatGlyphSpacing(sourceGlyph));
                         return;
                     }
 
-                    Pass("{0} U+{1:X4} advance adjustment={2}", fontPath, codepoint, glyph.OffsetX);
+                    Pass("{0} U+{1:X4} metrics match derived lobby source: {2}", fontPath, codepoint, FormatGlyphSpacing(targetGlyph));
                 }
                 catch (Exception ex)
                 {

@@ -25,9 +25,7 @@ namespace FfxivKoreanPatch.PatchRouteVerifier
                 int skippedBlank = 0;
                 int skippedIntentional = 0;
                 int skippedMissing = 0;
-                int lobbyAxisAdvanceNormalized = 0;
                 int lobbyAxisAdvanceEntriesChecked = 0;
-                int lobbyAxisAdvanceEntriesNormalized = 0;
 
                 foreach (string fontPath in fontPaths)
                 {
@@ -54,8 +52,7 @@ namespace FfxivKoreanPatch.PatchRouteVerifier
                         fontPath,
                         sourceFdt,
                         targetFdt,
-                        ref lobbyAxisAdvanceEntriesChecked,
-                        ref lobbyAxisAdvanceEntriesNormalized);
+                        ref lobbyAxisAdvanceEntriesChecked);
 
                     for (int i = 0; i < codepoints.Length; i++)
                     {
@@ -100,22 +97,8 @@ namespace FfxivKoreanPatch.PatchRouteVerifier
 
                         long score = Diff(source.Alpha, target.Alpha);
                         bool spacingMatch = GlyphSpacingMetricsMatch(sourceGlyph, targetGlyph);
-                        bool allowedLobbyAxisAdvanceChange =
-                            IsAllowedLobbyAxisHangulAdvanceNormalization(
-                                fontPath,
-                                codepoint,
-                                sourceGlyph,
-                                targetGlyph,
-                                source.VisiblePixels,
-                                target.VisiblePixels,
-                                score);
-                        if (score == 0 && (spacingMatch || allowedLobbyAxisAdvanceChange) && target.VisiblePixels >= 10)
+                        if (score == 0 && spacingMatch && target.VisiblePixels >= 10)
                         {
-                            if (allowedLobbyAxisAdvanceChange && !spacingMatch)
-                            {
-                                lobbyAxisAdvanceNormalized++;
-                            }
-
                             compared++;
                             continue;
                         }
@@ -139,10 +122,8 @@ namespace FfxivKoreanPatch.PatchRouteVerifier
                 }
 
                 Pass(
-                    "Hangul TTMP source glyphs preserved: compared={0}, lobby_axis_advance_normalized={1}, lobby_axis_entries={2}/{3}, skipped_blank={4}, skipped_intentional={5}, skipped_missing_fonts={6}",
+                    "Hangul TTMP source glyphs preserved: compared={0}, lobby_axis_entries_preserved={1}, skipped_blank={2}, skipped_intentional={3}, skipped_missing_fonts={4}",
                     compared,
-                    lobbyAxisAdvanceNormalized,
-                    lobbyAxisAdvanceEntriesNormalized,
                     lobbyAxisAdvanceEntriesChecked,
                     skippedBlank,
                     skippedIntentional,
@@ -221,46 +202,11 @@ namespace FfxivKoreanPatch.PatchRouteVerifier
                 return false;
             }
 
-            private static bool IsAllowedLobbyAxisHangulAdvanceNormalization(
-                string fontPath,
-                uint codepoint,
-                FdtGlyphEntry sourceGlyph,
-                FdtGlyphEntry targetGlyph,
-                int sourceVisiblePixels,
-                int targetVisiblePixels,
-                long renderDiffScore)
-            {
-                if (!IsLobbyAxisHangulAdvanceNormalizedFont(fontPath) ||
-                    !IsHangulCodepoint(codepoint) ||
-                    renderDiffScore != 0 ||
-                    sourceVisiblePixels != targetVisiblePixels ||
-                    targetVisiblePixels < 10)
-                {
-                    return false;
-                }
-
-                if (sourceGlyph.ShiftJisValue != targetGlyph.ShiftJisValue ||
-                    sourceGlyph.Width != targetGlyph.Width ||
-                    sourceGlyph.Height != targetGlyph.Height ||
-                    sourceGlyph.OffsetY != targetGlyph.OffsetY)
-                {
-                    return false;
-                }
-
-                int sourceAdvance = GetGlyphAdvance(sourceGlyph);
-                int targetAdvance = GetGlyphAdvance(targetGlyph);
-                return sourceGlyph.OffsetX < 0 &&
-                       targetGlyph.OffsetX == 0 &&
-                       sourceAdvance < sourceGlyph.Width &&
-                       targetAdvance == targetGlyph.Width;
-            }
-
             private void VerifyAllLobbyAxisHangulAdvanceEntries(
                 string fontPath,
                 byte[] sourceFdt,
                 byte[] targetFdt,
-                ref int totalChecked,
-                ref int totalNormalized)
+                ref int totalChecked)
             {
                 if (!IsLobbyAxisHangulAdvanceNormalizedFont(fontPath))
                 {
@@ -278,7 +224,6 @@ namespace FfxivKoreanPatch.PatchRouteVerifier
                 }
 
                 int checkedEntries = 0;
-                int normalizedEntries = 0;
                 for (int i = 0; i < glyphCount; i++)
                 {
                     int offset = glyphStart + i * FdtGlyphEntrySize;
@@ -309,10 +254,6 @@ namespace FfxivKoreanPatch.PatchRouteVerifier
                     }
 
                     checkedEntries++;
-                    if (sourceGlyph.OffsetX != targetGlyph.OffsetX)
-                    {
-                        normalizedEntries++;
-                    }
                 }
 
                 if (checkedEntries == 0)
@@ -322,12 +263,10 @@ namespace FfxivKoreanPatch.PatchRouteVerifier
                 }
 
                 totalChecked += checkedEntries;
-                totalNormalized += normalizedEntries;
                 Pass(
-                    "{0} lobby AXIS Hangul advance entries verified: checked={1}, normalized={2}",
+                    "{0} lobby AXIS Hangul advance entries source-preserved: checked={1}",
                     fontPath,
-                    checkedEntries,
-                    normalizedEntries);
+                    checkedEntries);
             }
 
             private static Dictionary<uint, FdtGlyphEntry> ReadHangulGlyphEntries(byte[] fdt)
@@ -377,9 +316,7 @@ namespace FfxivKoreanPatch.PatchRouteVerifier
                     return sourceGlyph.OffsetX == targetGlyph.OffsetX;
                 }
 
-                int sourceAdvance = GetGlyphAdvance(sourceGlyph);
-                sbyte expectedOffsetX = sourceAdvance < sourceGlyph.Width ? (sbyte)0 : sourceGlyph.OffsetX;
-                return targetGlyph.OffsetX == expectedOffsetX;
+                return sourceGlyph.OffsetX == targetGlyph.OffsetX;
             }
 
             private static string FormatGlyphEntryRoute(FdtGlyphEntry glyph)

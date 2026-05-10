@@ -119,6 +119,18 @@ namespace FfxivKoreanPatch.PatchRouteVerifier
                     return false;
                 }
 
+                if (!GlyphSpacingMetricsMatch(sourceGlyph, targetGlyph))
+                {
+                    Fail(
+                        "{0} U+{1:X4} scaled lobby glyph metrics differ from {2}: target={3}, source={4}",
+                        route.TargetFontPath,
+                        codepoint,
+                        route.SourceFontPath,
+                        FormatGlyphSpacing(targetGlyph),
+                        FormatGlyphSpacing(sourceGlyph));
+                    return false;
+                }
+
                 GlyphCanvas sourceCanvas;
                 GlyphCanvas targetCanvas;
                 try

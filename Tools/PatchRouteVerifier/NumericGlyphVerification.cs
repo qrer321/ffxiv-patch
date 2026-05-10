@@ -11,9 +11,11 @@ namespace FfxivKoreanPatch.PatchRouteVerifier
                 Console.WriteLine("[FDT] Numeric glyphs used by duty/reward UI");
                 for (int f = 0; f < NumericGlyphSameFontChecks.Length; f++)
                 {
+                    string targetFontPath = NumericGlyphSameFontChecks[f];
+                    string sourceFontPath = ResolveCleanAsciiReferenceFontPath(targetFontPath);
                     for (int c = 0; c < NumericGlyphCodepoints.Length; c++)
                     {
-                        ExpectGlyphEqual(_cleanFont, NumericGlyphSameFontChecks[f], NumericGlyphCodepoints[c], _patchedFont, NumericGlyphSameFontChecks[f], NumericGlyphCodepoints[c]);
+                        ExpectGlyphEqual(_cleanFont, sourceFontPath, NumericGlyphCodepoints[c], _patchedFont, targetFontPath, NumericGlyphCodepoints[c]);
                     }
                 }
 
