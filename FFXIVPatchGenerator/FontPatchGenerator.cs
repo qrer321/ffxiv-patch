@@ -1123,6 +1123,7 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
             int partyShapeFixes = ApplyPartyListSelfMarkerCleanShapes(path, ref fdt, glyphRepair, globalArchive, texturePatches);
             int cleanAsciiFixes = ApplyCleanAsciiGlyphShapes(path, fdt, glyphRepair, globalArchive, texturePatches);
             int cleanAsciiKerningFixes = ApplyCleanAsciiKerning(path, ref fdt, globalArchive);
+            int lobbyAxisHangulAdvanceFixes = NormalizeLobbyAxisHangulAdvances(path, fdt);
             // FDT edits are written as standard files when key normalization,
             // targeted Hangul repair, party marker allocation, or ASCII/numeric
             // glyph repair changed the render contract for the file.
@@ -1135,6 +1136,7 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
                 partyShapeFixes == 0 &&
                 cleanAsciiFixes == 0 &&
                 cleanAsciiKerningFixes == 0 &&
+                lobbyAxisHangulAdvanceFixes == 0 &&
                 originalPackedFile != null)
             {
                 return datWriter.WritePackedFile(originalPackedFile);
@@ -1173,6 +1175,11 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
             if (cleanAsciiKerningFixes > 0)
             {
                 Console.WriteLine("  Restored clean ASCII kerning pairs: {0} ({1})", cleanAsciiKerningFixes, path);
+            }
+
+            if (lobbyAxisHangulAdvanceFixes > 0)
+            {
+                Console.WriteLine("  Normalized lobby AXIS Hangul advances: {0} ({1})", lobbyAxisHangulAdvanceFixes, path);
             }
 
             return datWriter.WriteStandardFile(fdt);
@@ -2315,14 +2322,7 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
 
         private static string ResolveDerivedLobbyCleanAsciiSourceFdtPath(string targetPath)
         {
-            string normalized = NormalizeGamePath(targetPath);
-            int suffixIndex = normalized.LastIndexOf("_lobby.fdt", StringComparison.OrdinalIgnoreCase);
-            if (suffixIndex < 0)
-            {
-                return normalized;
-            }
-
-            return normalized.Substring(0, suffixIndex) + ".fdt";
+            return NormalizeGamePath(targetPath);
         }
 
         private static string ResolveDerivedLobbyFallbackCleanAsciiSourceFdtPath(string targetPath)
@@ -2364,6 +2364,59 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
                 ? Math.Max(Math.Max(baseAdvance, minimumCjkAdvance), visualGapAdvance)
                 : Math.Max(baseAdvance + ComputeNoCjkFallbackSafetyAdvance(glyphWidth), visualGapAdvance);
             return ToAdvanceAdjustment(glyphWidth, targetAdvance);
+        }
+
+        private static int NormalizeLobbyAxisHangulAdvances(string path, byte[] fdt)
+        {
+            if (!ShouldNormalizeLobbyAxisHangulAdvances(path) || fdt == null)
+            {
+                return 0;
+            }
+
+            int fontTableOffset;
+            uint glyphCount;
+            int glyphStart;
+            if (!TryGetFdtGlyphTable(fdt, out fontTableOffset, out glyphCount, out glyphStart))
+            {
+                return 0;
+            }
+
+            int changed = 0;
+            for (int i = 0; i < glyphCount; i++)
+            {
+                int offset = glyphStart + i * FdtGlyphEntrySize;
+                uint codepoint;
+                if (!TryDecodeFdtUtf8Value(Endian.ReadUInt32LE(fdt, offset), out codepoint) ||
+                    !IsHangulCodepoint(codepoint))
+                {
+                    continue;
+                }
+
+                FdtGlyphEntry entry = ReadFdtGlyphEntry(fdt, offset);
+                if (entry.Width == 0 || entry.Height == 0)
+                {
+                    continue;
+                }
+
+                int currentAdvance = Math.Max(1, entry.Width + entry.OffsetX);
+                if (currentAdvance >= entry.Width)
+                {
+                    continue;
+                }
+
+                fdt[offset + 14] = unchecked((byte)ToAdvanceAdjustment(entry.Width, entry.Width));
+                changed++;
+            }
+
+            return changed;
+        }
+
+        private static bool ShouldNormalizeLobbyAxisHangulAdvances(string path)
+        {
+            string normalized = NormalizeGamePath(path);
+            return string.Equals(normalized, "common/font/AXIS_12_lobby.fdt", StringComparison.OrdinalIgnoreCase) ||
+                   string.Equals(normalized, "common/font/AXIS_14_lobby.fdt", StringComparison.OrdinalIgnoreCase) ||
+                   string.Equals(normalized, "common/font/AXIS_18_lobby.fdt", StringComparison.OrdinalIgnoreCase);
         }
 
         private static sbyte ToAdvanceAdjustment(byte glyphWidth, int targetAdvance)
@@ -2463,12 +2516,6 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
             if (normalized.IndexOf("/krnaxis_360.fdt", StringComparison.OrdinalIgnoreCase) >= 0)
             {
                 return "common/font/AXIS_36.fdt";
-            }
-
-            int lobbySuffixIndex = normalized.LastIndexOf("_lobby.fdt", StringComparison.OrdinalIgnoreCase);
-            if (lobbySuffixIndex >= 0)
-            {
-                return normalized.Substring(0, lobbySuffixIndex) + ".fdt";
             }
 
             return normalized;

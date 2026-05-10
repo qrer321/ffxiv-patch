@@ -362,6 +362,122 @@ namespace FfxivKoreanPatch.PatchRouteVerifier
                 Pass("{0} phrase [{1}] layout glyphs={2}, width={3}, minGap={4}", fontPath, Escape(phrase), layout.Glyphs, layout.Width, layout.MinimumGapPixels);
             }
 
+            private void VerifySystemSettingsScaledRoutePhraseLayout(string fontPath, string phrase)
+            {
+                if (!IsScaledLobbySystemSettingsFont(fontPath))
+                {
+                    VerifyNoPhraseOverlap(fontPath, phrase);
+                    return;
+                }
+
+                PhraseLayoutResult layout;
+                string error;
+                if (!TryMeasurePhraseLayout(_patchedFont, fontPath, phrase, true, out layout, out error))
+                {
+                    Fail("{0} system-settings phrase [{1}] layout error: {2}", fontPath, Escape(phrase), error);
+                    return;
+                }
+
+                if (layout.OverlapPixels > 0)
+                {
+                    Fail(
+                        "{0} system-settings phrase [{1}] has overlap pixels={2}",
+                        fontPath,
+                        Escape(phrase),
+                        layout.OverlapPixels);
+                    return;
+                }
+
+                if (layout.MinimumGapPixels < 1)
+                {
+                    if (ScaledLobbyGapMatchesCleanAsciiBaseline(fontPath, phrase, layout))
+                    {
+                        Pass("{0} system-settings phrase [{1}] scaled-lobby layout glyphs={2}, width={3}, minGap={4} matches clean ASCII baseline", fontPath, Escape(phrase), layout.Glyphs, layout.Width, layout.MinimumGapPixels);
+                        return;
+                    }
+
+                    string pairDetail = DescribeScaledLobbyPairSpacing(
+                        fontPath,
+                        layout.MinimumGapLeftCodepoint,
+                        layout.MinimumGapRightCodepoint);
+                    Fail(
+                        "{0} system-settings phrase [{1}] min visual gap {2} is below scaled-lobby floor 1, pair=U+{3:X4}/U+{4:X4}{5}",
+                        fontPath,
+                        Escape(phrase),
+                        layout.MinimumGapPixels,
+                        layout.MinimumGapLeftCodepoint,
+                        layout.MinimumGapRightCodepoint,
+                        pairDetail);
+                    return;
+                }
+
+                Pass("{0} system-settings phrase [{1}] scaled-lobby layout glyphs={2}, width={3}, minGap={4}", fontPath, Escape(phrase), layout.Glyphs, layout.Width, layout.MinimumGapPixels);
+            }
+
+            private bool ScaledLobbyGapMatchesCleanAsciiBaseline(string fontPath, string phrase, PhraseLayoutResult layout)
+            {
+                if (layout.MinimumGapLeftCodepoint > 0x7Eu ||
+                    layout.MinimumGapRightCodepoint > 0x7Eu)
+                {
+                    return false;
+                }
+
+                PhraseLayoutResult cleanLayout;
+                string error;
+                string sourceFontPath = ResolveCleanAsciiReferenceFontPath(fontPath);
+                return !string.IsNullOrEmpty(sourceFontPath) &&
+                       TryMeasurePhraseLayout(_cleanFont, sourceFontPath, ToAsciiOnlyPhrase(phrase), false, out cleanLayout, out error) &&
+                       cleanLayout.Glyphs > 1 &&
+                       layout.MinimumGapPixels >= cleanLayout.MinimumGapPixels;
+            }
+
+            private string DescribeScaledLobbyPairSpacing(string fontPath, uint leftCodepoint, uint rightCodepoint)
+            {
+                try
+                {
+                    byte[] fdt = _patchedFont.ReadFile(fontPath);
+                    FdtGlyphEntry leftGlyph;
+                    FdtGlyphEntry rightGlyph;
+                    if (!TryFindGlyph(fdt, leftCodepoint, out leftGlyph) ||
+                        !TryFindGlyph(fdt, rightCodepoint, out rightGlyph))
+                    {
+                        return string.Empty;
+                    }
+
+                    PhraseGlyphMeasurement leftMeasurement;
+                    PhraseGlyphMeasurement rightMeasurement;
+                    string error;
+                    if (!TryMeasurePhraseGlyph(_patchedFont, fontPath, fdt, leftCodepoint, false, out leftMeasurement, out error) ||
+                        !TryMeasurePhraseGlyph(_patchedFont, fontPath, fdt, rightCodepoint, false, out rightMeasurement, out error))
+                    {
+                        return string.Empty;
+                    }
+
+                    int kerning = GetKerningAdjustment(ReadKerningAdjustments(fdt), leftCodepoint, rightCodepoint);
+                    return string.Format(
+                        " leftAdvance={0}, leftSize={1}x{2}, leftOffset={3}/{4}, leftBounds={5}-{6}, rightAdvance={7}, rightSize={8}x{9}, rightOffset={10}/{11}, rightBounds={12}-{13}, kerning={14}",
+                        GetGlyphAdvance(leftGlyph),
+                        leftGlyph.Width,
+                        leftGlyph.Height,
+                        leftGlyph.OffsetX,
+                        leftGlyph.OffsetY,
+                        leftMeasurement.MinX,
+                        leftMeasurement.MaxX,
+                        GetGlyphAdvance(rightGlyph),
+                        rightGlyph.Width,
+                        rightGlyph.Height,
+                        rightGlyph.OffsetX,
+                        rightGlyph.OffsetY,
+                        rightMeasurement.MinX,
+                        rightMeasurement.MaxX,
+                        kerning);
+                }
+                catch
+                {
+                    return string.Empty;
+                }
+            }
+
             private void VerifyPhraseMinimumVisualGap(string fontPath, string phrase)
             {
                 PhraseLayoutResult layout;
@@ -425,6 +541,15 @@ namespace FfxivKoreanPatch.PatchRouteVerifier
                 }
 
                 return IsAsciiPhrase(phrase);
+            }
+
+            private static bool IsScaledLobbySystemSettingsFont(string fontPath)
+            {
+                string normalized = (fontPath ?? string.Empty).Replace('\\', '/');
+                return string.Equals(normalized, "common/font/AXIS_12_lobby.fdt", StringComparison.OrdinalIgnoreCase) ||
+                       string.Equals(normalized, "common/font/AXIS_14_lobby.fdt", StringComparison.OrdinalIgnoreCase) ||
+                       string.Equals(normalized, "common/font/AXIS_18_lobby.fdt", StringComparison.OrdinalIgnoreCase) ||
+                       string.Equals(normalized, "common/font/AXIS_36_lobby.fdt", StringComparison.OrdinalIgnoreCase);
             }
 
             private static bool IsAsciiPhrase(string phrase)
