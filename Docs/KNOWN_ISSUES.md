@@ -26,7 +26,7 @@
 
 ### 0. 2026-05-09 재보고: 시작 화면 데이터센터/시스템 설정 실사용 경로 미검증
 
-상태: 코드 검증 통과, 실제 일본어 클라이언트 확인 대기
+상태: 열린 이슈, strict verifier에서 현재 ja 산출물 FAIL
 
 최근 verifier는 통과했지만 실제 클라이언트에서 아래 문제가 계속 재현되었습니다. 이는 기존 검증이 실제 시작 화면 UI route를 충분히 잡지 못했다는 뜻으로 취급합니다.
 
@@ -47,14 +47,17 @@
 - 2026-05-10 추가 검증: 실제 UI 배율에서 12/14가 아니라 큰 로비 폰트로 치환되는 경로를 잡기 위해 `lobby-scale-font-sources` verifier를 추가했다. 이 검증은 `AXIS_12/14/18_lobby`와 `AXIS_36_lobby` 등 고배율 파생 로비 폰트가 각 배율에 대응되는 TTMP source glyph를 쓰는지, 100% glyph를 억지 확대하지 않는지 width/height 및 alpha pixel 단위로 확인한다.
 - 2026-05-10 최신 산출물: `.tmp\lobby-scale-source-ja`는 `start-system-settings-uld,lobby-scale-font-sources,system-settings-mixed-scale-layouts` PASS. `start-system-settings-uld`는 이제 `150%(FHD): ...` 계열 고해상도 UI 옵션 문구도 `AXIS_12/14/18_lobby` route에서 검사한다.
 - 2026-05-10 인게임 ActionDetail 배율 보강: `ActionDetail.uld` route를 추적하고 `즉시 발동`, `초`, `120.00초`, `1.50초`를 숫자 baseline과 비교하는 `action-detail-scale-layouts` verifier를 추가했다. `TrumpGothic_68.fdt`의 고배율 Hangul glyph는 `Addon#699-714`와 fallback 문구에서 자동 수집한 codepoint만 route 단위로 보정하며, 기존 glyph atlas cell은 덮어쓰지 않는다. `.tmp\action-detail-scale-ja4`와 `.tmp\action-detail-scale-ja4-apply` 산출물은 ActionDetail/reported-ingame/4K lobby derivation/Hangul preservation 검증을 통과했다. 실제 일본어 클라이언트 폴더 복사는 실행 중인 `ffxiv_dx11`/`XIVLauncher` 잠금으로 차단되어 산출물 검증 상태로 남긴다.
+- 2026-05-10 strict 검증 강화 정정: 이전 PASS는 clean/source baseline도 음수 visual gap을 갖는 경우를 통과시켜 사용자가 보고한 로비/데이터센터 증상을 닫지 못했다. `data-center-title-uld,data-center-worldmap-uld,start-system-settings-uld`는 이제 strict visual-gap을 적용하며, 현재 `.tmp\lobby-krnaxis-advance-ja`는 `.tmp\verifier-strict-lobby-routes-v3.log`에서 FAIL한다.
+- 현재 재현: 데이터센터 ULD route의 `_lobby.fdt` ASCII 라벨은 `AXIS_12_lobby`, `AXIS_14_lobby`, `Jupiter_20_lobby`, `MiedingerMid_14_lobby`, `TrumpGothic_*_lobby` 등에서 서버명/DC명 `minGap < 0`을 보고한다. 시작화면 시스템 설정은 `AXIS_18.fdt`의 `설정을 변경했습니다.`, `일부 설정은 적용을 눌러야 반영됩니다.`, `높은 해상도로 플레이하는 분을 위한 설정입니다.`가 `다` + `.` pair `minGap=-1`로 실패한다.
+- 상태 정정: 데이터센터 영어 서버명 spacing/blur와 로비 150%+ 시스템 설정 spacing/blur는 사용자 OK 전까지뿐 아니라 verifier 기준에서도 열린 이슈다.
 
 재보고 항목:
 
 - 시작 화면의 `종료`가 `EXIT`로 표시됨. 처리됨
 - 데이터 센터 선택 화면을 나가는 버튼이 `-로?` / `-료?`처럼 깨져 보임. `Lobby#2009/#2052` 뒤로 row와 관련 ULD font phrase 검증을 추가해 처리됨
-- 데이터 센터 선택 화면의 group label은 영어로 나오지만 흐리게 보임. 2px texture-neighborhood verifier와 ja 산출물 기준 처리됨
-- 데이터 센터 선택 화면의 서버명/데이터센터명은 영어로 나오지만 문자 간격이 서로 침범함. clean glyph/metrics/kerning/phrase pixel/padding verifier 기준 처리됨
-- 시작 화면 시스템 설정에서 UI 배율을 150/200/300%로 키우면 한글이 `=`로 깨지고 문자 간격이 침범함. `=` fallback은 처리됐고, 간격/번짐은 배율별 대응 로비 폰트 source 검증까지 추가됨
+- 데이터 센터 선택 화면의 group label은 영어로 나오지만 흐리게 보임. strict verifier 기준 열린 이슈
+- 데이터 센터 선택 화면의 서버명/데이터센터명은 영어로 나오지만 문자 간격이 서로 침범함. strict verifier 기준 열린 이슈
+- 시작 화면 시스템 설정에서 UI 배율을 150/200/300%로 키우면 한글이 `=`로 깨지고 문자 간격이 침범함. `=` fallback은 처리됐으나 간격/번짐은 strict verifier 기준 열린 이슈
 - `데이터 센터 Mana에 입장합니다` 계열 팝업 문구는 처리됨. 재발 시 sheet/row/column 추적 verifier를 먼저 보강
 - 인게임 `즉시 발동`/`초`가 UI 배율별 상대 크기를 제대로 따라가지 않는 문제는 `action-detail-scale-layouts` verifier와 `TrumpGothic_68.fdt` route 단위 glyph 보정으로 처리됨. 실제 클라이언트 복사는 파일 잠금 해제 후 재적용 필요
 - 스토리 종료 후 컷씬/이벤트 이미지 설명문이 베이스 클라이언트 언어로 표시됨. 폰트 패치가 아니라 지역 이동 타이틀처럼 실제 표시 리소스를 한국 클라이언트 리소스로 교체해야 할 가능성이 높음. 단, 아직 scene 리소스로 단정하지 않고 `EventImage` 등 sheet 기반 이미지 가능성부터 확인해야 함
@@ -120,7 +123,7 @@
 
 ### 3. 150% 이상 UI에서 문자 간격이 좁아 폰트가 겹쳐 보임
 
-상태: 검증 보강 및 코드 수정됨, 실제 클라이언트 재적용 확인 필요
+상태: 열린 이슈, strict verifier에서 현재 ja 산출물 FAIL
 
 150% 이상 UI, 특히 시스템 설정 창에서 space 또는 문자 간격이 좁아 glyph가 겹쳐 보이는 현상이 있습니다. 4K lobby/in-game FDT의 advance 값, offset, glyph width를 잘못 가져오거나 normalize가 부족한 가능성이 있습니다.
 

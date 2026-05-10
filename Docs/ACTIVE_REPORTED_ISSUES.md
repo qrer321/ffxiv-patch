@@ -126,6 +126,10 @@
 - 검증 보강: `--korea`를 받는 `korean-lobby-font-sources` verifier를 추가했다. 한국 클라이언트 source glyph의 width/height/offsetY/pixel alpha와 patched target을 비교하고, advance는 기대 정규화 값과 정확히 일치해야 한다.
 - 현재 산출물 기준: `.tmp\lobby-krnaxis-advance-ja`는 `korean-lobby-font-sources,system-settings-mixed-scale-layouts,lobby-scale-font-sources,clean-ascii-font-routes` focused verifier PASS(`.tmp\verifier-lobby-krnaxis-advance-focused-r2.log`). `start-system-settings-uld`도 실제 ULD route가 AXIS 계열임을 확인하고 PASS(`.tmp\verifier-lobby-krnaxis-start-system-settings-uld.log`).
 - 열린 이슈: 데이터센터 영어 서버명 spacing/blur는 이번 KrnAXIS Hangul route 조치와 별개로 계속 열린 항목이다. 실제 로비 150%+ 픽셀 번짐도 사용자 OK 전까지 열린 항목으로 유지한다.
+- 2026-05-10 검증 강화 정정: 기존 PASS는 clean/source baseline도 같은 음수 visual gap을 갖는 경우를 통과시켜 실제 데이터센터/로비 증상을 닫지 못했다. `data-center-title-uld,data-center-worldmap-uld,start-system-settings-uld`에 strict visual-gap 검증을 추가했고, 현재 산출물 `.tmp\lobby-krnaxis-advance-ja`는 `.tmp\verifier-strict-lobby-routes-v3.log`에서 FAIL한다.
+- 새 실패 기준: 데이터센터 ULD가 route한 모든 `_lobby.fdt` ASCII 라벨은 clean baseline 예외 없이 `minGap < 0`이면 실패한다. 현재 `AXIS_12_lobby`, `AXIS_14_lobby`, `Jupiter_20_lobby`, `MiedingerMid_14_lobby`, `TrumpGothic_*_lobby` 등에서 서버명/DC명 음수 gap이 재현된다.
+- 새 실패 기준: 시작화면 시스템 설정 route font는 lobby/non-lobby를 나누지 않고 `SystemSettingsScaledFonts`와 AXIS lobby route의 대표 문구를 strict visual-gap으로 검사한다. 현재 `AXIS_18.fdt`에서 `설정을 변경했습니다.`, `일부 설정은 적용을 눌러야 반영됩니다.`, `높은 해상도로 플레이하는 분을 위한 설정입니다.`가 `다` + `.` pair의 `minGap=-1`로 FAIL한다.
+- 다음 처리: 이 항목은 `사용자 OK 대기`가 아니라 verifier 기준에서도 열린 이슈다. 수정은 generator/source route를 바꾼 뒤 위 strict verifier가 PASS할 때까지 반복한다.
 
 ## Verification Rule
 
