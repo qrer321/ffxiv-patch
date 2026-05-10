@@ -42,6 +42,11 @@ namespace FfxivKoreanPatch.PatchRouteVerifier
                 return SqPackArchive.UnpackStandardFile(packed);
             }
 
+            public bool ContainsPath(string gamePath)
+            {
+                return _index.TryGetEntry(SqPackHash.GetIndexHash(gamePath), out _);
+            }
+
             public bool TryReadPackedFile(string gamePath, out byte[] data)
             {
                 SqPackIndexEntry entry;

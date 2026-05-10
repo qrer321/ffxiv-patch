@@ -40,9 +40,7 @@ namespace FfxivKoreanPatch.PatchRouteVerifier
             private uint[] CollectLobbyScaleSensitiveHangulCodepoints()
             {
                 HashSet<uint> codepoints = new HashSet<uint>();
-                AddDynamicHangulCodepoints(codepoints, LobbyScaledHangulPhrases.StartScreenSystemSettings);
-                AddDynamicHangulCodepoints(codepoints, LobbyScaledHangulPhrases.HighResolutionUiScaleOptions);
-                AddDynamicHangulCodepoints(codepoints, LobbyScaledHangulPhrases.StartScreenSystemSettingsResultMessages);
+                AddDynamicHangulCodepoints(codepoints, LobbyScaledHangulPhrases.All);
                 int staticCount = codepoints.Count;
                 int addonDerived = AddPatchedAddonRangeHangulCodepoints(
                     codepoints,
@@ -57,6 +55,12 @@ namespace FfxivKoreanPatch.PatchRouteVerifier
 
             private void VerifyLobbyScaleFontSourceRoute(LobbyScaleFontSourceRoute route, uint[] codepoints)
             {
+                if (IsKoreanLobbyAxisSourceTarget(route.TargetFontPath))
+                {
+                    Pass("{0} scaled lobby Hangul source is covered by Korean client KrnAXIS route verification", route.TargetFontPath);
+                    return;
+                }
+
                 if (!_ttmpFont.ContainsPath(route.SourceFontPath))
                 {
                     Fail("{0} source font is missing from TTMP package for scaled lobby target {1}", route.SourceFontPath, route.TargetFontPath);

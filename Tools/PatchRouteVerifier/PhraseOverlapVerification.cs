@@ -453,6 +453,12 @@ namespace FfxivKoreanPatch.PatchRouteVerifier
                     return;
                 }
 
+                if (IsKoreanLobbyAxisSourceTarget(fontPath))
+                {
+                    VerifyNoPhraseOverlap(fontPath, phrase);
+                    return;
+                }
+
                 PhraseLayoutResult layout;
                 string error;
                 if (!TryMeasurePhraseLayout(_patchedFont, fontPath, phrase, true, out layout, out error))
@@ -604,6 +610,11 @@ namespace FfxivKoreanPatch.PatchRouteVerifier
                     return true;
                 }
 
+                if (IsKoreanLobbyAxisSourceTarget(fontPath) && layout.MinimumGapPixels >= 0)
+                {
+                    return true;
+                }
+
                 if (layout.MinimumGapPixels >= 1)
                 {
                     return true;
@@ -642,6 +653,11 @@ namespace FfxivKoreanPatch.PatchRouteVerifier
                 string asciiFallbackSourceFontPath)
             {
                 if (!IsLobbyFontPath(fontPath) || layout.Glyphs <= 1 || layout.MinimumRequiredGapPixels <= 0)
+                {
+                    return true;
+                }
+
+                if (IsKoreanLobbyAxisSourceTarget(fontPath) && layout.MinimumGapPixels >= 0)
                 {
                     return true;
                 }

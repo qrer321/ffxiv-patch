@@ -28,6 +28,9 @@ namespace FfxivKoreanPatch.PatchRouteVerifier
                 string output = Path.GetFullPath(options.OutputPath);
                 string globalGame = Path.GetFullPath(options.GlobalGamePath);
                 string globalSqpack = Path.Combine(globalGame, "sqpack", "ffxiv");
+                string koreaSqpack = string.IsNullOrWhiteSpace(options.KoreaGamePath)
+                    ? null
+                    : Path.Combine(Path.GetFullPath(options.KoreaGamePath), "sqpack", "ffxiv");
                 string appliedSqpack = string.IsNullOrWhiteSpace(options.AppliedGamePath)
                     ? output
                     : Path.Combine(Path.GetFullPath(options.AppliedGamePath), "sqpack", "ffxiv");
@@ -39,7 +42,7 @@ namespace FfxivKoreanPatch.PatchRouteVerifier
                         : Path.GetFullPath(options.GlyphDumpDir));
 
                 bool compareAppliedOutput = !string.IsNullOrWhiteSpace(options.AppliedGamePath);
-                Verifier verifier = new Verifier(output, appliedSqpack, globalSqpack, language, glyphDumpDir, options.Checks, options.FontPackDir, compareAppliedOutput);
+                Verifier verifier = new Verifier(output, appliedSqpack, globalSqpack, koreaSqpack, language, glyphDumpDir, options.Checks, options.FontPackDir, compareAppliedOutput);
                 verifier.Run();
                 return verifier.Failed ? 1 : 0;
             }
@@ -53,7 +56,7 @@ namespace FfxivKoreanPatch.PatchRouteVerifier
 
         private static void PrintUsage()
         {
-            Console.WriteLine("PatchRouteVerifier.exe --output <patch-output-dir> --global <global-game-dir> [--applied-game <game-dir>] [--target-language ja] [--font-pack-dir <dir>] [--glyph-dump-dir <dir>] [--no-glyph-dump] [--checks <name[,name]>]");
+            Console.WriteLine("PatchRouteVerifier.exe --output <patch-output-dir> --global <global-game-dir> [--korea <korean-game-dir>] [--applied-game <game-dir>] [--target-language ja] [--font-pack-dir <dir>] [--glyph-dump-dir <dir>] [--no-glyph-dump] [--checks <name[,name]>]");
         }
 
     }

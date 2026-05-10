@@ -5,6 +5,8 @@ param(
     [Parameter(Mandatory = $true)]
     [string]$Global,
 
+    [string]$Korea,
+
     [string]$AppliedGame,
 
     [string]$TargetLanguage = "ja",
@@ -36,6 +38,9 @@ if ($LASTEXITCODE -ne 0) {
 }
 
 $arguments = @("--output", $Output, "--global", $Global, "--target-language", $TargetLanguage)
+if (![string]::IsNullOrWhiteSpace($Korea)) {
+    $arguments += @("--korea", $Korea)
+}
 if (![string]::IsNullOrWhiteSpace($AppliedGame)) {
     $arguments += @("--applied-game", $AppliedGame)
 }
