@@ -25,6 +25,7 @@
   - 2026-05-10 검증 보강: FDT `OffsetX`를 draw 시작 위치가 아니라 advance 조정값으로 해석하도록 verifier 렌더링을 수정했다. 이전 설치 산출물은 새 기준에서 `DATA CENTER SELECT`, `Elemental`, `Tonberry` 등 데이터센터 라벨 visual gap FAIL을 재현한다.
   - 2026-05-10 재처리 정정: safe spacing 보정은 100% 로비에서 글자 간격을 과하게 벌렸고, 비로비 인게임 FDT를 clean reference로 쓰는 방식도 로비 렌더러의 실제 기본 폰트와 달라 번짐/간격 판단을 흐렸다. `_lobby.fdt` ASCII/숫자/기호는 이제 동일 이름의 clean lobby FDT를 기준으로 복원한다. 예: `AXIS_12_lobby.fdt` -> clean `AXIS_12_lobby.fdt`.
   - 2026-05-10 검증 결과: `.tmp\lobby-axis-hangul-advance-ja`는 `data-center-title-uld,data-center-worldmap-uld,clean-ascii-font-routes,high-scale-ascii-phrase-layouts`와 전체 broad verifier PASS. 로비 ASCII는 clean lobby FDT의 glyph/kerning/texture 기준과 일치해야 하며, 비로비 인게임 metric으로 강제하지 않는다.
+  - 2026-05-10 재보고 후 검증 정정: 로비 번짐/간격 검증은 실제 UI 배율에서 치환되는 큰 로비 폰트가 동급 소스 glyph를 쓰는지도 확인해야 한다. `lobby-scale-font-sources` verifier를 추가해 `AXIS_12/14/18_lobby`는 TTMP의 같은 로비 폰트와, `AXIS_36_lobby` 등 파생 고배율 로비 폰트는 대응되는 TTMP 고배율 source와 glyph 크기/픽셀이 일치하는지 검사한다.
   - 다음 처리: 클라이언트/런처 종료 후 최신 `Release\Public\FFXIVKoreanPatch.exe` 또는 산출물로 font patch를 재적용하고, `applied-output-files,data-center-title-uld,data-center-worldmap-uld`를 실제 적용 폴더 기준으로 PASS시킨다.
 
 - [ ] Data center select: 서버명은 영어로 나오지만 문자 간격이 서로 침범함
@@ -61,7 +62,9 @@
   - 2026-05-10 재처리 정정: 4K lobby 파생 폰트와 lobby ASCII route의 safe advance/negative kerning 정규화를 제거했다. ASCII/숫자/기호는 동일 이름의 clean lobby FDT를 기준으로 복원하고, 해당 reference에 없는 문장 기호만 fallback source에서 보충한다. 이 변경은 `_lobby.fdt` 경로에만 제한해 인게임/대사 폰트 metrics 오염을 막는다.
   - 2026-05-10 원인 추가: 한글 `=` fallback은 해결됐지만, `AXIS_12_lobby`/`AXIS_14_lobby`/`AXIS_18_lobby`의 TTMP 한글 glyph가 `OffsetX=-3` 계열로 들어와 advance가 glyph width보다 좁아지는 경우가 있었다. 로비 고배율 문장에서는 이 값이 인접 한글 alpha bounds를 침범시키므로, 픽셀은 그대로 두고 위 세 로비 AXIS 폰트의 한글에 한해 `source advance < glyph width`일 때만 `OffsetX=0`으로 정규화한다.
   - 2026-05-10 검증 결과: `.tmp\lobby-axis-hangul-advance-ja`는 `start-system-settings-uld,clean-ascii-font-routes,system-settings-mixed-scale-layouts` PASS, `data-center-title-uld,data-center-worldmap-uld,system-settings-scaled-phrase-layouts,high-scale-ascii-phrase-layouts,lobby-hangul-visibility` PASS, 전체 broad verifier PASS. `hangul-source-preservation`은 대표 문구 5,072개 TTMP 한글 glyph 렌더를 비교하고, 별도 전수 스캔으로 로비 AXIS 한글 table 34,437개 중 33,779개의 advance-only 정규화가 규칙과 맞는지 확인한다.
-  - 다음 처리: font patch 재적용 후 `applied-output-files,start-system-settings-uld,4k-lobby-phrase-layouts,lobby-hangul-visibility`를 실제 적용 폴더 기준으로 PASS시킨다. 그래도 재현되면 시작화면 시스템 설정의 실제 scale별 font substitution을 별도 verifier로 추가한다.
+  - 2026-05-10 재보고 후 검증 정정: `일부 설정은 적용을 눌러야 반영됩니다.`가 결과 메시지 목록에서 빠져 있어 고배율 파생 로비 폰트 glyph 수집과 문장 검증에서 누락됐다. 해당 문구를 `StartScreenSystemSettingsResultMessages`에 추가했고, `start-system-settings-uld`가 `150%(FHD): ...` 같은 고해상도 UI 옵션 문구도 `AXIS_12/14/18_lobby` route에서 검사하도록 확장했다.
+  - 2026-05-10 재조합 검증 추가: `lobby-scale-font-sources`는 로비 배율별 대응 폰트가 100% glyph를 억지 확대하지 않았는지 잡기 위해, scale-sensitive Hangul 260개를 대상으로 target glyph width/height와 렌더 alpha가 대응 TTMP source와 동일한지 검사한다. 새 산출물 `.tmp\lobby-scale-source-ja`는 `start-system-settings-uld,lobby-scale-font-sources,system-settings-mixed-scale-layouts` PASS.
+  - 다음 처리: font patch 재적용 후 `applied-output-files,start-system-settings-uld,lobby-scale-font-sources,4k-lobby-phrase-layouts,lobby-hangul-visibility`를 실제 적용 폴더 기준으로 PASS시킨다. 그래도 재현되면 시작화면 시스템 설정의 실제 runtime scale substitution map을 더 세분화해 verifier에 추가한다.
 
 - [x] Data center select popup: `데이터 센터 Mana에 입장합니다` 계열 팝업 문구가 base client 언어로 나옴 - 처리됨
   - 재보고일: 2026-05-09
