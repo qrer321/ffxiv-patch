@@ -1152,6 +1152,7 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
             int partyShapeFixes = ApplyPartyListSelfMarkerCleanShapes(path, ref fdt, glyphRepair, globalArchive, texturePatches);
             int cleanAsciiFixes = ApplyCleanAsciiGlyphShapes(path, fdt, glyphRepair, globalArchive, texturePatches);
             int cleanAsciiKerningFixes = ApplyCleanAsciiKerning(path, ref fdt, globalArchive);
+            int startScreenKerningFixes = ApplyStartScreenSystemSettingsKerning(path, ref fdt);
             int lobbyAxisHangulAdvanceFixes = NormalizeLobbyAxisHangulAdvances(path, fdt);
             // FDT edits are written as standard files when key normalization,
             // targeted Hangul repair, party marker allocation, or ASCII/numeric
@@ -1166,6 +1167,7 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
                 partyShapeFixes == 0 &&
                 cleanAsciiFixes == 0 &&
                 cleanAsciiKerningFixes == 0 &&
+                startScreenKerningFixes == 0 &&
                 lobbyAxisHangulAdvanceFixes == 0 &&
                 originalPackedFile != null)
             {
@@ -1210,6 +1212,11 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
             if (cleanAsciiKerningFixes > 0)
             {
                 Console.WriteLine("  Restored clean ASCII kerning pairs: {0} ({1})", cleanAsciiKerningFixes, path);
+            }
+
+            if (startScreenKerningFixes > 0)
+            {
+                Console.WriteLine("  Added start-screen system-settings kerning pairs: {0} ({1})", startScreenKerningFixes, path);
             }
 
             if (lobbyAxisHangulAdvanceFixes > 0)
@@ -2352,6 +2359,267 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
             }
 
             int changed = ReplaceAsciiKerningEntries(ref targetFdt, sourceFdt, ShouldNormalizeCleanAsciiLobbySpacing(normalizedPath));
+            return changed;
+        }
+
+        private static readonly StartScreenKerningRoute[] StartScreenKerningRoutes = new StartScreenKerningRoute[]
+        {
+            new StartScreenKerningRoute("common/font/AXIS_12.fdt", true, true, false),
+            new StartScreenKerningRoute("common/font/KrnAXIS_120.fdt", true, true, false),
+            new StartScreenKerningRoute("common/font/AXIS_14.fdt", true, true, true),
+            new StartScreenKerningRoute("common/font/KrnAXIS_140.fdt", true, true, true),
+            new StartScreenKerningRoute("common/font/AXIS_18.fdt", false, true, false),
+            new StartScreenKerningRoute("common/font/KrnAXIS_180.fdt", false, true, false)
+        };
+
+        private static int ApplyStartScreenSystemSettingsKerning(string path, ref byte[] targetFdt)
+        {
+            StartScreenKerningRoute route;
+            if (!TryGetStartScreenKerningRoute(path, out route) || targetFdt == null)
+            {
+                return 0;
+            }
+
+            return UpsertKerningEntries(ref targetFdt, CollectStartScreenKerningPairs(route), 2);
+        }
+
+        private static bool TryGetStartScreenKerningRoute(string path, out StartScreenKerningRoute route)
+        {
+            string normalized = NormalizeGamePath(path);
+            for (int i = 0; i < StartScreenKerningRoutes.Length; i++)
+            {
+                if (string.Equals(normalized, StartScreenKerningRoutes[i].FontPath, StringComparison.OrdinalIgnoreCase))
+                {
+                    route = StartScreenKerningRoutes[i];
+                    return true;
+                }
+            }
+
+            route = new StartScreenKerningRoute();
+            return false;
+        }
+
+        private static List<byte[]> CollectStartScreenKerningPairs(StartScreenKerningRoute route)
+        {
+            Dictionary<string, byte[]> entries = new Dictionary<string, byte[]>(StringComparer.Ordinal);
+            if (route.IncludeResultMessageHangulPairs)
+            {
+                AddAdjacentHangulKerningPairs(entries, LobbyScaledHangulPhrases.StartScreenSystemSettingsResultMessages);
+            }
+
+            if (route.IncludeTerminalPunctuationPairs)
+            {
+                AddTerminalPunctuationKerningPairs(entries, LobbyScaledHangulPhrases.HighResolutionUiScaleOptions);
+                AddTerminalPunctuationKerningPairs(entries, LobbyScaledHangulPhrases.StartScreenSystemSettingsResultMessages);
+            }
+
+            if (route.IncludeHighResolutionPercentPairs)
+            {
+                AddAsciiPercentKerningPairs(entries, LobbyScaledHangulPhrases.HighResolutionUiScaleOptions);
+            }
+
+            List<byte[]> result = new List<byte[]>(entries.Values);
+            result.Sort(CompareKerningEntries);
+            return result;
+        }
+
+        private static void AddAdjacentHangulKerningPairs(Dictionary<string, byte[]> entries, string[] phrases)
+        {
+            AddStartScreenKerningPairs(
+                entries,
+                phrases,
+                delegate(uint left, uint right)
+                {
+                    return IsHangulCodepoint(left) && IsHangulCodepoint(right);
+                });
+        }
+
+        private static void AddTerminalPunctuationKerningPairs(Dictionary<string, byte[]> entries, string[] phrases)
+        {
+            AddStartScreenKerningPairs(
+                entries,
+                phrases,
+                delegate(uint left, uint right)
+                {
+                    return IsHangulCodepoint(left) && IsTerminalPunctuationCodepoint(right);
+                });
+        }
+
+        private static void AddAsciiPercentKerningPairs(Dictionary<string, byte[]> entries, string[] phrases)
+        {
+            AddStartScreenKerningPairs(
+                entries,
+                phrases,
+                delegate(uint left, uint right)
+                {
+                    return left >= '0' && left <= '9' && right == '%';
+                });
+        }
+
+        private static void AddStartScreenKerningPairs(Dictionary<string, byte[]> entries, string[] phrases, KerningPairPredicate predicate)
+        {
+            if (phrases == null)
+            {
+                return;
+            }
+
+            for (int phraseIndex = 0; phraseIndex < phrases.Length; phraseIndex++)
+            {
+                string phrase = phrases[phraseIndex] ?? string.Empty;
+                uint previous = 0;
+                bool hasPrevious = false;
+                for (int i = 0; i < phrase.Length; i++)
+                {
+                    uint codepoint = ReadCodepoint(phrase, ref i);
+                    if (hasPrevious && predicate(previous, codepoint))
+                    {
+                        byte[] entry = CreateKerningEntry(previous, codepoint, 2);
+                        entries[BuildKerningKey(Endian.ReadUInt32LE(entry, 0), Endian.ReadUInt32LE(entry, 4))] = entry;
+                    }
+
+                    previous = codepoint;
+                    hasPrevious = !IsPhraseSeparatorCodepoint(codepoint);
+                }
+            }
+        }
+
+        private delegate bool KerningPairPredicate(uint left, uint right);
+
+        private struct StartScreenKerningRoute
+        {
+            public readonly string FontPath;
+            public readonly bool IncludeResultMessageHangulPairs;
+            public readonly bool IncludeTerminalPunctuationPairs;
+            public readonly bool IncludeHighResolutionPercentPairs;
+
+            public StartScreenKerningRoute(
+                string fontPath,
+                bool includeResultMessageHangulPairs,
+                bool includeTerminalPunctuationPairs,
+                bool includeHighResolutionPercentPairs)
+            {
+                FontPath = fontPath;
+                IncludeResultMessageHangulPairs = includeResultMessageHangulPairs;
+                IncludeTerminalPunctuationPairs = includeTerminalPunctuationPairs;
+                IncludeHighResolutionPercentPairs = includeHighResolutionPercentPairs;
+            }
+        }
+
+        private static bool IsTerminalPunctuationCodepoint(uint codepoint)
+        {
+            return codepoint == 0x002Eu ||
+                   codepoint == 0x3002u ||
+                   codepoint == 0xFF0Eu;
+        }
+
+        private static bool IsPhraseSeparatorCodepoint(uint codepoint)
+        {
+            return codepoint == 0 || codepoint == 0x20u || codepoint == 0x3000u;
+        }
+
+        private static byte[] CreateKerningEntry(uint leftCodepoint, uint rightCodepoint, int adjustment)
+        {
+            byte[] entry = new byte[FdtKerningEntrySize];
+            Endian.WriteUInt32LE(entry, 0, PackFdtUtf8Value(leftCodepoint));
+            Endian.WriteUInt32LE(entry, 4, PackFdtUtf8Value(rightCodepoint));
+
+            ushort leftShiftJis;
+            ushort rightShiftJis;
+            if (TryEncodeShiftJisValue(leftCodepoint, out leftShiftJis))
+            {
+                Endian.WriteUInt16LE(entry, 8, leftShiftJis);
+            }
+
+            if (TryEncodeShiftJisValue(rightCodepoint, out rightShiftJis))
+            {
+                Endian.WriteUInt16LE(entry, 10, rightShiftJis);
+            }
+
+            Endian.WriteUInt32LE(entry, 12, unchecked((uint)adjustment));
+            return entry;
+        }
+
+        private static int UpsertKerningEntries(ref byte[] targetFdt, List<byte[]> requiredEntries, int minimumAdjustment)
+        {
+            if (requiredEntries == null || requiredEntries.Count == 0)
+            {
+                return 0;
+            }
+
+            int targetHeaderOffset;
+            int targetStart;
+            int targetCount;
+            if (!TryGetFdtKerningTable(targetFdt, out targetHeaderOffset, out targetStart, out targetCount))
+            {
+                return 0;
+            }
+
+            Dictionary<string, byte[]> requiredByKey = new Dictionary<string, byte[]>(StringComparer.Ordinal);
+            for (int i = 0; i < requiredEntries.Count; i++)
+            {
+                byte[] requiredEntry = requiredEntries[i];
+                requiredByKey[BuildKerningKey(Endian.ReadUInt32LE(requiredEntry, 0), Endian.ReadUInt32LE(requiredEntry, 4))] = requiredEntry;
+            }
+
+            List<byte[]> entries = new List<byte[]>(targetCount + requiredEntries.Count);
+            HashSet<string> seen = new HashSet<string>(StringComparer.Ordinal);
+            int changed = 0;
+            for (int i = 0; i < targetCount; i++)
+            {
+                int offset = targetStart + i * FdtKerningEntrySize;
+                byte[] entry = new byte[FdtKerningEntrySize];
+                Buffer.BlockCopy(targetFdt, offset, entry, 0, FdtKerningEntrySize);
+                string key = BuildKerningKey(Endian.ReadUInt32LE(entry, 0), Endian.ReadUInt32LE(entry, 4));
+                byte[] required;
+                if (requiredByKey.TryGetValue(key, out required))
+                {
+                    int current = unchecked((int)Endian.ReadUInt32LE(entry, 12));
+                    if (current < minimumAdjustment)
+                    {
+                        Endian.WriteUInt32LE(entry, 12, unchecked((uint)minimumAdjustment));
+                        changed++;
+                    }
+
+                    seen.Add(key);
+                }
+
+                entries.Add(entry);
+            }
+
+            for (int i = 0; i < requiredEntries.Count; i++)
+            {
+                byte[] requiredEntry = requiredEntries[i];
+                string key = BuildKerningKey(Endian.ReadUInt32LE(requiredEntry, 0), Endian.ReadUInt32LE(requiredEntry, 4));
+                if (seen.Contains(key))
+                {
+                    continue;
+                }
+
+                byte[] entry = new byte[FdtKerningEntrySize];
+                Buffer.BlockCopy(requiredEntry, 0, entry, 0, FdtKerningEntrySize);
+                entries.Add(entry);
+                changed++;
+            }
+
+            if (changed == 0)
+            {
+                return 0;
+            }
+
+            entries.Sort(CompareKerningEntries);
+            int targetEnd = checked(targetStart + targetCount * FdtKerningEntrySize);
+            int oldKerningBytes = checked(targetCount * FdtKerningEntrySize);
+            int newKerningBytes = checked(entries.Count * FdtKerningEntrySize);
+            byte[] rewritten = new byte[checked(targetFdt.Length + newKerningBytes - oldKerningBytes)];
+            Buffer.BlockCopy(targetFdt, 0, rewritten, 0, targetStart);
+            for (int i = 0; i < entries.Count; i++)
+            {
+                Buffer.BlockCopy(entries[i], 0, rewritten, targetStart + i * FdtKerningEntrySize, FdtKerningEntrySize);
+            }
+
+            Buffer.BlockCopy(targetFdt, targetEnd, rewritten, targetStart + newKerningBytes, targetFdt.Length - targetEnd);
+            Endian.WriteUInt32LE(rewritten, targetHeaderOffset + 0x04, checked((uint)entries.Count));
+            targetFdt = rewritten;
             return changed;
         }
 
