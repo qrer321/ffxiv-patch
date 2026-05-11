@@ -460,7 +460,7 @@ namespace FfxivKoreanPatch.PatchRouteVerifier
             {
                 if (!IsScaledLobbySystemSettingsFont(fontPath))
                 {
-                    if (strictVisualGap &&
+                    if ((strictVisualGap || IsStartScreenHighRiskSystemSettingsPhrase(phrase)) &&
                         IsSystemSettingsStrictVisualFont(fontPath) &&
                         !VerifySystemSettingsStrictScaledRoutePhraseLayout(fontPath, phrase))
                     {
@@ -884,6 +884,30 @@ namespace FfxivKoreanPatch.PatchRouteVerifier
                 for (int i = 0; i < SystemSettingsScaledFonts.Length; i++)
                 {
                     if (string.Equals(normalized, SystemSettingsScaledFonts[i], StringComparison.OrdinalIgnoreCase))
+                    {
+                        return true;
+                    }
+                }
+
+                return false;
+            }
+
+            private static bool IsStartScreenHighRiskSystemSettingsPhrase(string phrase)
+            {
+                return ContainsPhrase(LobbyScaledHangulPhrases.HighResolutionUiScaleOptions, phrase) ||
+                       ContainsPhrase(LobbyScaledHangulPhrases.StartScreenSystemSettingsResultMessages, phrase);
+            }
+
+            private static bool ContainsPhrase(string[] phrases, string phrase)
+            {
+                if (phrases == null)
+                {
+                    return false;
+                }
+
+                for (int i = 0; i < phrases.Length; i++)
+                {
+                    if (string.Equals(phrases[i], phrase, StringComparison.Ordinal))
                     {
                         return true;
                     }

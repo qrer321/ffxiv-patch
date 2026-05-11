@@ -36,6 +36,7 @@ namespace FfxivKoreanPatch.PatchRouteVerifier
                     new VerificationStep("action-detail-scale-layouts", VerifyActionDetailScaleLayouts),
                     new VerificationStep("party-list-self-marker", VerifyPartyListSelfMarker),
                     new VerificationStep("lobby-hangul-visibility", VerifyLobbyHangulVisibility),
+                    new VerificationStep("lobby-render-snapshots", VerifyLobbyRenderSnapshots),
                     new VerificationStep("lobby-phrase-glyph-diagnostics", VerifyLobbyPhraseGlyphDiagnostics),
                     new VerificationStep("dialogue-phrase-glyph-diagnostics", VerifyDialoguePhraseGlyphDiagnostics)
                 };
