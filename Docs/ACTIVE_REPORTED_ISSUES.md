@@ -125,6 +125,9 @@
 - 검증 보강: `lobby-scale-font-sources`는 TTMP source 대비 width/height/pixel alpha를 직접 비교하고, 이전 KrnAXIS 산출물 `.tmp\lobby-spacing-normalized-ja-v3`를 FAIL시킨다. `korean-lobby-font-sources`는 KrnAXIS route가 비활성화되어야 한다는 guard로 축소했다. 시작 메뉴/시스템 설정 phrase verifier는 pixel/size 보존과 advance-only 보정 폭을 분리해 계산한다.
 - 현재 산출물 기준: `.tmp\lobby-ttmp-source-advance-ja`는 focused verifier `.tmp\verifier-lobby-ttmp-source-advance-focused-r5.log` 및 broad verifier `.tmp\verifier-lobby-ttmp-source-advance-full-r2.log`에서 PASS한다.
 - 열린 이슈: 실제 시작화면/로비 150%+ 번짐/간격은 사용자 OK 전까지 열린 항목으로 유지한다. generated-output PASS만으로 완료 처리하지 않고, 적용 폴더 기준 검증과 사용자 확인을 별도 단계로 둔다.
+- 2026-05-11 재검증 보강: upstream `korean-patch/ffxiv-patch-generator`는 TTMP payload를 그대로 얹는 흐름인데, 우리 verifier는 그 뒤의 재조합 결과만 `_lobby` 중심으로 확인하고 있었다. `lobby-render-snapshots`는 `설정을 변경했습니다.`, `150%(FHD): 1728x972 이상 권장` 등을 PNG/TSV로 덤프하고, `_lobby`뿐 아니라 실제 150% 후보인 non-lobby `AXIS_18.fdt`/`KrnAXIS_180.fdt`와 200/300% 후보 `AXIS_36.fdt`/`KrnAXIS_360.fdt`를 비교한다. `AXIS_18.fdt`/`KrnAXIS_180.fdt` advance를 직접 보정한 `.tmp\lobby-axis-advance-ja`는 render snapshot은 통과했지만 `reported-ingame-hangul-phrases`에서 인게임 문구를 오염시켜 폐기했다. 전역 AXIS/KrnAXIS는 진단 대상으로만 남기고, 실제 수정은 로비 전용 route나 타이틀 컨텍스트 route를 분리하는 방향으로 유지한다. 사용자 OK 전까지 완료로 닫지 않는다.
+- 2026-05-12 재검증 강화: `lobby-render-snapshots`는 `min_pair`를 기록하고, 재보고된 실제 후보 `AXIS_12.fdt` 150%와 `AXIS_14.fdt` 150/200/300%를 `minGap >= 1` 실패 조건으로 승격했다. 이 기준에서 r1은 `했/습`, `다/.`, `0/%` 계열로 실패했고, r2 산출물 `.tmp\startscreen-route-kerning-ja-r2`는 통과했다.
+- 2026-05-12 코드 조치: 보정 pair는 시작화면 시스템 설정 문구 목록에서 자동 수집한다. 직접 glyph 보호 배열이나 broad advance 보정은 피하고, `AXIS_12/14/18` 및 대응 `KrnAXIS`의 필요한 kerning pair만 최소 보정한다. 같은 FDT가 인게임에서도 쓰일 수 있으므로 `.tmp\verifier-startscreen-route-kerning-regression.log`에서 데이터센터, 설정 공유, 보즈야, 오컬트 크레센트, 인게임 보고 문구, ActionDetail, Hangul source preservation, lobby render snapshot 회귀 묶음을 함께 통과시켰다. 사용자 OK 전까지 완료로 닫지 않는다.
 
 ## Verification Rule
 
