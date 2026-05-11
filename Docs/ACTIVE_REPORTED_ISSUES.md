@@ -120,16 +120,11 @@
 ## 2026-05-10 lobby high-scale font follow-up
 
 - 사용자 지시: 사용자가 OK하기 전까지 시작화면/로비 150% 이상 폰트 문제는 `수정 완료`로 판단하지 않는다. 코드상 조치와 verifier 산출물은 남기되, 상태는 열린 이슈로 유지한다.
-- 재검증 공백: 기존 `lobby-scale-font-sources`는 patched lobby font가 TTMP font package source와 같은지만 봤다. TTMP 재조합 source 자체가 한국 클라이언트의 배율별 원본 glyph와 다른 경우를 놓칠 수 있었다.
-- 원인 후보 확인: 기존 산출물의 `AXIS_12/14/18/36_lobby` Hangul glyph는 한국 클라이언트 `KrnAXIS_120/140/180/360`보다 높이가 컸다. 예: `AXIS_36_lobby` target `41x50` vs Korean `KrnAXIS_360` source `41x41`.
-- 코드상 조치: TTMP package가 있더라도 lobby AXIS Hangul은 한국 클라이언트 `KrnAXIS_120/140/180/360` source glyph shape를 복사한다. advance는 겹침 방지를 위해 source advance가 glyph width보다 좁을 때 glyph width로만 정규화한다. 이 경로는 `_lobby` AXIS font와 scale-sensitive Hangul codepoint에 한정한다.
-- 검증 보강: `--korea`를 받는 `korean-lobby-font-sources` verifier를 추가했다. 한국 클라이언트 source glyph의 width/height/offsetY/pixel alpha와 patched target을 비교하고, advance는 기대 정규화 값과 정확히 일치해야 한다.
-- 현재 산출물 기준: `.tmp\lobby-krnaxis-advance-ja`는 `korean-lobby-font-sources,system-settings-mixed-scale-layouts,lobby-scale-font-sources,clean-ascii-font-routes` focused verifier PASS(`.tmp\verifier-lobby-krnaxis-advance-focused-r2.log`). `start-system-settings-uld`도 실제 ULD route가 AXIS 계열임을 확인하고 PASS(`.tmp\verifier-lobby-krnaxis-start-system-settings-uld.log`).
-- 열린 이슈: 데이터센터 영어 서버명 spacing/blur는 이번 KrnAXIS Hangul route 조치와 별개로 계속 열린 항목이다. 실제 로비 150%+ 픽셀 번짐도 사용자 OK 전까지 열린 항목으로 유지한다.
-- 2026-05-10 검증 강화 정정: 기존 PASS는 clean/source baseline도 같은 음수 visual gap을 갖는 경우를 통과시켜 실제 데이터센터/로비 증상을 닫지 못했다. `data-center-title-uld,data-center-worldmap-uld,start-system-settings-uld`에 strict visual-gap 검증을 추가했고, 현재 산출물 `.tmp\lobby-krnaxis-advance-ja`는 `.tmp\verifier-strict-lobby-routes-v3.log`에서 FAIL한다.
-- 새 실패 기준: 데이터센터 ULD가 route한 모든 `_lobby.fdt` ASCII 라벨은 clean baseline 예외 없이 `minGap < 0`이면 실패한다. 현재 `AXIS_12_lobby`, `AXIS_14_lobby`, `Jupiter_20_lobby`, `MiedingerMid_14_lobby`, `TrumpGothic_*_lobby` 등에서 서버명/DC명 음수 gap이 재현된다.
-- 새 실패 기준: 시작화면 시스템 설정 route font는 lobby/non-lobby를 나누지 않고 `SystemSettingsScaledFonts`와 AXIS lobby route의 대표 문구를 strict visual-gap으로 검사한다. 현재 `AXIS_18.fdt`에서 `설정을 변경했습니다.`, `일부 설정은 적용을 눌러야 반영됩니다.`, `높은 해상도로 플레이하는 분을 위한 설정입니다.`가 `다` + `.` pair의 `minGap=-1`로 FAIL한다.
-- 다음 처리: 이 항목은 `사용자 OK 대기`가 아니라 verifier 기준에서도 열린 이슈다. 수정은 generator/source route를 바꾼 뒤 위 strict verifier가 PASS할 때까지 반복한다.
+- 재검증 정정: upstream `ffxiv-patch-generator`는 TTMP payload를 재패킹할 뿐 FDT glyph cell을 재조합하지 않는다. 우리 쪽에서 추가한 broad `KrnAXIS` lobby route가 `AXIS_12/14/18/36_lobby` Hangul의 높이/컴포넌트 수를 바꾸며, 사용자가 보고한 150%+ pixelation 증상과 같은 방향의 오염을 만들었다.
+- 코드상 조치: broad `KrnAXIS_120/140/180/360` lobby Hangul 치환을 제거하고, `AXIS_*_lobby` Hangul glyph의 TTMP source 크기/pixel을 복원했다. 겹침 방지는 `AXIS_12_lobby`, `AXIS_14_lobby`, `AXIS_18_lobby`에서 source advance가 glyph width보다 좁은 Hangul에 한해 `OffsetX=0`으로 바꾸는 advance-only 보정만 허용한다. `AXIS_36_lobby`는 다시 TTMP `AXIS_36.fdt` 기반 파생 route를 탄다.
+- 검증 보강: `lobby-scale-font-sources`는 TTMP source 대비 width/height/pixel alpha를 직접 비교하고, 이전 KrnAXIS 산출물 `.tmp\lobby-spacing-normalized-ja-v3`를 FAIL시킨다. `korean-lobby-font-sources`는 KrnAXIS route가 비활성화되어야 한다는 guard로 축소했다. 시작 메뉴/시스템 설정 phrase verifier는 pixel/size 보존과 advance-only 보정 폭을 분리해 계산한다.
+- 현재 산출물 기준: `.tmp\lobby-ttmp-source-advance-ja`는 focused verifier `.tmp\verifier-lobby-ttmp-source-advance-focused-r5.log` 및 broad verifier `.tmp\verifier-lobby-ttmp-source-advance-full-r2.log`에서 PASS한다.
+- 열린 이슈: 실제 시작화면/로비 150%+ 번짐/간격은 사용자 OK 전까지 열린 항목으로 유지한다. generated-output PASS만으로 완료 처리하지 않고, 적용 폴더 기준 검증과 사용자 확인을 별도 단계로 둔다.
 
 ## Verification Rule
 

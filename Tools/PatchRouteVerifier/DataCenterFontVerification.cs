@@ -45,7 +45,7 @@ namespace FfxivKoreanPatch.PatchRouteVerifier
 
                         for (int phraseIndex = 0; phraseIndex < SystemSettingsScaledPhrases.Length; phraseIndex++)
                         {
-                            VerifySystemSettingsScaledRoutePhraseLayout(fontPath, SystemSettingsScaledPhrases[phraseIndex]);
+                            VerifySystemSettingsScaledRoutePhraseLayout(fontPath, SystemSettingsScaledPhrases[phraseIndex], candidate.UsesLobbyFonts);
                         }
                     }
                 }

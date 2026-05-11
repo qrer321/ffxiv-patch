@@ -26,7 +26,7 @@
 
 ### 0. 2026-05-09 재보고: 시작 화면 데이터센터/시스템 설정 실사용 경로 미검증
 
-상태: 열린 이슈, strict verifier에서 현재 ja 산출물 FAIL
+상태: 코드 산출물 verifier PASS, 사용자 OK 대기
 
 최근 verifier는 통과했지만 실제 클라이언트에서 아래 문제가 계속 재현되었습니다. 이는 기존 검증이 실제 시작 화면 UI route를 충분히 잡지 못했다는 뜻으로 취급합니다.
 
@@ -47,17 +47,17 @@
 - 2026-05-10 추가 검증: 실제 UI 배율에서 12/14가 아니라 큰 로비 폰트로 치환되는 경로를 잡기 위해 `lobby-scale-font-sources` verifier를 추가했다. 이 검증은 `AXIS_12/14/18_lobby`와 `AXIS_36_lobby` 등 고배율 파생 로비 폰트가 각 배율에 대응되는 TTMP source glyph를 쓰는지, 100% glyph를 억지 확대하지 않는지 width/height 및 alpha pixel 단위로 확인한다.
 - 2026-05-10 최신 산출물: `.tmp\lobby-scale-source-ja`는 `start-system-settings-uld,lobby-scale-font-sources,system-settings-mixed-scale-layouts` PASS. `start-system-settings-uld`는 이제 `150%(FHD): ...` 계열 고해상도 UI 옵션 문구도 `AXIS_12/14/18_lobby` route에서 검사한다.
 - 2026-05-10 인게임 ActionDetail 배율 보강: `ActionDetail.uld` route를 추적하고 `즉시 발동`, `초`, `120.00초`, `1.50초`를 숫자 baseline과 비교하는 `action-detail-scale-layouts` verifier를 추가했다. `TrumpGothic_68.fdt`의 고배율 Hangul glyph는 `Addon#699-714`와 fallback 문구에서 자동 수집한 codepoint만 route 단위로 보정하며, 기존 glyph atlas cell은 덮어쓰지 않는다. `.tmp\action-detail-scale-ja4`와 `.tmp\action-detail-scale-ja4-apply` 산출물은 ActionDetail/reported-ingame/4K lobby derivation/Hangul preservation 검증을 통과했다. 실제 일본어 클라이언트 폴더 복사는 실행 중인 `ffxiv_dx11`/`XIVLauncher` 잠금으로 차단되어 산출물 검증 상태로 남긴다.
-- 2026-05-10 strict 검증 강화 정정: 이전 PASS는 clean/source baseline도 음수 visual gap을 갖는 경우를 통과시켜 사용자가 보고한 로비/데이터센터 증상을 닫지 못했다. `data-center-title-uld,data-center-worldmap-uld,start-system-settings-uld`는 이제 strict visual-gap을 적용하며, 현재 `.tmp\lobby-krnaxis-advance-ja`는 `.tmp\verifier-strict-lobby-routes-v3.log`에서 FAIL한다.
-- 현재 재현: 데이터센터 ULD route의 `_lobby.fdt` ASCII 라벨은 `AXIS_12_lobby`, `AXIS_14_lobby`, `Jupiter_20_lobby`, `MiedingerMid_14_lobby`, `TrumpGothic_*_lobby` 등에서 서버명/DC명 `minGap < 0`을 보고한다. 시작화면 시스템 설정은 `AXIS_18.fdt`의 `설정을 변경했습니다.`, `일부 설정은 적용을 눌러야 반영됩니다.`, `높은 해상도로 플레이하는 분을 위한 설정입니다.`가 `다` + `.` pair `minGap=-1`로 실패한다.
-- 상태 정정: 데이터센터 영어 서버명 spacing/blur와 로비 150%+ 시스템 설정 spacing/blur는 사용자 OK 전까지뿐 아니라 verifier 기준에서도 열린 이슈다.
+- 2026-05-10 strict 검증 강화 정정: 이전 PASS는 clean/source baseline도 음수 visual gap을 갖는 경우를 통과시켜 사용자가 보고한 로비/데이터센터 증상을 닫지 못했다. `data-center-title-uld,data-center-worldmap-uld,start-system-settings-uld`는 strict visual-gap을 적용한다.
+- 2026-05-11 재조합 정정: broad `KrnAXIS_120/140/180/360` lobby Hangul 치환은 `AXIS_12/14/18/36_lobby` glyph의 높이/컴포넌트 수를 바꾸며 pixelation 위험을 만들었으므로 제거했다. `AXIS_*_lobby` Hangul은 TTMP source glyph 크기/pixel을 보존하고, `AXIS_12/14/18_lobby`에서 `source advance < glyph width`인 Hangul만 `OffsetX=0` advance-only 보정을 허용한다.
+- 현재 산출물: `.tmp\lobby-ttmp-source-advance-ja`는 `.tmp\verifier-lobby-ttmp-source-advance-focused-r5.log`와 `.tmp\verifier-lobby-ttmp-source-advance-full-r2.log`에서 PASS한다. 다만 데이터센터 영어 서버명 spacing/blur와 로비 150%+ 시스템 설정 spacing/blur는 사용자 OK 전까지 열린 항목으로 둔다.
 
 재보고 항목:
 
 - 시작 화면의 `종료`가 `EXIT`로 표시됨. 처리됨
 - 데이터 센터 선택 화면을 나가는 버튼이 `-로?` / `-료?`처럼 깨져 보임. `Lobby#2009/#2052` 뒤로 row와 관련 ULD font phrase 검증을 추가해 처리됨
-- 데이터 센터 선택 화면의 group label은 영어로 나오지만 흐리게 보임. strict verifier 기준 열린 이슈
-- 데이터 센터 선택 화면의 서버명/데이터센터명은 영어로 나오지만 문자 간격이 서로 침범함. strict verifier 기준 열린 이슈
-- 시작 화면 시스템 설정에서 UI 배율을 150/200/300%로 키우면 한글이 `=`로 깨지고 문자 간격이 침범함. `=` fallback은 처리됐으나 간격/번짐은 strict verifier 기준 열린 이슈
+- 데이터 센터 선택 화면의 group label은 영어로 나오지만 흐리게 보임. 코드 산출물 verifier PASS, 사용자 OK 대기
+- 데이터 센터 선택 화면의 서버명/데이터센터명은 영어로 나오지만 문자 간격이 서로 침범함. 코드 산출물 verifier PASS, 사용자 OK 대기
+- 시작 화면 시스템 설정에서 UI 배율을 150/200/300%로 키우면 한글이 `=`로 깨지고 문자 간격이 침범함. `=` fallback 및 코드 산출물 verifier PASS, 사용자 OK 대기
 - `데이터 센터 Mana에 입장합니다` 계열 팝업 문구는 처리됨. 재발 시 sheet/row/column 추적 verifier를 먼저 보강
 - 인게임 `즉시 발동`/`초`가 UI 배율별 상대 크기를 제대로 따라가지 않는 문제는 `action-detail-scale-layouts` verifier와 `TrumpGothic_68.fdt` route 단위 glyph 보정으로 처리됨. 실제 클라이언트 복사는 파일 잠금 해제 후 재적용 필요
 - 스토리 종료 후 컷씬/이벤트 이미지 설명문이 베이스 클라이언트 언어로 표시됨. 폰트 패치가 아니라 지역 이동 타이틀처럼 실제 표시 리소스를 한국 클라이언트 리소스로 교체해야 할 가능성이 높음. 단, 아직 scene 리소스로 단정하지 않고 `EventImage` 등 sheet 기반 이미지 가능성부터 확인해야 함
@@ -123,7 +123,7 @@
 
 ### 3. 150% 이상 UI에서 문자 간격이 좁아 폰트가 겹쳐 보임
 
-상태: 열린 이슈, strict verifier에서 현재 ja 산출물 FAIL
+상태: 코드 산출물 verifier PASS, 사용자 OK 대기
 
 150% 이상 UI, 특히 시스템 설정 창에서 space 또는 문자 간격이 좁아 glyph가 겹쳐 보이는 현상이 있습니다. 4K lobby/in-game FDT의 advance 값, offset, glyph width를 잘못 가져오거나 normalize가 부족한 가능성이 있습니다.
 
@@ -135,6 +135,12 @@
 - Hangul advance는 clean CJK median 또는 glyph width 기반 safety advance를 기준으로 보정
 - clean target에 없는 ASCII는 파생 source pair의 clean lobby font에서 4px padding과 함께 보충
 - `.tmp\mixed-scale-spacing-fix-ja9` 기준 `.tmp\verifier-reported-font-routes-after-fix2.log` PASS
+
+2026-05-11 정정:
+
+- broad `KrnAXIS` lobby Hangul 치환은 제거하고 TTMP source glyph 크기/pixel 보존으로 되돌렸다.
+- `AXIS_12/14/18_lobby`는 glyph pixel을 바꾸지 않고 Hangul advance만 필요한 경우 `OffsetX=0`으로 보정한다.
+- `lobby-scale-font-sources`, `start-system-settings-uld`, `system-settings-mixed-scale-layouts`, `start-main-menu-phrase-layouts`, `hangul-source-preservation` 기준으로 `.tmp\lobby-ttmp-source-advance-ja` PASS.
 
 필요 작업:
 
@@ -271,7 +277,7 @@
 - `applied-output-files` verifier check compares critical generated font/UI packed files against an installed game folder when `--applied-game <game-dir>` is supplied. Use this before asking for live client confirmation when generated output passes but the installed client still differs.
 - `build-release.ps1` now verifies that the release exe embeds the freshly built `FFXIVPatchGenerator.exe` by SHA-256. Generated-output PASS is not enough if the user is applying from a stale `Release\Public\FFXIVKoreanPatch.exe`.
 - Release UI reapply guard now allows applying over an already patched client when clean base indexes are available from current index, installed `orig.*` indexes, or any same-version local `restore-baseline` language folder. This prevents stale installed font/UI dat files from surviving after generated output already passes verification.
-- 2026-05-10 lobby high-scale KrnAXIS follow-up: do not mark the lobby 150%+ blur/pixelation issue as complete until the user explicitly OKs it. The previous verifier compared patched lobby fonts only to the TTMP package source and missed that TTMP AXIS Hangul was taller than the Korean client scale source. The generator now routes `AXIS_12/14/18/36_lobby` Hangul through Korean client `KrnAXIS_120/140/180/360` glyph shapes and normalizes advance only to the expected no-overlap value. `korean-lobby-font-sources` checks 273 scale-sensitive Hangul codepoints against Korean source pixels/metrics and passes for `.tmp\lobby-krnaxis-advance-ja` in `.tmp\verifier-lobby-krnaxis-advance-focused-r2.log`; the issue remains user-confirmation pending.
+- 2026-05-11 lobby high-scale source correction: do not mark the lobby 150%+ blur/pixelation issue as complete until the user explicitly OKs it. The broad `KrnAXIS` lobby route was removed because it changed `AXIS_12/14/18/36_lobby` Hangul glyph dimensions/component profiles. The generator now preserves TTMP lobby glyph pixels/sizes and only applies advance-only `OffsetX=0` normalization for `AXIS_12/14/18_lobby` Hangul whose source advance is narrower than glyph width. `.tmp\lobby-ttmp-source-advance-ja` passes focused and broad verifiers in `.tmp\verifier-lobby-ttmp-source-advance-focused-r5.log` and `.tmp\verifier-lobby-ttmp-source-advance-full-r2.log`; the issue remains user-confirmation pending.
 
 ## 작업 시 주의 사항
 

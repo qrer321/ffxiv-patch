@@ -55,12 +55,6 @@ namespace FfxivKoreanPatch.PatchRouteVerifier
 
             private void VerifyLobbyScaleFontSourceRoute(LobbyScaleFontSourceRoute route, uint[] codepoints)
             {
-                if (IsKoreanLobbyAxisSourceTarget(route.TargetFontPath))
-                {
-                    Pass("{0} scaled lobby Hangul source is covered by Korean client KrnAXIS route verification", route.TargetFontPath);
-                    return;
-                }
-
                 if (!_ttmpFont.ContainsPath(route.SourceFontPath))
                 {
                     Fail("{0} source font is missing from TTMP package for scaled lobby target {1}", route.SourceFontPath, route.TargetFontPath);
@@ -126,7 +120,11 @@ namespace FfxivKoreanPatch.PatchRouteVerifier
                     return false;
                 }
 
-                if (!GlyphSpacingMetricsMatch(sourceGlyph, targetGlyph))
+                bool spacingMatches =
+                    GlyphSpacingMetricsMatch(sourceGlyph, targetGlyph) ||
+                    (IsLobbyAxisHangulAdvanceNormalizedFont(route.TargetFontPath) &&
+                     LobbyAxisHangulAdvanceEntryMatchesExpected(sourceGlyph, targetGlyph));
+                if (!spacingMatches)
                 {
                     Fail(
                         "{0} U+{1:X4} scaled lobby glyph metrics differ from {2}: target={3}, source={4}",

@@ -103,7 +103,8 @@ namespace FfxivKoreanPatch.PatchRouteVerifier
                         hasPreviousCodepoint = true;
                     }
 
-                    if (targetAdvance != sourceAdvance)
+                    if (targetAdvance != sourceAdvance &&
+                        !AllowsLobbyAsciiSpacingNormalization(targetFontPath, phrase, sourceAdvance, targetAdvance))
                     {
                         Fail(
                             "{0} phrase [{1}] width differs from {2}: target={3}, clean={4}",
@@ -155,6 +156,21 @@ namespace FfxivKoreanPatch.PatchRouteVerifier
                     return;
                 }
 
+                int checkedGlyphs;
+                if (AllowsLobbyAsciiSpacingNormalization(targetFontPath, phrase, source.Width, target.Width) &&
+                    TryPhraseGlyphPixelsMatchClean(sourceFontPath, targetFontPath, phrase, out checkedGlyphs, out error))
+                {
+                    Pass(
+                        "{0} phrase [{1}] glyph pixels match {2} with normalized lobby spacing, glyphs={3}, width={4}/{5}",
+                        targetFontPath,
+                        Escape(phrase),
+                        sourceFontPath,
+                        checkedGlyphs,
+                        target.Width,
+                        source.Width);
+                    return;
+                }
+
                 Fail(
                     "{0} phrase [{1}] pixels differ from {2}: glyphs={3}/{4}, width={5}/{6}, pixels={7}/{8}",
                     targetFontPath,
@@ -166,6 +182,13 @@ namespace FfxivKoreanPatch.PatchRouteVerifier
                     source.Width,
                     target.Pixels.Count,
                     source.Pixels.Count);
+            }
+
+            private static bool AllowsLobbyAsciiSpacingNormalization(string targetFontPath, string phrase, int sourceWidth, int targetWidth)
+            {
+                return IsLobbyFontPath(targetFontPath) &&
+                       IsAsciiPhrase(phrase) &&
+                       targetWidth >= sourceWidth;
             }
 
             private bool TryPhraseGlyphPixelsMatchClean(

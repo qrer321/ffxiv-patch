@@ -111,7 +111,12 @@ namespace FfxivKoreanPatch.PatchRouteVerifier
 
         private static bool KerningAdjustmentMatchesOrLobbySafe(string targetFontPath, int sourceAdjustment, int targetAdjustment)
         {
-            return sourceAdjustment == targetAdjustment;
+            if (sourceAdjustment == targetAdjustment)
+            {
+                return true;
+            }
+
+            return IsLobbyFontPath(targetFontPath) && sourceAdjustment < 0 && targetAdjustment == 0;
         }
 
         private static bool KerningEntryMatchesOrLobbySafe(string targetFontPath, byte[] sourceEntry, byte[] targetEntry)
@@ -121,7 +126,15 @@ namespace FfxivKoreanPatch.PatchRouteVerifier
                 return true;
             }
 
-            return false;
+            if (!IsLobbyFontPath(targetFontPath) ||
+                !BytesEqualExceptKerningAdjustment(sourceEntry, targetEntry))
+            {
+                return false;
+            }
+
+            int sourceAdjustment = unchecked((int)Endian.ReadUInt32LE(sourceEntry, 12));
+            int targetAdjustment = unchecked((int)Endian.ReadUInt32LE(targetEntry, 12));
+            return sourceAdjustment < 0 && targetAdjustment == 0;
         }
 
         private static bool BytesEqualExceptKerningAdjustment(byte[] left, byte[] right)

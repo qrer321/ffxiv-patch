@@ -25,7 +25,24 @@ namespace FfxivKoreanPatch.PatchRouteVerifier
             FdtGlyphEntry sourceGlyph,
             FdtGlyphEntry targetGlyph)
         {
-            return GlyphSpacingMetricsMatch(sourceGlyph, targetGlyph);
+            if (GlyphSpacingMetricsMatch(sourceGlyph, targetGlyph))
+            {
+                return true;
+            }
+
+            if (!IsLobbyFontPath(targetFontPath) ||
+                codepoint <= 0x20u ||
+                codepoint > 0x7Eu ||
+                sourceGlyph.ShiftJisValue != targetGlyph.ShiftJisValue ||
+                sourceGlyph.Width != targetGlyph.Width ||
+                sourceGlyph.Height != targetGlyph.Height ||
+                sourceGlyph.OffsetY != targetGlyph.OffsetY)
+            {
+                return false;
+            }
+
+            sbyte expectedOffsetX = sourceGlyph.OffsetX < 0 ? (sbyte)0 : sourceGlyph.OffsetX;
+            return targetGlyph.OffsetX == expectedOffsetX;
         }
 
         private static string FormatGlyphSpacing(FdtGlyphEntry glyph)

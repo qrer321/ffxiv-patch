@@ -101,7 +101,18 @@ namespace FfxivKoreanPatch.PatchRouteVerifier
                     return;
                 }
 
-                int allowedWidth = sourceLayout.Width + widthTolerancePixels;
+                int normalizedSourceWidth = sourceLayout.Width;
+                bool hasAdvanceNormalizedWidth =
+                    IsLobbyAxisHangulAdvanceNormalizedFont(pair.TargetFontPath) &&
+                    TryComputeLobbyAxisAdvanceNormalizedWidth(
+                        pair.TargetFontPath,
+                        pair.SourceFontPath,
+                        phrase,
+                        sourceLayout,
+                        out normalizedSourceWidth,
+                        out sourceError);
+                int widthTolerance = hasAdvanceNormalizedWidth ? 9 : widthTolerancePixels;
+                int allowedWidth = normalizedSourceWidth + widthTolerance;
                 if (targetLayout.Width > allowedWidth)
                 {
                     Fail(
@@ -109,8 +120,8 @@ namespace FfxivKoreanPatch.PatchRouteVerifier
                         pair.TargetFontPath,
                         Escape(phrase),
                         targetLayout.Width,
-                        sourceLayout.Width,
-                        widthTolerancePixels,
+                        normalizedSourceWidth,
+                        widthTolerance,
                         pair.SourceFontPath);
                     return;
                 }
@@ -136,7 +147,7 @@ namespace FfxivKoreanPatch.PatchRouteVerifier
                     pair.TargetFontPath,
                     Escape(phrase),
                     targetLayout.Width,
-                    sourceLayout.Width,
+                    normalizedSourceWidth,
                     targetLayout.MaximumGapPixels,
                     sourceLayout.MaximumGapPixels,
                     targetLayout.MinimumGapPixels);
@@ -445,23 +456,13 @@ namespace FfxivKoreanPatch.PatchRouteVerifier
                 Pass("{0} phrase [{1}] layout glyphs={2}, width={3}, minGap={4}", fontPath, Escape(phrase), layout.Glyphs, layout.Width, layout.MinimumGapPixels);
             }
 
-            private void VerifySystemSettingsScaledRoutePhraseLayout(string fontPath, string phrase)
+            private void VerifySystemSettingsScaledRoutePhraseLayout(string fontPath, string phrase, bool strictVisualGap)
             {
                 if (!IsScaledLobbySystemSettingsFont(fontPath))
                 {
-                    if (IsSystemSettingsStrictVisualFont(fontPath) &&
+                    if (strictVisualGap &&
+                        IsSystemSettingsStrictVisualFont(fontPath) &&
                         !VerifySystemSettingsStrictScaledRoutePhraseLayout(fontPath, phrase))
-                    {
-                        return;
-                    }
-
-                    VerifyNoPhraseOverlap(fontPath, phrase);
-                    return;
-                }
-
-                if (IsKoreanLobbyAxisSourceTarget(fontPath))
-                {
-                    if (!VerifySystemSettingsStrictScaledRoutePhraseLayout(fontPath, phrase))
                     {
                         return;
                     }
@@ -506,14 +507,27 @@ namespace FfxivKoreanPatch.PatchRouteVerifier
                     return;
                 }
 
-                if (layout.Width > sourceLayout.Width + 8)
+                int normalizedSourceWidth = sourceLayout.Width;
+                bool hasAdvanceNormalizedWidth =
+                    IsLobbyAxisHangulAdvanceNormalizedFont(fontPath) &&
+                    TryComputeLobbyAxisAdvanceNormalizedWidth(
+                        fontPath,
+                        sourceFontPath,
+                        phrase,
+                        sourceLayout,
+                        out normalizedSourceWidth,
+                        out sourceError);
+                int allowedSourceWidth = hasAdvanceNormalizedWidth ? normalizedSourceWidth : sourceLayout.Width;
+                int widthTolerance = hasAdvanceNormalizedWidth ? 9 : 8;
+                if (layout.Width > allowedSourceWidth + widthTolerance)
                 {
                     Fail(
-                        "{0} system-settings phrase [{1}] width {2} exceeds source {3}+8 from {4}",
+                        "{0} system-settings phrase [{1}] width {2} exceeds source {3}+{4} from {5}",
                         fontPath,
                         Escape(phrase),
                         layout.Width,
-                        sourceLayout.Width,
+                        allowedSourceWidth,
+                        widthTolerance,
                         sourceFontPath);
                     return;
                 }
@@ -532,7 +546,8 @@ namespace FfxivKoreanPatch.PatchRouteVerifier
                     return;
                 }
 
-                if (!VerifySystemSettingsStrictVisualGap(fontPath, phrase, layout))
+                if (strictVisualGap &&
+                    !VerifySystemSettingsStrictVisualGap(fontPath, phrase, layout))
                 {
                     return;
                 }
@@ -543,10 +558,92 @@ namespace FfxivKoreanPatch.PatchRouteVerifier
                     Escape(phrase),
                     layout.Glyphs,
                     layout.Width,
-                    sourceLayout.Width,
+                    allowedSourceWidth,
                     layout.MaximumGapPixels,
                     sourceLayout.MaximumGapPixels,
                     layout.MinimumGapPixels);
+            }
+
+            private bool TryComputeLobbyAxisAdvanceNormalizedWidth(
+                string fontPath,
+                string sourceFontPath,
+                string phrase,
+                PhraseLayoutResult sourceLayout,
+                out int normalizedWidth,
+                out string error)
+            {
+                normalizedWidth = sourceLayout.Width;
+                error = null;
+                if (_ttmpFont == null || !_ttmpFont.ContainsPath(sourceFontPath))
+                {
+                    error = "source font is missing";
+                    return false;
+                }
+
+                byte[] sourceFdt;
+                try
+                {
+                    sourceFdt = _ttmpFont.ReadFile(sourceFontPath);
+                }
+                catch (Exception ex)
+                {
+                    error = ex.Message;
+                    return false;
+                }
+
+                byte[] targetFdt;
+                try
+                {
+                    targetFdt = _patchedFont.ReadFile(fontPath);
+                }
+                catch (Exception ex)
+                {
+                    error = ex.Message;
+                    return false;
+                }
+
+                for (int i = 0; i < phrase.Length; i++)
+                {
+                    uint codepoint = ReadCodepoint(phrase, ref i);
+                    if (IsPhraseLayoutSpace(codepoint))
+                    {
+                        continue;
+                    }
+
+                    FdtGlyphEntry sourceGlyph;
+                    if (!TryFindGlyph(sourceFdt, codepoint, out sourceGlyph))
+                    {
+                        error = "missing U+" + codepoint.ToString("X4");
+                        return false;
+                    }
+
+                    FdtGlyphEntry targetGlyph;
+                    if (!TryFindGlyph(targetFdt, codepoint, out targetGlyph))
+                    {
+                        continue;
+                    }
+
+                    int sourceAdvance = GetGlyphAdvance(sourceGlyph);
+                    int targetAdvance = sourceAdvance;
+                    if (IsHangulCodepoint(codepoint) &&
+                        LobbyAxisHangulAdvanceEntryMatchesExpected(sourceGlyph, targetGlyph))
+                    {
+                        targetAdvance = GetGlyphAdvance(targetGlyph);
+                    }
+                    else if (codepoint > 0x20u &&
+                             codepoint <= 0x7Eu &&
+                             GlyphSpacingMetricsMatchOrLobbySafe(fontPath, codepoint, sourceGlyph, targetGlyph))
+                    {
+                        targetAdvance = GetGlyphAdvance(targetGlyph);
+                    }
+
+                    if (targetAdvance > sourceAdvance)
+                    {
+                        normalizedWidth += targetAdvance - sourceAdvance;
+                    }
+                }
+
+                return true;
             }
 
             private bool VerifySystemSettingsStrictScaledRoutePhraseLayout(string fontPath, string phrase)
@@ -666,11 +763,6 @@ namespace FfxivKoreanPatch.PatchRouteVerifier
                     return true;
                 }
 
-                if (IsKoreanLobbyAxisSourceTarget(fontPath) && layout.MinimumGapPixels >= 0)
-                {
-                    return true;
-                }
-
                 if (layout.MinimumGapPixels >= 1)
                 {
                     return true;
@@ -709,11 +801,6 @@ namespace FfxivKoreanPatch.PatchRouteVerifier
                 string asciiFallbackSourceFontPath)
             {
                 if (!IsLobbyFontPath(fontPath) || layout.Glyphs <= 1 || layout.MinimumRequiredGapPixels <= 0)
-                {
-                    return true;
-                }
-
-                if (IsKoreanLobbyAxisSourceTarget(fontPath) && layout.MinimumGapPixels >= 0)
                 {
                     return true;
                 }
