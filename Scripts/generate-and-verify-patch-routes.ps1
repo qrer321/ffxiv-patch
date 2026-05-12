@@ -16,7 +16,7 @@ param(
 
     [string]$BaseIndexDirectory,
 
-    [string]$Checks = "applied-output-files,data-center-title-uld,data-center-worldmap-uld,start-system-settings-uld,lobby-scale-font-sources,korean-lobby-font-sources,system-settings-mixed-scale-layouts,clean-ascii-font-routes,start-main-menu-phrase-layouts,4k-lobby-font-derivations,numeric-glyphs",
+    [string]$Checks = "applied-output-files,data-center-title-uld,data-center-worldmap-uld,start-system-settings-uld,lobby-ttmp-payloads,korean-lobby-font-sources,system-settings-mixed-scale-layouts,clean-ascii-font-routes,start-main-menu-phrase-layouts,numeric-glyphs",
 
     [string]$Configuration = "Release",
 
