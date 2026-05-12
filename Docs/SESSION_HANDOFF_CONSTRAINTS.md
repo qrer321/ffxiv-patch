@@ -121,3 +121,4 @@
 - 새 기준 검증은 `lobby-clean-payloads`다. `.tmp\lobby-clean-ja`는 clean lobby payload, clean ASCII route, Hangul source preservation, Configuration Sharing, Bozja, Occult Crescent, ActionDetail checks를 통과했다.
 - `lobby-render-snapshots`는 clean baseline에서 여전히 FAIL한다. 이는 의도된 열린 이슈이며, 다음 구현은 clean baseline 위에서 로비/타이틀 route별 최소 Korean glyph/texture injection을 다시 설계해야 한다.
 - clean baseline 동안 `data-center-title-uld`, `data-center-worldmap-uld`, `start-system-settings-uld`, `system-settings-mixed-scale-layouts`, `start-main-menu-phrase-layouts`는 기본 smoke check에서 제외한다. 새 injection route가 생기면 다시 기본 묶음에 넣는다.
+- clean 클라이언트 자체가 로비 ASCII/숫자/영어에서 정상이라는 사용자 확인이 있으므로, alpha-bound `minGap` 절대값을 clean까지 고칠 대상으로 삼지 않는다. ASCII/숫자/영어 verifier는 patched가 clean보다 나빠졌는지 differential로 판단해야 한다.

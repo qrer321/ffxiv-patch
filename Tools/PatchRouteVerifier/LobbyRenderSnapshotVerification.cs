@@ -90,6 +90,27 @@ namespace FfxivKoreanPatch.PatchRouteVerifier
 
                 if (layout.OverlapPixels > 0 || layout.MinimumGapPixels < renderCase.MinimumGapFloor)
                 {
+                    PhraseLayoutResult cleanLayout;
+                    string cleanLayoutError;
+                    string cleanSourceFontPath = ResolveCleanAsciiReferenceFontPath(renderCase.FontPath);
+                    if (!string.IsNullOrEmpty(cleanSourceFontPath) &&
+                        TryMeasurePhraseLayout(_cleanFont, cleanSourceFontPath, renderCase.Phrase, false, out cleanLayout, out cleanLayoutError) &&
+                        layout.MinimumGapPixels >= cleanLayout.MinimumGapPixels &&
+                        layout.OverlapPixels <= cleanLayout.OverlapPixels + 2)
+                    {
+                        Pass(
+                            "{0} render snapshot matches clean spacing baseline: font={1}, phrase=[{2}], minGap={3}/{4}, overlap={5}/{6}, png={7}",
+                            renderCase.Id,
+                            renderCase.FontPath,
+                            Escape(renderCase.Phrase),
+                            layout.MinimumGapPixels,
+                            cleanLayout.MinimumGapPixels,
+                            layout.OverlapPixels,
+                            cleanLayout.OverlapPixels,
+                            pngPath ?? "disabled");
+                        return;
+                    }
+
                     if (!renderCase.DiagnosticOnly)
                     {
                         Fail(
