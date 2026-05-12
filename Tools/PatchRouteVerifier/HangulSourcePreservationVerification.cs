@@ -6,6 +6,8 @@ namespace FfxivKoreanPatch.PatchRouteVerifier
 {
     internal static partial class PatchRouteVerifier
     {
+        private const int LobbyHangulAdvanceSafetyPixels = 2;
+
         private sealed partial class Verifier
         {
             private void VerifyHangulSourcePreservation()
@@ -314,13 +316,16 @@ namespace FfxivKoreanPatch.PatchRouteVerifier
                 FdtGlyphEntry sourceGlyph,
                 FdtGlyphEntry targetGlyph)
             {
+                sbyte expectedOffsetX = sourceGlyph.OffsetX;
+                if (expectedOffsetX < 0)
+                {
+                    expectedOffsetX = (sbyte)Math.Min(0, expectedOffsetX + LobbyHangulAdvanceSafetyPixels);
+                }
+
                 return sourceGlyph.ShiftJisValue == targetGlyph.ShiftJisValue &&
-                       sourceGlyph.ImageIndex == targetGlyph.ImageIndex &&
-                       sourceGlyph.X == targetGlyph.X &&
-                       sourceGlyph.Y == targetGlyph.Y &&
                        sourceGlyph.Width == targetGlyph.Width &&
                        sourceGlyph.Height == targetGlyph.Height &&
-                       sourceGlyph.OffsetX == targetGlyph.OffsetX &&
+                       targetGlyph.OffsetX == expectedOffsetX &&
                        sourceGlyph.OffsetY == targetGlyph.OffsetY;
             }
 
@@ -336,7 +341,8 @@ namespace FfxivKoreanPatch.PatchRouteVerifier
                 string normalized = fontPath.Replace('\\', '/');
                 return string.Equals(normalized, "common/font/AXIS_12_lobby.fdt", StringComparison.OrdinalIgnoreCase) ||
                        string.Equals(normalized, "common/font/AXIS_14_lobby.fdt", StringComparison.OrdinalIgnoreCase) ||
-                       string.Equals(normalized, "common/font/AXIS_18_lobby.fdt", StringComparison.OrdinalIgnoreCase);
+                       string.Equals(normalized, "common/font/AXIS_18_lobby.fdt", StringComparison.OrdinalIgnoreCase) ||
+                       string.Equals(normalized, "common/font/AXIS_36_lobby.fdt", StringComparison.OrdinalIgnoreCase);
             }
         }
     }

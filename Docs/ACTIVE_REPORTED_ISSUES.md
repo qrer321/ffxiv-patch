@@ -1,5 +1,12 @@
 # Active Reported Issues
 
+## 2026-05-12 Lobby Hangul Reinjection Attempt
+
+- Clean lobby FDT/ASCII metrics are preserved, and only required Hangul glyph cells are injected into selected lobby fonts (`AXIS_*_lobby`, data-center popup/menu fonts).
+- Existing clean lobby glyph cells are reserved before allocation to avoid contaminating English/number glyphs.
+- Latest ja output `.tmp\lobby-hangul-injection-ja-r4` passes `clean-ascii-font-routes,numeric-glyphs,data-center-title-uld,data-center-worldmap-uld,start-system-settings-uld,lobby-render-snapshots` with `Verifier failures: 0`.
+- This is not user-confirmed fixed yet.
+
 사용자가 "아직 안 된다"고 재보고한 항목은 구현만 다시 보지 않고,
 먼저 검증 방식 자체가 실패를 잡도록 강화한 뒤 수정한다.
 
