@@ -99,12 +99,21 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
             "\uC885\uB8CC"
         };
 
+        public static readonly string[] CharacterSelect = new string[]
+        {
+            "\uB85C\uC2A4\uAC00\uB974",
+            "\uC885\uC871",
+            "\uB2CC\uC790",
+            "\uC9C0\uACE0\uCC9C \uAC70\uB9AC"
+        };
+
         public static readonly string[] All = Combine(
             Core,
             StartScreenSystemSettings,
             HighResolutionUiScaleOptions,
             StartScreenSystemSettingsResultMessages,
-            StartScreenMainMenu);
+            StartScreenMainMenu,
+            CharacterSelect);
 
         private static string[] Combine(params string[][] groups)
         {

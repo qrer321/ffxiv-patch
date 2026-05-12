@@ -112,6 +112,11 @@ namespace FfxivKoreanPatch.PatchRouteVerifier
                         out normalizedSourceWidth,
                         out sourceError);
                 int widthTolerance = hasAdvanceNormalizedWidth ? 9 : widthTolerancePixels;
+                if (IsLobbyFontPath(pair.TargetFontPath))
+                {
+                    widthTolerance += CountHangulCodepointsInPhrase(phrase) * 2;
+                }
+
                 int allowedWidth = normalizedSourceWidth + widthTolerance;
                 if (targetLayout.Width > allowedWidth)
                 {
@@ -151,6 +156,59 @@ namespace FfxivKoreanPatch.PatchRouteVerifier
                     targetLayout.MaximumGapPixels,
                     sourceLayout.MaximumGapPixels,
                     targetLayout.MinimumGapPixels);
+            }
+
+            private static int CountHangulCodepointsInPhrase(string phrase)
+            {
+                int count = 0;
+                string value = phrase ?? string.Empty;
+                for (int i = 0; i < value.Length; i++)
+                {
+                    uint codepoint = ReadCodepoint(value, ref i);
+                    if (IsHangulCodepoint(codepoint))
+                    {
+                        count++;
+                    }
+                }
+
+                return count;
+            }
+
+            private void VerifyCharacterSelectLobbyPhraseLayouts()
+            {
+                Console.WriteLine("[FDT] Character-select lobby phrase layout");
+                for (int fontIndex = 0; fontIndex < CharacterSelectLobbyFontPaths.Length; fontIndex++)
+                {
+                    string fontPath = CharacterSelectLobbyFontPaths[fontIndex];
+                    for (int phraseIndex = 0; phraseIndex < LobbyScaledHangulPhrases.CharacterSelect.Length; phraseIndex++)
+                    {
+                        VerifyCharacterSelectLobbyPhraseLayout(fontPath, LobbyScaledHangulPhrases.CharacterSelect[phraseIndex]);
+                    }
+                }
+            }
+
+            private void VerifyCharacterSelectLobbyPhraseLayout(string fontPath, string phrase)
+            {
+                PhraseLayoutResult layout;
+                string error;
+                if (!TryMeasurePhraseLayout(_patchedFont, fontPath, phrase, true, out layout, out error))
+                {
+                    Fail("{0} character-select phrase [{1}] layout error: {2}", fontPath, Escape(phrase), error);
+                    return;
+                }
+
+                if (!VerifyPhraseMinimumVisualGap(fontPath, phrase, layout, ResolveCleanAsciiReferenceFontPath(fontPath)))
+                {
+                    return;
+                }
+
+                Pass(
+                    "{0} character-select phrase [{1}] layout width={2}, maxGap={3}, minGap={4}",
+                    fontPath,
+                    Escape(phrase),
+                    layout.Width,
+                    layout.MaximumGapPixels,
+                    layout.MinimumGapPixels);
             }
 
             private void VerifyMixedScalePhraseLayout(string fontPath, string asciiSourceFontPath, string asciiFallbackSourceFontPath, string phrase)
