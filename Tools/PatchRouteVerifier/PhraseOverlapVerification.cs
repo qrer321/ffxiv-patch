@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using FfxivKoreanPatch.FFXIVPatchGenerator;
 
 namespace FfxivKoreanPatch.PatchRouteVerifier
@@ -65,6 +66,75 @@ namespace FfxivKoreanPatch.PatchRouteVerifier
                         VerifyStartScreenMainMenuPhraseLayout(pair, LobbyScaledHangulPhrases.StartScreenMainMenu[phraseIndex]);
                     }
                 }
+
+                VerifyStartScreenMainMenuUldRoutes();
+            }
+
+            private void VerifyStartScreenMainMenuUldRoutes()
+            {
+                Console.WriteLine("[ULD/FDT] Start-screen main menu font routes");
+                int found = 0;
+                HashSet<string> checkedRoutes = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+                for (int candidateIndex = 0; candidateIndex < StartScreenMainMenuUldCandidates.Length; candidateIndex++)
+                {
+                    UldRouteCandidate candidate = StartScreenMainMenuUldCandidates[candidateIndex];
+                    HashSet<string> routedFontPaths;
+                    if (!TryCollectOptionalPreservedUldFontRoutes(
+                        candidate.Path,
+                        "start-screen main menu",
+                        candidate.UsesLobbyFonts,
+                        out routedFontPaths))
+                    {
+                        continue;
+                    }
+
+                    found++;
+                    foreach (string fontPath in routedFontPaths)
+                    {
+                        if (!checkedRoutes.Add(fontPath))
+                        {
+                            continue;
+                        }
+
+                        for (int phraseIndex = 0; phraseIndex < LobbyScaledHangulPhrases.StartScreenMainMenu.Length; phraseIndex++)
+                        {
+                            VerifyStartScreenMainMenuRoutedPhraseLayout(fontPath, LobbyScaledHangulPhrases.StartScreenMainMenu[phraseIndex]);
+                        }
+                    }
+                }
+
+                if (found == 0)
+                {
+                    Fail("No start-screen main menu ULD candidate was found; verifier is not covering the live title menu route");
+                }
+                else
+                {
+                    Pass("start-screen main menu ULD candidates found: {0}", found);
+                }
+            }
+
+            private void VerifyStartScreenMainMenuRoutedPhraseLayout(string fontPath, string phrase)
+            {
+                PhraseLayoutResult layout;
+                string error;
+                if (!TryMeasurePhraseLayout(_patchedFont, fontPath, phrase, true, out layout, out error))
+                {
+                    Fail("{0} start main-menu routed phrase [{1}] layout error: {2}", fontPath, Escape(phrase), error);
+                    return;
+                }
+
+                if (!VerifyPhraseMinimumVisualGap(fontPath, phrase, layout, ResolveCleanAsciiReferenceFontPath(fontPath)))
+                {
+                    return;
+                }
+
+                Pass(
+                    "{0} start main-menu routed phrase [{1}] layout width={2}, maxGap={3}, minGap={4}",
+                    fontPath,
+                    Escape(phrase),
+                    layout.Width,
+                    layout.MaximumGapPixels,
+                    layout.MinimumGapPixels);
             }
 
             private void VerifyStartScreenMainMenuPhraseLayout(FontPair pair, string phrase)
@@ -184,6 +254,51 @@ namespace FfxivKoreanPatch.PatchRouteVerifier
                     {
                         VerifyCharacterSelectLobbyPhraseLayout(fontPath, LobbyScaledHangulPhrases.CharacterSelect[phraseIndex]);
                     }
+                }
+
+                VerifyCharacterSelectLobbyUldRoutes();
+            }
+
+            private void VerifyCharacterSelectLobbyUldRoutes()
+            {
+                Console.WriteLine("[ULD/FDT] Character-select lobby font routes");
+                int found = 0;
+                HashSet<string> checkedRoutes = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+                for (int candidateIndex = 0; candidateIndex < CharacterSelectLobbyUldCandidates.Length; candidateIndex++)
+                {
+                    UldRouteCandidate candidate = CharacterSelectLobbyUldCandidates[candidateIndex];
+                    HashSet<string> routedFontPaths;
+                    if (!TryCollectOptionalPreservedUldFontRoutes(
+                        candidate.Path,
+                        "character-select lobby",
+                        candidate.UsesLobbyFonts,
+                        out routedFontPaths))
+                    {
+                        continue;
+                    }
+
+                    found++;
+                    foreach (string fontPath in routedFontPaths)
+                    {
+                        if (!checkedRoutes.Add(fontPath))
+                        {
+                            continue;
+                        }
+
+                        for (int phraseIndex = 0; phraseIndex < LobbyScaledHangulPhrases.CharacterSelect.Length; phraseIndex++)
+                        {
+                            VerifyCharacterSelectLobbyPhraseLayout(fontPath, LobbyScaledHangulPhrases.CharacterSelect[phraseIndex]);
+                        }
+                    }
+                }
+
+                if (found == 0)
+                {
+                    Fail("No character-select lobby ULD candidate was found; verifier is not covering the live character-select route");
+                }
+                else
+                {
+                    Pass("character-select lobby ULD candidates found: {0}", found);
                 }
             }
 

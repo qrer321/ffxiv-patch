@@ -151,6 +151,16 @@ namespace FfxivKoreanPatch.PatchRouteVerifier
                     paths.Add(StartScreenSystemSettingsUldCandidates[i].Path);
                 }
 
+                for (int i = 0; i < StartScreenMainMenuUldCandidates.Length; i++)
+                {
+                    paths.Add(StartScreenMainMenuUldCandidates[i].Path);
+                }
+
+                for (int i = 0; i < CharacterSelectLobbyUldCandidates.Length; i++)
+                {
+                    paths.Add(CharacterSelectLobbyUldCandidates[i].Path);
+                }
+
                 return ToSortedArray(paths);
             }
 

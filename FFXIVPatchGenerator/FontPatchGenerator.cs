@@ -153,6 +153,11 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
             new DerivedLobbyFontSpec("common/font/TrumpGothic_68_lobby.fdt", "common/font/TrumpGothic_68.fdt")
         };
 
+        private static readonly DerivedLobbyFontSpec[] LobbyHangulSourceAliases = new DerivedLobbyFontSpec[]
+        {
+            new DerivedLobbyFontSpec("common/font/Jupiter_45_lobby.fdt", "common/font/Jupiter_46.fdt")
+        };
+
         private static readonly string[] LobbyHangulTargetFontPaths = new string[]
         {
             "common/font/AXIS_12_lobby.fdt",
@@ -169,9 +174,11 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
 
         private static readonly string[] LobbyMainMenuHangulTargetFontPaths = new string[]
         {
+            "common/font/Jupiter_45_lobby.fdt",
             "common/font/Jupiter_46_lobby.fdt",
             "common/font/Jupiter_90_lobby.fdt",
             "common/font/Meidinger_40_lobby.fdt",
+            "common/font/MiedingerMid_18_lobby.fdt",
             "common/font/MiedingerMid_36_lobby.fdt",
             "common/font/TrumpGothic_68_lobby.fdt"
         };
@@ -2698,6 +2705,12 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
             }
 
             string normalized = NormalizeGamePath(targetPath);
+            string aliasSource = ResolveLobbyHangulSourceAliasFdtPath(normalized);
+            if (aliasSource != null && payloadsByPath.ContainsKey(aliasSource))
+            {
+                return aliasSource;
+            }
+
             if (payloadsByPath.ContainsKey(normalized))
             {
                 return normalized;
@@ -2707,6 +2720,20 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
             if (derivedSource != null && payloadsByPath.ContainsKey(derivedSource))
             {
                 return derivedSource;
+            }
+
+            return null;
+        }
+
+        private static string ResolveLobbyHangulSourceAliasFdtPath(string targetPath)
+        {
+            string normalized = NormalizeGamePath(targetPath);
+            for (int i = 0; i < LobbyHangulSourceAliases.Length; i++)
+            {
+                if (string.Equals(normalized, NormalizeGamePath(LobbyHangulSourceAliases[i].TargetPath), StringComparison.OrdinalIgnoreCase))
+                {
+                    return NormalizeGamePath(LobbyHangulSourceAliases[i].SourcePath);
+                }
             }
 
             return null;

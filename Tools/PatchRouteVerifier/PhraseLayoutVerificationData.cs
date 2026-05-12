@@ -71,11 +71,43 @@ namespace FfxivKoreanPatch.PatchRouteVerifier
                 new FontPair("common/font/AXIS_14_lobby.fdt", "common/font/AXIS_14_lobby.fdt"),
                 new FontPair("common/font/AXIS_18_lobby.fdt", "common/font/AXIS_18_lobby.fdt"),
                 new FontPair("common/font/AXIS_36.fdt", "common/font/AXIS_36_lobby.fdt"),
+                new FontPair("common/font/Jupiter_46.fdt", "common/font/Jupiter_45_lobby.fdt"),
                 new FontPair("common/font/Jupiter_46.fdt", "common/font/Jupiter_46_lobby.fdt"),
                 new FontPair("common/font/Jupiter_46.fdt", "common/font/Jupiter_90_lobby.fdt"),
                 new FontPair("common/font/MiedingerMid_36.fdt", "common/font/Meidinger_40_lobby.fdt"),
+                new FontPair("common/font/MiedingerMid_18_lobby.fdt", "common/font/MiedingerMid_18_lobby.fdt"),
                 new FontPair("common/font/MiedingerMid_36.fdt", "common/font/MiedingerMid_36_lobby.fdt"),
                 new FontPair("common/font/TrumpGothic_68.fdt", "common/font/TrumpGothic_68_lobby.fdt")
+            };
+
+            private static readonly UldRouteCandidate[] StartScreenMainMenuUldCandidates = new UldRouteCandidate[]
+            {
+                new UldRouteCandidate("ui/uld/Title.uld", true),
+                new UldRouteCandidate("ui/uld/Title_Menu.uld", true),
+                new UldRouteCandidate("ui/uld/TitleMenu.uld", true),
+                new UldRouteCandidate("ui/uld/Title_MainMenu.uld", true),
+                new UldRouteCandidate("ui/uld/TitleMainMenu.uld", true),
+                new UldRouteCandidate("ui/uld/Title_Start.uld", true),
+                new UldRouteCandidate("ui/uld/TitleStart.uld", true),
+                new UldRouteCandidate("ui/uld/Title_Top.uld", true),
+                new UldRouteCandidate("ui/uld/TitleTop.uld", true)
+            };
+
+            private static readonly UldRouteCandidate[] CharacterSelectLobbyUldCandidates = new UldRouteCandidate[]
+            {
+                new UldRouteCandidate("ui/uld/CharaSelect_DKT_Select.uld", true),
+                new UldRouteCandidate("ui/uld/CharaSelect_DKT_YesNo.uld", true),
+                new UldRouteCandidate("ui/uld/CharaSelect_Info.uld", true),
+                new UldRouteCandidate("ui/uld/CharaSelect_WorldServer.uld", true),
+                new UldRouteCandidate("ui/uld/CharaSelect.uld", true),
+                new UldRouteCandidate("ui/uld/CharaSelectList.uld", true),
+                new UldRouteCandidate("ui/uld/CharaSelectWorld.uld", true),
+                new UldRouteCandidate("ui/uld/CharaSelectInfo.uld", true),
+                new UldRouteCandidate("ui/uld/CharaSelectClass.uld", true),
+                new UldRouteCandidate("ui/uld/CharacterSelect.uld", true),
+                new UldRouteCandidate("ui/uld/CharacterSelectList.uld", true),
+                new UldRouteCandidate("ui/uld/CharacterSelectWorld.uld", true),
+                new UldRouteCandidate("ui/uld/CharacterSelectInfo.uld", true)
             };
 
             private static readonly string[] CharacterSelectLobbyFontPaths = new string[]
