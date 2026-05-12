@@ -117,3 +117,7 @@
 - 로비 폰트가 망가진 가장 유력한 원인은 로비 한글 glyph를 너무 넓게 AXIS atlas cell로 리맵한 것이다.
 - 해결 방향은 “광범위 리맵 제거 + 실제 오염 글자만 좁게 수리 + TTMP 원본 픽셀 보존 검증”이다.
 - 이 기준으로 만든 새 산출물은 verifier에서 PASS했고, 기존 광범위 리맵 산출물은 새 verifier에서 FAIL이 발생하는 것을 확인했다.
+- 2026-05-12 정정: “재조합 제거”와 “TTMP lobby payload 적용 제거”는 별개였다. 현재 clean baseline은 TTMP/Korean direct fallback의 `_lobby.fdt`와 `font_lobby*.tex`를 모두 건너뛰고 clean global lobby asset을 유지한다.
+- 새 기준 검증은 `lobby-clean-payloads`다. `.tmp\lobby-clean-ja`는 clean lobby payload, clean ASCII route, Hangul source preservation, Configuration Sharing, Bozja, Occult Crescent, ActionDetail checks를 통과했다.
+- `lobby-render-snapshots`는 clean baseline에서 여전히 FAIL한다. 이는 의도된 열린 이슈이며, 다음 구현은 clean baseline 위에서 로비/타이틀 route별 최소 Korean glyph/texture injection을 다시 설계해야 한다.
+- clean baseline 동안 `data-center-title-uld`, `data-center-worldmap-uld`, `start-system-settings-uld`, `system-settings-mixed-scale-layouts`, `start-main-menu-phrase-layouts`는 기본 smoke check에서 제외한다. 새 injection route가 생기면 다시 기본 묶음에 넣는다.
