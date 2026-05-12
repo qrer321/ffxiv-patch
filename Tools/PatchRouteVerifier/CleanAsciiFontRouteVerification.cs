@@ -192,6 +192,11 @@ namespace FfxivKoreanPatch.PatchRouteVerifier
             private static string ResolveCleanAsciiReferenceFontPath(string targetFontPath)
             {
                 string normalized = targetFontPath.Replace('\\', '/');
+                if (IsLobbyFontPath(normalized))
+                {
+                    return normalized;
+                }
+
                 string derivedSource = ResolveLobbyHangulSourceFontPath(normalized);
                 if (!string.Equals(derivedSource, normalized, StringComparison.OrdinalIgnoreCase))
                 {

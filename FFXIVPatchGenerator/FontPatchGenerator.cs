@@ -265,6 +265,13 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
                     continue;
                 }
 
+                if (ShouldPreserveCleanGlobalLobbyPayload(path))
+                {
+                    _report.FontFilesSkippedByProfile++;
+                    Console.WriteLine("  Preserved clean global lobby font payload: {0}", path);
+                    continue;
+                }
+
                 if (!mutableIndex.ContainsPath(path))
                 {
                     AddLimitedWarning("Missing global font target: " + path);
@@ -342,22 +349,24 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
                         continue;
                     }
 
-                    byte[] packedFile = ReadPackedPayload(mpdStream, payload.ModOffset, payload.ModSize, path);
-                    int normalized;
-                    long datOffset;
                     List<FontTexturePatch> pendingTexturePatches;
-                    if (ShouldPreserveVerbatimLobbyPayload(path))
+                    if (ShouldPreserveCleanGlobalLobbyPayload(path))
                     {
                         if (texturePatches.TryGetValue(path, out pendingTexturePatches) && pendingTexturePatches.Count > 0)
                         {
-                            Console.WriteLine("  Ignored lobby recomposition texture patches: {0} ({1})", pendingTexturePatches.Count, path);
+                            Console.WriteLine("  Ignored clean-lobby texture patches: {0} ({1})", pendingTexturePatches.Count, path);
                             pendingTexturePatches.Clear();
                         }
 
-                        datOffset = datWriter.WritePackedFile(packedFile);
-                        normalized = 0;
+                        _report.FontFilesSkippedByProfile++;
+                        Console.WriteLine("  Preserved clean global lobby font payload: {0}", path);
+                        continue;
                     }
-                    else if (texturePatches.TryGetValue(path, out pendingTexturePatches) && pendingTexturePatches.Count > 0)
+
+                    byte[] packedFile = ReadPackedPayload(mpdStream, payload.ModOffset, payload.ModSize, path);
+                    int normalized;
+                    long datOffset;
+                    if (texturePatches.TryGetValue(path, out pendingTexturePatches) && pendingTexturePatches.Count > 0)
                     {
                         int protectedRestores = AppendProtectedHangulGlyphTexturePatches(path, pendingTexturePatches, protectedHangulGlyphs);
                         byte[] patchedPackedTexture = PatchPackedFontTexture(packedFile, pendingTexturePatches);
@@ -386,9 +395,9 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
                 {
                     if (pair.Value.Count > 0)
                     {
-                        if (ShouldPreserveVerbatimLobbyPayload(pair.Key))
+                        if (ShouldPreserveCleanGlobalLobbyPayload(pair.Key))
                         {
-                            Console.WriteLine("  Ignored pending lobby recomposition texture patches: {0} ({1})", pair.Value.Count, pair.Key);
+                            Console.WriteLine("  Ignored pending clean-lobby texture patches: {0} ({1})", pair.Value.Count, pair.Key);
                             pair.Value.Clear();
                             continue;
                         }
@@ -666,11 +675,6 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
         {
             normalized = 0;
             if (!path.EndsWith(".fdt", StringComparison.OrdinalIgnoreCase))
-            {
-                return datWriter.WritePackedFile(packedFile);
-            }
-
-            if (ShouldPreserveVerbatimLobbyPayload(path))
             {
                 return datWriter.WritePackedFile(packedFile);
             }
@@ -2012,7 +2016,7 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
                 return false;
             }
 
-            if (ShouldPreserveVerbatimLobbyPayload(normalized))
+            if (ShouldPreserveCleanGlobalLobbyPayload(normalized))
             {
                 return false;
             }
@@ -2157,7 +2161,7 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
                    NormalizeGamePath(fontPath).IndexOf("_lobby.fdt", StringComparison.OrdinalIgnoreCase) >= 0;
         }
 
-        private static bool ShouldPreserveVerbatimLobbyPayload(string path)
+        private static bool ShouldPreserveCleanGlobalLobbyPayload(string path)
         {
             string normalized = NormalizeGamePath(path);
             return IsLobbyFontPath(normalized) || IsLobbyFontTexturePath(normalized);
@@ -3095,19 +3099,12 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
             FontGlyphRepairContext context = new FontGlyphRepairContext();
             AddFontAtlasAllocator(context, fontPackage, mpdStream, Font1TexturePath);
             AddFontAtlasAllocator(context, fontPackage, mpdStream, Font2TexturePath);
-            AddFontAtlasAllocator(context, fontPackage, mpdStream, FontLobby1TexturePath);
-            AddFontAtlasAllocator(context, fontPackage, mpdStream, FontLobby2TexturePath);
             AddFontAtlasAllocator(context, fontPackage, mpdStream, FontKrnTexturePath);
             AddGlobalFontAtlasAllocator(context, globalArchive, Font3TexturePath);
             AddGlobalFontAtlasAllocator(context, globalArchive, Font4TexturePath);
             AddGlobalFontAtlasAllocator(context, globalArchive, Font5TexturePath);
             AddGlobalFontAtlasAllocator(context, globalArchive, Font6TexturePath);
             AddGlobalFontAtlasAllocator(context, globalArchive, Font7TexturePath);
-            AddGlobalFontAtlasAllocator(context, globalArchive, FontLobby3TexturePath);
-            AddGlobalFontAtlasAllocator(context, globalArchive, FontLobby4TexturePath);
-            AddGlobalFontAtlasAllocator(context, globalArchive, FontLobby5TexturePath);
-            AddGlobalFontAtlasAllocator(context, globalArchive, FontLobby6TexturePath);
-            AddGlobalFontAtlasAllocator(context, globalArchive, FontLobby7TexturePath);
 
             if (context.AllocatorCount == 0)
             {

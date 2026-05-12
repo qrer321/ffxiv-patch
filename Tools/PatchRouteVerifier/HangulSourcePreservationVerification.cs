@@ -137,12 +137,10 @@ namespace FfxivKoreanPatch.PatchRouteVerifier
             private static HashSet<string> CollectHangulSourcePreservationFontPaths()
             {
                 HashSet<string> paths = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-                AddValues(paths, LobbyPhraseFontPaths);
                 AddValues(paths, DialoguePhraseFontPaths);
                 AddValues(paths, SystemSettingsScaledFonts);
                 for (int i = 0; i < Derived4kLobbyFontPairs.GetLength(0); i++)
                 {
-                    paths.Add(Derived4kLobbyFontPairs[i, 0]);
                     paths.Add(Derived4kLobbyFontPairs[i, 1]);
                 }
 

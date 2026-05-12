@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 
 namespace FfxivKoreanPatch.PatchRouteVerifier
 {
@@ -54,6 +55,46 @@ namespace FfxivKoreanPatch.PatchRouteVerifier
                 {
                     Pass("lobby payload preservation checked: {0}", checkedPayloads);
                 }
+            }
+
+            private void VerifyLobbyCleanPayloads()
+            {
+                Console.WriteLine("[FDT/TEX] clean global lobby payload preservation");
+                int checkedPayloads = 0;
+                HashSet<string> checkedPaths = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+                for (int i = 0; i < LobbyPhraseFontPaths.Length; i++)
+                {
+                    checkedPayloads += VerifyLobbyPayloadMatchesCleanOnce(LobbyPhraseFontPaths[i], checkedPaths);
+                }
+
+                for (int i = 0; i < LobbyVerbatimTexturePaths.Length; i++)
+                {
+                    checkedPayloads += VerifyLobbyPayloadMatchesCleanOnce(LobbyVerbatimTexturePaths[i], checkedPaths);
+                }
+
+                for (int i = 0; i < Derived4kLobbyFontPairs.GetLength(0); i++)
+                {
+                    checkedPayloads += VerifyLobbyPayloadMatchesCleanOnce(Derived4kLobbyFontPairs[i, 0], checkedPaths);
+                }
+
+                if (checkedPayloads == 0)
+                {
+                    Fail("No lobby font payloads were checked against clean source");
+                }
+                else
+                {
+                    Pass("clean lobby payload preservation checked: {0}", checkedPayloads);
+                }
+            }
+
+            private int VerifyLobbyPayloadMatchesCleanOnce(string path, HashSet<string> checkedPaths)
+            {
+                if (!checkedPaths.Add(path))
+                {
+                    return 0;
+                }
+
+                return VerifyLobbyPayloadMatchesClean(path);
             }
 
             private int VerifyLobbyPayload(string path)
