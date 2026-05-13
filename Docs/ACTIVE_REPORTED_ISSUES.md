@@ -1,16 +1,25 @@
 # Active Reported Issues
 
-## 2026-05-12 Lobby Hangul Reinjection Attempt
+## 2026-05-13 Lobby Route-Scoped Hangul Reinjection Attempt
 
 - Clean lobby FDT/ASCII metrics are preserved, and only required Hangul glyph cells are injected into selected lobby fonts (`AXIS_*_lobby`, data-center popup/menu fonts).
 - Existing clean lobby glyph cells are reserved before allocation to avoid contaminating English/number glyphs.
-- Latest ja output `.tmp\lobby-hangul-injection-ja-r4` passes `clean-ascii-font-routes,numeric-glyphs,data-center-title-uld,data-center-worldmap-uld,start-system-settings-uld,lobby-render-snapshots` with `Verifier failures: 0`.
+- 2026-05-13 검증 정정: 이전 focused PASS는 verifier가 generated output dat와 fallback/baseline dat를 잘못 섞어 읽어서 missing glyph를 놓친 false PASS였다. `CompositeArchive`가 sibling `orig.*.index`를 baseline으로 사용하고, generated font dat에 같은 offset의 patched entry가 있으면 primary dat를 읽도록 수정했다.
+- 이 검증기 수정 뒤 기존 산출물은 `Jupiter_45_lobby.fdt`의 `템/치/뒤`, `Jupiter_20_lobby.fdt`의 character-select glyph 누락을 제대로 실패시켰다.
+- Latest fresh ja output `.tmp\lobby-route-scoped-ja-r4` passes `clean-ascii-font-routes,numeric-glyphs,data-center-title-uld,data-center-worldmap-uld,start-system-settings-uld,start-main-menu-phrase-layouts,character-select-lobby-phrase-layouts,lobby-render-snapshots,hangul-source-preservation,configuration-sharing,bozja-entrance,occult-crescent-support-jobs,reported-ingame-hangul-phrases,action-detail-scale-layouts` with `Verifier failures: 0`.
+- `lobby-clean-payloads`는 clean reset 시점의 guard다. 현재 설계는 route-scoped Hangul glyph를 selected lobby FDT/TEX에 의도적으로 추가하므로, 이 check를 현재 성공 기준으로 쓰지 않는다. 대신 clean ASCII/number preservation, ULD route checks, render snapshots, Hangul source preservation, reported in-game regression checks를 함께 사용한다.
 - This is not user-confirmed fixed yet.
 
 사용자가 "아직 안 된다"고 재보고한 항목은 구현만 다시 보지 않고,
 먼저 검증 방식 자체가 실패를 잡도록 강화한 뒤 수정한다.
 
 ## Current Checklist
+
+- [ ] 예정 조사: 기존에 참고했던 GitHub 저장소 중 로비/시작 화면용 sheet, row, column, route map을 미리 확보한 저장소가 있는지 확인
+  - 추가일: 2026-05-13
+  - 지금 바로 실행하지 않는다. 후속 조사 항목으로만 유지한다.
+  - 목적: 로비 한글 커버리지를 broad EXD 수집이나 단일 glyph 수동 추가에 의존하지 않도록, upstream 또는 관련 저장소에 이미 정리된 route-scoped sheet 데이터가 있는지 확인한다.
+  - 제약: 로비 폰트 재조합 금지 원칙은 유지한다. 발견한 sheet map은 넓은 glyph atlas injection이 아니라 경로 기반 커버리지와 verifier 케이스에만 사용한다.
 
 - [x] Start screen: `종료`가 `EXIT`로 표시됨
   - 재보고일: 2026-05-09
@@ -143,6 +152,8 @@
 - 2026-05-12 clean baseline render status: `lobby-render-snapshots`는 아직 FAIL이어야 한다. clean lobby fonts에는 `설정을 변경했습니다.`/`150%(FHD)...`용 Korean glyph가 빠지고, `Jupiter_20_lobby`/`TrumpGothic_23_lobby`는 clean-source English spacing issue를 그대로 드러낸다. non-lobby `AXIS_12/14` high-scale candidates도 `minGap >= 1`을 통과하지 못한다. 다음 구현은 clean baseline 위에서 route-specific 최소 Korean glyph/texture injection을 다시 설계해야 하며, 사용자가 OK하기 전까지 완료로 판단하지 않는다.
 - 2026-05-12 default verifier correction: clean baseline은 lobby Korean glyph injection이 빠져 있고 clean-source data-center visual-gap 실패도 그대로 드러내므로 `data-center-title-uld`, `data-center-worldmap-uld`, `start-system-settings-uld`, `system-settings-mixed-scale-layouts`, `start-main-menu-phrase-layouts`는 현재 기본 smoke check에서 제외한다. 해당 실패는 `lobby-render-snapshots`의 열린 이슈로 유지하고, 새 route-specific injection 구현 뒤 기본 묶음에 다시 넣는다.
 - 2026-05-12 clean-client observation: clean 클라이언트에서는 로비 글자 침범/번짐/깨짐이 재현되지 않는다는 사용자 확인에 따라, verifier의 절대 `minGap` 기준은 clean 자체를 고칠 대상으로 보지 않는다. lobby ASCII/숫자/영어는 patched가 clean global보다 나빠졌는지로만 판단한다. `.tmp\verify-clean-render-relative.log` 기준으로 데이터센터 영어 `Jupiter_20_lobby`/`TrumpGothic_23_lobby`는 clean-baseline OK가 되었고, 남은 실패는 Korean glyph missing 및 Korean/high-scale layout뿐이다.
+- 2026-05-13 verifier false-pass correction: generated output을 읽는 `CompositeArchive`가 patched font dat의 same-offset entry를 fallback/base dat로 잘못 읽는 경우가 있어, `start-main-menu-phrase-layouts`/`character-select-lobby-phrase-layouts`가 실제 산출물의 missing glyph를 놓쳤다. 이제 sibling `orig.*.index`를 baseline으로 두고, generated font dat에 offset이 존재하면 primary dat를 우선 읽는다. 이 수정으로 기존 r3 산출물에서 `Jupiter_45_lobby`/`Jupiter_20_lobby` 누락 glyph가 재현됐고, route-scoped coverage 수정 뒤 `.tmp\lobby-route-scoped-ja-r4`가 fresh generate-and-verify 전체 묶음을 PASS했다.
+- 2026-05-13 current verifier set: 현재 로비 한글 재주입 설계는 selected lobby FDT/TEX를 수정하므로 `lobby-clean-payloads`는 의도적으로 제외한다. 대신 `clean-ascii-font-routes`, `numeric-glyphs`, 데이터센터/시스템설정 ULD route, start main menu/character-select phrase layouts, `lobby-render-snapshots`, `hangul-source-preservation`, 설정 공유/보즈야/오컬트/인게임 보고 문구/ActionDetail 회귀 검증을 한 번에 돌린다. 사용자 OK 전까지 실제 로비 150%+ 이슈는 열린 상태로 둔다.
 
 ## Verification Rule
 
