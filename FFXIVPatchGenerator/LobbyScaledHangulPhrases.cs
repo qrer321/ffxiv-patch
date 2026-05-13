@@ -30,14 +30,14 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
             // labels are stored in Lobby. Keep this row-scoped to visible route
             // groups; the full Lobby sheet also contains long descriptions for
             // unrelated panels and exceeds the shared lobby font atlas.
-            new SheetRowRange("Lobby", 0, 80),
+            new SheetRowRange("Lobby", 0, 99),
             new SheetRowRange("Lobby", 462, 464),
-            new SheetRowRange("Lobby", 612, 617),
-            new SheetRowRange("Lobby", 840, 999),
-            new SheetRowRange("Lobby", 1170, 1180),
-            new SheetRowRange("Lobby", 1800, 1800),
+            new SheetRowRange("Lobby", 500, 656),
+            new SheetRowRange("Lobby", 800, 999),
+            new SheetRowRange("Lobby", 1100, 1250),
+            new SheetRowRange("Lobby", 1800, 1802),
             new SheetRowRange("Lobby", 2001, 2060),
-            new SheetRowRange("Error", 13206, 13206),
+            new SheetRowRange("Error", 13001, 13307),
             new SheetRowRange("Addon", 5522, 5522),
             new SheetRowRange("Addon", 6927, 6928),
             new SheetRowRange("Addon", 8283, 8284),
@@ -180,6 +180,18 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
             "\uBC14\uAFC0 \uC218 \uC788\uB294",
             "\uC21C\uCC28\uC801\uC73C\uB85C \uB85C\uADF8\uC778 \uCC98\uB9AC\uB97C",
             "\uB85C\uADF8\uC778 \uCC98\uB9AC\uB97C \uC911\uB2E8\uD558\uC2DC\uACA0\uC2B5\uB2C8\uAE4C?",
+            "\uC6D0\uD65C\uD55C \uC811\uC18D\uC744 \uC704\uD574",
+            "\uCE90\uB9AD\uD130 \uBAA9\uB85D\uC744 \uD655\uC778\uD560 \uC11C\uBC84\uB97C \uC120\uD0DD\uD558\uC2ED\uC2DC\uC624.",
+            "\uB85C\uBE44 \uC11C\uBC84 \uC811\uC18D \uC911",
+            "\uC624\uB958\uAC00 \uBC1C\uC0DD\uD588\uC2B5\uB2C8\uB2E4",
+            "\uC7A0\uC2DC \uD6C4 \uB2E4\uC2DC \uB85C\uADF8\uC778\uD574 \uC8FC\uC2ED\uC2DC\uC624",
+            "\uD604\uC7AC \uC11C\uBC84\uAC00 \uD63C\uC7A1\uD569\uB2C8\uB2E4.",
+            "\uC77C\uC815 \uC2DC\uAC04 \uB3D9\uC548 \uC870\uC791\uD558\uC9C0 \uC54A\uC544 \uC790\uB3D9\uC73C\uB85C \uC811\uC18D\uC774 \uC885\uB8CC\uB418\uC5C8\uC2B5\uB2C8\uB2E4.",
+            "\uC9D1\uC0AC\uC758 \uC678\uBAA8 \uD3B8\uC9D1\uC744 \uC911\uB2E8\uD558\uC2DC\uACA0\uC2B5\uB2C8\uAE4C?",
+            "\uD604\uC7AC\uC758 \uC7AC\uD3B8\uC9D1 \uC815\uBCF4\uB97C \uCE90\uB9AD\uD130\uC5D0 \uBC18\uC601\uD558\uC2DC\uACA0\uC2B5\uB2C8\uAE4C?",
+            "\uCF8C\uC801\uD55C \uC11C\uBC84\uB85C \uC774\uB3D9\uD569\uB2C8\uB2E4.",
+            "\uC11C\uBC84 \uC815\uBCF4\uB97C \uBD88\uB7EC\uC624\uACE0 \uC788\uC2B5\uB2C8\uB2E4.",
+            "\uCE90\uB9AD\uD130 \uC815\uBCF4\uB97C \uBD88\uB7EC\uC624\uACE0 \uC788\uC2B5\uB2C8\uB2E4.",
             "\uCDE8\uC18C"
         };
 

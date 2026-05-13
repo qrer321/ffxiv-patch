@@ -2733,12 +2733,16 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
             }
 
             int changed = 0;
+            HashSet<string> protectedKerningPairs = ShouldPatchLobbyMainMenuHangulFont(path)
+                ? CollectLobbyHangulPhraseKerningPairs(LobbyScaledHangulPhrases.StartScreenMainMenu)
+                : null;
             AddLobbyHangulPhraseKerningEntries(
                 LobbyScaledHangulPhrases.CharacterSelect,
                 targetEntries,
                 targetEntryIndexes,
                 glyphBoundsByCodepoint,
                 entriesByKey,
+                protectedKerningPairs,
                 ref changed);
 
             if (changed == 0)
@@ -2776,6 +2780,7 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
             Dictionary<uint, int> targetEntryIndexes,
             Dictionary<uint, LobbyHangulGlyphBounds> glyphBoundsByCodepoint,
             Dictionary<string, byte[]> entriesByKey,
+            HashSet<string> protectedKerningPairs,
             ref int changed)
         {
             if (phrases == null)
@@ -2794,6 +2799,8 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
                     if (IsHangulCodepoint(codepoint))
                     {
                         if (hasPrevious &&
+                            (protectedKerningPairs == null ||
+                             !protectedKerningPairs.Contains(BuildCodepointPairKey(previous, codepoint))) &&
                             TryAddLobbyHangulKerningEntry(
                                 previous,
                                 codepoint,
@@ -2821,6 +2828,49 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
                     }
                 }
             }
+        }
+
+        private static HashSet<string> CollectLobbyHangulPhraseKerningPairs(string[] phrases)
+        {
+            HashSet<string> pairs = new HashSet<string>(StringComparer.Ordinal);
+            if (phrases == null)
+            {
+                return pairs;
+            }
+
+            for (int phraseIndex = 0; phraseIndex < phrases.Length; phraseIndex++)
+            {
+                string phrase = phrases[phraseIndex] ?? string.Empty;
+                uint previous = 0;
+                bool hasPrevious = false;
+                for (int i = 0; i < phrase.Length; i++)
+                {
+                    uint codepoint = ReadCodepoint(phrase, ref i);
+                    if (IsHangulCodepoint(codepoint))
+                    {
+                        if (hasPrevious)
+                        {
+                            pairs.Add(BuildCodepointPairKey(previous, codepoint));
+                        }
+
+                        previous = codepoint;
+                        hasPrevious = true;
+                        continue;
+                    }
+
+                    if (IsLobbyPhraseKerningLeftCodepoint(codepoint))
+                    {
+                        previous = codepoint;
+                        hasPrevious = true;
+                    }
+                    else
+                    {
+                        hasPrevious = false;
+                    }
+                }
+            }
+
+            return pairs;
         }
 
         private static bool TryAddLobbyHangulKerningEntry(
@@ -2881,6 +2931,11 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
             Endian.WriteUInt32LE(entry, 12, unchecked((uint)newAdjustment));
             entriesByKey[key] = entry;
             return true;
+        }
+
+        private static string BuildCodepointPairKey(uint leftCodepoint, uint rightCodepoint)
+        {
+            return leftCodepoint.ToString("X") + "/" + rightCodepoint.ToString("X");
         }
 
         private static bool TryGetLobbyPhraseKerningLeftBounds(
