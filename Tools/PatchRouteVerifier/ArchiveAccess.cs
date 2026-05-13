@@ -10,10 +10,12 @@ namespace FfxivKoreanPatch.PatchRouteVerifier
         private sealed class CompositeArchive : IDisposable
         {
             private readonly SqPackIndexFile _index;
+            private readonly SqPackIndexFile _baselineIndex;
             private readonly string _datDir;
             private readonly string _fallbackDatDir;
             private readonly string _datPrefix;
-            private readonly Dictionary<byte, FileStream> _streams = new Dictionary<byte, FileStream>();
+            private readonly Dictionary<string, FileStream> _streams = new Dictionary<string, FileStream>(StringComparer.OrdinalIgnoreCase);
+            private readonly Dictionary<byte, List<SqPackIndexEntry>> _primaryEntriesByDat = new Dictionary<byte, List<SqPackIndexEntry>>();
 
             public string CacheKey { get; private set; }
 
@@ -29,6 +31,14 @@ namespace FfxivKoreanPatch.PatchRouteVerifier
                 _fallbackDatDir = fallbackDatDir;
                 _datPrefix = datPrefix;
                 CacheKey = Path.GetFullPath(indexPath);
+
+                string baselineIndexPath = ResolveBaselineIndexPath(indexPath);
+                if (baselineIndexPath != null)
+                {
+                    _baselineIndex = new SqPackIndexFile(baselineIndexPath);
+                }
+
+                BuildPrimaryEntryMap();
             }
 
             public byte[] ReadFile(string gamePath)
@@ -56,10 +66,13 @@ namespace FfxivKoreanPatch.PatchRouteVerifier
                     return false;
                 }
 
-                FileStream stream = GetStream(entry.DataFileId);
+                bool usePrimary = ShouldReadFromPrimary(entry);
+                FileStream stream = GetStream(entry.DataFileId, usePrimary);
                 lock (stream)
                 {
-                    long nextOffset = _index.GetNextOffset(entry.DataFileId, entry.Offset, stream.Length);
+                    long nextOffset = usePrimary
+                        ? GetNextPrimaryOffset(entry.DataFileId, entry.Offset, stream.Length)
+                        : GetNextFallbackOffset(entry, stream.Length);
                     long length = nextOffset - entry.Offset;
                     if (length <= 0 || length > int.MaxValue)
                     {
@@ -90,16 +103,132 @@ namespace FfxivKoreanPatch.PatchRouteVerifier
                 }
             }
 
-            private FileStream GetStream(byte datId)
+            private static string ResolveBaselineIndexPath(string indexPath)
             {
-                FileStream stream;
-                if (_streams.TryGetValue(datId, out stream))
+                if (string.IsNullOrWhiteSpace(indexPath))
                 {
-                    return stream;
+                    return null;
+                }
+
+                string directory = Path.GetDirectoryName(Path.GetFullPath(indexPath));
+                string fileName = Path.GetFileName(indexPath);
+                if (string.IsNullOrEmpty(directory) ||
+                    string.IsNullOrEmpty(fileName) ||
+                    fileName.StartsWith("orig.", StringComparison.OrdinalIgnoreCase))
+                {
+                    return null;
+                }
+
+                string baseline = Path.Combine(directory, "orig." + fileName);
+                return File.Exists(baseline) ? baseline : null;
+            }
+
+            private void BuildPrimaryEntryMap()
+            {
+                List<SqPackIndexEntry> entries = _index.GetEntries();
+                for (int i = 0; i < entries.Count; i++)
+                {
+                    SqPackIndexEntry entry = entries[i];
+                    if (!ShouldReadFromPrimary(entry))
+                    {
+                        continue;
+                    }
+
+                    List<SqPackIndexEntry> byDat;
+                    if (!_primaryEntriesByDat.TryGetValue(entry.DataFileId, out byDat))
+                    {
+                        byDat = new List<SqPackIndexEntry>();
+                        _primaryEntriesByDat.Add(entry.DataFileId, byDat);
+                    }
+
+                    byDat.Add(entry);
+                }
+
+                foreach (List<SqPackIndexEntry> byDat in _primaryEntriesByDat.Values)
+                {
+                    byDat.Sort(CompareIndexEntryOffset);
+                }
+            }
+
+            private static int CompareIndexEntryOffset(SqPackIndexEntry left, SqPackIndexEntry right)
+            {
+                return left.Offset.CompareTo(right.Offset);
+            }
+
+            private bool ShouldReadFromPrimary(SqPackIndexEntry entry)
+            {
+                if (string.Equals(_datPrefix, FontPrefix, StringComparison.OrdinalIgnoreCase) &&
+                    PrimaryDatContainsOffset(entry.DataFileId, entry.Offset))
+                {
+                    return true;
+                }
+
+                if (_baselineIndex == null)
+                {
+                    return true;
+                }
+
+                SqPackIndexEntry baselineEntry;
+                return !_baselineIndex.TryGetEntry(entry.Hash, out baselineEntry) ||
+                       baselineEntry.Data != entry.Data;
+            }
+
+            private bool PrimaryDatContainsOffset(byte datId, long offset)
+            {
+                if (offset < 0)
+                {
+                    return false;
                 }
 
                 string path = Path.Combine(_datDir, _datPrefix + ".dat" + datId.ToString());
                 if (!File.Exists(path))
+                {
+                    return false;
+                }
+
+                long length = new FileInfo(path).Length;
+                return offset < length;
+            }
+
+            private long GetNextPrimaryOffset(byte dataFileId, long currentOffset, long datLength)
+            {
+                long next = datLength;
+                List<SqPackIndexEntry> entries;
+                if (!_primaryEntriesByDat.TryGetValue(dataFileId, out entries))
+                {
+                    return next;
+                }
+
+                for (int i = 0; i < entries.Count; i++)
+                {
+                    long offset = entries[i].Offset;
+                    if (offset > currentOffset && offset < next)
+                    {
+                        next = offset;
+                    }
+                }
+
+                return next;
+            }
+
+            private long GetNextFallbackOffset(SqPackIndexEntry entry, long datLength)
+            {
+                if (_baselineIndex != null)
+                {
+                    SqPackIndexEntry baselineEntry;
+                    if (_baselineIndex.TryGetEntry(entry.Hash, out baselineEntry))
+                    {
+                        return _baselineIndex.GetNextOffset(baselineEntry.DataFileId, baselineEntry.Offset, datLength);
+                    }
+                }
+
+                return _index.GetNextOffset(entry.DataFileId, entry.Offset, datLength);
+            }
+
+            private FileStream GetStream(byte datId, bool usePrimary)
+            {
+                string path = Path.Combine(usePrimary ? _datDir : _fallbackDatDir, _datPrefix + ".dat" + datId.ToString());
+                if (usePrimary && !File.Exists(path))
                 {
                     path = Path.Combine(_fallbackDatDir, _datPrefix + ".dat" + datId.ToString());
                 }
@@ -109,14 +238,25 @@ namespace FfxivKoreanPatch.PatchRouteVerifier
                     throw new FileNotFoundException("SqPack dat file is missing", path);
                 }
 
+                FileStream stream;
+                if (_streams.TryGetValue(path, out stream))
+                {
+                    return stream;
+                }
+
                 stream = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.ReadWrite);
-                _streams.Add(datId, stream);
+                _streams.Add(path, stream);
                 return stream;
             }
 
             public void Dispose()
             {
                 _index.Dispose();
+                if (_baselineIndex != null)
+                {
+                    _baselineIndex.Dispose();
+                }
+
                 foreach (FileStream stream in _streams.Values)
                 {
                     stream.Dispose();
