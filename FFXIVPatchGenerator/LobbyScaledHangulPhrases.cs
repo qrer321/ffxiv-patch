@@ -12,6 +12,33 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
             new AddonRowRange(8683, 8722)
         };
 
+        public static readonly SheetRowRange[] StartScreenMainMenuSheetRowRanges = new SheetRowRange[]
+        {
+            new SheetRowRange("Addon", 2744, 2744),
+            new SheetRowRange("Addon", 4000, 4000),
+            new SheetRowRange("Lobby", 2009, 2009),
+            new SheetRowRange("Lobby", 2052, 2052)
+        };
+
+        public static readonly SheetRowRange[] CharacterSelectSheetRowRanges = new SheetRowRange[]
+        {
+            new SheetRowRange("Lobby", 23, 24),
+            new SheetRowRange("Lobby", 101, 101),
+            new SheetRowRange("Lobby", 840, 842),
+            new SheetRowRange("Lobby", 1100, 1100),
+            new SheetRowRange("Lobby", 1104, 1104),
+            new SheetRowRange("Lobby", 1150, 1150),
+            new SheetRowRange("Lobby", 1223, 1223),
+            new SheetRowRange("Lobby", 2009, 2009),
+            new SheetRowRange("Lobby", 2015, 2019),
+            new SheetRowRange("Lobby", 2052, 2052),
+            new SheetRowRange("Lobby", 2065, 2066),
+            new SheetRowRange("Addon", 5522, 5522),
+            new SheetRowRange("Addon", 6927, 6928),
+            new SheetRowRange("Addon", 8283, 8284),
+            new SheetRowRange("Addon", 10134, 10134)
+        };
+
         public static readonly string[] Core = new string[]
         {
             "\uCE90\uB9AD\uD130 \uC815\uBCF4\uB97C \uBCC0\uACBD\uD558\uAE30 \uC704\uD574",
@@ -89,22 +116,41 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
             "\uC77C\uBD80 \uC124\uC815\uC740 \uC801\uC6A9\uC744 \uB20C\uB7EC\uC57C \uBC18\uC601\uB429\uB2C8\uB2E4."
         };
 
+        public static readonly string[] General = Combine(
+            Core,
+            StartScreenSystemSettings,
+            HighResolutionUiScaleOptions,
+            StartScreenSystemSettingsResultMessages);
+
         public static readonly string[] StartScreenMainMenu = new string[]
         {
             "\uAC8C\uC784 \uC2DC\uC791",
             "\uB370\uC774\uD130 \uC13C\uD130",
             "\uB3D9\uC601\uC0C1 \uBC0F \uD0C0\uC774\uD2C0",
+            "\uC2DC\uC2A4\uD15C \uC124\uC815",
             "\uC124\uC815",
+            "\uC124\uCE58 \uC815\uBCF4",
             "\uB77C\uC774\uC120\uC2A4",
-            "\uC885\uB8CC"
+            "\uC885\uB8CC",
+            "\uB4A4\uB85C"
         };
 
         public static readonly string[] CharacterSelect = new string[]
         {
             "\uB85C\uC2A4\uAC00\uB974",
             "\uC885\uC871",
+            "\uC9C1\uC5C5",
             "\uB2CC\uC790",
-            "\uC9C0\uACE0\uCC9C \uAC70\uB9AC"
+            "\uC9C0\uACE0\uCC9C \uAC70\uB9AC",
+            "\uADF8\uB9BC\uC790 5\uC6D4 11\uC77C",
+            "\uB610\uB294",
+            "\uB4A4\uB85C",
+            "\uCE90\uB9AD\uD130 \uC815\uBCF4 \uBD88\uB7EC\uC624\uAE30",
+            "\uC774\uB984 \uBCC0\uACBD",
+            "\uC9D1\uC0AC \uC774\uB984 \uBCC0\uACBD",
+            "\uCE90\uB9AD\uD130 \uC124\uC815 \uB370\uC774\uD130 \uBC31\uC5C5",
+            "\uCF8C\uC801\uD55C \uC11C\uBC84\uB85C \uC774\uB3D9",
+            "\uB2E4\uB978 \uB370\uC774\uD130 \uC13C\uD130 \uBC29\uBB38"
         };
 
         public static readonly string[] All = Combine(
@@ -149,6 +195,27 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
         public bool Contains(uint rowId)
         {
             return rowId >= StartId && rowId <= EndId;
+        }
+    }
+
+    internal struct SheetRowRange
+    {
+        public readonly string SheetName;
+        public readonly uint StartId;
+        public readonly uint EndId;
+
+        public SheetRowRange(string sheetName, uint startId, uint endId)
+        {
+            SheetName = sheetName ?? string.Empty;
+            StartId = startId;
+            EndId = endId;
+        }
+
+        public bool Contains(string sheetName, uint rowId)
+        {
+            return string.Equals(SheetName, sheetName ?? string.Empty, StringComparison.OrdinalIgnoreCase) &&
+                   rowId >= StartId &&
+                   rowId <= EndId;
         }
     }
 }
