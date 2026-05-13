@@ -1229,6 +1229,16 @@ namespace FfxivKoreanPatch.PatchRouteVerifier
                     return true;
                 }
 
+                if (IsAsciiCodepoint(layout.MinimumGapLeftCodepoint) &&
+                    IsAsciiCodepoint(layout.MinimumGapRightCodepoint) &&
+                    !string.IsNullOrEmpty(sourceFontPath) &&
+                    TryMeasurePhraseLayout(_cleanFont, sourceFontPath, ToAsciiOnlyPhrase(phrase), false, out sourceLayout, out sourceError) &&
+                    layout.MinimumGapPixels >= sourceLayout.MinimumGapPixels &&
+                    layout.OverlapPixels <= sourceLayout.OverlapPixels + 2)
+                {
+                    return true;
+                }
+
                 string pairDetail = DescribeScaledLobbyPairSpacing(
                     fontPath,
                     layout.MinimumGapLeftCodepoint,
@@ -1392,6 +1402,11 @@ namespace FfxivKoreanPatch.PatchRouteVerifier
                 }
 
                 return true;
+            }
+
+            private static bool IsAsciiCodepoint(uint codepoint)
+            {
+                return codepoint >= 0x21u && codepoint <= 0x7Eu;
             }
         }
     }
