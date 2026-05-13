@@ -189,15 +189,14 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
 
         private static readonly string[] LobbyCharacterSelectHangulTargetFontPaths = new string[]
         {
+            // Fonts routed by the preserved CharaSelect_* lobby ULD text nodes.
+            // Keep this route-scoped; injecting the whole Lobby sheet into every
+            // lobby font exhausts the shared lobby atlas before all glyphs land.
             "common/font/AXIS_12_lobby.fdt",
             "common/font/AXIS_14_lobby.fdt",
             "common/font/AXIS_18_lobby.fdt",
-            "common/font/Jupiter_16_lobby.fdt",
-            "common/font/Jupiter_20_lobby.fdt",
-            "common/font/Jupiter_23_lobby.fdt",
             "common/font/MiedingerMid_12_lobby.fdt",
             "common/font/MiedingerMid_14_lobby.fdt",
-            "common/font/MiedingerMid_18_lobby.fdt",
             "common/font/TrumpGothic_23_lobby.fdt",
             "common/font/TrumpGothic_34_lobby.fdt"
         };
@@ -207,12 +206,29 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
             public readonly uint[] General;
             public readonly uint[] MainMenu;
             public readonly uint[] CharacterSelect;
+            private readonly Dictionary<string, CachedLobbyHangulGlyphCell> _allocatedCells =
+                new Dictionary<string, CachedLobbyHangulGlyphCell>(StringComparer.Ordinal);
 
             public LobbyHangulGlyphCoverage(uint[] general, uint[] mainMenu, uint[] characterSelect)
             {
                 General = general;
                 MainMenu = mainMenu;
                 CharacterSelect = characterSelect;
+            }
+
+            public bool TryGetAllocatedCell(string key, out CachedLobbyHangulGlyphCell cell)
+            {
+                return _allocatedCells.TryGetValue(key, out cell);
+            }
+
+            public void AddAllocatedCell(string key, CachedLobbyHangulGlyphCell cell)
+            {
+                if (string.IsNullOrEmpty(key) || _allocatedCells.ContainsKey(key))
+                {
+                    return;
+                }
+
+                _allocatedCells.Add(key, cell);
             }
         }
 
@@ -228,6 +244,14 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
                 Entries = entries;
                 Textures = new Dictionary<string, byte[]>(StringComparer.OrdinalIgnoreCase);
             }
+        }
+
+        private sealed class CachedLobbyHangulGlyphCell
+        {
+            public string TexturePath;
+            public AllocatedFontGlyphCell Cell;
+            public int ClearWidth;
+            public int ClearHeight;
         }
 
         private struct LobbyHangulGlyphBounds
@@ -1726,15 +1750,26 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
                     AllocatedFontGlyphCell allocatedCell;
                     int clearWidth = sourceEntry.Width;
                     int clearHeight = sourceEntry.Height;
-                    if (!hasTargetEntry ||
-                        !TryReuseExistingLobbyHangulGlyphCell(
-                            normalizedPath,
-                            targetEntries[targetEntryIndex],
-                            sourceEntry,
-                            out allocatedTexturePath,
-                            out allocatedCell,
-                            out clearWidth,
-                            out clearHeight))
+                    bool reusedCachedCell = false;
+                    string sourceCellKey = CreateLobbyHangulSourceCellKey(utf8Value, sourceEntry, sourceAlpha);
+                    CachedLobbyHangulGlyphCell cachedCell;
+                    if (lobbyHangulGlyphCoverage.TryGetAllocatedCell(sourceCellKey, out cachedCell))
+                    {
+                        allocatedTexturePath = cachedCell.TexturePath;
+                        allocatedCell = cachedCell.Cell;
+                        clearWidth = cachedCell.ClearWidth;
+                        clearHeight = cachedCell.ClearHeight;
+                        reusedCachedCell = true;
+                    }
+                    else if (!hasTargetEntry ||
+                             !TryReuseExistingLobbyHangulGlyphCell(
+                                 normalizedPath,
+                                 targetEntries[targetEntryIndex],
+                                 sourceEntry,
+                                 out allocatedTexturePath,
+                                 out allocatedCell,
+                                 out clearWidth,
+                                 out clearHeight))
                     {
                         if (!TryAllocateLobbyHangulGlyphCell(
                             glyphRepair,
@@ -1747,18 +1782,28 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
                         }
                     }
 
-                    FontTexturePatch patch = new FontTexturePatch();
-                    patch.TargetX = allocatedCell.X;
-                    patch.TargetY = allocatedCell.Y;
-                    patch.TargetChannel = allocatedCell.Channel;
-                    patch.ClearWidth = clearWidth;
-                    patch.ClearHeight = clearHeight;
-                    patch.SourceWidth = sourceEntry.Width;
-                    patch.SourceHeight = sourceEntry.Height;
-                    patch.SourceAlpha = sourceAlpha;
-                    patch.SourceFdtPath = glyphSource.FdtPath;
-                    patch.SourceCodepoint = codepoint;
-                    AddTexturePatch(texturePatches, allocatedTexturePath, patch);
+                    if (!reusedCachedCell)
+                    {
+                        FontTexturePatch patch = new FontTexturePatch();
+                        patch.TargetX = allocatedCell.X;
+                        patch.TargetY = allocatedCell.Y;
+                        patch.TargetChannel = allocatedCell.Channel;
+                        patch.ClearWidth = clearWidth;
+                        patch.ClearHeight = clearHeight;
+                        patch.SourceWidth = sourceEntry.Width;
+                        patch.SourceHeight = sourceEntry.Height;
+                        patch.SourceAlpha = sourceAlpha;
+                        patch.SourceFdtPath = glyphSource.FdtPath;
+                        patch.SourceCodepoint = codepoint;
+                        AddTexturePatch(texturePatches, allocatedTexturePath, patch);
+
+                        CachedLobbyHangulGlyphCell cell = new CachedLobbyHangulGlyphCell();
+                        cell.TexturePath = allocatedTexturePath;
+                        cell.Cell = allocatedCell;
+                        cell.ClearWidth = clearWidth;
+                        cell.ClearHeight = clearHeight;
+                        lobbyHangulGlyphCoverage.AddAllocatedCell(sourceCellKey, cell);
+                    }
 
                     byte[] replacementEntry = new byte[FdtGlyphEntrySize];
                     Buffer.BlockCopy(sourceEntryBytes, 0, replacementEntry, 0, FdtGlyphEntrySize);
@@ -2745,27 +2790,35 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
                 bool hasPrevious = false;
                 for (int i = 0; i < phrase.Length; i++)
                 {
-                    uint codepoint = phrase[i];
-                    if (!IsHangulCodepoint(codepoint))
+                    uint codepoint = ReadCodepoint(phrase, ref i);
+                    if (IsHangulCodepoint(codepoint))
                     {
-                        hasPrevious = false;
+                        if (hasPrevious &&
+                            TryAddLobbyHangulKerningEntry(
+                                previous,
+                                codepoint,
+                                targetEntries,
+                                targetEntryIndexes,
+                                glyphBoundsByCodepoint,
+                                entriesByKey))
+                        {
+                            changed++;
+                        }
+
+                        previous = codepoint;
+                        hasPrevious = true;
                         continue;
                     }
 
-                    if (hasPrevious &&
-                        TryAddLobbyHangulKerningEntry(
-                            previous,
-                            codepoint,
-                            targetEntries,
-                            targetEntryIndexes,
-                            glyphBoundsByCodepoint,
-                            entriesByKey))
+                    if (IsLobbyPhraseKerningLeftCodepoint(codepoint))
                     {
-                        changed++;
+                        previous = codepoint;
+                        hasPrevious = true;
                     }
-
-                    previous = codepoint;
-                    hasPrevious = true;
+                    else
+                    {
+                        hasPrevious = false;
+                    }
                 }
             }
         }
@@ -2783,17 +2836,25 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
 
             int leftIndex;
             int rightIndex;
-            LobbyHangulGlyphBounds leftBounds;
             LobbyHangulGlyphBounds rightBounds;
             if (!targetEntryIndexes.TryGetValue(leftUtf8, out leftIndex) ||
                 !targetEntryIndexes.TryGetValue(rightUtf8, out rightIndex) ||
-                !glyphBoundsByCodepoint.TryGetValue(leftCodepoint, out leftBounds) ||
                 !glyphBoundsByCodepoint.TryGetValue(rightCodepoint, out rightBounds))
             {
                 return false;
             }
 
             FdtGlyphEntry leftGlyph = ReadFdtGlyphEntry(targetEntries[leftIndex], 0);
+            LobbyHangulGlyphBounds leftBounds;
+            if (!TryGetLobbyPhraseKerningLeftBounds(
+                    leftCodepoint,
+                    leftGlyph,
+                    glyphBoundsByCodepoint,
+                    out leftBounds))
+            {
+                return false;
+            }
+
             int leftAdvance = Math.Max(1, leftGlyph.Width + leftGlyph.OffsetX);
             string key = BuildKerningKey(leftUtf8, rightUtf8);
             byte[] entry;
@@ -2820,6 +2881,32 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
             Endian.WriteUInt32LE(entry, 12, unchecked((uint)newAdjustment));
             entriesByKey[key] = entry;
             return true;
+        }
+
+        private static bool TryGetLobbyPhraseKerningLeftBounds(
+            uint codepoint,
+            FdtGlyphEntry glyph,
+            Dictionary<uint, LobbyHangulGlyphBounds> glyphBoundsByCodepoint,
+            out LobbyHangulGlyphBounds bounds)
+        {
+            if (IsHangulCodepoint(codepoint))
+            {
+                return glyphBoundsByCodepoint.TryGetValue(codepoint, out bounds);
+            }
+
+            if (IsLobbyPhraseKerningLeftCodepoint(codepoint) && glyph.Width > 0)
+            {
+                bounds = new LobbyHangulGlyphBounds(0, glyph.Width - 1);
+                return true;
+            }
+
+            bounds = new LobbyHangulGlyphBounds();
+            return false;
+        }
+
+        private static bool IsLobbyPhraseKerningLeftCodepoint(uint codepoint)
+        {
+            return codepoint >= 0x21 && codepoint <= 0x7E;
         }
 
         private static bool ShouldNormalizeCleanAsciiLobbySpacing(string path)
@@ -3114,6 +3201,35 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
             }
 
             sourcePaths.Add(normalized);
+        }
+
+        private static string CreateLobbyHangulSourceCellKey(uint utf8Value, FdtGlyphEntry sourceEntry, byte[] sourceAlpha)
+        {
+            return utf8Value.ToString("X8") +
+                   "|" + sourceEntry.Width.ToString() +
+                   "|" + sourceEntry.Height.ToString() +
+                   "|" + ((int)sourceEntry.OffsetX).ToString() +
+                   "|" + ((int)sourceEntry.OffsetY).ToString() +
+                   "|" + ComputeStableAlphaHash(sourceAlpha).ToString("X16");
+        }
+
+        private static ulong ComputeStableAlphaHash(byte[] alpha)
+        {
+            const ulong offset = 14695981039346656037UL;
+            const ulong prime = 1099511628211UL;
+            ulong hash = offset;
+            if (alpha == null)
+            {
+                return hash;
+            }
+
+            for (int i = 0; i < alpha.Length; i++)
+            {
+                hash ^= alpha[i];
+                hash *= prime;
+            }
+
+            return hash;
         }
 
         private static bool TryFindLobbyHangulSourceEntry(
@@ -3604,7 +3720,12 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
             List<uint> priorityCodepoints = new List<uint>();
             AddHangulPhraseCodepoints(priorityCodepoints, codepoints, LobbyScaledHangulPhrases.General);
             int staticCount = codepoints.Count;
-            int dynamicAdded = AddAddonHangulCodepoints(
+            int lobbySheetDerived = AddSheetHangulCodepoints(
+                codepoints,
+                koreaSqpack,
+                LobbyScaledHangulPhrases.GeneralLobbySheetRowRanges,
+                "general lobby glyph coverage");
+            int addonDerived = AddAddonHangulCodepoints(
                 codepoints,
                 koreaSqpack,
                 LobbyScaledHangulPhrases.StartScreenSystemSettingsAddonRowRanges,
@@ -3612,9 +3733,10 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
 
             uint[] values = ToPriorityCodepointArray(priorityCodepoints, codepoints);
             Console.WriteLine(
-                "Lobby Hangul codepoints: {0} static, {1} addon-derived, {2} total",
+                "Lobby Hangul codepoints: {0} static, {1} lobby-derived, {2} addon-derived, {3} total",
                 staticCount,
-                dynamicAdded,
+                lobbySheetDerived,
+                addonDerived,
                 values.Length);
             return values;
         }

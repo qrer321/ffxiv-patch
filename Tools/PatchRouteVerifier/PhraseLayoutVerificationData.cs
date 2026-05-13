@@ -115,12 +115,8 @@ namespace FfxivKoreanPatch.PatchRouteVerifier
                 "common/font/AXIS_12_lobby.fdt",
                 "common/font/AXIS_14_lobby.fdt",
                 "common/font/AXIS_18_lobby.fdt",
-                "common/font/Jupiter_16_lobby.fdt",
-                "common/font/Jupiter_20_lobby.fdt",
-                "common/font/Jupiter_23_lobby.fdt",
                 "common/font/MiedingerMid_12_lobby.fdt",
                 "common/font/MiedingerMid_14_lobby.fdt",
-                "common/font/MiedingerMid_18_lobby.fdt",
                 "common/font/TrumpGothic_23_lobby.fdt",
                 "common/font/TrumpGothic_34_lobby.fdt"
             };

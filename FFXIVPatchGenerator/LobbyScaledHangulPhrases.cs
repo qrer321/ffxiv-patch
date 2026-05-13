@@ -12,6 +12,10 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
             new AddonRowRange(8683, 8722)
         };
 
+        public static readonly SheetRowRange[] GeneralLobbySheetRowRanges = new SheetRowRange[]
+        {
+        };
+
         public static readonly SheetRowRange[] StartScreenMainMenuSheetRowRanges = new SheetRowRange[]
         {
             new SheetRowRange("Addon", 2744, 2744),
@@ -22,17 +26,15 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
 
         public static readonly SheetRowRange[] CharacterSelectSheetRowRanges = new SheetRowRange[]
         {
-            new SheetRowRange("Lobby", 23, 24),
-            new SheetRowRange("Lobby", 101, 101),
-            new SheetRowRange("Lobby", 840, 842),
-            new SheetRowRange("Lobby", 1100, 1100),
-            new SheetRowRange("Lobby", 1104, 1104),
-            new SheetRowRange("Lobby", 1150, 1150),
-            new SheetRowRange("Lobby", 1223, 1223),
-            new SheetRowRange("Lobby", 2009, 2009),
-            new SheetRowRange("Lobby", 2015, 2019),
-            new SheetRowRange("Lobby", 2052, 2052),
-            new SheetRowRange("Lobby", 2065, 2066),
+            // Character select, world transfer, lobby help and title/character
+            // labels are stored in Lobby. Keep this row-scoped to visible route
+            // groups; the full Lobby sheet also contains long descriptions for
+            // unrelated panels and exceeds the shared lobby font atlas.
+            new SheetRowRange("Lobby", 0, 80),
+            new SheetRowRange("Lobby", 462, 464),
+            new SheetRowRange("Lobby", 612, 617),
+            new SheetRowRange("Lobby", 1170, 1180),
+            new SheetRowRange("Lobby", 2001, 2060),
             new SheetRowRange("Addon", 5522, 5522),
             new SheetRowRange("Addon", 6927, 6928),
             new SheetRowRange("Addon", 8283, 8284),
@@ -150,7 +152,18 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
             "\uC9D1\uC0AC \uC774\uB984 \uBCC0\uACBD",
             "\uCE90\uB9AD\uD130 \uC124\uC815 \uB370\uC774\uD130 \uBC31\uC5C5",
             "\uCF8C\uC801\uD55C \uC11C\uBC84\uB85C \uC774\uB3D9",
-            "\uB2E4\uB978 \uB370\uC774\uD130 \uC13C\uD130 \uBC29\uBB38"
+            "\uB2E4\uB978 \uB370\uC774\uD130 \uC13C\uD130 \uBC29\uBB38",
+            "\uB9C8\uC6B0\uC2A4 \uC67C\uCABD \uB04C\uAE30",
+            "\uB9C8\uC6B0\uC2A4 \uC624\uB978\uCABD \uB04C\uAE30",
+            "\uD720 \uD074\uB9AD \uB04C\uAE30",
+            "\uD655\uB300/\uCD95\uC18C",
+            "\uB5A0\uB3C4\uB294 \uBCC4",
+            "\uD604\uC7AC \uC704\uCE58",
+            "\uB204\uC801 \uACB0\uC81C \uBCF4\uC0C1",
+            "\uC9C0\uAE08\uAE4C\uC9C0 \uB204\uC801\uB41C \uACB0\uC81C \uC77C\uC218",
+            "\uCE90\uB9AD\uD130 \uC0AD\uC81C",
+            "\uC774\uC804 \uB2E8\uACC4",
+            "\uCDE8\uC18C"
         };
 
         public static readonly string[] All = Combine(

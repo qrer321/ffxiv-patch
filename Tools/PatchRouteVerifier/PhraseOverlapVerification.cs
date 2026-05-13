@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Text;
 using FfxivKoreanPatch.FFXIVPatchGenerator;
 
 namespace FfxivKoreanPatch.PatchRouteVerifier
@@ -256,30 +257,39 @@ namespace FfxivKoreanPatch.PatchRouteVerifier
                     }
                 }
 
-                VerifyCharacterSelectLobbyUldRoutes();
+                HashSet<string> routedFontPaths = VerifyCharacterSelectLobbyUldRoutes();
+                if (routedFontPaths.Count > 0)
+                {
+                    VerifyLobbySheetGlyphCoverage(
+                        "character-select lobby",
+                        ToStringArray(routedFontPaths),
+                        LobbyScaledHangulPhrases.CharacterSelectSheetRowRanges);
+                }
             }
 
-            private void VerifyCharacterSelectLobbyUldRoutes()
+            private HashSet<string> VerifyCharacterSelectLobbyUldRoutes()
             {
                 Console.WriteLine("[ULD/FDT] Character-select lobby font routes");
                 int found = 0;
                 HashSet<string> checkedRoutes = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+                HashSet<string> routedFontPaths = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
                 for (int candidateIndex = 0; candidateIndex < CharacterSelectLobbyUldCandidates.Length; candidateIndex++)
                 {
                     UldRouteCandidate candidate = CharacterSelectLobbyUldCandidates[candidateIndex];
-                    HashSet<string> routedFontPaths;
+                    HashSet<string> candidateFontPaths;
                     if (!TryCollectOptionalPreservedUldFontRoutes(
                         candidate.Path,
                         "character-select lobby",
                         candidate.UsesLobbyFonts,
-                        out routedFontPaths))
+                        out candidateFontPaths))
                     {
                         continue;
                     }
 
                     found++;
-                    foreach (string fontPath in routedFontPaths)
+                    foreach (string fontPath in candidateFontPaths)
                     {
+                        routedFontPaths.Add(fontPath);
                         if (!checkedRoutes.Add(fontPath))
                         {
                             continue;
@@ -300,6 +310,16 @@ namespace FfxivKoreanPatch.PatchRouteVerifier
                 {
                     Pass("character-select lobby ULD candidates found: {0}", found);
                 }
+
+                return routedFontPaths;
+            }
+
+            private static string[] ToStringArray(HashSet<string> values)
+            {
+                string[] result = new string[values.Count];
+                values.CopyTo(result);
+                Array.Sort(result, StringComparer.OrdinalIgnoreCase);
+                return result;
             }
 
             private void VerifyCharacterSelectLobbyPhraseLayout(string fontPath, string phrase)
@@ -324,6 +344,253 @@ namespace FfxivKoreanPatch.PatchRouteVerifier
                     layout.Width,
                     layout.MaximumGapPixels,
                     layout.MinimumGapPixels);
+            }
+
+            private void VerifyLobbySheetGlyphCoverage(string label, string[] fontPaths, SheetRowRange[] ranges)
+            {
+                HashSet<uint> codepoints = CollectPatchedSheetHangulCodepoints(ranges, label);
+                if (codepoints.Count == 0)
+                {
+                    Fail("{0} sheet glyph coverage collected no Hangul codepoints", label);
+                    return;
+                }
+
+                for (int fontIndex = 0; fontIndex < fontPaths.Length; fontIndex++)
+                {
+                    string fontPath = fontPaths[fontIndex];
+                    byte[] fdt;
+                    try
+                    {
+                        fdt = _patchedFont.ReadFile(fontPath);
+                    }
+                    catch (Exception ex)
+                    {
+                        Fail("{0} sheet glyph coverage cannot read {1}: {2}", label, fontPath, ex.Message);
+                        continue;
+                    }
+
+                    int failures = 0;
+                    List<string> samples = new List<string>();
+                    foreach (uint codepoint in codepoints)
+                    {
+                        FdtGlyphEntry ignored;
+                        if (!TryFindGlyph(fdt, codepoint, out ignored))
+                        {
+                            AddGlyphCoverageFailure(samples, codepoint, "missing");
+                            failures++;
+                            continue;
+                        }
+
+                        try
+                        {
+                            GlyphCanvas glyph = RenderGlyph(_patchedFont, fontPath, codepoint);
+                            if (glyph.VisiblePixels <= 0)
+                            {
+                                AddGlyphCoverageFailure(samples, codepoint, "invisible");
+                                failures++;
+                                continue;
+                            }
+
+                            if (GlyphMatchesFallback(fontPath, glyph, codepoint, '-') ||
+                                GlyphMatchesFallback(fontPath, glyph, codepoint, '='))
+                            {
+                                AddGlyphCoverageFailure(samples, codepoint, "fallback");
+                                failures++;
+                            }
+                        }
+                        catch (Exception ex)
+                        {
+                            AddGlyphCoverageFailure(samples, codepoint, "error:" + ex.Message);
+                            failures++;
+                        }
+                    }
+
+                    if (failures > 0)
+                    {
+                        Fail(
+                            "{0} sheet glyph coverage failed for {1}: failures={2}/{3}, samples={4}",
+                            label,
+                            fontPath,
+                            failures,
+                            codepoints.Count,
+                            string.Join(", ", samples.ToArray()));
+                    }
+                    else
+                    {
+                        Pass("{0} sheet glyph coverage OK for {1}: codepoints={2}", label, fontPath, codepoints.Count);
+                    }
+                }
+            }
+
+            private static void AddGlyphCoverageFailure(List<string> samples, uint codepoint, string reason)
+            {
+                if (samples.Count >= 24)
+                {
+                    return;
+                }
+
+                samples.Add("U+" + codepoint.ToString("X4") + "(" + CodepointToString(codepoint) + "):" + reason);
+            }
+
+            private HashSet<uint> CollectPatchedSheetHangulCodepoints(SheetRowRange[] ranges, string label)
+            {
+                HashSet<uint> codepoints = new HashSet<uint>();
+                if (ranges == null || ranges.Length == 0)
+                {
+                    return codepoints;
+                }
+
+                List<string> sheetNames = CollectSheetNames(ranges);
+                for (int sheetIndex = 0; sheetIndex < sheetNames.Count; sheetIndex++)
+                {
+                    string sheetName = sheetNames[sheetIndex];
+                    ExcelHeader header;
+                    try
+                    {
+                        header = ExcelHeader.Parse(_patchedText.ReadFile("exd/" + sheetName + ".exh"));
+                    }
+                    catch (Exception ex)
+                    {
+                        Fail("{0} sheet glyph coverage cannot read {1}.exh: {2}", label, sheetName, ex.Message);
+                        continue;
+                    }
+
+                    if (header.Variant != ExcelVariant.Default)
+                    {
+                        Fail("{0} sheet glyph coverage does not support {1} variant {2}", label, sheetName, header.Variant);
+                        continue;
+                    }
+
+                    byte languageId = LanguageToId(_language);
+                    bool hasLanguageSuffix = header.HasLanguage(languageId);
+                    List<int> stringColumns = header.GetStringColumnIndexes();
+                    for (int pageIndex = 0; pageIndex < header.Pages.Count; pageIndex++)
+                    {
+                        ExcelPageDefinition page = header.Pages[pageIndex];
+                        if (!SheetPageOverlaps(sheetName, page, ranges))
+                        {
+                            continue;
+                        }
+
+                        string exdPath = BuildExdPath(sheetName, page.StartId, _language, hasLanguageSuffix);
+                        ExcelDataFile file;
+                        try
+                        {
+                            file = ExcelDataFile.Parse(_patchedText.ReadFile(exdPath));
+                        }
+                        catch (Exception ex)
+                        {
+                            Fail("{0} sheet glyph coverage cannot read {1}: {2}", label, exdPath, ex.Message);
+                            continue;
+                        }
+
+                        for (int rowIndex = 0; rowIndex < file.Rows.Count; rowIndex++)
+                        {
+                            ExcelDataRow row = file.Rows[rowIndex];
+                            if (!RowInSheetRanges(sheetName, row.RowId, ranges))
+                            {
+                                continue;
+                            }
+
+                            for (int columnIndex = 0; columnIndex < stringColumns.Count; columnIndex++)
+                            {
+                                byte[] bytes = file.GetStringBytes(row, header, stringColumns[columnIndex]);
+                                if (bytes == null || bytes.Length == 0)
+                                {
+                                    continue;
+                                }
+
+                                AddHangulCodepoints(codepoints, Encoding.UTF8.GetString(bytes));
+                            }
+                        }
+                    }
+                }
+
+                return codepoints;
+            }
+
+            private static List<string> CollectSheetNames(SheetRowRange[] ranges)
+            {
+                List<string> sheetNames = new List<string>();
+                for (int rangeIndex = 0; rangeIndex < ranges.Length; rangeIndex++)
+                {
+                    string sheetName = ranges[rangeIndex].SheetName ?? string.Empty;
+                    if (sheetName.Length == 0 || ContainsOrdinalIgnoreCase(sheetNames, sheetName))
+                    {
+                        continue;
+                    }
+
+                    sheetNames.Add(sheetName);
+                }
+
+                return sheetNames;
+            }
+
+            private static bool ContainsOrdinalIgnoreCase(List<string> values, string value)
+            {
+                for (int index = 0; index < values.Count; index++)
+                {
+                    if (string.Equals(values[index], value, StringComparison.OrdinalIgnoreCase))
+                    {
+                        return true;
+                    }
+                }
+
+                return false;
+            }
+
+            private static bool SheetPageOverlaps(string sheetName, ExcelPageDefinition page, SheetRowRange[] ranges)
+            {
+                uint pageEnd = page.RowCount == 0 ? page.StartId : page.StartId + page.RowCount - 1;
+                for (int rangeIndex = 0; rangeIndex < ranges.Length; rangeIndex++)
+                {
+                    if (string.Equals(ranges[rangeIndex].SheetName, sheetName, StringComparison.OrdinalIgnoreCase) &&
+                        ranges[rangeIndex].StartId <= pageEnd &&
+                        ranges[rangeIndex].EndId >= page.StartId)
+                    {
+                        return true;
+                    }
+                }
+
+                return false;
+            }
+
+            private static bool RowInSheetRanges(string sheetName, uint rowId, SheetRowRange[] ranges)
+            {
+                for (int rangeIndex = 0; rangeIndex < ranges.Length; rangeIndex++)
+                {
+                    if (ranges[rangeIndex].Contains(sheetName, rowId))
+                    {
+                        return true;
+                    }
+                }
+
+                return false;
+            }
+
+            private static void AddHangulCodepoints(HashSet<uint> codepoints, string value)
+            {
+                value = value ?? string.Empty;
+                for (int charIndex = 0; charIndex < value.Length; charIndex++)
+                {
+                    uint codepoint = ReadCodepoint(value, ref charIndex);
+                    if (IsHangulCodepoint(codepoint))
+                    {
+                        codepoints.Add(codepoint);
+                    }
+                }
+            }
+
+            private static string CodepointToString(uint codepoint)
+            {
+                try
+                {
+                    return char.ConvertFromUtf32(checked((int)codepoint));
+                }
+                catch
+                {
+                    return "?";
+                }
             }
 
             private void VerifyMixedScalePhraseLayout(string fontPath, string asciiSourceFontPath, string asciiFallbackSourceFontPath, string phrase)
