@@ -11,6 +11,7 @@ namespace FfxivKoreanPatch.PatchRouteVerifier
                     new VerificationStep("applied-output-files", VerifyAppliedOutputFiles),
                     new VerificationStep("lobby-route-survey", VerifyLobbyRouteSurvey),
                     new VerificationStep("lobby-atlas-capacity", VerifyLobbyAtlasCapacity),
+                    new VerificationStep("lobby-ttmp-ascii-delta", VerifyLobbyTtmpAsciiDelta),
                     new VerificationStep("data-center-rows", VerifyDataCenterRows),
                     new VerificationStep("data-center-language-slots", VerifyDataCenterRowsAllGlobalLanguageSlots),
                     new VerificationStep("data-center-title-uld", VerifyDataCenterTitleUldRoute),

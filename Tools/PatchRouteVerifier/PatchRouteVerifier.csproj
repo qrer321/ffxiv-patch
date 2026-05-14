@@ -95,6 +95,7 @@
     <Compile Include="LobbyRenderSnapshotVerification.cs" />
     <Compile Include="LobbyRouteSurveyVerification.cs" />
     <Compile Include="LobbyScaleFontSourceVerification.cs" />
+    <Compile Include="LobbyTtmpAsciiDeltaVerification.cs" />
     <Compile Include="LobbyTtmpPayloadVerification.cs" />
     <Compile Include="NumericGlyphVerification.cs" />
     <Compile Include="OccultCrescentSupportJobVerification.cs" />

@@ -69,3 +69,12 @@
 - source texture 조사 결과, 필요한 로비 글리프 대부분은 TTMP의 `font_lobby1.tex`, 일부는 `font_lobby2.tex`에 있다.
 - 현재 기준 산출물의 `font_lobby1.tex`/`font_lobby2.tex`는 clean global과 같고 TTMP와 다르다. 따라서 TTMP FDT glyph entry만 가져오면 잘못된 clean texture cell을 참조한다.
 - TTMP `font_lobby1.tex`/`font_lobby2.tex`를 통째로 적용하는 방식은 shared lobby texture를 바꾸므로 데이터 센터/영문 glyph metrics 회귀를 먼저 검증해야 한다.
+
+## TTMP Lobby ASCII Delta 조사
+
+- 실행 검증: `PatchRouteVerifier --checks lobby-ttmp-ascii-delta`
+- 리포트 위치: `.tmp/lobby-ttmp-ascii-delta-smoke`
+- 결과: 22 fonts, 1267 ASCII glyphs, 940 shape/spacing differences, 223 pixel differences, 5 data-center routed visual-unsafe fonts.
+- 데이터 센터 routed font 중 `AXIS_12_lobby`, `AXIS_14_lobby`, `MiedingerMid_14_lobby`, `TrumpGothic_23_lobby`, `TrumpGothic_34_lobby`는 clean 대비 TTMP shape/spacing 차이가 있다.
+- `Jupiter_16_lobby`/`Jupiter_20_lobby`는 visual shape/pixel은 clean과 같지만 Shift-JIS 값은 다르다. kerning/lookup 영향은 별도 검증 전까지 안전하다고 보지 않는다.
+- 결론: TTMP lobby FDT/TEX를 통째로 적용하는 방식은 데이터 센터를 건드리지 않는다는 조건과 충돌한다. 한글 glyph만 필요 font에 넣되 clean ASCII cell/spacing을 보존하거나, 데이터 센터가 타지 않는 별도 route/page 전략을 찾아야 한다.
