@@ -336,9 +336,11 @@ namespace FfxivKoreanPatch.PatchRouteVerifier
                 string detailReportPath = Path.Combine(reportDir, "lobby-atlas-allocation-details.tsv");
                 string aggregateReportPath = Path.Combine(reportDir, "lobby-atlas-aggregate-capacity.tsv");
                 string groupReportPath = Path.Combine(reportDir, "lobby-atlas-group-capacity.tsv");
+                string sourceTextureReportPath = Path.Combine(reportDir, "lobby-source-texture-summary.tsv");
 
                 LobbyAtlasCapacityStats stats = new LobbyAtlasCapacityStats();
                 Dictionary<string, byte[]> fdtCache = new Dictionary<string, byte[]>(StringComparer.OrdinalIgnoreCase);
+                Dictionary<string, int> sourceTextureUseCounts = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
                 LobbyAtlasAllocator baseAllocator = TryCreateLobbyAtlasAllocator();
                 LobbyAtlasAllocator aggregateAllocator = baseAllocator == null ? null : baseAllocator.Clone();
                 Dictionary<string, int> aggregateAllocatedByFont = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
@@ -351,7 +353,7 @@ namespace FfxivKoreanPatch.PatchRouteVerifier
                 using (StreamWriter detailWriter = CreateUtf8Writer(detailReportPath))
                 {
                     fontWriter.WriteLine("font_path\tdiagnostic_only\tscreens\tgroups\trequired\talready_present\tmissing_target\tsource_covered\tsource_missing\tindependent_allocated\tindependent_failures\tsource_paths");
-                    detailWriter.WriteLine("font_path\tcodepoint\tchar\tstatus\tsource_path\twidth\theight");
+                    detailWriter.WriteLine("font_path\tcodepoint\tchar\tstatus\tsource_path\tsource_texture\timage_index\tchannel\tx\ty\twidth\theight\toffset_x\toffset_y");
 
                     for (int fontIndex = 0; fontIndex < fonts.Count; fontIndex++)
                     {
@@ -395,17 +397,18 @@ namespace FfxivKoreanPatch.PatchRouteVerifier
                             if (!TryResolveLobbySourceGlyph(fontPath, codepoint, fdtCache, out sourceGlyph))
                             {
                                 sourceMissing++;
-                                WriteAllocationDetail(detailWriter, fontPath, codepoint, "missing-source", string.Empty, 0, 0);
+                                WriteAllocationDetail(detailWriter, fontPath, codepoint, "missing-source", new LobbySourceGlyph());
                                 continue;
                             }
 
                             sourceCovered++;
                             stats.SourceCoveredGlyphs++;
                             sourcePaths.Add(sourceGlyph.SourcePath);
+                            IncrementCounter(sourceTextureUseCounts, sourceGlyph.TexturePath);
 
                             if (diagnosticOnly)
                             {
-                                WriteAllocationDetail(detailWriter, fontPath, codepoint, "diagnostic-non-lobby", sourceGlyph.SourcePath, sourceGlyph.Width, sourceGlyph.Height);
+                                WriteAllocationDetail(detailWriter, fontPath, codepoint, "diagnostic-non-lobby", sourceGlyph);
                                 continue;
                             }
 
@@ -437,9 +440,7 @@ namespace FfxivKoreanPatch.PatchRouteVerifier
                                 fontPath,
                                 codepoint,
                                 independentOk ? "allocated" : "allocation-failed",
-                                sourceGlyph.SourcePath,
-                                sourceGlyph.Width,
-                                sourceGlyph.Height);
+                                sourceGlyph);
                         }
 
                         int aggregateAllocated = GetCounter(aggregateAllocatedByFont, fontPath);
@@ -463,7 +464,37 @@ namespace FfxivKoreanPatch.PatchRouteVerifier
 
                 WriteAggregateCapacityReport(aggregateReportPath, aggregateAllocatedByFont, aggregateFailuresByFont);
                 WriteLobbyAtlasGroupCapacityReport(groupReportPath, requirements, fdtCache, baseAllocator);
+                WriteLobbySourceTextureSummaryReport(sourceTextureReportPath, sourceTextureUseCounts);
                 return stats;
+            }
+
+            private void WriteLobbySourceTextureSummaryReport(
+                string reportPath,
+                Dictionary<string, int> sourceTextureUseCounts)
+            {
+                List<string> texturePaths = new List<string>(sourceTextureUseCounts.Keys);
+                texturePaths.Sort(StringComparer.OrdinalIgnoreCase);
+                using (StreamWriter writer = CreateUtf8Writer(reportPath))
+                {
+                    writer.WriteLine("source_texture\tglyph_references\tttmp_present\tpatched_present\tclean_present\tpatched_matches_ttmp\tpatched_matches_clean\tclean_matches_ttmp");
+                    for (int i = 0; i < texturePaths.Count; i++)
+                    {
+                        string texturePath = texturePaths[i];
+                        byte[] ttmp = TryReadUnpackedTexture(_ttmpFont, texturePath);
+                        byte[] patched = TryReadUnpackedTexture(_patchedFont, texturePath);
+                        byte[] clean = TryReadUnpackedTexture(_cleanFont, texturePath);
+                        WriteTsvRow(
+                            writer,
+                            texturePath,
+                            GetCounter(sourceTextureUseCounts, texturePath).ToString(),
+                            ttmp == null ? "no" : "yes",
+                            patched == null ? "no" : "yes",
+                            clean == null ? "no" : "yes",
+                            FormatByteEquality(patched, ttmp),
+                            FormatByteEquality(patched, clean),
+                            FormatByteEquality(clean, ttmp));
+                    }
+                }
             }
 
             private void WriteLobbyAtlasGroupCapacityReport(
@@ -692,8 +723,15 @@ namespace FfxivKoreanPatch.PatchRouteVerifier
 
                     sourceGlyph = new LobbySourceGlyph();
                     sourceGlyph.SourcePath = (candidate.FromTtmp ? "ttmp:" : "patched:") + candidate.FontPath;
+                    sourceGlyph.TexturePath = ResolveFontTexturePath(candidate.FontPath, glyph.ImageIndex) ?? string.Empty;
+                    sourceGlyph.ImageIndex = glyph.ImageIndex;
+                    sourceGlyph.Channel = glyph.ImageIndex % 4;
+                    sourceGlyph.X = glyph.X;
+                    sourceGlyph.Y = glyph.Y;
                     sourceGlyph.Width = glyph.Width;
                     sourceGlyph.Height = glyph.Height;
+                    sourceGlyph.OffsetX = glyph.OffsetX;
+                    sourceGlyph.OffsetY = glyph.OffsetY;
                     return true;
                 }
 
@@ -797,14 +835,54 @@ namespace FfxivKoreanPatch.PatchRouteVerifier
                 }
             }
 
+            private byte[] TryReadUnpackedTexture(CompositeArchive archive, string texturePath)
+            {
+                if (archive == null || string.IsNullOrEmpty(texturePath))
+                {
+                    return null;
+                }
+
+                byte[] packed;
+                if (!archive.TryReadPackedFile(texturePath, out packed))
+                {
+                    return null;
+                }
+
+                return UnpackTextureFile(packed);
+            }
+
+            private byte[] TryReadUnpackedTexture(TtmpFontPackage package, string texturePath)
+            {
+                if (package == null || string.IsNullOrEmpty(texturePath))
+                {
+                    return null;
+                }
+
+                byte[] packed;
+                if (!package.TryReadPackedFile(texturePath, out packed))
+                {
+                    return null;
+                }
+
+                return UnpackTextureFile(packed);
+            }
+
+            private static string FormatByteEquality(byte[] left, byte[] right)
+            {
+                if (left == null || right == null)
+                {
+                    return "n/a";
+                }
+
+                return BytesEqual(left, right) ? "yes" : "no";
+            }
+
             private static void WriteAllocationDetail(
                 StreamWriter writer,
                 string fontPath,
                 uint codepoint,
                 string status,
-                string sourcePath,
-                int width,
-                int height)
+                LobbySourceGlyph sourceGlyph)
             {
                 WriteTsvRow(
                     writer,
@@ -812,9 +890,16 @@ namespace FfxivKoreanPatch.PatchRouteVerifier
                     "U+" + codepoint.ToString("X4"),
                     char.ConvertFromUtf32(checked((int)codepoint)),
                     status,
-                    sourcePath,
-                    width.ToString(),
-                    height.ToString());
+                    sourceGlyph.SourcePath ?? string.Empty,
+                    sourceGlyph.TexturePath ?? string.Empty,
+                    sourceGlyph.ImageIndex.ToString(),
+                    sourceGlyph.Channel.ToString(),
+                    sourceGlyph.X.ToString(),
+                    sourceGlyph.Y.ToString(),
+                    sourceGlyph.Width.ToString(),
+                    sourceGlyph.Height.ToString(),
+                    sourceGlyph.OffsetX.ToString(),
+                    sourceGlyph.OffsetY.ToString());
             }
 
             private static void WriteAggregateCapacityReport(
@@ -1157,8 +1242,15 @@ namespace FfxivKoreanPatch.PatchRouteVerifier
             private sealed class LobbySourceGlyph
             {
                 public string SourcePath;
+                public string TexturePath;
+                public int ImageIndex;
+                public int Channel;
+                public int X;
+                public int Y;
                 public int Width;
                 public int Height;
+                public int OffsetX;
+                public int OffsetY;
             }
 
             private struct LobbySourceCandidate

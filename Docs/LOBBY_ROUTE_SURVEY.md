@@ -66,3 +66,6 @@
 - source glyph는 모두 TTMP font pack 안에서 확인됐다. 현재 실패는 source 부재가 아니라 기존 `font_lobby1.tex`~`font_lobby7.tex` 용량/배치 실패다.
 - 독립 배치 실패가 큰 폰트는 `TrumpGothic_34_lobby` 279 glyphs, `TrumpGothic_23_lobby` 154 glyphs, `AXIS_18_lobby` 56 glyphs다.
 - 이 상태에서 기존 아틀라스에 글리프를 복사 주입하는 방식으로 진행하면 텍스처 오염, 번짐, fallback 재발 가능성이 높다. 다음 구현 전에는 새 texture page 추가, screen/font별 분리, 또는 source texture cell 재사용 가능성을 먼저 확인한다.
+- source texture 조사 결과, 필요한 로비 글리프 대부분은 TTMP의 `font_lobby1.tex`, 일부는 `font_lobby2.tex`에 있다.
+- 현재 기준 산출물의 `font_lobby1.tex`/`font_lobby2.tex`는 clean global과 같고 TTMP와 다르다. 따라서 TTMP FDT glyph entry만 가져오면 잘못된 clean texture cell을 참조한다.
+- TTMP `font_lobby1.tex`/`font_lobby2.tex`를 통째로 적용하는 방식은 shared lobby texture를 바꾸므로 데이터 센터/영문 glyph metrics 회귀를 먼저 검증해야 한다.
