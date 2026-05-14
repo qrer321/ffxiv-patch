@@ -90,6 +90,7 @@
     <Compile Include="LobbyGlyphDiagnosticTargets.cs" />
     <Compile Include="LabelPreviewDumpOutput.cs" />
     <Compile Include="LobbyGlyphDiagnostics.cs" />
+    <Compile Include="LobbyAtlasCapacityVerification.cs" />
     <Compile Include="LobbyDataCenterLabels.cs" />
     <Compile Include="LobbyRenderSnapshotVerification.cs" />
     <Compile Include="LobbyRouteSurveyVerification.cs" />

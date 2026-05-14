@@ -21,6 +21,7 @@
 - `character-select`: `AXIS_12_lobby`, `AXIS_14_lobby`, `AXIS_18_lobby`, `MiedingerMid_12_lobby`, `MiedingerMid_14_lobby`, `TrumpGothic_23_lobby`, `TrumpGothic_34_lobby`
 
 중요: `start-system-settings`는 non-lobby와 lobby 후보가 모두 남아 있다. 실제 제목/로비 컨텍스트에서 어느 suffix를 타는지 확정하기 전에는 전역 `AXIS_*`를 수정하지 않는다.
+중요: `data-center-select`는 현재 패치 대상에서 제외한다. 이 route는 조사/회귀 감시용으로만 유지하고 glyph coverage나 atlas allocation 후보에 넣지 않는다.
 
 ## Sheet Coverage 요약
 
@@ -55,3 +56,13 @@
 - `Lobby#458` 같은 긴 종족 설명문은 atlas capacity 검토 전까지 glyph source로 쓰지 않는다.
 - `Addon` 전체 13013 rows는 로비 대상이 아니다. 시작 메뉴/설정 공유 등 확인된 row만 별도 후보로 관리한다.
 - 다음 구현 전 필요한 리포트: target font별 required glyph count와 atlas free capacity.
+
+## Atlas Capacity 조사
+
+- 실행 검증: `PatchRouteVerifier --checks lobby-atlas-capacity`
+- 리포트 위치: `.tmp/lobby-atlas-capacity-smoke`
+- 데이터 센터는 glyph coverage와 atlas allocation 후보에서 제외했다.
+- 결과: 12 target fonts, 3569 required codepoints, 2795 missing target glyphs, 2795 source-covered glyphs, 1019 aggregate allocation failures.
+- source glyph는 모두 TTMP font pack 안에서 확인됐다. 현재 실패는 source 부재가 아니라 기존 `font_lobby1.tex`~`font_lobby7.tex` 용량/배치 실패다.
+- 독립 배치 실패가 큰 폰트는 `TrumpGothic_34_lobby` 279 glyphs, `TrumpGothic_23_lobby` 154 glyphs, `AXIS_18_lobby` 56 glyphs다.
+- 이 상태에서 기존 아틀라스에 글리프를 복사 주입하는 방식으로 진행하면 텍스처 오염, 번짐, fallback 재발 가능성이 높다. 다음 구현 전에는 새 texture page 추가, screen/font별 분리, 또는 source texture cell 재사용 가능성을 먼저 확인한다.
