@@ -73,17 +73,6 @@ namespace FfxivKoreanPatch.PatchRouteVerifier
                         checkedPhrases++;
                         if (layout.MinimumGapPixels < 0)
                         {
-                            string sourceFontPath = ResolveCleanAsciiReferenceFontPath(fontPath);
-                            PhraseLayoutResult cleanLayout;
-                            string cleanError;
-                            if (!string.IsNullOrEmpty(sourceFontPath) &&
-                                TryMeasurePhraseLayout(_cleanFont, sourceFontPath, phrase, false, out cleanLayout, out cleanError) &&
-                                layout.MinimumGapPixels >= cleanLayout.MinimumGapPixels &&
-                                layout.OverlapPixels <= cleanLayout.OverlapPixels + 2)
-                            {
-                                continue;
-                            }
-
                             string pairDetail = DescribeScaledLobbyPairSpacing(
                                 fontPath,
                                 layout.MinimumGapLeftCodepoint,

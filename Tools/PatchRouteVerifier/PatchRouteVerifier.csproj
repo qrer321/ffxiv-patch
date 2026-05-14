@@ -92,6 +92,7 @@
     <Compile Include="LobbyGlyphDiagnostics.cs" />
     <Compile Include="LobbyDataCenterLabels.cs" />
     <Compile Include="LobbyRenderSnapshotVerification.cs" />
+    <Compile Include="LobbyRouteSurveyVerification.cs" />
     <Compile Include="LobbyScaleFontSourceVerification.cs" />
     <Compile Include="LobbyTtmpPayloadVerification.cs" />
     <Compile Include="NumericGlyphVerification.cs" />

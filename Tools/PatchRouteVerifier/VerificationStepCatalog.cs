@@ -9,6 +9,7 @@ namespace FfxivKoreanPatch.PatchRouteVerifier
                 return new VerificationStep[]
                 {
                     new VerificationStep("applied-output-files", VerifyAppliedOutputFiles),
+                    new VerificationStep("lobby-route-survey", VerifyLobbyRouteSurvey),
                     new VerificationStep("data-center-rows", VerifyDataCenterRows),
                     new VerificationStep("data-center-language-slots", VerifyDataCenterRowsAllGlobalLanguageSlots),
                     new VerificationStep("data-center-title-uld", VerifyDataCenterTitleUldRoute),
@@ -25,7 +26,6 @@ namespace FfxivKoreanPatch.PatchRouteVerifier
                     new VerificationStep("system-settings-scaled-phrase-layouts", VerifySystemSettingsScaledPhraseLayouts),
                     new VerificationStep("system-settings-mixed-scale-layouts", VerifySystemSettingsMixedScalePhraseLayouts),
                     new VerificationStep("start-main-menu-phrase-layouts", VerifyStartScreenMainMenuPhraseLayouts),
-                    new VerificationStep("character-select-lobby-phrase-layouts", VerifyCharacterSelectLobbyPhraseLayouts),
                     new VerificationStep("lobby-scale-font-sources", VerifyLobbyScaleFontSourceRoutes),
                     new VerificationStep("korean-lobby-font-sources", VerifyKoreanLobbyFontSourceRoutes),
                     new VerificationStep("lobby-ttmp-payloads", VerifyLobbyTtmpPayloads),

@@ -12,38 +12,6 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
             new AddonRowRange(8683, 8722)
         };
 
-        public static readonly SheetRowRange[] GeneralLobbySheetRowRanges = new SheetRowRange[]
-        {
-        };
-
-        public static readonly SheetRowRange[] StartScreenMainMenuSheetRowRanges = new SheetRowRange[]
-        {
-            new SheetRowRange("Addon", 2744, 2744),
-            new SheetRowRange("Addon", 4000, 4000),
-            new SheetRowRange("Lobby", 2009, 2009),
-            new SheetRowRange("Lobby", 2052, 2052)
-        };
-
-        public static readonly SheetRowRange[] CharacterSelectSheetRowRanges = new SheetRowRange[]
-        {
-            // Character select, world transfer, lobby help and title/character
-            // labels are stored in Lobby. Keep this row-scoped to visible route
-            // groups; the full Lobby sheet also contains long descriptions for
-            // unrelated panels and exceeds the shared lobby font atlas.
-            new SheetRowRange("Lobby", 0, 99),
-            new SheetRowRange("Lobby", 462, 464),
-            new SheetRowRange("Lobby", 500, 656),
-            new SheetRowRange("Lobby", 800, 999),
-            new SheetRowRange("Lobby", 1100, 1250),
-            new SheetRowRange("Lobby", 1800, 1802),
-            new SheetRowRange("Lobby", 2001, 2060),
-            new SheetRowRange("Error", 13001, 13307),
-            new SheetRowRange("Addon", 5522, 5522),
-            new SheetRowRange("Addon", 6927, 6928),
-            new SheetRowRange("Addon", 8283, 8284),
-            new SheetRowRange("Addon", 10134, 10134)
-        };
-
         public static readonly string[] Core = new string[]
         {
             "\uCE90\uB9AD\uD130 \uC815\uBCF4\uB97C \uBCC0\uACBD\uD558\uAE30 \uC704\uD574",
@@ -55,9 +23,6 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
             "\uD30C\uD2F0 \uBAA9\uB85D",
             "\uB370\uC774\uD130 \uC13C\uD130",
             "\uB370\uC774\uD130 \uC13C\uD130 Mana\uC5D0 \uC811\uC18D \uC911\uC785\uB2C8\uB2E4.",
-            "\uD604\uC7AC \uC811\uC18D \uC911\uC778 \uB370\uC774\uD130 \uC13C\uD130",
-            "\uB2E4\uB978 \uB370\uC774\uD130 \uC13C\uD130",
-            "\uC811\uC18D\uD558\uC2DC\uACA0\uC2B5\uB2C8\uAE4C?",
             "\uC885\uB8CC",
             "\uB098\uAC00\uAE30",
             "\uB4A4\uB85C",
@@ -121,78 +86,14 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
             "\uC77C\uBD80 \uC124\uC815\uC740 \uC801\uC6A9\uC744 \uB20C\uB7EC\uC57C \uBC18\uC601\uB429\uB2C8\uB2E4."
         };
 
-        public static readonly string[] General = Combine(
-            Core,
-            StartScreenSystemSettings,
-            HighResolutionUiScaleOptions,
-            StartScreenSystemSettingsResultMessages);
-
         public static readonly string[] StartScreenMainMenu = new string[]
         {
             "\uAC8C\uC784 \uC2DC\uC791",
             "\uB370\uC774\uD130 \uC13C\uD130",
             "\uB3D9\uC601\uC0C1 \uBC0F \uD0C0\uC774\uD2C0",
-            "\uC2DC\uC2A4\uD15C \uC124\uC815",
             "\uC124\uC815",
-            "\uC124\uCE58 \uC815\uBCF4",
             "\uB77C\uC774\uC120\uC2A4",
-            "\uC885\uB8CC",
-            "\uB4A4\uB85C"
-        };
-
-        public static readonly string[] CharacterSelect = new string[]
-        {
-            "\uB85C\uC2A4\uAC00\uB974",
-            "\uC885\uC871",
-            "\uC9C1\uC5C5",
-            "\uB2CC\uC790",
-            "\uC9C0\uACE0\uCC9C \uAC70\uB9AC",
-            "\uADF8\uB9BC\uC790 5\uC6D4 11\uC77C",
-            "\uB610\uB294",
-            "\uB4A4\uB85C",
-            "\uCE90\uB9AD\uD130 \uC815\uBCF4 \uBD88\uB7EC\uC624\uAE30",
-            "\uC774\uB984 \uBCC0\uACBD",
-            "\uC9D1\uC0AC \uC774\uB984 \uBCC0\uACBD",
-            "\uCE90\uB9AD\uD130 \uC124\uC815 \uB370\uC774\uD130 \uBC31\uC5C5",
-            "\uCF8C\uC801\uD55C \uC11C\uBC84\uB85C \uC774\uB3D9",
-            "\uB2E4\uB978 \uB370\uC774\uD130 \uC13C\uD130 \uBC29\uBB38",
-            "\uB9C8\uC6B0\uC2A4 \uC67C\uCABD \uB04C\uAE30",
-            "\uB9C8\uC6B0\uC2A4 \uC624\uB978\uCABD \uB04C\uAE30",
-            "\uD720 \uD074\uB9AD \uB04C\uAE30",
-            "\uD655\uB300/\uCD95\uC18C",
-            "\uB5A0\uB3C4\uB294 \uBCC4",
-            "\uD604\uC7AC \uC704\uCE58",
-            "\uB204\uC801 \uACB0\uC81C \uBCF4\uC0C1",
-            "\uC9C0\uAE08\uAE4C\uC9C0 \uB204\uC801\uB41C \uACB0\uC81C \uC77C\uC218",
-            "\uCE90\uB9AD\uD130 \uC0AD\uC81C",
-            "\uC774\uC804 \uB2E8\uACC4",
-            "\uD074\uB77C\uC774\uC5B8\uD2B8 \uC124\uC815 \uB370\uC774\uD130 \uBC31\uC5C5",
-            "\uCE90\uB9AD\uD130 \uC124\uC815 \uBC31\uC5C5",
-            "\uBC31\uC5C5 \uB300\uC0C1",
-            "\uC785\uB825 \uC7A5\uCE58 \uC124\uC815",
-            "\uAC01\uC885 HUD \uC704\uCE58\uC640 \uD06C\uAE30",
-            "\uB2E8\uCD95\uBC14 \uBC0F \uC2ED\uC790 \uB2E8\uCD95\uBC14",
-            "\uB9E4\uD06C\uB85C \uC124\uC815 \uBCF5\uC6D0",
-            "\uACF5\uC6A9 \uB9E4\uD06C\uB85C",
-            "\uC124\uC815 \uB370\uC774\uD130 \uBCF5\uC0AC",
-            "\uB2E4\uB978 \uCE90\uB9AD\uD130\uC758 \uC124\uC815 \uB370\uC774\uD130 \uBCF5\uC0AC",
-            "\uD654\uBA74 \uD574\uC0C1\uB3C4\uB97C \uBE44\uB86F\uD558\uC5EC",
-            "\uBC14\uAFC0 \uC218 \uC788\uB294",
-            "\uC21C\uCC28\uC801\uC73C\uB85C \uB85C\uADF8\uC778 \uCC98\uB9AC\uB97C",
-            "\uB85C\uADF8\uC778 \uCC98\uB9AC\uB97C \uC911\uB2E8\uD558\uC2DC\uACA0\uC2B5\uB2C8\uAE4C?",
-            "\uC6D0\uD65C\uD55C \uC811\uC18D\uC744 \uC704\uD574",
-            "\uCE90\uB9AD\uD130 \uBAA9\uB85D\uC744 \uD655\uC778\uD560 \uC11C\uBC84\uB97C \uC120\uD0DD\uD558\uC2ED\uC2DC\uC624.",
-            "\uB85C\uBE44 \uC11C\uBC84 \uC811\uC18D \uC911",
-            "\uC624\uB958\uAC00 \uBC1C\uC0DD\uD588\uC2B5\uB2C8\uB2E4",
-            "\uC7A0\uC2DC \uD6C4 \uB2E4\uC2DC \uB85C\uADF8\uC778\uD574 \uC8FC\uC2ED\uC2DC\uC624",
-            "\uD604\uC7AC \uC11C\uBC84\uAC00 \uD63C\uC7A1\uD569\uB2C8\uB2E4.",
-            "\uC77C\uC815 \uC2DC\uAC04 \uB3D9\uC548 \uC870\uC791\uD558\uC9C0 \uC54A\uC544 \uC790\uB3D9\uC73C\uB85C \uC811\uC18D\uC774 \uC885\uB8CC\uB418\uC5C8\uC2B5\uB2C8\uB2E4.",
-            "\uC9D1\uC0AC\uC758 \uC678\uBAA8 \uD3B8\uC9D1\uC744 \uC911\uB2E8\uD558\uC2DC\uACA0\uC2B5\uB2C8\uAE4C?",
-            "\uD604\uC7AC\uC758 \uC7AC\uD3B8\uC9D1 \uC815\uBCF4\uB97C \uCE90\uB9AD\uD130\uC5D0 \uBC18\uC601\uD558\uC2DC\uACA0\uC2B5\uB2C8\uAE4C?",
-            "\uCF8C\uC801\uD55C \uC11C\uBC84\uB85C \uC774\uB3D9\uD569\uB2C8\uB2E4.",
-            "\uC11C\uBC84 \uC815\uBCF4\uB97C \uBD88\uB7EC\uC624\uACE0 \uC788\uC2B5\uB2C8\uB2E4.",
-            "\uCE90\uB9AD\uD130 \uC815\uBCF4\uB97C \uBD88\uB7EC\uC624\uACE0 \uC788\uC2B5\uB2C8\uB2E4.",
-            "\uCDE8\uC18C"
+            "\uC885\uB8CC"
         };
 
         public static readonly string[] All = Combine(
@@ -200,8 +101,7 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
             StartScreenSystemSettings,
             HighResolutionUiScaleOptions,
             StartScreenSystemSettingsResultMessages,
-            StartScreenMainMenu,
-            CharacterSelect);
+            StartScreenMainMenu);
 
         private static string[] Combine(params string[][] groups)
         {
@@ -237,27 +137,6 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
         public bool Contains(uint rowId)
         {
             return rowId >= StartId && rowId <= EndId;
-        }
-    }
-
-    internal struct SheetRowRange
-    {
-        public readonly string SheetName;
-        public readonly uint StartId;
-        public readonly uint EndId;
-
-        public SheetRowRange(string sheetName, uint startId, uint endId)
-        {
-            SheetName = sheetName ?? string.Empty;
-            StartId = startId;
-            EndId = endId;
-        }
-
-        public bool Contains(string sheetName, uint rowId)
-        {
-            return string.Equals(SheetName, sheetName ?? string.Empty, StringComparison.OrdinalIgnoreCase) &&
-                   rowId >= StartId &&
-                   rowId <= EndId;
         }
     }
 }
