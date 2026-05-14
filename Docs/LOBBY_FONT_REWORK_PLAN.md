@@ -68,7 +68,7 @@
 
 생성 패치가 아래 조건을 만족하기 전에는 수정 완료로 판단하지 않는다.
 
-- 작업 중 반복 검증은 선택 verifier만 사용한다. 기본 약한 검증은 `lobby-route-survey`와 필요한 소수의 route/source check로 제한한다.
+- 작업 중 반복 검증은 선택 verifier만 사용한다. 기본 약한 검증은 `lobby-route-survey`만 사용하고, 필요한 route/source check는 clean base 조건이 맞을 때 명시적으로 추가한다.
 - 전체 verifier와 긴 render/layout 검증은 로비 주입 방식이 안정된 뒤와 릴리즈 빌드 직전에만 실행한다.
 - generator 로그에 로비 font별 required/changed/allocation-failures가 출력된다.
 - 모든 로비 target font에서 `allocation-failures=0`이어야 한다.

@@ -16,7 +16,7 @@ param(
 
     [string]$BaseIndexDirectory,
 
-    [string]$Checks = "applied-output-files,lobby-route-survey,lobby-clean-payloads,korean-lobby-font-sources,clean-ascii-font-routes,numeric-glyphs",
+    [string]$Checks = "lobby-route-survey",
 
     [string]$Configuration = "Release",
 
