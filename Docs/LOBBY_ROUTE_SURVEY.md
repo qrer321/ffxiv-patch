@@ -78,3 +78,13 @@
 - 데이터 센터 routed font 중 `AXIS_12_lobby`, `AXIS_14_lobby`, `MiedingerMid_14_lobby`, `TrumpGothic_23_lobby`, `TrumpGothic_34_lobby`는 clean 대비 TTMP shape/spacing 차이가 있다.
 - `Jupiter_16_lobby`/`Jupiter_20_lobby`는 visual shape/pixel은 clean과 같지만 Shift-JIS 값은 다르다. kerning/lookup 영향은 별도 검증 전까지 안전하다고 보지 않는다.
 - 결론: TTMP lobby FDT/TEX를 통째로 적용하는 방식은 데이터 센터를 건드리지 않는다는 조건과 충돌한다. 한글 glyph만 필요 font에 넣되 clean ASCII cell/spacing을 보존하거나, 데이터 센터가 타지 않는 별도 route/page 전략을 찾아야 한다.
+
+## Source Cell Conflict 조사
+
+- 실행 검증: `PatchRouteVerifier --checks lobby-source-cell-conflicts`
+- 리포트 위치: `.tmp/lobby-source-cell-conflicts-smoke`
+- 결과: 2537 candidate glyph cells, 0 known FDT conflicts, 44 texture alpha conflicts, 0 data-center FDT conflicts, 0 source overlap pairs.
+- TTMP 한글 glyph cell 좌표는 현재 clean/patched 로비 FDT에서 참조 중인 glyph cell과 겹치지 않는다.
+- source cell끼리도 서로 다른 glyph를 덮는 overlap은 없다.
+- 따라서 다음 구현 후보는 TTMP FDT/TEX 통째 적용이 아니라, 필요한 한글 glyph entry만 target FDT에 추가하고 필요한 TTMP source cell alpha만 기존 `font_lobby1.tex`/`font_lobby2.tex`의 같은 좌표에 복사하는 방식이다.
+- 단, clean texture에 이미 alpha가 있는 미참조 영역 44개는 있으므로 texture patch 전후에 데이터 센터 routed ASCII glyph pixel/spacing verifier를 반드시 유지한다.
