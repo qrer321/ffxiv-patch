@@ -300,6 +300,8 @@
 
 - 2026-05-13 current ja result: fresh `.tmp\lobby-route-scoped-ja-r4` passes `clean-ascii-font-routes,numeric-glyphs,data-center-title-uld,data-center-worldmap-uld,start-system-settings-uld,start-main-menu-phrase-layouts,character-select-lobby-phrase-layouts,lobby-render-snapshots,hangul-source-preservation,configuration-sharing,bozja-entrance,occult-crescent-support-jobs,reported-ingame-hangul-phrases,action-detail-scale-layouts` with `Verifier failures: 0`. `lobby-clean-payloads` is no longer the pass/fail check for this design because route-scoped Hangul injection intentionally modifies selected lobby FDT/TEX; keep the live lobby 150%+ issue open until the user explicitly confirms it.
 
+- 2026-05-15 lobby atlas correction: allocating required Hangul into the existing 1024 lobby atlas could still collide with clean logical glyph rectangles or exhaust capacity. The generator now keeps clean lobby ASCII/FDT metrics, expands the affected lobby texture when TTMP source coordinates exceed the clean texture size, and copies only required TTMP Hangul alpha cells at their source coordinates. `lobby-hangul-source-cells` now verifies TTMP pixel/metric equality and rejects overlap with clean lobby cells. Fresh ja output `.tmp\lobby-hangul-expanded-r7-ja` passes `lobby-hangul-source-cells,clean-ascii-font-routes,data-center-title-glyphs` with `Verifier failures: 0`. This is still pending live-client confirmation and must not be treated as user-confirmed fixed yet.
+
 ## 작업 시 주의 사항
 
 - 인게임 폰트가 정상인 상태에서 로비 문제를 고치기 위해 인게임 폰트를 광범위하게 건드리지 말 것

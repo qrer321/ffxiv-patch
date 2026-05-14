@@ -52,6 +52,13 @@ namespace FfxivKoreanPatch.PatchRouteVerifier
                 ", offset=" + glyph.OffsetX.ToString() + "/" + glyph.OffsetY.ToString();
         }
 
+        private static string FormatGlyphRoute(FdtGlyphEntry glyph)
+        {
+            return FormatGlyphSpacing(glyph) +
+                ", image=" + glyph.ImageIndex.ToString() +
+                ", cell=" + glyph.X.ToString() + "/" + glyph.Y.ToString();
+        }
+
         private static int GetGlyphAdvance(FdtGlyphEntry glyph)
         {
             return Math.Max(1, glyph.Width + glyph.OffsetX);

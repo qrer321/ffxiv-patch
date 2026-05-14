@@ -4,9 +4,11 @@
 
 - Clean lobby FDT/ASCII metrics are preserved, and only required Hangul glyph cells are injected into selected lobby fonts (`AXIS_*_lobby`, data-center popup/menu fonts).
 - Existing clean lobby glyph cells are reserved before allocation to avoid contaminating English/number glyphs.
+- 2026-05-15 correction: existing 1024 lobby atlas allocation was not enough for all required Hangul without risking clean glyph contamination. Current implementation expands the affected clean lobby texture to fit TTMP source coordinates, keeps clean ASCII/FDT metrics, and copies only required TTMP Hangul alpha cells.
 - 2026-05-13 검증 정정: 이전 focused PASS는 verifier가 generated output dat와 fallback/baseline dat를 잘못 섞어 읽어서 missing glyph를 놓친 false PASS였다. `CompositeArchive`가 sibling `orig.*.index`를 baseline으로 사용하고, generated font dat에 같은 offset의 patched entry가 있으면 primary dat를 읽도록 수정했다.
 - 이 검증기 수정 뒤 기존 산출물은 `Jupiter_45_lobby.fdt`의 `템/치/뒤`, `Jupiter_20_lobby.fdt`의 character-select glyph 누락을 제대로 실패시켰다.
 - Latest fresh ja output `.tmp\lobby-route-scoped-ja-r4` passes `clean-ascii-font-routes,numeric-glyphs,data-center-title-uld,data-center-worldmap-uld,start-system-settings-uld,start-main-menu-phrase-layouts,character-select-lobby-phrase-layouts,lobby-render-snapshots,hangul-source-preservation,configuration-sharing,bozja-entrance,occult-crescent-support-jobs,reported-ingame-hangul-phrases,action-detail-scale-layouts` with `Verifier failures: 0`.
+- Latest focused ja output `.tmp\lobby-hangul-expanded-r7-ja` passes `lobby-hangul-source-cells,clean-ascii-font-routes,data-center-title-glyphs` with `Verifier failures: 0`.
 - `lobby-clean-payloads`는 clean reset 시점의 guard다. 현재 설계는 route-scoped Hangul glyph를 selected lobby FDT/TEX에 의도적으로 추가하므로, 이 check를 현재 성공 기준으로 쓰지 않는다. 대신 clean ASCII/number preservation, ULD route checks, render snapshots, Hangul source preservation, reported in-game regression checks를 함께 사용한다.
 - This is not user-confirmed fixed yet.
 

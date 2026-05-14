@@ -84,13 +84,15 @@ namespace FfxivKoreanPatch.PatchRouteVerifier
                         if (score != 0)
                         {
                             Fail(
-                                "{0} U+{1:X4} pixels differ from {2}: score={3}, visible={4}/{5}",
+                                "{0} U+{1:X4} pixels differ from {2}: score={3}, visible={4}/{5}, target={6}, source={7}",
                                 targetFontPath,
                                 codepoint,
                                 sourceFontPath,
                                 score,
                                 sourceCanvas.VisiblePixels,
-                                targetCanvas.VisiblePixels);
+                                targetCanvas.VisiblePixels,
+                                FormatGlyphRoute(targetGlyph),
+                                FormatGlyphRoute(sourceGlyph));
                             ok = false;
                             continue;
                         }
@@ -160,13 +162,15 @@ namespace FfxivKoreanPatch.PatchRouteVerifier
                         if (score != 0)
                         {
                             Fail(
-                                "{0} required U+{1:X4} pixels differ from derived source {2}: score={3}, visible={4}/{5}",
+                                "{0} required U+{1:X4} pixels differ from derived source {2}: score={3}, visible={4}/{5}, target={6}, source={7}",
                                 targetFontPath,
                                 codepoint,
                                 sourceFontPath,
                                 score,
                                 sourceCanvas.VisiblePixels,
-                                targetCanvas.VisiblePixels);
+                                targetCanvas.VisiblePixels,
+                                FormatGlyphRoute(targetGlyph),
+                                FormatGlyphRoute(sourceGlyph));
                             ok = false;
                             continue;
                         }

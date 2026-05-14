@@ -157,20 +157,15 @@ namespace FfxivKoreanPatch.PatchRouteVerifier
 
             private bool ShouldReadFromPrimary(SqPackIndexEntry entry)
             {
-                if (string.Equals(_datPrefix, FontPrefix, StringComparison.OrdinalIgnoreCase) &&
-                    PrimaryDatContainsOffset(entry.DataFileId, entry.Offset))
+                if (_baselineIndex != null)
                 {
-                    return true;
+                    SqPackIndexEntry baselineEntry;
+                    return !_baselineIndex.TryGetEntry(entry.Hash, out baselineEntry) ||
+                           baselineEntry.Data != entry.Data;
                 }
 
-                if (_baselineIndex == null)
-                {
-                    return true;
-                }
-
-                SqPackIndexEntry baselineEntry;
-                return !_baselineIndex.TryGetEntry(entry.Hash, out baselineEntry) ||
-                       baselineEntry.Data != entry.Data;
+                return !string.Equals(_datPrefix, FontPrefix, StringComparison.OrdinalIgnoreCase) ||
+                       PrimaryDatContainsOffset(entry.DataFileId, entry.Offset);
             }
 
             private bool PrimaryDatContainsOffset(byte datId, long offset)

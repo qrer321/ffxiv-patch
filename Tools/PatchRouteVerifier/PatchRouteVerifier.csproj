@@ -94,6 +94,7 @@
     <Compile Include="LobbyDataCenterLabels.cs" />
     <Compile Include="LobbyRenderSnapshotVerification.cs" />
     <Compile Include="LobbyRouteSurveyVerification.cs" />
+    <Compile Include="LobbyHangulSourceCellVerification.cs" />
     <Compile Include="LobbyScaleFontSourceVerification.cs" />
     <Compile Include="LobbySourceCellConflictVerification.cs" />
     <Compile Include="LobbyTtmpAsciiDeltaVerification.cs" />
@@ -130,6 +131,9 @@
     </Compile>
     <Compile Include="..\..\FFXIVPatchGenerator\LobbyScaledHangulPhrases.cs">
       <Link>Generator\LobbyScaledHangulPhrases.cs</Link>
+    </Compile>
+    <Compile Include="..\..\FFXIVPatchGenerator\LobbyHangulCoverage.cs">
+      <Link>Generator\LobbyHangulCoverage.cs</Link>
     </Compile>
     <Compile Include="..\..\FFXIVPatchGenerator\SqPack.cs">
       <Link>Generator\SqPack.cs</Link>
