@@ -758,10 +758,11 @@ namespace FfxivKoreanPatch.PatchRouteVerifier
                 }
 
                 bool isAddon = string.Equals(sheet, "Addon", StringComparison.OrdinalIgnoreCase);
+                bool isLongText = IsLongLobbyCoverageGapText(text);
                 for (int i = 0; i < ReportedLobbyCoveragePhrases.Length; i++)
                 {
                     string phrase = ReportedLobbyCoveragePhrases[i];
-                    if (isAddon && phrase.Length < 4)
+                    if ((isAddon || isLongText) && phrase.Length < 4)
                     {
                         continue;
                     }
@@ -773,7 +774,7 @@ namespace FfxivKoreanPatch.PatchRouteVerifier
                     }
                 }
 
-                bool allowBroadKeywords = !isAddon;
+                bool allowBroadKeywords = !isAddon && !isLongText;
                 if (!allowBroadKeywords)
                 {
                     return string.Join(",", reasons.ToArray());
@@ -790,6 +791,21 @@ namespace FfxivKoreanPatch.PatchRouteVerifier
                 }
 
                 return string.Join(",", reasons.ToArray());
+            }
+
+            private static bool IsLongLobbyCoverageGapText(string text)
+            {
+                if (string.IsNullOrEmpty(text))
+                {
+                    return false;
+                }
+
+                if (text.IndexOf('\n') >= 0)
+                {
+                    return true;
+                }
+
+                return CountHangulChars(text) > 80;
             }
 
             private static uint GetNearestLobbyCoverageDistance(string sheet, uint rowId)

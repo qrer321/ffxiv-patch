@@ -44,10 +44,10 @@
 - 전체 후보: `lobby-uncovered-hangul-candidates.tsv`
 - 우선 검토 후보: `lobby-uncovered-actionable-candidates.tsv`
 - 요약: `lobby-uncovered-hangul-summary.tsv`
-- 실행 결과: `.tmp\verify-lobby-route-survey-actionable-r8.log` PASS
-- 현재 산출물 기준 전체 미커버 후보는 13,658 rows, actionable 후보는 660 rows다.
-- actionable 분포: `Lobby` 383 columns, `Addon` 240 columns, `Error` 47 columns, `GuardianDeity` 12 columns.
-- `ClassJob`, `Race`, `Tribe`는 현재 커버리지 기준 미커버 후보가 0이다.
+- 실행 결과: `.tmp\verify-lobby-route-survey-actionable-r9.log` PASS
+- 현재 산출물 기준 전체 미커버 후보는 13,658 rows, actionable 후보는 596 rows다.
+- actionable 분포: `Lobby` 323 columns, `Addon` 240 columns, `Error` 47 columns.
+- `ClassJob`, `Race`, `Tribe`는 현재 커버리지 기준 미커버 후보가 0이다. `GuardianDeity` 설명문은 긴 설명문으로 분류되어 actionable에서 제외한다.
 
 실제 로비 row를 찾는 절차:
 
