@@ -57,6 +57,20 @@
 4. `Addon`은 전체 시트가 로비 대상이 아니므로 짧은 공통 단어만으로 추가하지 않는다. 시작 메뉴/시스템 설정/설정 공유처럼 ULD나 사용자 제보 문구로 연결되는 row만 후보로 올린다.
 5. 후보 row를 coverage에 넣은 뒤 `lobby-coverage-glyphs`와 `lobby-atlas-capacity`를 같이 돌려 누락 glyph와 atlas 초과를 먼저 확인한다.
 
+## Actionable Capacity 조사
+
+2026-05-16 기준 `lobby-atlas-capacity`는 coverage 확장 후보를 바로 주입하지 않고도 아래 리포트를 추가로 만든다.
+
+- row 묶음: `lobby-actionable-coverage-ranges.tsv`
+- 묶음별/font별 capacity: `lobby-actionable-group-capacity.tsv`
+- 실행 결과: `.tmp\verify-lobby-actionable-capacity-r2.log` PASS
+- 실행 시간: 약 6.8초
+- 현재 산출물 기준 actionable candidate ranges는 225개다.
+- 분포: `character-select-core` 105 ranges, `character-select-world-transfer` 13 ranges, `start-main-menu` 41 ranges, `start-system-settings` 66 ranges.
+- `lobby-actionable-group-capacity.tsv` 기준 `missing_target=0`, `aggregate_failures=0`이다.
+
+해석: 현재 산출물에서 actionable 후보의 한글 codepoint는 이미 routed target font에 존재한다. 따라서 같은 산출물에서 로비 글자가 `-`/`=`로 보인다면, 다음 의심점은 단순 codepoint coverage 부족이 아니라 적용 폴더 불일치, 실제 ULD route가 다른 font를 타는 경우, 또는 이 survey가 아직 못 잡은 sheet/row다. 이 경우 문자를 하나씩 추가하지 말고, 적용 산출물 기준 `lobby-uld-font-routes.tsv`와 actual missing row를 먼저 다시 잡는다.
+
 ## 보고된 누락 문구 위치
 
 - 시작 메뉴: `Lobby#2003`/`Addon#4000` 시스템 설정, `Lobby#2059`/`Addon#2744` 설치 정보, `Lobby#2009`/`Lobby#2052` 뒤로
