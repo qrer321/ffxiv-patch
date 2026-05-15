@@ -48,7 +48,7 @@ namespace FfxivKoreanPatch.PatchRouteVerifier
                 {
                     if (!sourceKerning.ContainsKey(targetKey))
                     {
-                        if (IsAllowedStartScreenAsciiKerningPair(targetFontPath, targetKey))
+                        if (IsAllowedStartScreenAsciiKerningPair(targetFontPath, targetKey, targetKerning[targetKey]))
                         {
                             checkedPairs++;
                             continue;
@@ -65,7 +65,27 @@ namespace FfxivKoreanPatch.PatchRouteVerifier
             private static readonly System.Lazy<HashSet<string>> AllowedStartScreenAsciiKerningPairs =
                 new System.Lazy<HashSet<string>>(CreateAllowedStartScreenAsciiKerningPairs);
 
-            private static bool IsAllowedStartScreenAsciiKerningPair(string targetFontPath, string key)
+            private static bool IsAllowedStartScreenAsciiKerningPair(string targetFontPath, string key, byte[] targetEntry)
+            {
+                uint left;
+                uint right;
+                if (!TryDecodeKerningKey(key, out left, out right))
+                {
+                    return false;
+                }
+
+                int targetAdjustment = targetEntry != null && targetEntry.Length >= FdtKerningEntrySize
+                    ? unchecked((int)Endian.ReadUInt32LE(targetEntry, 12))
+                    : 0;
+                return IsAllowedStartScreenAsciiKerningAdjustment(targetFontPath, left, right, 0, targetAdjustment);
+            }
+
+            private static bool IsAllowedStartScreenAsciiKerningAdjustment(
+                string targetFontPath,
+                uint leftPackedUtf8,
+                uint rightPackedUtf8,
+                int sourceAdjustment,
+                int targetAdjustment)
             {
                 string normalized = (targetFontPath ?? string.Empty).Replace('\\', '/');
                 if (!string.Equals(normalized, "common/font/AXIS_14.fdt", System.StringComparison.OrdinalIgnoreCase) &&
@@ -74,7 +94,28 @@ namespace FfxivKoreanPatch.PatchRouteVerifier
                     return false;
                 }
 
+                if (sourceAdjustment != 0 || targetAdjustment != 1)
+                {
+                    return false;
+                }
+
+                string key = leftPackedUtf8.ToString("X2") + ":" + rightPackedUtf8.ToString("X2");
                 return AllowedStartScreenAsciiKerningPairs.Value.Contains(key);
+            }
+
+            private static bool TryDecodeKerningKey(string key, out uint leftPackedUtf8, out uint rightPackedUtf8)
+            {
+                leftPackedUtf8 = 0;
+                rightPackedUtf8 = 0;
+                if (string.IsNullOrEmpty(key))
+                {
+                    return false;
+                }
+
+                string[] parts = key.Split(':');
+                return parts.Length == 2 &&
+                       uint.TryParse(parts[0], System.Globalization.NumberStyles.HexNumber, null, out leftPackedUtf8) &&
+                       uint.TryParse(parts[1], System.Globalization.NumberStyles.HexNumber, null, out rightPackedUtf8);
             }
 
             private static HashSet<string> CreateAllowedStartScreenAsciiKerningPairs()

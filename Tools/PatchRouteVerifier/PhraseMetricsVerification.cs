@@ -42,7 +42,8 @@ namespace FfxivKoreanPatch.PatchRouteVerifier
                         {
                             int sourceKerning = GetKerningAdjustment(sourceKerningAdjustments, previousCodepoint, codepoint);
                             int targetKerning = GetKerningAdjustment(targetKerningAdjustments, previousCodepoint, codepoint);
-                            if (!KerningAdjustmentMatchesOrLobbySafe(targetFontPath, sourceKerning, targetKerning))
+                            if (!KerningAdjustmentMatchesOrLobbySafe(targetFontPath, sourceKerning, targetKerning) &&
+                                !IsAllowedStartScreenAsciiKerningAdjustment(targetFontPath, PackUtf8(previousCodepoint), PackUtf8(codepoint), sourceKerning, targetKerning))
                             {
                                 Fail(
                                     "{0} phrase [{1}] kerning U+{2:X4}->U+{3:X4} differs from {4}: target={5}, clean={6}",
@@ -104,7 +105,8 @@ namespace FfxivKoreanPatch.PatchRouteVerifier
                     }
 
                     if (targetAdvance != sourceAdvance &&
-                        !AllowsLobbyAsciiSpacingNormalization(targetFontPath, phrase, sourceAdvance, targetAdvance))
+                        !AllowsLobbyAsciiSpacingNormalization(targetFontPath, phrase, sourceAdvance, targetAdvance) &&
+                        !AllowsStartScreenAsciiKerningWidthDelta(targetFontPath, phrase, sourceAdvance, targetAdvance))
                     {
                         Fail(
                             "{0} phrase [{1}] width differs from {2}: target={3}, clean={4}",
@@ -189,6 +191,27 @@ namespace FfxivKoreanPatch.PatchRouteVerifier
                 return IsLobbyFontPath(targetFontPath) &&
                        IsAsciiPhrase(phrase) &&
                        targetWidth >= sourceWidth;
+            }
+
+            private static bool AllowsStartScreenAsciiKerningWidthDelta(string targetFontPath, string phrase, int sourceWidth, int targetWidth)
+            {
+                int expectedDelta = 0;
+                bool hasPrevious = false;
+                uint previous = 0;
+                for (int i = 0; i < phrase.Length; i++)
+                {
+                    uint codepoint = ReadCodepoint(phrase, ref i);
+                    if (hasPrevious &&
+                        IsAllowedStartScreenAsciiKerningAdjustment(targetFontPath, PackUtf8(previous), PackUtf8(codepoint), 0, 1))
+                    {
+                        expectedDelta++;
+                    }
+
+                    previous = codepoint;
+                    hasPrevious = !IsPhraseLayoutSpace(codepoint);
+                }
+
+                return expectedDelta > 0 && targetWidth - sourceWidth == expectedDelta;
             }
 
             private bool TryPhraseGlyphPixelsMatchClean(

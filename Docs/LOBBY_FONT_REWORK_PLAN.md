@@ -96,6 +96,7 @@
 - 2026-05-15 추가된 `lobby-multitexture-font-set` verifier는 거부된 `.tmp\lobby-hangul-expanded-r7-ja` 산출물을 `font_lobby3/4.tex` 참조 불일치로 실패시키고, `.tmp\lobby-clean-ja`는 통과시킨다.
 - 2026-05-15 `.tmp\lobby-multitex-allocated-ja-r2`는 TTMP 한글 alpha를 clean `font_lobby3..6.tex` 빈 영역에 재배치하는 방식으로 `lobby-multitexture-font-set`와 `lobby-hangul-visibility`를 통과했다. `lobby-render-snapshots`의 `_lobby.fdt` route도 통과하지만, non-lobby `AXIS_12/14.fdt` 150/200/300% 후보는 여전히 실패하므로 이 이슈는 닫지 않는다.
 - 2026-05-15 `.tmp\lobby-multitex-kerning-ja-r2`는 위 multi-texture route 위에 시작화면 시스템 설정 문구 기반 kerning을 다시 얹어 `lobby-multitexture-font-set,lobby-hangul-visibility,lobby-render-snapshots,clean-ascii-font-routes,reported-ingame-hangul-phrases,action-detail-scale-layouts,hangul-source-preservation`을 통과했다. `clean-ascii-font-routes`는 `AXIS_14/KrnAXIS_140`의 `0/%` kerning 1쌍만 시작화면 고해상도 UI 옵션 문구에서 자동 수집된 허용 예외로 본다. 사용자 확인 전에는 완료로 닫지 않는다.
+- 2026-05-15 `.tmp\lobby-supplemental-full-ja-r1`는 TTMP payload 목록에 없는 고배율 clean lobby FDT도 supplemental payload로 작성한다. 파생 route는 대응되는 TTMP source FDT에서 한글 alpha를 가져오고, atlas-neighborhood padding을 함께 복사한 뒤 glyph 좌표를 padding 안쪽으로 보정한다. source advance/offset은 그대로 유지한다. 전체 font/text verifier와 인게임 회귀 verifier는 통과했지만, 사용자 확인 전에는 완료로 닫지 않는다.
 - 2026-05-15 로비 ASCII spacing 정규화는 끈다. clean lobby ASCII metric/kerning이 기준이며, 100% 로비 글자 간격을 넓히는 방식은 회귀로 본다.
 - 인게임 폰트 관련 verifier가 회귀하지 않아야 한다.
 

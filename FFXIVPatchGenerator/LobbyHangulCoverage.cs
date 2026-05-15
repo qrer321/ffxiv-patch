@@ -9,9 +9,15 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
             "common/font/AXIS_12_lobby.fdt",
             "common/font/AXIS_14_lobby.fdt",
             "common/font/AXIS_18_lobby.fdt",
+            "common/font/AXIS_36_lobby.fdt",
+            "common/font/Jupiter_46_lobby.fdt",
+            "common/font/Jupiter_90_lobby.fdt",
+            "common/font/Meidinger_40_lobby.fdt",
             "common/font/MiedingerMid_12_lobby.fdt",
             "common/font/MiedingerMid_14_lobby.fdt",
-            "common/font/MiedingerMid_18_lobby.fdt"
+            "common/font/MiedingerMid_18_lobby.fdt",
+            "common/font/MiedingerMid_36_lobby.fdt",
+            "common/font/TrumpGothic_68_lobby.fdt"
         };
 
         public static readonly LobbyHangulCoverageRowSpec[] Rows = new LobbyHangulCoverageRowSpec[]
