@@ -94,6 +94,7 @@
 - clean에 존재하던 lobby texture는 패치 후 width/height가 커지면 실패로 처리한다. overflow는 texture resize가 아니라 page 수/폰트 세트 문제로 해결한다.
 - source-cell 복사 방식 검증은 폐기하고, multi-texture font set route 검증을 사용한다.
 - 2026-05-15 추가된 `lobby-multitexture-font-set` verifier는 거부된 `.tmp\lobby-hangul-expanded-r7-ja` 산출물을 `font_lobby3/4.tex` 참조 불일치로 실패시키고, `.tmp\lobby-clean-ja`는 통과시킨다.
+- 2026-05-15 `.tmp\lobby-multitex-allocated-ja-r2`는 TTMP 한글 alpha를 clean `font_lobby3..6.tex` 빈 영역에 재배치하는 방식으로 `lobby-multitexture-font-set`와 `lobby-hangul-visibility`를 통과했다. `lobby-render-snapshots`의 `_lobby.fdt` route도 통과하지만, non-lobby `AXIS_12/14.fdt` 150/200/300% 후보는 여전히 실패하므로 이 이슈는 닫지 않는다.
 - 인게임 폰트 관련 verifier가 회귀하지 않아야 한다.
 
 ## 다음 작업 순서
