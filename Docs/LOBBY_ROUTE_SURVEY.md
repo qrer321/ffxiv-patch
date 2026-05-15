@@ -73,16 +73,18 @@
 
 ## Applied Lobby Route 비교
 
-2026-05-16 기준 `applied-lobby-routes` 검증을 추가했다. `--applied-game <game dir>`를 넘기면 generated output과 실제 설치 폴더를 로비 route/payload 단위로 비교한다.
+2026-05-16 기준 `applied-lobby-routes` 검증을 추가했다. `--applied-game <game dir>`를 넘기면 generated output과 실제 설치 폴더를 로비 route/payload 단위로 비교한다. 이 검증은 설치 폴더가 최신 산출물을 실제로 읽는지 확인하는 적용 상태 검증이며, 이미 잘못된 패치가 들어간 클라이언트를 원본/정답 baseline으로 취급하지 않는다.
 
 - route 비교: `applied-lobby-route-comparison.tsv`
 - payload 비교: `applied-lobby-payload-comparison.tsv`
 - `--applied-game`이 없으면 skip한다.
-- D 드라이브 글로벌 클라이언트 기준 실행 결과: `.tmp\verify-applied-lobby-routes-dgame-r2.log` FAIL
+- 이미 패치가 적용된 D 드라이브 클라이언트 기준 실행 결과: `.tmp\verify-applied-lobby-routes-dgame-r2.log` FAIL
 - 해당 실행에서 ULD route는 일치했다: `route_match=yes` 422 rows, `n/a` 31 rows, route mismatch 0.
-- 실패 원인은 payload 불일치다: routed font 14개, required font 49개, font texture 11개, optional UI 25개가 generated output과 달랐다.
+- 실패 원인은 payload 불일치다: routed font 14개, required font 49개, font texture 11개, optional UI 25개가 generated output과 달랐다. 이는 D 클라이언트가 원본이 아니라 현재 설치된 패치 상태라는 뜻으로 해석해야 한다.
 
-해석: 로비 glyph가 산출물 verifier에서는 보이는데 실제 클라이언트에서 `-`/`=`로 보이면, 먼저 `applied-lobby-routes`를 적용 폴더에 대해 돌린다. route mismatch가 없고 payload mismatch만 있으면 코드를 더 고치기 전에 설치 폴더가 최신 산출물과 같은 FDT/TEX를 실제로 읽고 있는지부터 잡는다.
+해석: 로비 glyph가 산출물 verifier에서는 보이는데 실제 클라이언트에서 `-`/`=`로 보이면, 먼저 `applied-lobby-routes`를 적용 폴더에 대해 돌린다. route mismatch가 없고 payload mismatch만 있으면 그 결과는 “설치 폴더가 이번 generated output과 다르다”까지만 의미한다. 원인 분석용 clean baseline은 `.tmp\clean-global-full-input-game` 같은 원본 snapshot을 사용해야 하며, 이미 잘못된 패치가 들어간 게임 폴더를 `--global-ui` baseline으로 쓰지 않는다.
+
+주의: 2026-05-16 확인 기준 `.tmp\clean-global-full-input-game`의 UI sqpack은 `060000.win32.dat4`만 있고 `dat0`~`dat3`이 없다. 따라서 현 상태의 clean snapshot은 text/font 검증에는 사용할 수 있어도, 로비 ULD를 읽는 완전한 clean UI baseline으로는 부족하다. `--global-ui` clean 기준 검증을 하려면 원본 UI dat shard를 먼저 확보해야 한다.
 
 ## 보고된 누락 문구 위치
 
