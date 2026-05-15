@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using FfxivKoreanPatch.FFXIVPatchGenerator;
 
 namespace FfxivKoreanPatch.PatchRouteVerifier
 {
@@ -47,12 +48,58 @@ namespace FfxivKoreanPatch.PatchRouteVerifier
                 {
                     if (!sourceKerning.ContainsKey(targetKey))
                     {
+                        if (IsAllowedStartScreenAsciiKerningPair(targetFontPath, targetKey))
+                        {
+                            checkedPairs++;
+                            continue;
+                        }
+
                         Fail("{0} has extra ASCII kerning pair {1} not present in {2}", targetFontPath, targetKey, sourceFontPath);
                         ok = false;
                     }
                 }
 
                 return checkedPairs;
+            }
+
+            private static readonly System.Lazy<HashSet<string>> AllowedStartScreenAsciiKerningPairs =
+                new System.Lazy<HashSet<string>>(CreateAllowedStartScreenAsciiKerningPairs);
+
+            private static bool IsAllowedStartScreenAsciiKerningPair(string targetFontPath, string key)
+            {
+                string normalized = (targetFontPath ?? string.Empty).Replace('\\', '/');
+                if (!string.Equals(normalized, "common/font/AXIS_14.fdt", System.StringComparison.OrdinalIgnoreCase) &&
+                    !string.Equals(normalized, "common/font/KrnAXIS_140.fdt", System.StringComparison.OrdinalIgnoreCase))
+                {
+                    return false;
+                }
+
+                return AllowedStartScreenAsciiKerningPairs.Value.Contains(key);
+            }
+
+            private static HashSet<string> CreateAllowedStartScreenAsciiKerningPairs()
+            {
+                HashSet<string> pairs = new HashSet<string>(System.StringComparer.Ordinal);
+                string[] phrases = LobbyScaledHangulPhrases.HighResolutionUiScaleOptions;
+                for (int phraseIndex = 0; phraseIndex < phrases.Length; phraseIndex++)
+                {
+                    string phrase = phrases[phraseIndex] ?? string.Empty;
+                    uint previous = 0;
+                    bool hasPrevious = false;
+                    for (int i = 0; i < phrase.Length; i++)
+                    {
+                        uint codepoint = ReadCodepoint(phrase, ref i);
+                        if (hasPrevious && previous >= '0' && previous <= '9' && codepoint == '%')
+                        {
+                            pairs.Add(PackUtf8(previous).ToString("X2") + ":" + PackUtf8(codepoint).ToString("X2"));
+                        }
+
+                        previous = codepoint;
+                        hasPrevious = !IsPhraseLayoutSpace(codepoint);
+                    }
+                }
+
+                return pairs;
             }
         }
     }

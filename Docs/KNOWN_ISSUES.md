@@ -302,6 +302,7 @@
 
 - 2026-05-15 lobby atlas correction rejected: allocating required Hangul into the existing lobby atlas and then expanding affected clean lobby textures to fit TTMP source coordinates failed live-client review and made the 로비 150%+ glyph/blur/spacing issue worse. `lobby-hangul-source-cells` passing was a false success criterion for the wrong architecture. Do not use source-cell grafting or texture expansion as the next fix path.
 - 2026-05-15 new lobby font direction: treat overflow as a complete font-set/page-count problem. A valid 로비 fix must keep `*_lobby.fdt` glyph `image_index` values consistent with actual `font_lobby1..N.tex` pages, keep glyph rectangles inside texture bounds, and reject any patched lobby texture width/height expansion. Follow `Docs/LOBBY_FONT_REWORK_PLAN.md` before editing 로비 font code.
+- 2026-05-15 multi-texture + kerning follow-up: `.tmp\lobby-multitex-kerning-ja-r2` keeps clean lobby ASCII metric/kerning as baseline, allocates TTMP Hangul alpha into valid `font_lobby3..6.tex` pages, and adds only start-screen system-settings kerning pairs collected from the high-resolution/result-message phrase lists. `clean-ascii-font-routes` allows the generated `AXIS_14/KrnAXIS_140` `0/%` pair as a start-screen exception, while other ASCII glyph/kerning routes must still match clean. Focused verifiers pass, but the 로비 150%+ issue remains open until user confirmation.
 
 ## 작업 시 주의 사항
 
