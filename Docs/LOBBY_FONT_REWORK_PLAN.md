@@ -99,6 +99,8 @@
 - 2026-05-15 `.tmp\lobby-supplemental-full-ja-r1`는 TTMP payload 목록에 없는 고배율 clean lobby FDT도 supplemental payload로 작성한다. 파생 route는 대응되는 TTMP source FDT에서 한글 alpha를 가져오고, atlas-neighborhood padding을 함께 복사한 뒤 glyph 좌표를 padding 안쪽으로 보정한다. source advance/offset은 그대로 유지한다. 전체 font/text verifier와 인게임 회귀 verifier는 통과했지만, 사용자 확인 전에는 완료로 닫지 않는다.
 - 2026-05-15 `.tmp\lobby-kerning-axis12-split-ja-r1`는 verifier baseline을 text/font/ui로 분리한 뒤 `start-system-settings-uld`를 통과했다. AXIS_12_lobby는 1px kerning으로도 일부 12px 한글 pair가 겹쳐 2px를 사용하고, AXIS_14_lobby/AXIS_18_lobby는 1px를 유지한다. 검증기는 clean ASCII 보존과 허용된 시스템 설정 kerning만 source width 보정에 반영한다.
 - 2026-05-15 로비 ASCII spacing 정규화는 끈다. clean lobby ASCII metric/kerning이 기준이며, 100% 로비 글자 간격을 넓히는 방식은 회귀로 본다.
+- 2026-05-15 `.tmp\lobby-axis12-full-ja-r2` 검증부터 output에 UI index가 없으면 verifier가 split baseline의 UI index를 읽는다. `--skip-ui-texture-fix` 산출물도 text/font/ui 기준을 분리해 검증할 수 있어야 한다.
+- 2026-05-15 `4k-lobby-font-derivations`는 로비 Latin/숫자를 non-lobby source와 비교하지 않는다. 로비 Latin/숫자는 clean lobby 보존이 기준이고 `clean-ascii-font-routes,numeric-glyphs`가 검증한다. 4K derivation check는 한글 glyph가 대응되는 큰 source glyph를 쓰는지만 검증한다.
 - 인게임 폰트 관련 verifier가 회귀하지 않아야 한다.
 
 ## 다음 작업 순서

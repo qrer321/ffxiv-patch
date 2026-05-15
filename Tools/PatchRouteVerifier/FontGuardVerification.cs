@@ -20,11 +20,6 @@ namespace FfxivKoreanPatch.PatchRouteVerifier
                     string targetFontPath = Derived4kLobbyFontPairs[i, 0];
                     string sourceFontPath = Derived4kLobbyFontPairs[i, 1];
 
-                    for (int latinIndex = 0; latinIndex < FourKLobbyLatinCodepoints.Length; latinIndex++)
-                    {
-                        ExpectGlyphEqualIfSourceExists(_patchedFont, sourceFontPath, FourKLobbyLatinCodepoints[latinIndex], _patchedFont, targetFontPath, FourKLobbyLatinCodepoints[latinIndex]);
-                    }
-
                     byte[] sourceFdt;
                     try
                     {

@@ -21,24 +21,41 @@ namespace FfxivKoreanPatch.PatchRouteVerifier
 
             public CompositeArchive(string indexPath, string datDir, string fallbackDatDir, string datPrefix)
             {
-                if (!File.Exists(indexPath))
+                string resolvedIndexPath = ResolveExistingIndexPath(indexPath, fallbackDatDir, datPrefix);
+                if (resolvedIndexPath == null)
                 {
                     throw new FileNotFoundException("index file was not found", indexPath);
                 }
 
-                _index = new SqPackIndexFile(indexPath);
+                _index = new SqPackIndexFile(resolvedIndexPath);
                 _datDir = datDir;
                 _fallbackDatDir = fallbackDatDir;
                 _datPrefix = datPrefix;
-                CacheKey = Path.GetFullPath(indexPath);
+                CacheKey = Path.GetFullPath(resolvedIndexPath);
 
-                string baselineIndexPath = ResolveBaselineIndexPath(indexPath);
+                string baselineIndexPath = ResolveBaselineIndexPath(resolvedIndexPath);
                 if (baselineIndexPath != null)
                 {
                     _baselineIndex = new SqPackIndexFile(baselineIndexPath);
                 }
 
                 BuildPrimaryEntryMap();
+            }
+
+            private static string ResolveExistingIndexPath(string indexPath, string fallbackDatDir, string datPrefix)
+            {
+                if (File.Exists(indexPath))
+                {
+                    return indexPath;
+                }
+
+                if (string.IsNullOrWhiteSpace(fallbackDatDir))
+                {
+                    return null;
+                }
+
+                string fallbackIndexPath = Path.Combine(fallbackDatDir, datPrefix + ".index");
+                return File.Exists(fallbackIndexPath) ? fallbackIndexPath : null;
             }
 
             public byte[] ReadFile(string gamePath)

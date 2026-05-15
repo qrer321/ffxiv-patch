@@ -4,8 +4,6 @@ namespace FfxivKoreanPatch.PatchRouteVerifier
     {
         private sealed partial class Verifier
         {
-            private static readonly uint[] FourKLobbyLatinCodepoints = new uint[] { 'A', 'a', '0', '1' };
-
             private static readonly string[] NumericGlyphSameFontChecks = new string[]
             {
                 "common/font/AXIS_12.fdt",
