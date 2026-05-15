@@ -23,6 +23,11 @@ namespace FfxivKoreanPatch.PatchRouteVerifier
                 for (int i = 0; i < DialoguePhraseFontPaths.Length; i++)
                 {
                     string targetFontPath = DialoguePhraseFontPaths[i];
+                    if (IsCombatFlyTextSourceFontPath(targetFontPath))
+                    {
+                        continue;
+                    }
+
                     if (checkedTargets.Add(targetFontPath))
                     {
                         VerifyCleanAsciiFontRoute(ResolveCleanAsciiReferenceFontPath(targetFontPath), targetFontPath);

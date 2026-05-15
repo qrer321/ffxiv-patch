@@ -641,7 +641,18 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
 
             return TryAllocateFromCandidateTextures(
                 glyphRepair,
-                new string[] { preferredTexturePath, sourceTexturePath, Font1TexturePath, Font2TexturePath },
+                new string[]
+                {
+                    preferredTexturePath,
+                    sourceTexturePath,
+                    Font1TexturePath,
+                    Font2TexturePath,
+                    Font3TexturePath,
+                    Font4TexturePath,
+                    Font5TexturePath,
+                    Font6TexturePath,
+                    Font7TexturePath
+                },
                 width,
                 height,
                 out allocatedTexturePath,
@@ -732,6 +743,33 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
             return false;
         }
 
+        private static bool PatchFitsAllocatedFontTexture(
+            FontGlyphRepairContext glyphRepair,
+            string texturePath,
+            int x,
+            int y,
+            int width,
+            int height)
+        {
+            if (glyphRepair == null || string.IsNullOrEmpty(texturePath))
+            {
+                return false;
+            }
+
+            FontAtlasAllocator allocator;
+            if (!glyphRepair.TryGetAllocator(texturePath, out allocator))
+            {
+                return false;
+            }
+
+            return x >= 0 &&
+                   y >= 0 &&
+                   width >= 0 &&
+                   height >= 0 &&
+                   x + width <= allocator.Width &&
+                   y + height <= allocator.Height;
+        }
+
         private static bool TryAllocateProtectedPuaGlyphCell(
             FontGlyphRepairContext glyphRepair,
             string fdtPath,
@@ -764,7 +802,12 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
                 {
                     preferredTexturePath,
                     Font1TexturePath,
-                    Font2TexturePath
+                    Font2TexturePath,
+                    Font3TexturePath,
+                    Font4TexturePath,
+                    Font5TexturePath,
+                    Font6TexturePath,
+                    Font7TexturePath
                 };
             }
 
@@ -2118,12 +2161,17 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
 
                 AllocatedFontGlyphCell allocatedCell = new AllocatedFontGlyphCell();
                 string allocatedTexturePath = targetTexturePath;
-                bool useAllocatedCell;
-                if (hasTargetEntry)
-                {
-                    useAllocatedCell = glyphRepair.TryAllocate(targetTexturePath, sourceEntry.Width, sourceEntry.Height, out allocatedCell);
-                }
-                else
+                bool useAllocatedCell = false;
+                bool canReuseTargetCell =
+                    hasTargetEntry &&
+                    PatchFitsAllocatedFontTexture(
+                        glyphRepair,
+                        targetTexturePath,
+                        targetEntry.X,
+                        targetEntry.Y,
+                        sourceEntry.Width,
+                        sourceEntry.Height);
+                if (!canReuseTargetCell)
                 {
                     useAllocatedCell = TryAllocateProtectedPuaGlyphCell(
                         glyphRepair,
@@ -2135,21 +2183,39 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
                         out allocatedCell);
                 }
 
-                if (!hasTargetEntry && !useAllocatedCell)
+                if (!canReuseTargetCell && !useAllocatedCell)
+                {
+                    continue;
+                }
+
+                int patchTargetX = useAllocatedCell ? allocatedCell.X : targetEntry.X;
+                int patchTargetY = useAllocatedCell ? allocatedCell.Y : targetEntry.Y;
+                int patchClearWidth = sourceEntry.Width;
+                int patchClearHeight = sourceEntry.Height;
+                string patchTexturePath = useAllocatedCell ? allocatedTexturePath : targetTexturePath;
+                if (!PatchFitsAllocatedFontTexture(
+                    glyphRepair,
+                    patchTexturePath,
+                    patchTargetX,
+                    patchTargetY,
+                    Math.Max(patchClearWidth, sourceEntry.Width),
+                    Math.Max(patchClearHeight, sourceEntry.Height)))
                 {
                     continue;
                 }
 
                 FontTexturePatch patch = new FontTexturePatch();
-                patch.TargetX = useAllocatedCell ? allocatedCell.X : targetEntry.X;
-                patch.TargetY = useAllocatedCell ? allocatedCell.Y : targetEntry.Y;
+                patch.TargetX = patchTargetX;
+                patch.TargetY = patchTargetY;
                 patch.TargetChannel = useAllocatedCell ? allocatedCell.Channel : targetEntry.ImageIndex % 4;
-                patch.ClearWidth = hasTargetEntry ? Math.Max(targetEntry.Width, sourceEntry.Width) : sourceEntry.Width;
-                patch.ClearHeight = hasTargetEntry ? Math.Max(targetEntry.Height, sourceEntry.Height) : sourceEntry.Height;
+                patch.ClearWidth = patchClearWidth;
+                patch.ClearHeight = patchClearHeight;
                 patch.SourceWidth = sourceEntry.Width;
                 patch.SourceHeight = sourceEntry.Height;
                 patch.SourceAlpha = ExtractFontTextureAlpha(sourceTexture, sourceEntry);
-                AddTexturePatch(texturePatches, allocatedTexturePath, patch);
+                patch.SourceFdtPath = sourceFdtPath;
+                patch.SourceCodepoint = codepoint;
+                AddTexturePatch(texturePatches, patchTexturePath, patch);
 
                 byte[] replacementEntry = new byte[FdtGlyphEntrySize];
                 Buffer.BlockCopy(sourceEntryBytes, 0, replacementEntry, 0, FdtGlyphEntrySize);
@@ -2343,13 +2409,31 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
                     continue;
                 }
 
+                CleanAsciiTextureRegion effectivePatchRegion = useAllocatedCell ? allocationRegion : sourceRegion;
+                int effectiveTargetX = useAllocatedCell ? allocatedCell.X : targetEntry.X - effectivePatchRegion.LeftPadding;
+                int effectiveTargetY = useAllocatedCell ? allocatedCell.Y : targetEntry.Y - effectivePatchRegion.TopPadding;
+                int effectiveClearWidth = useAllocatedCell ? effectivePatchRegion.Width : Math.Max(targetEntry.Width, effectivePatchRegion.Width);
+                int effectiveClearHeight = useAllocatedCell ? effectivePatchRegion.Height : Math.Max(targetEntry.Height, effectivePatchRegion.Height);
+                string effectiveTexturePath = useAllocatedCell ? allocatedTexturePath : targetTexturePath;
+                if (effectivePatchRegion.IsValid &&
+                    !PatchFitsAllocatedFontTexture(
+                        glyphRepair,
+                        effectiveTexturePath,
+                        effectiveTargetX,
+                        effectiveTargetY,
+                        Math.Max(effectiveClearWidth, effectivePatchRegion.Width),
+                        Math.Max(effectiveClearHeight, effectivePatchRegion.Height)))
+                {
+                    continue;
+                }
+
                 if (!ShouldIncludeFontPath(targetTexturePath))
                 {
                     // Diagnostic profiles can exclude a texture while still
                     // patching FDTs that point to it. Move ASCII/numeric glyphs
                     // to an included clean cell when possible so the excluded
                     // atlas remains untouched.
-                    CleanAsciiTextureRegion patchRegion = useAllocatedCell ? allocationRegion : sourceRegion;
+                    CleanAsciiTextureRegion patchRegion = effectivePatchRegion;
                     if (ShouldIncludeFontPath(sourceTexturePath) && patchRegion.IsValid)
                     {
                         FontTexturePatch patch = CreateCleanAsciiTexturePatch(
@@ -2378,14 +2462,14 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
 
                 if (sourceRegion.IsValid)
                 {
-                    CleanAsciiTextureRegion patchRegion = useAllocatedCell ? allocationRegion : sourceRegion;
+                    CleanAsciiTextureRegion patchRegion = effectivePatchRegion;
                     FontTexturePatch patch = CreateCleanAsciiTexturePatch(
-                        useAllocatedCell ? allocatedCell.X : targetEntry.X - patchRegion.LeftPadding,
-                        useAllocatedCell ? allocatedCell.Y : targetEntry.Y - patchRegion.TopPadding,
+                        effectiveTargetX,
+                        effectiveTargetY,
                         useAllocatedCell ? allocatedCell.Channel : targetEntry.ImageIndex % 4,
                         patchRegion,
-                        useAllocatedCell ? patchRegion.Width : Math.Max(targetEntry.Width, patchRegion.Width),
-                        useAllocatedCell ? patchRegion.Height : Math.Max(targetEntry.Height, patchRegion.Height),
+                        effectiveClearWidth,
+                        effectiveClearHeight,
                         sourceFdtPath,
                         (uint)codepoint);
                     AddTexturePatch(texturePatches, useAllocatedCell ? allocatedTexturePath : targetTexturePath, patch);
@@ -2952,12 +3036,26 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
                 return false;
             }
 
+            if (ShouldPreserveTtmpCombatFlyTextGlyphs(normalized))
+            {
+                return false;
+            }
+
             return ShouldRepairCleanDigitsOnlyFont(normalized) ||
                    ShouldRepairCleanFullAsciiAxisFont(normalized) ||
                    normalized.IndexOf("/jupiter_", StringComparison.OrdinalIgnoreCase) >= 0 ||
                    normalized.IndexOf("/miedingermid_", StringComparison.OrdinalIgnoreCase) >= 0 ||
                    normalized.IndexOf("/meidinger_", StringComparison.OrdinalIgnoreCase) >= 0 ||
                    normalized.IndexOf("/trumpgothic_", StringComparison.OrdinalIgnoreCase) >= 0;
+        }
+
+        private static bool ShouldPreserveTtmpCombatFlyTextGlyphs(string path)
+        {
+            string normalized = NormalizeGamePath(path);
+            return string.Equals(normalized, "common/font/TrumpGothic_23.fdt", StringComparison.OrdinalIgnoreCase) ||
+                   string.Equals(normalized, "common/font/TrumpGothic_34.fdt", StringComparison.OrdinalIgnoreCase) ||
+                   string.Equals(normalized, "common/font/TrumpGothic_68.fdt", StringComparison.OrdinalIgnoreCase) ||
+                   string.Equals(normalized, "common/font/TrumpGothic_184.fdt", StringComparison.OrdinalIgnoreCase);
         }
 
         private static bool ShouldRepairCleanDigitsOnlyFont(string path)
@@ -4717,30 +4815,41 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
                 return rawTexture;
             }
 
-            if (IsLobbyFontTexturePath(texturePath))
+            throw new InvalidOperationException(
+                "Font texture patch would resize " + NormalizeGamePath(texturePath) +
+                " from " + texture.Width.ToString() + "x" + texture.Height.ToString() +
+                " to at least " + requiredWidth.ToString() + "x" + requiredHeight.ToString() +
+                ". Offender: " + DescribeFirstOutOfBoundsTexturePatch(texture, patches) +
+                ". Treat this as a missing texture page route, not an atlas expansion.");
+        }
+
+        private static string DescribeFirstOutOfBoundsTexturePatch(FontTexture texture, List<FontTexturePatch> patches)
+        {
+            if (patches == null)
             {
-                throw new InvalidOperationException(
-                    "Lobby font texture patch would resize " + NormalizeGamePath(texturePath) +
-                    " from " + texture.Width.ToString() + "x" + texture.Height.ToString() +
-                    " to at least " + requiredWidth.ToString() + "x" + requiredHeight.ToString() +
-                    ". Treat this as a missing multi-texture lobby font set, not an atlas expansion.");
+                return "none";
             }
 
-            int expandedWidth = NextPowerOfTwo(requiredWidth);
-            int expandedHeight = NextPowerOfTwo(requiredHeight);
-            byte[] expanded = new byte[checked(texture.DataOffset + expandedWidth * expandedHeight * 2)];
-            Buffer.BlockCopy(rawTexture, 0, expanded, 0, texture.DataOffset);
-            Endian.WriteUInt16LE(expanded, 8, checked((ushort)expandedWidth));
-            Endian.WriteUInt16LE(expanded, 10, checked((ushort)expandedHeight));
-
-            for (int y = 0; y < texture.Height; y++)
+            for (int i = 0; i < patches.Count; i++)
             {
-                int sourceOffset = texture.DataOffset + y * texture.Width * 2;
-                int targetOffset = texture.DataOffset + y * expandedWidth * 2;
-                Buffer.BlockCopy(rawTexture, sourceOffset, expanded, targetOffset, texture.Width * 2);
+                FontTexturePatch patch = patches[i];
+                int width = Math.Max(patch.ClearWidth, patch.SourceWidth);
+                int height = Math.Max(patch.ClearHeight, patch.SourceHeight);
+                if (patch.TargetX < 0 ||
+                    patch.TargetY < 0 ||
+                    patch.TargetX + width > texture.Width ||
+                    patch.TargetY + height > texture.Height)
+                {
+                    return "index=" + i.ToString() +
+                           ", source=" + (patch.SourceFdtPath == null ? "(unknown)" : NormalizeGamePath(patch.SourceFdtPath)) +
+                           ", codepoint=U+" + patch.SourceCodepoint.ToString("X4") +
+                           ", xy=" + patch.TargetX.ToString() + "," + patch.TargetY.ToString() +
+                           ", clear=" + patch.ClearWidth.ToString() + "x" + patch.ClearHeight.ToString() +
+                           ", sourceSize=" + patch.SourceWidth.ToString() + "x" + patch.SourceHeight.ToString();
+                }
             }
 
-            return expanded;
+            return "not found";
         }
 
         private static int NextPowerOfTwo(int value)
@@ -5406,6 +5515,16 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
         {
             private readonly FontTexture _texture;
             private readonly bool[][] _occupied;
+
+            public int Width
+            {
+                get { return _texture.Width; }
+            }
+
+            public int Height
+            {
+                get { return _texture.Height; }
+            }
 
             public FontAtlasAllocator(byte[] rawTexture)
             {

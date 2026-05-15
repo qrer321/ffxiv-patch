@@ -119,6 +119,15 @@ namespace FfxivKoreanPatch.PatchRouteVerifier
             "common/font/TrumpGothic_184.fdt"
         };
 
+        private static bool IsCombatFlyTextSourceFontPath(string fontPath)
+        {
+            string normalized = (fontPath ?? string.Empty).Replace('\\', '/');
+            return string.Equals(normalized, "common/font/TrumpGothic_23.fdt", System.StringComparison.OrdinalIgnoreCase) ||
+                   string.Equals(normalized, "common/font/TrumpGothic_34.fdt", System.StringComparison.OrdinalIgnoreCase) ||
+                   string.Equals(normalized, "common/font/TrumpGothic_68.fdt", System.StringComparison.OrdinalIgnoreCase) ||
+                   string.Equals(normalized, "common/font/TrumpGothic_184.fdt", System.StringComparison.OrdinalIgnoreCase);
+        }
+
         private struct UldRouteCandidate
         {
             public readonly string Path;

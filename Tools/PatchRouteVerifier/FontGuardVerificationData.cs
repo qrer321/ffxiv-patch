@@ -46,7 +46,11 @@ namespace FfxivKoreanPatch.PatchRouteVerifier
                 "common/font/TrumpGothic_184_lobby.fdt"
             };
 
-            private static readonly uint[] NumericGlyphCodepoints = new uint[] { '0', '1', '2', '9' };
+            private static readonly uint[] NumericGlyphCodepoints = new uint[]
+            {
+                '0', '1', '2', '3', '4', '5', '6', '7', '8', '9',
+                '!', '+', '-', '.', ',', '%'
+            };
 
             private static readonly string[,] NumericGlyphKoreanFontChecks = new string[,]
             {

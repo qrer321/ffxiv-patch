@@ -124,6 +124,21 @@
   - 처리: `호` 같은 특정 글자를 보호 배열에 넣지 않고, 보고 문구 목록에서 Hangul codepoint를 자동 수집해 `hangul-source-preservation`으로 TTMP 원본 대비 glyph source를 검증한다. 추가로 `reported-ingame-hangul-phrases`가 문장 전체 pixel/layout/metrics를 TTMP 원본과 비교한다.
   - 검증 결과: `.tmp\verifier-ja-reported-ingame-phrases.log`와 `.tmp\verifier-ja-regression-with-reported-phrases.log` PASS.
 
+- [ ] In-game combat flytext: critical/direct-hit font regression
+  - Reported: critical or direct-hit combat text can render with broken font glyphs after recent font work.
+  - Investigation: in-game `font1.tex` through `font7.tex` already exist and can be referenced by FDT image indexes, but regular in-game clean ASCII repair was still mostly writing to `font1/font2`. More importantly, non-lobby `TrumpGothic_23/34/68/184.fdt` combat candidates were receiving clean global ASCII/symbol replacement, which changed TTMP combat phrases such as direct-hit/critical punctuation routes.
+  - Current code direction: preserve TTMP source glyphs for non-lobby `TrumpGothic_23/34/68/184.fdt`; keep lobby `*_lobby.fdt` clean ASCII behavior separate.
+  - Verification added: `reported-ingame-hangul-phrases` now includes direct-hit/critical-style phrases with `!`; `numeric-glyphs` skips missing source glyphs and no longer treats combat flytext fonts as clean-ASCII targets.
+  - 2026-05-15 check: `.tmp\combat-flytext-ja-r1` passes `reported-ingame-hangul-phrases`, `numeric-glyphs,clean-ascii-font-routes`, and `action-detail-scale-layouts`. This is not user-confirmed fixed.
+
+- [ ] In-game font blur/halo after font patching
+  - Reported: in-game Korean text looks slightly blurred, like a faint 1px larger alpha layer is present behind the intended glyph.
+  - Found cause candidate: previous font repair could let in-game textures such as `font1.tex` through `font7.tex` and `font_krn_1.tex` grow from `4096x4096` to `4096x8192` when a patch wrote past the existing atlas. This is rejected for both lobby and in-game fonts.
+  - Code direction: font texture resize is now a hard failure for every font texture. Patches must fit an existing atlas page or allocate another existing page (`font1.tex` through `font7.tex`, or `font_krn_1.tex` for KrnAXIS); they must not expand an atlas.
+  - Party-list PUA clean-shape repair now reuses the existing clean-sized cell when it fits, allocates to an existing page only when needed, and writes only the source glyph dimensions so boundary cells do not force texture growth.
+  - Verification added: `ingame-ttmp-texture-neighborhoods` compares in-game TTMP texture dimensions and 2px Hangul glyph neighborhoods against TTMP source, excluding the intentional ActionDetail high-scale route.
+  - 2026-05-16 code check: `.tmp\ingame-noexpand-ja-r6` passes `ingame-ttmp-texture-neighborhoods`, `party-list-self-marker`, `reported-ingame-hangul-phrases`, `numeric-glyphs`, `clean-ascii-font-routes`, `action-detail-scale-layouts`, and `protected-hangul-glyphs`. This is not user-confirmed fixed.
+
 - [ ] Occult Crescent: 메인은 `PHANTOM KNIGHT` / `Ph. Knight`, 서브는 `서포트 나이트`
   - 검증 보강: `MkdSupportJob` playable row 전체의 메인 full/short column과 support 설명 column을 확인한다.
   - 수정 방향: 특정 Knight만 예외 처리하지 않고, column 역할 기준으로 매핑한다.
@@ -165,6 +180,7 @@
 
 ## Verification Rule
 
+- 2026-05-16: `lobby-coverage-glyphs` verifies every Hangul codepoint collected from the current route-scoped lobby coverage sheets against every routed lobby font, and fails if the glyph is missing or renders with zero visible pixels. This guards against `-`/`=` fallback beyond representative render snapshots without reintroducing broad all-row atlas injection.
 - 재보고된 항목은 먼저 verifier가 실패하도록 만든다.
 - verifier가 pass인데 사용자가 다시 실패를 보고하면 해당 검증이 불완전한 것으로 간주한다.
 - 특정 row/codepoint만 임시로 덮지 않고, 가능한 경우 sheet column 역할, ULD route,

@@ -84,6 +84,7 @@
     <Compile Include="GlyphTextureNeighborhoodVerification.cs" />
     <Compile Include="GlyphVisibilityAssertions.cs" />
     <Compile Include="HangulSourcePreservationVerification.cs" />
+    <Compile Include="InGameTextureNeighborhoodVerification.cs" />
     <Compile Include="KoreanLobbyFontSourceVerification.cs" />
     <Compile Include="LobbyGlyphDiagnosticComparison.cs" />
     <Compile Include="LobbyGlyphDiagnosticReference.cs" />

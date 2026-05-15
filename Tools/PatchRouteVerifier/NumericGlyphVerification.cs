@@ -12,10 +12,15 @@ namespace FfxivKoreanPatch.PatchRouteVerifier
                 for (int f = 0; f < NumericGlyphSameFontChecks.Length; f++)
                 {
                     string targetFontPath = NumericGlyphSameFontChecks[f];
+                    if (IsCombatFlyTextSourceFontPath(targetFontPath))
+                    {
+                        continue;
+                    }
+
                     string sourceFontPath = ResolveCleanAsciiReferenceFontPath(targetFontPath);
                     for (int c = 0; c < NumericGlyphCodepoints.Length; c++)
                     {
-                        ExpectGlyphEqual(_cleanFont, sourceFontPath, NumericGlyphCodepoints[c], _patchedFont, targetFontPath, NumericGlyphCodepoints[c]);
+                        ExpectGlyphEqualIfSourceExists(_cleanFont, sourceFontPath, NumericGlyphCodepoints[c], _patchedFont, targetFontPath, NumericGlyphCodepoints[c]);
                     }
                 }
 
@@ -23,7 +28,7 @@ namespace FfxivKoreanPatch.PatchRouteVerifier
                 {
                     for (int c = 0; c < NumericGlyphCodepoints.Length; c++)
                     {
-                        ExpectGlyphEqual(_cleanFont, NumericGlyphKoreanFontChecks[f, 0], NumericGlyphCodepoints[c], _patchedFont, NumericGlyphKoreanFontChecks[f, 1], NumericGlyphCodepoints[c]);
+                        ExpectGlyphEqualIfSourceExists(_cleanFont, NumericGlyphKoreanFontChecks[f, 0], NumericGlyphCodepoints[c], _patchedFont, NumericGlyphKoreanFontChecks[f, 1], NumericGlyphCodepoints[c]);
                     }
                 }
             }

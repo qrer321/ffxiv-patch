@@ -11,6 +11,7 @@ namespace FfxivKoreanPatch.PatchRouteVerifier
         private sealed partial class Verifier
         {
             private const int LobbyAtlasPadding = 4;
+            private const int MaxLobbyCoverageGlyphFailures = 80;
 
             private static readonly string[] LobbyAtlasTexturePaths = new string[]
             {
@@ -41,6 +42,112 @@ namespace FfxivKoreanPatch.PatchRouteVerifier
                     stats.MissingTargetGlyphs,
                     stats.SourceCoveredGlyphs,
                     stats.AggregateAllocationFailures);
+            }
+
+            private void VerifyLobbyCoverageGlyphs()
+            {
+                Console.WriteLine("[FDT] Lobby coverage glyphs");
+                string reportDir = ResolveLobbyReportDir();
+                Directory.CreateDirectory(reportDir);
+
+                Dictionary<string, HashSet<string>> fontsByScreen = CollectLobbyFontsByScreen();
+                Dictionary<string, LobbyFontGlyphRequirement> requirements =
+                    CollectLobbyFontGlyphRequirements(fontsByScreen, reportDir);
+
+                int checkedFonts = 0;
+                int checkedGlyphs = 0;
+                int failures = 0;
+                List<string> fonts = new List<string>(requirements.Keys);
+                fonts.Sort(StringComparer.OrdinalIgnoreCase);
+                for (int fontIndex = 0; fontIndex < fonts.Count; fontIndex++)
+                {
+                    string fontPath = fonts[fontIndex];
+                    LobbyFontGlyphRequirement requirement = requirements[fontPath];
+                    byte[] targetFdt;
+                    try
+                    {
+                        targetFdt = _patchedFont.ReadFile(fontPath);
+                    }
+                    catch (Exception ex)
+                    {
+                        failures = FailLobbyCoverageGlyphOnce(failures, "{0} required by {1} is missing or unreadable: {2}", fontPath, JoinSorted(requirement.Screens), ex.Message);
+                        continue;
+                    }
+
+                    checkedFonts++;
+                    List<uint> codepoints = new List<uint>(requirement.Codepoints);
+                    codepoints.Sort();
+                    for (int codepointIndex = 0; codepointIndex < codepoints.Count; codepointIndex++)
+                    {
+                        uint codepoint = codepoints[codepointIndex];
+                        FdtGlyphEntry glyph;
+                        if (!TryFindGlyph(targetFdt, codepoint, out glyph))
+                        {
+                            failures = FailLobbyCoverageGlyphOnce(
+                                failures,
+                                "{0} missing lobby coverage glyph U+{1:X4} [{2}] for screens={3}, groups={4}",
+                                fontPath,
+                                codepoint,
+                                char.ConvertFromUtf32(checked((int)codepoint)),
+                                JoinSorted(requirement.Screens),
+                                JoinSorted(requirement.Groups));
+                            continue;
+                        }
+
+                        try
+                        {
+                            GlyphCanvas canvas = RenderGlyph(_patchedFont, fontPath, codepoint);
+                            if (canvas.VisiblePixels <= 0)
+                            {
+                                failures = FailLobbyCoverageGlyphOnce(
+                                    failures,
+                                    "{0} invisible lobby coverage glyph U+{1:X4} [{2}] for screens={3}, groups={4}",
+                                    fontPath,
+                                    codepoint,
+                                    char.ConvertFromUtf32(checked((int)codepoint)),
+                                    JoinSorted(requirement.Screens),
+                                    JoinSorted(requirement.Groups));
+                                continue;
+                            }
+                        }
+                        catch (Exception ex)
+                        {
+                            failures = FailLobbyCoverageGlyphOnce(
+                                failures,
+                                "{0} lobby coverage glyph U+{1:X4} [{2}] render error: {3}",
+                                fontPath,
+                                codepoint,
+                                char.ConvertFromUtf32(checked((int)codepoint)),
+                                ex.Message);
+                            continue;
+                        }
+
+                        checkedGlyphs++;
+                    }
+                }
+
+                if (failures >= MaxLobbyCoverageGlyphFailures)
+                {
+                    Warn("lobby coverage glyph check stopped after {0} failures", MaxLobbyCoverageGlyphFailures);
+                }
+
+                if (failures == 0)
+                {
+                    Pass(
+                        "lobby coverage glyphs are present and visible: fonts={0}, glyphs={1}",
+                        checkedFonts,
+                        checkedGlyphs);
+                }
+            }
+
+            private int FailLobbyCoverageGlyphOnce(int failures, string format, params object[] args)
+            {
+                if (failures < MaxLobbyCoverageGlyphFailures)
+                {
+                    Fail(format, args);
+                }
+
+                return failures + 1;
             }
 
             private Dictionary<string, HashSet<string>> CollectLobbyFontsByScreen()
