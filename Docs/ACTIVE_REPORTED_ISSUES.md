@@ -181,6 +181,7 @@
 ## Verification Rule
 
 - 2026-05-16: `lobby-coverage-glyphs` verifies every Hangul codepoint collected from the current route-scoped lobby coverage sheets against every routed lobby font, and fails if the glyph is missing or renders with zero visible pixels. This guards against `-`/`=` fallback beyond representative render snapshots without reintroducing broad all-row atlas injection.
+- 2026-05-16: `lobby-route-survey` now writes `lobby-uncovered-hangul-candidates.tsv`, `lobby-uncovered-actionable-candidates.tsv`, and `lobby-uncovered-hangul-summary.tsv`. Use these reports to find real lobby sheet/row gaps before expanding coverage; do not add one-off characters from screenshots when the missing text can be traced to a sheet row.
 - 재보고된 항목은 먼저 verifier가 실패하도록 만든다.
 - verifier가 pass인데 사용자가 다시 실패를 보고하면 해당 검증이 불완전한 것으로 간주한다.
 - 특정 row/codepoint만 임시로 덮지 않고, 가능한 경우 sheet column 역할, ULD route,

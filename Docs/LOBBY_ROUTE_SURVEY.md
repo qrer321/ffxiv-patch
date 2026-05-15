@@ -37,6 +37,26 @@
 
 전체 시트 주입은 금지한다. 위 숫자는 커버리지 상한을 보기 위한 조사값이며, 실제 주입 범위는 ULD route와 화면별 row 목록으로 줄여야 한다.
 
+## Coverage Gap 리포트
+
+2026-05-16 기준 `lobby-route-survey`는 현재 `LobbyHangulCoverage`에 들어가지 않은 한글 후보를 별도 TSV로 기록한다.
+
+- 전체 후보: `lobby-uncovered-hangul-candidates.tsv`
+- 우선 검토 후보: `lobby-uncovered-actionable-candidates.tsv`
+- 요약: `lobby-uncovered-hangul-summary.tsv`
+- 실행 결과: `.tmp\verify-lobby-route-survey-actionable-r8.log` PASS
+- 현재 산출물 기준 전체 미커버 후보는 13,658 rows, actionable 후보는 660 rows다.
+- actionable 분포: `Lobby` 383 columns, `Addon` 240 columns, `Error` 47 columns, `GuardianDeity` 12 columns.
+- `ClassJob`, `Race`, `Tribe`는 현재 커버리지 기준 미커버 후보가 0이다.
+
+실제 로비 row를 찾는 절차:
+
+1. `lobby-uld-font-routes.tsv`에서 화면군별 ULD와 routed font를 먼저 확인한다.
+2. `lobby-uncovered-actionable-candidates.tsv`에서 `reported:*`, `near-lobby-coverage`, `near-addon-coverage`, `error-sheet` 이유가 붙은 row를 우선 본다.
+3. 새 row를 추가하기 전에는 같은 sheet의 `nearest_coverage`와 `column_offset`을 확인해서 기존 범위 확장인지, 별도 route 후보인지 분리한다.
+4. `Addon`은 전체 시트가 로비 대상이 아니므로 짧은 공통 단어만으로 추가하지 않는다. 시작 메뉴/시스템 설정/설정 공유처럼 ULD나 사용자 제보 문구로 연결되는 row만 후보로 올린다.
+5. 후보 row를 coverage에 넣은 뒤 `lobby-coverage-glyphs`와 `lobby-atlas-capacity`를 같이 돌려 누락 glyph와 atlas 초과를 먼저 확인한다.
+
 ## 보고된 누락 문구 위치
 
 - 시작 메뉴: `Lobby#2003`/`Addon#4000` 시스템 설정, `Lobby#2059`/`Addon#2744` 설치 정보, `Lobby#2009`/`Lobby#2052` 뒤로
