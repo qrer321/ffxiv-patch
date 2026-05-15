@@ -5,6 +5,12 @@ param(
     [Parameter(Mandatory = $true)]
     [string]$Global,
 
+    [string]$GlobalText,
+
+    [string]$GlobalFont,
+
+    [string]$GlobalUi,
+
     [string]$Korea,
 
     [string]$AppliedGame,
@@ -38,6 +44,15 @@ if ($LASTEXITCODE -ne 0) {
 }
 
 $arguments = @("--output", $Output, "--global", $Global, "--target-language", $TargetLanguage)
+if (![string]::IsNullOrWhiteSpace($GlobalText)) {
+    $arguments += @("--global-text", $GlobalText)
+}
+if (![string]::IsNullOrWhiteSpace($GlobalFont)) {
+    $arguments += @("--global-font", $GlobalFont)
+}
+if (![string]::IsNullOrWhiteSpace($GlobalUi)) {
+    $arguments += @("--global-ui", $GlobalUi)
+}
 if (![string]::IsNullOrWhiteSpace($Korea)) {
     $arguments += @("--korea", $Korea)
 }

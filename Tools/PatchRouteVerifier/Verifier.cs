@@ -12,7 +12,9 @@ namespace FfxivKoreanPatch.PatchRouteVerifier
         {
             private readonly string _output;
             private readonly string _patchedSqpack;
-            private readonly string _globalSqpack;
+            private readonly string _globalTextSqpack;
+            private readonly string _globalFontSqpack;
+            private readonly string _globalUiSqpack;
             private readonly string _koreaSqpack;
             private readonly string _language;
             private readonly CompositeArchive _patchedText;
@@ -31,11 +33,24 @@ namespace FfxivKoreanPatch.PatchRouteVerifier
 
             public bool Failed { get; private set; }
 
-            public Verifier(string output, string patchedSqpack, string globalSqpack, string koreaSqpack, string language, string glyphDumpDir, string[] selectedChecks, string fontPackDir, bool compareAppliedOutput)
+            public Verifier(
+                string output,
+                string patchedSqpack,
+                string globalTextSqpack,
+                string globalFontSqpack,
+                string globalUiSqpack,
+                string koreaSqpack,
+                string language,
+                string glyphDumpDir,
+                string[] selectedChecks,
+                string fontPackDir,
+                bool compareAppliedOutput)
             {
                 _output = output;
                 _patchedSqpack = patchedSqpack;
-                _globalSqpack = globalSqpack;
+                _globalTextSqpack = globalTextSqpack;
+                _globalFontSqpack = globalFontSqpack;
+                _globalUiSqpack = globalUiSqpack;
                 _koreaSqpack = koreaSqpack;
                 _language = language;
                 _glyphDumpDir = glyphDumpDir;
@@ -45,41 +60,41 @@ namespace FfxivKoreanPatch.PatchRouteVerifier
                 _patchedText = new CompositeArchive(
                     Path.Combine(patchedSqpack, TextPrefix + ".index"),
                     patchedSqpack,
-                    globalSqpack,
+                    globalTextSqpack,
                     TextPrefix);
                 _patchedFont = new CompositeArchive(
                     Path.Combine(patchedSqpack, FontPrefix + ".index"),
                     patchedSqpack,
-                    globalSqpack,
+                    globalFontSqpack,
                     FontPrefix);
                 _patchedUi = new CompositeArchive(
                     Path.Combine(patchedSqpack, UiPrefix + ".index"),
                     patchedSqpack,
-                    globalSqpack,
+                    globalUiSqpack,
                     UiPrefix);
                 if (_compareAppliedOutput)
                 {
                     _generatedFont = new CompositeArchive(
                         Path.Combine(output, FontPrefix + ".index"),
                         output,
-                        globalSqpack,
+                        globalFontSqpack,
                         FontPrefix);
                     _generatedUi = new CompositeArchive(
                         Path.Combine(output, UiPrefix + ".index"),
                         output,
-                        globalSqpack,
+                        globalUiSqpack,
                         UiPrefix);
                 }
 
                 _cleanFont = new CompositeArchive(
                     Path.Combine(output, "orig." + FontPrefix + ".index"),
-                    globalSqpack,
-                    globalSqpack,
+                    globalFontSqpack,
+                    globalFontSqpack,
                     FontPrefix);
                 _cleanUi = new CompositeArchive(
                     Path.Combine(output, "orig." + UiPrefix + ".index"),
-                    globalSqpack,
-                    globalSqpack,
+                    globalUiSqpack,
+                    globalUiSqpack,
                     UiPrefix);
                 if (!string.IsNullOrWhiteSpace(koreaSqpack))
                 {
@@ -117,7 +132,9 @@ namespace FfxivKoreanPatch.PatchRouteVerifier
                     Console.WriteLine("Patch route verification");
                     Console.WriteLine("  output: {0}", _output);
                     Console.WriteLine("  patched sqpack: {0}", _patchedSqpack);
-                    Console.WriteLine("  global sqpack: {0}", _globalSqpack);
+                    Console.WriteLine("  global text sqpack: {0}", _globalTextSqpack);
+                    Console.WriteLine("  global font sqpack: {0}", _globalFontSqpack);
+                    Console.WriteLine("  global ui sqpack: {0}", _globalUiSqpack);
                     if (!string.IsNullOrWhiteSpace(_koreaSqpack))
                     {
                         Console.WriteLine("  korea sqpack: {0}", _koreaSqpack);

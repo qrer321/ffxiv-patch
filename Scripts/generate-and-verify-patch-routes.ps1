@@ -10,6 +10,12 @@ param(
 
     [string]$AppliedGame,
 
+    [string]$VerifyGlobalText,
+
+    [string]$VerifyGlobalFont,
+
+    [string]$VerifyGlobalUi,
+
     [string]$TargetLanguage = "ja",
 
     [string]$FontPackDir,
@@ -296,6 +302,18 @@ $verifyArgs = @(
     "-FontPackDir", $FontPackDir,
     "-Configuration", $Configuration
 )
+
+if (![string]::IsNullOrWhiteSpace($VerifyGlobalText)) {
+    $verifyArgs += @("-GlobalText", $VerifyGlobalText)
+}
+
+if (![string]::IsNullOrWhiteSpace($VerifyGlobalFont)) {
+    $verifyArgs += @("-GlobalFont", $VerifyGlobalFont)
+}
+
+if (![string]::IsNullOrWhiteSpace($VerifyGlobalUi)) {
+    $verifyArgs += @("-GlobalUi", $VerifyGlobalUi)
+}
 
 if (![string]::IsNullOrWhiteSpace($AppliedGame)) {
     $verifyArgs += @("-AppliedGame", $AppliedGame)

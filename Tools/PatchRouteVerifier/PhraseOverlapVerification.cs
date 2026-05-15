@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using FfxivKoreanPatch.FFXIVPatchGenerator;
 
 namespace FfxivKoreanPatch.PatchRouteVerifier
@@ -602,11 +603,41 @@ namespace FfxivKoreanPatch.PatchRouteVerifier
                     return false;
                 }
 
+                byte[] cleanTargetFdt = null;
+                try
+                {
+                    if (_cleanFont.ContainsPath(fontPath))
+                    {
+                        cleanTargetFdt = _cleanFont.ReadFile(fontPath);
+                    }
+                }
+                catch
+                {
+                    cleanTargetFdt = null;
+                }
+
+                Dictionary<string, int> sourceKerningAdjustments = ReadKerningAdjustments(sourceFdt);
+                Dictionary<string, int> targetKerningAdjustments = ReadKerningAdjustments(targetFdt);
+                bool hasPreviousCodepoint = false;
+                uint previousCodepoint = 0;
                 for (int i = 0; i < phrase.Length; i++)
                 {
                     uint codepoint = ReadCodepoint(phrase, ref i);
+                    if (hasPreviousCodepoint)
+                    {
+                        int sourceKerning = GetKerningAdjustment(sourceKerningAdjustments, previousCodepoint, codepoint);
+                        int targetKerning = GetKerningAdjustment(targetKerningAdjustments, previousCodepoint, codepoint);
+                        if (targetKerning > sourceKerning &&
+                            IsAllowedLobbySystemSettingsKerningAdjustment(fontPath, PackUtf8(previousCodepoint), PackUtf8(codepoint), sourceKerning, targetKerning))
+                        {
+                            normalizedWidth += targetKerning - sourceKerning;
+                        }
+                    }
+
                     if (IsPhraseLayoutSpace(codepoint))
                     {
+                        previousCodepoint = codepoint;
+                        hasPreviousCodepoint = true;
                         continue;
                     }
 
@@ -626,13 +657,13 @@ namespace FfxivKoreanPatch.PatchRouteVerifier
                     int sourceAdvance = GetGlyphAdvance(sourceGlyph);
                     int targetAdvance = sourceAdvance;
                     if (IsHangulCodepoint(codepoint) &&
-                        LobbyAxisHangulAdvanceEntryMatchesExpected(sourceGlyph, targetGlyph))
+                        LobbyAxisHangulSpacingEntryMatchesSource(sourceGlyph, targetGlyph))
                     {
                         targetAdvance = GetGlyphAdvance(targetGlyph);
                     }
                     else if (codepoint > 0x20u &&
                              codepoint <= 0x7Eu &&
-                             GlyphSpacingMetricsMatchOrLobbySafe(fontPath, codepoint, sourceGlyph, targetGlyph))
+                             LobbyAsciiMatchesCleanTarget(fontPath, codepoint, cleanTargetFdt, targetGlyph))
                     {
                         targetAdvance = GetGlyphAdvance(targetGlyph);
                     }
@@ -641,9 +672,37 @@ namespace FfxivKoreanPatch.PatchRouteVerifier
                     {
                         normalizedWidth += targetAdvance - sourceAdvance;
                     }
+
+                    previousCodepoint = codepoint;
+                    hasPreviousCodepoint = true;
                 }
 
                 return true;
+            }
+
+            private static bool LobbyAxisHangulSpacingEntryMatchesSource(FdtGlyphEntry sourceGlyph, FdtGlyphEntry targetGlyph)
+            {
+                return sourceGlyph.ShiftJisValue == targetGlyph.ShiftJisValue &&
+                       sourceGlyph.Width == targetGlyph.Width &&
+                       sourceGlyph.Height == targetGlyph.Height &&
+                       sourceGlyph.OffsetX == targetGlyph.OffsetX &&
+                       sourceGlyph.OffsetY == targetGlyph.OffsetY;
+            }
+
+            private static bool LobbyAsciiMatchesCleanTarget(
+                string fontPath,
+                uint codepoint,
+                byte[] cleanTargetFdt,
+                FdtGlyphEntry targetGlyph)
+            {
+                if (cleanTargetFdt == null)
+                {
+                    return false;
+                }
+
+                FdtGlyphEntry cleanGlyph;
+                return TryFindGlyph(cleanTargetFdt, codepoint, out cleanGlyph) &&
+                       GlyphSpacingMetricsMatchOrLobbySafe(fontPath, codepoint, cleanGlyph, targetGlyph);
             }
 
             private bool VerifySystemSettingsStrictScaledRoutePhraseLayout(string fontPath, string phrase)

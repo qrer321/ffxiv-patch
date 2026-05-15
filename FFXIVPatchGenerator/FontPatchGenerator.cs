@@ -2442,9 +2442,9 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
             new StartScreenKerningRoute("common/font/KrnAXIS_140.fdt", true, true, true, 2, 1),
             new StartScreenKerningRoute("common/font/AXIS_18.fdt", false, true, false),
             new StartScreenKerningRoute("common/font/KrnAXIS_180.fdt", false, true, false),
-            new StartScreenKerningRoute("common/font/AXIS_12_lobby.fdt", true, true, false),
-            new StartScreenKerningRoute("common/font/AXIS_14_lobby.fdt", true, true, false),
-            new StartScreenKerningRoute("common/font/AXIS_18_lobby.fdt", true, true, false)
+            new StartScreenKerningRoute("common/font/AXIS_12_lobby.fdt", true, true, false, 2, 2, true, true),
+            new StartScreenKerningRoute("common/font/AXIS_14_lobby.fdt", true, true, false, 1, 1, true),
+            new StartScreenKerningRoute("common/font/AXIS_18_lobby.fdt", true, true, false, 1, 1, true)
         };
 
         private static int ApplyStartScreenSystemSettingsKerning(string path, ref byte[] targetFdt)
@@ -2483,6 +2483,16 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
             if (route.IncludeResultMessageHangulPairs)
             {
                 AddAdjacentHangulKerningPairs(entries, LobbyScaledHangulPhrases.StartScreenSystemSettingsResultMessages, route.MinimumAdjustment);
+            }
+
+            if (route.IncludeSystemSettingsHangulPairs)
+            {
+                AddAdjacentHangulKerningPairs(entries, LobbyScaledHangulPhrases.StartScreenSystemSettings, route.MinimumAdjustment);
+            }
+
+            if (route.IncludeHighResolutionHangulPairs)
+            {
+                AddAdjacentHangulKerningPairs(entries, LobbyScaledHangulPhrases.HighResolutionUiScaleOptions, route.MinimumAdjustment);
             }
 
             if (route.IncludeTerminalPunctuationPairs)
@@ -2576,6 +2586,8 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
             public readonly bool IncludeResultMessageHangulPairs;
             public readonly bool IncludeTerminalPunctuationPairs;
             public readonly bool IncludeHighResolutionPercentPairs;
+            public readonly bool IncludeSystemSettingsHangulPairs;
+            public readonly bool IncludeHighResolutionHangulPairs;
             public readonly int MinimumAdjustment;
             public readonly int PercentAdjustment;
 
@@ -2584,7 +2596,7 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
                 bool includeResultMessageHangulPairs,
                 bool includeTerminalPunctuationPairs,
                 bool includeHighResolutionPercentPairs)
-                : this(fontPath, includeResultMessageHangulPairs, includeTerminalPunctuationPairs, includeHighResolutionPercentPairs, 2, 2)
+                : this(fontPath, includeResultMessageHangulPairs, includeTerminalPunctuationPairs, includeHighResolutionPercentPairs, 2, 2, false)
             {
             }
 
@@ -2594,7 +2606,7 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
                 bool includeTerminalPunctuationPairs,
                 bool includeHighResolutionPercentPairs,
                 int minimumAdjustment)
-                : this(fontPath, includeResultMessageHangulPairs, includeTerminalPunctuationPairs, includeHighResolutionPercentPairs, minimumAdjustment, minimumAdjustment)
+                : this(fontPath, includeResultMessageHangulPairs, includeTerminalPunctuationPairs, includeHighResolutionPercentPairs, minimumAdjustment, minimumAdjustment, false)
             {
             }
 
@@ -2605,11 +2617,38 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
                 bool includeHighResolutionPercentPairs,
                 int minimumAdjustment,
                 int percentAdjustment)
+                : this(fontPath, includeResultMessageHangulPairs, includeTerminalPunctuationPairs, includeHighResolutionPercentPairs, minimumAdjustment, percentAdjustment, false)
+            {
+            }
+
+            public StartScreenKerningRoute(
+                string fontPath,
+                bool includeResultMessageHangulPairs,
+                bool includeTerminalPunctuationPairs,
+                bool includeHighResolutionPercentPairs,
+                int minimumAdjustment,
+                int percentAdjustment,
+                bool includeSystemSettingsHangulPairs)
+                : this(fontPath, includeResultMessageHangulPairs, includeTerminalPunctuationPairs, includeHighResolutionPercentPairs, minimumAdjustment, percentAdjustment, includeSystemSettingsHangulPairs, false)
+            {
+            }
+
+            public StartScreenKerningRoute(
+                string fontPath,
+                bool includeResultMessageHangulPairs,
+                bool includeTerminalPunctuationPairs,
+                bool includeHighResolutionPercentPairs,
+                int minimumAdjustment,
+                int percentAdjustment,
+                bool includeSystemSettingsHangulPairs,
+                bool includeHighResolutionHangulPairs)
             {
                 FontPath = fontPath;
                 IncludeResultMessageHangulPairs = includeResultMessageHangulPairs;
                 IncludeTerminalPunctuationPairs = includeTerminalPunctuationPairs;
                 IncludeHighResolutionPercentPairs = includeHighResolutionPercentPairs;
+                IncludeSystemSettingsHangulPairs = includeSystemSettingsHangulPairs;
+                IncludeHighResolutionHangulPairs = includeHighResolutionHangulPairs;
                 MinimumAdjustment = minimumAdjustment;
                 PercentAdjustment = percentAdjustment;
             }
