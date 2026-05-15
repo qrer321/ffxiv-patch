@@ -13,7 +13,13 @@ namespace FfxivKoreanPatch.PatchRouteVerifier
 
             private void VerifyLobbyHangulSourceCells()
             {
-                Console.WriteLine("[FDT] Lobby Hangul source cells");
+                Console.WriteLine("[FDT] Lobby Hangul source cells (retired)");
+                Warn("source-cell grafting is rejected for lobby fonts; use lobby-multitexture-font-set instead");
+                if (!IsLegacyLobbyHangulSourceCellVerifierEnabled())
+                {
+                    return;
+                }
+
                 if (_ttmpFont == null)
                 {
                     Fail("TTMP font package is required to verify lobby Hangul source cells");
@@ -31,6 +37,11 @@ namespace FfxivKoreanPatch.PatchRouteVerifier
                         LobbyHangulCoverage.IsMainMenuOnlyTargetFontPath(fontPath) ? mainMenuCodepoints : codepoints,
                         cleanLobbyCells);
                 }
+            }
+
+            private static bool IsLegacyLobbyHangulSourceCellVerifierEnabled()
+            {
+                return false;
             }
 
             private uint[] CollectLobbyHangulCoverageCodepoints()

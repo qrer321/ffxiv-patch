@@ -86,5 +86,13 @@
 - 결과: 2537 candidate glyph cells, 0 known FDT conflicts, 44 texture alpha conflicts, 0 data-center FDT conflicts, 0 source overlap pairs.
 - TTMP 한글 glyph cell 좌표는 현재 clean/patched 로비 FDT에서 참조 중인 glyph cell과 겹치지 않는다.
 - source cell끼리도 서로 다른 glyph를 덮는 overlap은 없다.
-- 따라서 다음 구현 후보는 TTMP FDT/TEX 통째 적용이 아니라, 필요한 한글 glyph entry만 target FDT에 추가하고 필요한 TTMP source cell alpha만 기존 `font_lobby1.tex`/`font_lobby2.tex`의 같은 좌표에 복사하는 방식이다.
-- 단, clean texture에 이미 alpha가 있는 미참조 영역 44개는 있으므로 texture patch 전후에 데이터 센터 routed ASCII glyph pixel/spacing verifier를 반드시 유지한다.
+- 이 결과만으로 source cell 복사 구현을 진행하지 않는다. 2026-05-15 실제 적용 결과, source cell을 clean lobby texture에 복사하고 atlas overflow를 texture 확장으로 수습한 빌드는 로비 150% 이상에서 glyph 깨짐/번짐/크기 이상을 더 악화시켰다.
+- source cell 복사 방식은 폐기한다. 다음 구현은 `FDT + font_lobby1..N.tex`가 함께 맞는 complete multi-texture lobby font set을 생성하거나 소비하는 방향으로 진행한다.
+- clean texture에 이미 alpha가 있는 미참조 영역 44개는 여전히 회귀 위험이다. 하지만 해결책은 같은 좌표 덮어쓰기나 texture resize가 아니라, 새 texture page와 FDT `image_index`가 함께 유효한지 검증하는 방식이어야 한다.
+
+## Multi-texture Font Set 기준
+
+- 모든 lobby glyph의 `image_index / 4`는 실제 존재하는 `font_lobbyN.tex`로 해석되어야 한다.
+- glyph의 `x/y/width/height`는 참조 texture의 bounds 안에 있어야 한다.
+- clean에 있던 `font_lobby*.tex`는 패치 후 width/height가 바뀌면 실패로 처리한다.
+- atlas가 부족하면 기존 texture를 키우지 않고 page 수, glyph set, 또는 font route를 다시 설계한다.

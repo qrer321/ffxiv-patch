@@ -11,6 +11,7 @@ namespace FfxivKoreanPatch.PatchRouteVerifier
                     new VerificationStep("applied-output-files", VerifyAppliedOutputFiles),
                     new VerificationStep("lobby-route-survey", VerifyLobbyRouteSurvey),
                     new VerificationStep("lobby-atlas-capacity", VerifyLobbyAtlasCapacity),
+                    new VerificationStep("lobby-multitexture-font-set", VerifyLobbyMultiTextureFontSet),
                     new VerificationStep("lobby-source-cell-conflicts", VerifyLobbySourceCellConflicts),
                     new VerificationStep("lobby-hangul-source-cells", VerifyLobbyHangulSourceCells),
                     new VerificationStep("lobby-ttmp-ascii-delta", VerifyLobbyTtmpAsciiDelta),

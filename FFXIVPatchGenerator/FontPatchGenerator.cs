@@ -72,6 +72,7 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
         private const int CleanAsciiLast = 0x7E;
         private const int CleanAsciiTexturePadding = 4;
         private const int LobbyGlyphTextureNeighborhoodPadding = 4;
+        private static readonly bool EnableLegacyLobbyHangulSourceCellGrafting = false;
 
         // Explicit font resource set used by the global client for in-game and lobby text rendering.
         private static readonly string[] FontPaths = new string[]
@@ -368,7 +369,7 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
                                 continue;
                             }
 
-                            byte[] patchedPackedTexture = PatchPackedFontTexture(cleanPackedTexture, pendingTexturePatches);
+                            byte[] patchedPackedTexture = PatchPackedFontTexture(path, cleanPackedTexture, pendingTexturePatches);
                             long lobbyTextureOffset = datWriter.WritePackedFile(patchedPackedTexture);
                             mutableIndex.SetFileOffset(path, 1, lobbyTextureOffset);
                             mutableIndex2.SetFileOffset(path, 1, lobbyTextureOffset);
@@ -402,7 +403,7 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
                     if (texturePatches.TryGetValue(path, out pendingTexturePatches) && pendingTexturePatches.Count > 0)
                     {
                         int protectedRestores = AppendProtectedHangulGlyphTexturePatches(path, pendingTexturePatches, protectedHangulGlyphs);
-                        byte[] patchedPackedTexture = PatchPackedFontTexture(packedFile, pendingTexturePatches);
+                        byte[] patchedPackedTexture = PatchPackedFontTexture(path, packedFile, pendingTexturePatches);
                         datOffset = datWriter.WritePackedFile(patchedPackedTexture);
                         normalized = 0;
                         if (protectedRestores > 0)
@@ -448,7 +449,7 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
                         }
 
                         int protectedRestores = AppendProtectedHangulGlyphTexturePatches(pair.Key, pair.Value, protectedHangulGlyphs);
-                        byte[] patchedPackedTexture = PatchPackedFontTexture(globalPackedTexture, pair.Value);
+                        byte[] patchedPackedTexture = PatchPackedFontTexture(pair.Key, globalPackedTexture, pair.Value);
                         long datOffset = datWriter.WritePackedFile(patchedPackedTexture);
                         mutableIndex.SetFileOffset(pair.Key, 1, datOffset);
                         mutableIndex2.SetFileOffset(pair.Key, 1, datOffset);
@@ -738,7 +739,11 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
             int relocatedSkippedTextureHangulGlyphs = RelocateHangulGlyphsFromSkippedTextures(path, fdt, mpdStream, payloadsByPath, glyphRepair, texturePatches);
             int dialogueGlyphFixes = ApplyDialogueGlyphArtifactFix(path, fdt, dialogueGlyphRepair, glyphRepair, texturePatches);
             int actionDetailHighScaleFixes = ApplyActionDetailHighScaleHangulGlyphs(path, ref fdt, mpdStream, payloadsByPath, glyphRepair, texturePatches, actionDetailHighScaleHangulCodepoints);
-            int lobbyHangulFixes = ApplyLobbyHangulSourceCells(path, ref fdt, mpdStream, payloadsByPath, texturePatches, SelectLobbyHangulCodepointsForFont(path, lobbyHangulCodepoints, lobbyMainMenuHangulCodepoints));
+            int lobbyHangulFixes = 0;
+            if (EnableLegacyLobbyHangulSourceCellGrafting)
+            {
+                lobbyHangulFixes = ApplyLobbyHangulSourceCells(path, ref fdt, mpdStream, payloadsByPath, texturePatches, SelectLobbyHangulCodepointsForFont(path, lobbyHangulCodepoints, lobbyMainMenuHangulCodepoints));
+            }
             int partyShapeFixes = ApplyPartyListSelfMarkerCleanShapes(path, ref fdt, glyphRepair, globalArchive, texturePatches);
             int cleanAsciiFixes = ApplyCleanAsciiGlyphShapes(path, fdt, glyphRepair, globalArchive, texturePatches);
             int cleanAsciiKerningFixes = ApplyCleanAsciiKerning(path, ref fdt, globalArchive);
@@ -1517,6 +1522,11 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
 
         private static bool ShouldPatchLobbyHangulFont(string path, uint[] requiredCodepoints)
         {
+            if (!EnableLegacyLobbyHangulSourceCellGrafting)
+            {
+                return false;
+            }
+
             if (requiredCodepoints == null || requiredCodepoints.Length == 0)
             {
                 return false;
@@ -3986,16 +3996,16 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
             return UnpackTextureFile(packed, out ignored);
         }
 
-        private static byte[] PatchPackedFontTexture(byte[] packedFile, List<FontTexturePatch> patches)
+        private static byte[] PatchPackedFontTexture(string texturePath, byte[] packedFile, List<FontTexturePatch> patches)
         {
             List<TextureSubBlock> subBlocks;
             byte[] rawTexture = UnpackTextureFile(packedFile, out subBlocks);
-            rawTexture = EnsureFontTextureCapacityForPatches(rawTexture, patches);
+            rawTexture = EnsureFontTextureCapacityForPatches(texturePath, rawTexture, patches);
             ApplyFontTexturePatches(rawTexture, patches);
             return PackTextureFile(rawTexture);
         }
 
-        private static byte[] EnsureFontTextureCapacityForPatches(byte[] rawTexture, List<FontTexturePatch> patches)
+        private static byte[] EnsureFontTextureCapacityForPatches(string texturePath, byte[] rawTexture, List<FontTexturePatch> patches)
         {
             if (patches == null || patches.Count == 0)
             {
@@ -4015,6 +4025,15 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
             if (requiredWidth <= texture.Width && requiredHeight <= texture.Height)
             {
                 return rawTexture;
+            }
+
+            if (IsLobbyFontTexturePath(texturePath))
+            {
+                throw new InvalidOperationException(
+                    "Lobby font texture patch would resize " + NormalizeGamePath(texturePath) +
+                    " from " + texture.Width.ToString() + "x" + texture.Height.ToString() +
+                    " to at least " + requiredWidth.ToString() + "x" + requiredHeight.ToString() +
+                    ". Treat this as a missing multi-texture lobby font set, not an atlas expansion.");
             }
 
             int expandedWidth = NextPowerOfTwo(requiredWidth);
