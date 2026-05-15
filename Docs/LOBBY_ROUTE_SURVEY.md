@@ -71,6 +71,19 @@
 
 해석: 현재 산출물에서 actionable 후보의 한글 codepoint는 이미 routed target font에 존재한다. 따라서 같은 산출물에서 로비 글자가 `-`/`=`로 보인다면, 다음 의심점은 단순 codepoint coverage 부족이 아니라 적용 폴더 불일치, 실제 ULD route가 다른 font를 타는 경우, 또는 이 survey가 아직 못 잡은 sheet/row다. 이 경우 문자를 하나씩 추가하지 말고, 적용 산출물 기준 `lobby-uld-font-routes.tsv`와 actual missing row를 먼저 다시 잡는다.
 
+## Applied Lobby Route 비교
+
+2026-05-16 기준 `applied-lobby-routes` 검증을 추가했다. `--applied-game <game dir>`를 넘기면 generated output과 실제 설치 폴더를 로비 route/payload 단위로 비교한다.
+
+- route 비교: `applied-lobby-route-comparison.tsv`
+- payload 비교: `applied-lobby-payload-comparison.tsv`
+- `--applied-game`이 없으면 skip한다.
+- D 드라이브 글로벌 클라이언트 기준 실행 결과: `.tmp\verify-applied-lobby-routes-dgame-r2.log` FAIL
+- 해당 실행에서 ULD route는 일치했다: `route_match=yes` 422 rows, `n/a` 31 rows, route mismatch 0.
+- 실패 원인은 payload 불일치다: routed font 14개, required font 49개, font texture 11개, optional UI 25개가 generated output과 달랐다.
+
+해석: 로비 glyph가 산출물 verifier에서는 보이는데 실제 클라이언트에서 `-`/`=`로 보이면, 먼저 `applied-lobby-routes`를 적용 폴더에 대해 돌린다. route mismatch가 없고 payload mismatch만 있으면 코드를 더 고치기 전에 설치 폴더가 최신 산출물과 같은 FDT/TEX를 실제로 읽고 있는지부터 잡는다.
+
 ## 보고된 누락 문구 위치
 
 - 시작 메뉴: `Lobby#2003`/`Addon#4000` 시스템 설정, `Lobby#2059`/`Addon#2744` 설치 정보, `Lobby#2009`/`Lobby#2052` 뒤로

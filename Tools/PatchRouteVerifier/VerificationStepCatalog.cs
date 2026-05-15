@@ -9,6 +9,7 @@ namespace FfxivKoreanPatch.PatchRouteVerifier
                 return new VerificationStep[]
                 {
                     new VerificationStep("applied-output-files", VerifyAppliedOutputFiles),
+                    new VerificationStep("applied-lobby-routes", VerifyAppliedLobbyRoutes),
                     new VerificationStep("lobby-route-survey", VerifyLobbyRouteSurvey),
                     new VerificationStep("lobby-atlas-capacity", VerifyLobbyAtlasCapacity),
                     new VerificationStep("lobby-coverage-glyphs", VerifyLobbyCoverageGlyphs),
