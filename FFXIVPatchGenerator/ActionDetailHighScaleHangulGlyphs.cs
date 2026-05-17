@@ -69,14 +69,11 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
             new AddonRowRange(699, 714)
         };
 
-        public static readonly string[] CombatFlyTextPreservePhrases = new string[]
-        {
-            CriticalPhrase,
-            CriticalShortPhrase,
-            DirectHitPhrase,
-            CriticalDirectHitPhrase,
-            CriticalFlyTextPhrase
-        };
+        // Critical/direct-hit fly text uses clean damage digits and punctuation,
+        // not these Korean phrase glyphs. Do not exclude shared Hangul such as
+        // U+B300/U+D654 from large UI scaling, or PvP/ActionDetail labels mix
+        // high-scale and unscaled glyphs in the same phrase.
+        public static readonly string[] CombatFlyTextPreservePhrases = new string[0];
 
         public static readonly string[] VisualScaleTargetFontPaths = new string[]
         {

@@ -185,7 +185,7 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
         {
             new LargeUiLabelVisualScaleSpec("common/font/TrumpGothic_23.fdt", "common/font/TrumpGothic_23.fdt", "common/font/TrumpGothic_23.fdt"),
             new LargeUiLabelVisualScaleSpec("common/font/TrumpGothic_34.fdt", "common/font/TrumpGothic_34.fdt", "common/font/TrumpGothic_34.fdt"),
-            new LargeUiLabelVisualScaleSpec("common/font/TrumpGothic_68.fdt", "common/font/TrumpGothic_34.fdt", "common/font/TrumpGothic_68.fdt")
+            new LargeUiLabelVisualScaleSpec("common/font/TrumpGothic_68.fdt", "common/font/TrumpGothic_34.fdt", "common/font/TrumpGothic_68.fdt", 0.985d)
         };
 
         private static readonly LobbyLargeLabelVisualScaleSpec[] LobbyLargeLabelVisualScaleFonts = new LobbyLargeLabelVisualScaleSpec[]
@@ -1549,12 +1549,15 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
                     continue;
                 }
 
+                double horizontalScale = verticalScale > 0d
+                    ? verticalScale * spec.WidthScaleMultiplier
+                    : 0d;
                 int scaledWidth = sourceEntry.Width;
                 int scaledHeight = sourceEntry.Height;
                 if (verticalScale > 0d)
                 {
                     scaledWidth = ClampInt(
-                        (int)Math.Round(sourceEntry.Width * verticalScale),
+                        (int)Math.Round(sourceEntry.Width * horizontalScale),
                         1,
                         byte.MaxValue);
                     scaledHeight = ClampInt(
@@ -1572,7 +1575,7 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
 
                 int sourceAdvance = Math.Max(1, sourceEntry.Width + sourceEntry.OffsetX);
                 int scaledAdvance = verticalScale > 0d
-                    ? ClampInt((int)Math.Round(sourceAdvance * verticalScale), 1, byte.MaxValue)
+                    ? ClampInt((int)Math.Round(sourceAdvance * horizontalScale), 1, byte.MaxValue)
                     : sourceAdvance;
                 int scaledOffsetX = ClampInt(scaledAdvance - scaledWidth, sbyte.MinValue, sbyte.MaxValue);
 
@@ -7121,13 +7124,20 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
             public readonly string SourceFontPath;
             public readonly string MetricFontPath;
             public readonly double HangulToDigitRatio;
+            public readonly double WidthScaleMultiplier;
 
             public LargeUiLabelVisualScaleSpec(string targetFontPath, string sourceFontPath, string metricFontPath)
+                : this(targetFontPath, sourceFontPath, metricFontPath, 1d)
+            {
+            }
+
+            public LargeUiLabelVisualScaleSpec(string targetFontPath, string sourceFontPath, string metricFontPath, double widthScaleMultiplier)
             {
                 TargetFontPath = NormalizeGamePath(targetFontPath);
                 SourceFontPath = NormalizeGamePath(sourceFontPath);
                 MetricFontPath = NormalizeGamePath(metricFontPath);
                 HangulToDigitRatio = ActionDetailHighScaleHangulGlyphs.LargeUiHangulToDigitRatio;
+                WidthScaleMultiplier = widthScaleMultiplier <= 0d ? 1d : widthScaleMultiplier;
             }
         }
 
