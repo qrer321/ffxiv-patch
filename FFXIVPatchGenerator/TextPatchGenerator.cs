@@ -229,6 +229,10 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
         public TextPatchGenerator(BuildOptions options)
         {
             _options = options;
+            if (_options.AnonymizeQuestChatPhrasesRequested && !QuestChatPhraseAnonymizationFeature.Enabled)
+            {
+                _report.Warnings.Add(QuestChatPhraseAnonymizationFeature.DisabledWarning);
+            }
         }
 
         public BuildReport Build()

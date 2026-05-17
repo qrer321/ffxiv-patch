@@ -25,8 +25,15 @@ namespace FfxivKoreanPatch.PatchRouteVerifier
                 routedFontPaths = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
                 byte[] cleanPacked;
                 byte[] patchedPacked;
-                if (!_cleanUi.TryReadPackedFile(uldPath, out cleanPacked) ||
-                    !_patchedUi.TryReadPackedFile(uldPath, out patchedPacked))
+                try
+                {
+                    if (!_cleanUi.TryReadPackedFile(uldPath, out cleanPacked) ||
+                        !_patchedUi.TryReadPackedFile(uldPath, out patchedPacked))
+                    {
+                        return false;
+                    }
+                }
+                catch (System.IO.IOException)
                 {
                     return false;
                 }

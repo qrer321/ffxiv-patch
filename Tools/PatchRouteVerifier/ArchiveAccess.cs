@@ -20,6 +20,11 @@ namespace FfxivKoreanPatch.PatchRouteVerifier
             public string CacheKey { get; private set; }
 
             public CompositeArchive(string indexPath, string datDir, string fallbackDatDir, string datPrefix)
+                : this(indexPath, datDir, fallbackDatDir, datPrefix, null)
+            {
+            }
+
+            public CompositeArchive(string indexPath, string datDir, string fallbackDatDir, string datPrefix, string explicitBaselineIndexPath)
             {
                 string resolvedIndexPath = ResolveExistingIndexPath(indexPath, fallbackDatDir, datPrefix);
                 if (resolvedIndexPath == null)
@@ -33,7 +38,7 @@ namespace FfxivKoreanPatch.PatchRouteVerifier
                 _datPrefix = datPrefix;
                 CacheKey = Path.GetFullPath(resolvedIndexPath);
 
-                string baselineIndexPath = ResolveBaselineIndexPath(resolvedIndexPath);
+                string baselineIndexPath = ResolveBaselineIndexPath(resolvedIndexPath, explicitBaselineIndexPath);
                 if (baselineIndexPath != null)
                 {
                     _baselineIndex = new SqPackIndexFile(baselineIndexPath);
@@ -120,8 +125,17 @@ namespace FfxivKoreanPatch.PatchRouteVerifier
                 }
             }
 
-            private static string ResolveBaselineIndexPath(string indexPath)
+            private static string ResolveBaselineIndexPath(string indexPath, string explicitBaselineIndexPath)
             {
+                if (!string.IsNullOrWhiteSpace(explicitBaselineIndexPath))
+                {
+                    string fullPath = Path.GetFullPath(explicitBaselineIndexPath);
+                    if (File.Exists(fullPath))
+                    {
+                        return fullPath;
+                    }
+                }
+
                 if (string.IsNullOrWhiteSpace(indexPath))
                 {
                     return null;

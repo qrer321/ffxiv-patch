@@ -36,6 +36,12 @@ namespace FfxivKoreanPatch.PatchRouteVerifier
                 string globalUiGame = string.IsNullOrWhiteSpace(options.GlobalUiGamePath)
                     ? globalGame
                     : Path.GetFullPath(options.GlobalUiGamePath);
+                string cleanFontIndex = string.IsNullOrWhiteSpace(options.CleanFontIndexPath)
+                    ? null
+                    : Path.GetFullPath(options.CleanFontIndexPath);
+                string cleanUiIndex = string.IsNullOrWhiteSpace(options.CleanUiIndexPath)
+                    ? null
+                    : Path.GetFullPath(options.CleanUiIndexPath);
                 string globalTextSqpack = Path.Combine(globalTextGame, "sqpack", "ffxiv");
                 string globalFontSqpack = Path.Combine(globalFontGame, "sqpack", "ffxiv");
                 string globalUiSqpack = Path.Combine(globalUiGame, "sqpack", "ffxiv");
@@ -64,7 +70,9 @@ namespace FfxivKoreanPatch.PatchRouteVerifier
                     glyphDumpDir,
                     options.Checks,
                     options.FontPackDir,
-                    compareAppliedOutput);
+                    compareAppliedOutput,
+                    cleanFontIndex,
+                    cleanUiIndex);
                 verifier.Run();
                 return verifier.Failed ? 1 : 0;
             }
@@ -78,7 +86,7 @@ namespace FfxivKoreanPatch.PatchRouteVerifier
 
         private static void PrintUsage()
         {
-            Console.WriteLine("PatchRouteVerifier.exe --output <patch-output-dir> --global <global-game-dir> [--global-text <game-dir>] [--global-font <game-dir>] [--global-ui <game-dir>] [--korea <korean-game-dir>] [--applied-game <game-dir>] [--target-language ja] [--font-pack-dir <dir>] [--glyph-dump-dir <dir>] [--no-glyph-dump] [--checks <name[,name]>]");
+            Console.WriteLine("PatchRouteVerifier.exe --output <patch-output-dir> --global <global-game-dir> [--global-text <game-dir>] [--global-font <game-dir>] [--global-ui <game-dir>] [--clean-font-index <index>] [--clean-ui-index <index>] [--korea <korean-game-dir>] [--applied-game <game-dir>] [--target-language ja] [--font-pack-dir <dir>] [--glyph-dump-dir <dir>] [--no-glyph-dump] [--checks <name[,name]>]");
         }
 
     }

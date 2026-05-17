@@ -5,7 +5,7 @@ namespace FfxivKoreanPatch.PatchRouteVerifier
 {
     internal static partial class PatchRouteVerifier
     {
-        private const int InGameGlyphTextureNeighborhoodPadding = 2;
+        private const int InGameGlyphTextureNeighborhoodPadding = 8;
 
         private sealed partial class Verifier
         {

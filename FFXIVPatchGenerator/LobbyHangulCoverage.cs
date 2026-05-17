@@ -17,29 +17,59 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
             "common/font/MiedingerMid_14_lobby.fdt",
             "common/font/MiedingerMid_18_lobby.fdt",
             "common/font/MiedingerMid_36_lobby.fdt",
+            "common/font/TrumpGothic_23_lobby.fdt",
+            "common/font/TrumpGothic_34_lobby.fdt",
             "common/font/TrumpGothic_68_lobby.fdt"
         };
 
-        public static readonly LobbyHangulCoverageRowSpec[] Rows = new LobbyHangulCoverageRowSpec[]
+        public static readonly string[] HighScaleTargetFontPaths = new string[]
         {
-            new LobbyHangulCoverageRowSpec("Lobby", 2003, 2009),
-            new LobbyHangulCoverageRowSpec("Lobby", 2052, 2059),
-            new LobbyHangulCoverageRowSpec("Addon", 2744, 2744),
-            new LobbyHangulCoverageRowSpec("Addon", 4000, 4000),
-            new LobbyHangulCoverageRowSpec("Addon", 4000, 4200),
-            new LobbyHangulCoverageRowSpec("Addon", 8683, 8722),
-            new LobbyHangulCoverageRowSpec("Lobby", 23, 24),
-            new LobbyHangulCoverageRowSpec("Lobby", 41, 53),
-            new LobbyHangulCoverageRowSpec("Lobby", 101, 101),
-            new LobbyHangulCoverageRowSpec("Lobby", 507, 507),
-            new LobbyHangulCoverageRowSpec("Lobby", 841, 842),
-            new LobbyHangulCoverageRowSpec("Lobby", 849, 850),
-            new LobbyHangulCoverageRowSpec("Lobby", 921, 921),
-            new LobbyHangulCoverageRowSpec("Lobby", 975, 975),
-            new LobbyHangulCoverageRowSpec("Lobby", 1100, 1233),
-            new LobbyHangulCoverageRowSpec("Lobby", 2019, 2019),
-            new LobbyHangulCoverageRowSpec("Lobby", 2066, 2066),
-            new LobbyHangulCoverageRowSpec("Error", 13206, 13220),
+            "common/font/AXIS_36_lobby.fdt",
+            "common/font/Jupiter_46_lobby.fdt",
+            "common/font/Jupiter_90_lobby.fdt",
+            "common/font/Meidinger_40_lobby.fdt",
+            "common/font/MiedingerMid_36_lobby.fdt",
+            "common/font/TrumpGothic_68_lobby.fdt"
+        };
+
+        public static readonly LobbyHangulCoverageRowSpec[] Rows = CreateFullSheetRows(
+            "Lobby",
+            "Error",
+            "Addon",
+            "ClassJob",
+            "Race",
+            "Tribe",
+            "GuardianDeity");
+
+        public static readonly LobbyHangulCoverageRowSpec[] StartMainMenuRows = CreateFullSheetRows(
+            "Lobby",
+            "Error",
+            "Addon",
+            "ClassJob",
+            "Race",
+            "Tribe",
+            "GuardianDeity");
+
+        public static readonly LobbyHangulCoverageRowSpec[] SystemSettingsRows = CreateFullSheetRows(
+            "Lobby",
+            "Error",
+            "Addon",
+            "ClassJob",
+            "Race",
+            "Tribe",
+            "GuardianDeity");
+
+        public static readonly LobbyHangulCoverageRowSpec[] CharacterSelectRows = CreateFullSheetRows(
+            "Lobby",
+            "Error",
+            "Addon",
+            "ClassJob",
+            "Race",
+            "Tribe",
+            "GuardianDeity");
+
+        public static readonly LobbyHangulCoverageRowSpec[] LargeLabelRows = new LobbyHangulCoverageRowSpec[]
+        {
             new LobbyHangulCoverageRowSpec("ClassJob", 0, 43),
             new LobbyHangulCoverageRowSpec("Race", 1, 8),
             new LobbyHangulCoverageRowSpec("Tribe", 1, 16),
@@ -68,9 +98,34 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
                 StringComparison.OrdinalIgnoreCase);
         }
 
+        public static bool IsHighScaleTargetFontPath(string path)
+        {
+            string normalized = Normalize(path);
+            for (int i = 0; i < HighScaleTargetFontPaths.Length; i++)
+            {
+                if (string.Equals(normalized, HighScaleTargetFontPaths[i], StringComparison.OrdinalIgnoreCase))
+                {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
         private static string Normalize(string path)
         {
             return (path ?? string.Empty).Replace('\\', '/').Trim();
+        }
+
+        private static LobbyHangulCoverageRowSpec[] CreateFullSheetRows(params string[] sheets)
+        {
+            LobbyHangulCoverageRowSpec[] rows = new LobbyHangulCoverageRowSpec[sheets.Length];
+            for (int i = 0; i < sheets.Length; i++)
+            {
+                rows[i] = new LobbyHangulCoverageRowSpec(sheets[i], 0, uint.MaxValue);
+            }
+
+            return rows;
         }
     }
 

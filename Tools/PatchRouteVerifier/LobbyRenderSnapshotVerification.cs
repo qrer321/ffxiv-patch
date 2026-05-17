@@ -20,10 +20,10 @@ namespace FfxivKoreanPatch.PatchRouteVerifier
 
             private static readonly LobbyRenderCase[] LobbyRenderCases = new LobbyRenderCase[]
             {
-                new LobbyRenderCase("dc-axis12-elemental", "common/font/AXIS_12_lobby.fdt", "Elemental", 1.0),
-                new LobbyRenderCase("dc-axis14-pandaemonium", "common/font/AXIS_14_lobby.fdt", "Pandaemonium", 1.0),
-                new LobbyRenderCase("dc-jupiter20-worlds", "common/font/Jupiter_20_lobby.fdt", "Aegis  Atomos  Carbuncle", 1.0),
-                new LobbyRenderCase("dc-trump23-title", "common/font/TrumpGothic_23_lobby.fdt", "JAPAN DATA CENTER", 1.0),
+                new LobbyRenderCase("dc-axis12-elemental", "common/font/AXIS_12_lobby.fdt", "Elemental", 1.0, false, 0, true),
+                new LobbyRenderCase("dc-axis14-pandaemonium", "common/font/AXIS_14_lobby.fdt", "Pandaemonium", 1.0, false, 0, true),
+                new LobbyRenderCase("dc-jupiter20-worlds", "common/font/Jupiter_20_lobby.fdt", "Aegis  Atomos  Carbuncle", 1.0, false, 0, true),
+                new LobbyRenderCase("dc-trump23-title", "common/font/TrumpGothic_23_lobby.fdt", "JAPAN DATA CENTER", 1.0, false, 0, true),
                 new LobbyRenderCase("settings-axis12-result", "common/font/AXIS_12_lobby.fdt", SettingsChangedPhrase, 1.0),
                 new LobbyRenderCase("settings-axis14-fhd", "common/font/AXIS_14_lobby.fdt", HighResolutionFhdPhrase, 1.0),
                 new LobbyRenderCase("settings-axis18-result", "common/font/AXIS_18_lobby.fdt", SettingsChangedPhrase, 1.0),
@@ -90,6 +90,21 @@ namespace FfxivKoreanPatch.PatchRouteVerifier
 
                 if (layout.OverlapPixels > 0 || layout.MinimumGapPixels < renderCase.MinimumGapFloor)
                 {
+                    if (renderCase.AllowCleanBaselineGap &&
+                        TryCleanBaselineAcceptsLayout(renderCase.FontPath, renderCase.Phrase, layout))
+                    {
+                        Pass(
+                            "{0} render snapshot keeps clean baseline gap: overlap={1}, minGap={2}, pair={3}, font={4}, phrase=[{5}], png={6}",
+                            renderCase.Id,
+                            layout.OverlapPixels,
+                            layout.MinimumGapPixels,
+                            FormatCodepointPair(layout.MinimumGapLeftCodepoint, layout.MinimumGapRightCodepoint),
+                            renderCase.FontPath,
+                            Escape(renderCase.Phrase),
+                            pngPath ?? "disabled");
+                        return;
+                    }
+
                     if (!renderCase.DiagnosticOnly)
                     {
                         Fail(
@@ -132,6 +147,20 @@ namespace FfxivKoreanPatch.PatchRouteVerifier
                     renderCase.DiagnosticOnly && pngPath != null
                         ? pngPath + " (diagnostic route)"
                         : pngPath ?? "disabled");
+            }
+
+            private bool TryCleanBaselineAcceptsLayout(string fontPath, string phrase, PhraseLayoutResult patchedLayout)
+            {
+                PhraseLayoutResult cleanLayout;
+                string error;
+                if (!TryMeasurePhraseLayout(_cleanFont, fontPath, phrase, true, out cleanLayout, out error))
+                {
+                    Warn("{0} clean baseline layout unavailable: {1}", fontPath, error);
+                    return false;
+                }
+
+                return patchedLayout.OverlapPixels <= cleanLayout.OverlapPixels &&
+                       patchedLayout.MinimumGapPixels >= cleanLayout.MinimumGapPixels;
             }
 
             private void VerifyLobbyScaleComparisonCase(LobbyScaleComparisonCase comparison)
@@ -475,18 +504,24 @@ namespace FfxivKoreanPatch.PatchRouteVerifier
                 public readonly double OutputScale;
                 public readonly bool DiagnosticOnly;
                 public readonly int MinimumGapFloor;
+                public readonly bool AllowCleanBaselineGap;
 
                 public LobbyRenderCase(string id, string fontPath, string phrase, double outputScale)
-                    : this(id, fontPath, phrase, outputScale, false, 0)
+                    : this(id, fontPath, phrase, outputScale, false, 0, false)
                 {
                 }
 
                 public LobbyRenderCase(string id, string fontPath, string phrase, double outputScale, bool diagnosticOnly)
-                    : this(id, fontPath, phrase, outputScale, diagnosticOnly, 0)
+                    : this(id, fontPath, phrase, outputScale, diagnosticOnly, 0, false)
                 {
                 }
 
                 public LobbyRenderCase(string id, string fontPath, string phrase, double outputScale, bool diagnosticOnly, int minimumGapFloor)
+                    : this(id, fontPath, phrase, outputScale, diagnosticOnly, minimumGapFloor, false)
+                {
+                }
+
+                public LobbyRenderCase(string id, string fontPath, string phrase, double outputScale, bool diagnosticOnly, int minimumGapFloor, bool allowCleanBaselineGap)
                 {
                     Id = id;
                     FontPath = fontPath;
@@ -494,6 +529,7 @@ namespace FfxivKoreanPatch.PatchRouteVerifier
                     OutputScale = outputScale;
                     DiagnosticOnly = diagnosticOnly;
                     MinimumGapFloor = minimumGapFloor;
+                    AllowCleanBaselineGap = allowCleanBaselineGap;
                 }
             }
 

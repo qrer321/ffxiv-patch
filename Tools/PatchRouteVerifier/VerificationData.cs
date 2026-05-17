@@ -53,6 +53,21 @@ namespace FfxivKoreanPatch.PatchRouteVerifier
             { "common/font/TrumpGothic_68_lobby.fdt", "common/font/TrumpGothic_68.fdt" }
         };
 
+        private static readonly string[,] LobbyHangulSourceFontPairs = new string[,]
+        {
+            { "common/font/MiedingerMid_12_lobby.fdt", "common/font/AXIS_12_lobby.fdt" },
+            { "common/font/MiedingerMid_14_lobby.fdt", "common/font/AXIS_14_lobby.fdt" },
+            { "common/font/MiedingerMid_18_lobby.fdt", "common/font/AXIS_18_lobby.fdt" },
+            { "common/font/TrumpGothic_23_lobby.fdt", "common/font/AXIS_18_lobby.fdt" },
+            { "common/font/TrumpGothic_34_lobby.fdt", "common/font/AXIS_18_lobby.fdt" },
+            { "common/font/AXIS_36_lobby.fdt", "common/font/AXIS_36.fdt" },
+            { "common/font/Jupiter_46_lobby.fdt", "common/font/AXIS_36.fdt" },
+            { "common/font/Jupiter_90_lobby.fdt", "common/font/AXIS_36.fdt" },
+            { "common/font/Meidinger_40_lobby.fdt", "common/font/AXIS_36.fdt" },
+            { "common/font/MiedingerMid_36_lobby.fdt", "common/font/AXIS_36.fdt" },
+            { "common/font/TrumpGothic_68_lobby.fdt", "common/font/AXIS_36.fdt" }
+        };
+
         private static readonly string[] Derived4kLobbyRequiredHangulPhrases = LobbyScaledHangulPhrases.All;
 
         private static readonly uint[] Derived4kLobbyRequiredHangulCodepoints = CreateHangulCodepoints(Derived4kLobbyRequiredHangulPhrases);
@@ -122,10 +137,15 @@ namespace FfxivKoreanPatch.PatchRouteVerifier
         private static bool IsCombatFlyTextSourceFontPath(string fontPath)
         {
             string normalized = (fontPath ?? string.Empty).Replace('\\', '/');
-            return string.Equals(normalized, "common/font/TrumpGothic_23.fdt", System.StringComparison.OrdinalIgnoreCase) ||
-                   string.Equals(normalized, "common/font/TrumpGothic_34.fdt", System.StringComparison.OrdinalIgnoreCase) ||
-                   string.Equals(normalized, "common/font/TrumpGothic_68.fdt", System.StringComparison.OrdinalIgnoreCase) ||
-                   string.Equals(normalized, "common/font/TrumpGothic_184.fdt", System.StringComparison.OrdinalIgnoreCase);
+            if (!normalized.EndsWith(".fdt", System.StringComparison.OrdinalIgnoreCase) ||
+                normalized.IndexOf("_lobby.fdt", System.StringComparison.OrdinalIgnoreCase) >= 0)
+            {
+                return false;
+            }
+
+            return normalized.IndexOf("/TrumpGothic_", System.StringComparison.OrdinalIgnoreCase) >= 0 ||
+                   string.Equals(normalized, "common/font/Jupiter_45.fdt", System.StringComparison.OrdinalIgnoreCase) ||
+                   string.Equals(normalized, "common/font/Jupiter_90.fdt", System.StringComparison.OrdinalIgnoreCase);
         }
 
         private struct UldRouteCandidate

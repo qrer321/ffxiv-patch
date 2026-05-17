@@ -91,10 +91,22 @@ namespace FfxivKoreanPatch.PatchRouteVerifier
 
             int width = ReadU16(tex, 8);
             int height = ReadU16(tex, 10);
+            int mipmapCount = ReadU16(tex, 0x0E);
+            if (mipmapCount <= 0 || 0x1C + mipmapCount * 4 > tex.Length)
+            {
+                mipmapCount = 1;
+            }
+
+            int[] mipmapOffsets = new int[mipmapCount];
+            for (int i = 0; i < mipmapCount; i++)
+            {
+                mipmapOffsets[i] = (int)ReadU32(tex, 0x1C + i * 4);
+            }
+
             int offset = checked((int)ReadU32(tex, 0x1C));
             byte[] data = new byte[checked(width * height * 2)];
             Buffer.BlockCopy(tex, offset, data, 0, data.Length);
-            return new Texture { Width = width, Height = height, Data = data };
+            return new Texture { Width = width, Height = height, Data = data, Raw = tex, MipmapCount = mipmapCount, MipmapOffsets = mipmapOffsets };
         }
 
         private static ushort ReadU16(byte[] data, int offset)
@@ -115,6 +127,9 @@ namespace FfxivKoreanPatch.PatchRouteVerifier
             public int Width;
             public int Height;
             public byte[] Data;
+            public byte[] Raw;
+            public int MipmapCount;
+            public int[] MipmapOffsets;
         }
     }
 }

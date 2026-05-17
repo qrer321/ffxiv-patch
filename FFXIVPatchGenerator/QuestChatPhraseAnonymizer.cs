@@ -5,6 +5,13 @@ using System.Text;
 
 namespace FfxivKoreanPatch.FFXIVPatchGenerator
 {
+    internal static class QuestChatPhraseAnonymizationFeature
+    {
+        public const bool Enabled = false;
+        public const string DisabledWarning =
+            "Say quest chat phrase anonymization is disabled because sheet coverage is incomplete.";
+    }
+
     internal static class QuestChatPhraseAnonymizer
     {
         private const int QuestDialogueColumnIndex = 1;

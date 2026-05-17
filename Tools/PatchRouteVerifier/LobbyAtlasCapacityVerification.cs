@@ -10,7 +10,7 @@ namespace FfxivKoreanPatch.PatchRouteVerifier
     {
         private sealed partial class Verifier
         {
-            private const int LobbyAtlasPadding = 4;
+            private const int LobbyAtlasPadding = 0;
             private const int MaxLobbyCoverageGlyphFailures = 80;
 
             private static readonly string[] LobbyAtlasTexturePaths = new string[]
@@ -164,8 +164,18 @@ namespace FfxivKoreanPatch.PatchRouteVerifier
                 CollectLobbyFontsByScreen(fontsByScreen, "start-system-settings", StartScreenSystemSettingsUldCandidates);
                 CollectLobbyFontsByScreen(fontsByScreen, "start-main-menu", StartScreenMainMenuUldCandidates);
                 CollectLobbyFontsByScreen(fontsByScreen, "character-select", CharacterSelectLobbyUldCandidates);
+                AddHighScaleLobbyFonts(fontsByScreen);
 
                 return fontsByScreen;
+            }
+
+            private static void AddHighScaleLobbyFonts(Dictionary<string, HashSet<string>> fontsByScreen)
+            {
+                HashSet<string> fonts = GetOrAddStringSet(fontsByScreen, "high-scale-lobby");
+                for (int i = 0; i < LobbyHangulCoverage.HighScaleTargetFontPaths.Length; i++)
+                {
+                    fonts.Add(LobbyHangulCoverage.HighScaleTargetFontPaths[i]);
+                }
             }
 
             private void CollectLobbyFontsByScreen(
@@ -259,73 +269,59 @@ namespace FfxivKoreanPatch.PatchRouteVerifier
                     new LobbyCoverageGroup(
                         "start-main-menu",
                         new string[] { "start-main-menu" },
-                        new LobbyCoverageRowSpec[]
-                        {
-                            new LobbyCoverageRowSpec("Lobby", 2003, 2009),
-                            new LobbyCoverageRowSpec("Lobby", 2052, 2059),
-                            new LobbyCoverageRowSpec("Addon", 2744, 2744),
-                            new LobbyCoverageRowSpec("Addon", 4000, 4000)
-                        }),
+                        CreateFullSheetCoverageRows(
+                            "Lobby",
+                            "Error",
+                            "Addon",
+                            "ClassJob",
+                            "Race",
+                            "Tribe",
+                            "GuardianDeity")),
                     new LobbyCoverageGroup(
                         "start-system-settings",
                         new string[] { "start-system-settings" },
-                        CreateStartSystemSettingsCoverageRows()),
+                        CreateFullSheetCoverageRows(
+                            "Lobby",
+                            "Error",
+                            "Addon",
+                            "ClassJob",
+                            "Race",
+                            "Tribe",
+                            "GuardianDeity")),
                     new LobbyCoverageGroup(
-                        "character-select-core",
+                        "character-select",
                         new string[] { "character-select" },
-                        new LobbyCoverageRowSpec[]
-                        {
-                            new LobbyCoverageRowSpec("Lobby", 23, 24),
-                            new LobbyCoverageRowSpec("Lobby", 41, 53),
-                            new LobbyCoverageRowSpec("Lobby", 101, 101),
-                            new LobbyCoverageRowSpec("Lobby", 507, 507),
-                            new LobbyCoverageRowSpec("Lobby", 841, 842),
-                            new LobbyCoverageRowSpec("Lobby", 849, 850),
-                            new LobbyCoverageRowSpec("Lobby", 921, 921),
-                            new LobbyCoverageRowSpec("Lobby", 975, 975),
-                            new LobbyCoverageRowSpec("Lobby", 1100, 1104),
-                            new LobbyCoverageRowSpec("Lobby", 1150, 1150),
-                            new LobbyCoverageRowSpec("Lobby", 1223, 1223),
-                            new LobbyCoverageRowSpec("Lobby", 2019, 2019),
-                            new LobbyCoverageRowSpec("Lobby", 2066, 2066)
-                        }),
+                        CreateFullSheetCoverageRows(
+                            "Lobby",
+                            "Error",
+                            "Addon",
+                            "ClassJob",
+                            "Race",
+                            "Tribe",
+                            "GuardianDeity")),
                     new LobbyCoverageGroup(
-                        "character-select-world-transfer",
-                        new string[] { "character-select" },
-                        new LobbyCoverageRowSpec[]
-                        {
-                            new LobbyCoverageRowSpec("Lobby", 1100, 1233),
-                            new LobbyCoverageRowSpec("Error", 13206, 13220)
-                        }),
-                    new LobbyCoverageGroup(
-                        "character-select-class-race-tribe",
-                        new string[] { "character-select" },
-                        new LobbyCoverageRowSpec[]
-                        {
-                            new LobbyCoverageRowSpec("ClassJob", 0, 43),
-                            new LobbyCoverageRowSpec("Race", 1, 8),
-                            new LobbyCoverageRowSpec("Tribe", 1, 16)
-                        }),
-                    new LobbyCoverageGroup(
-                        "character-select-guardian-deity-names",
-                        new string[] { "character-select" },
-                        new LobbyCoverageRowSpec[]
-                        {
-                            new LobbyCoverageRowSpec("GuardianDeity", 1, 12, 0)
-                        })
+                        "high-scale-lobby",
+                        new string[] { "high-scale-lobby" },
+                        CreateFullSheetCoverageRows(
+                            "Lobby",
+                            "Error",
+                            "Addon",
+                            "ClassJob",
+                            "Race",
+                            "Tribe",
+                            "GuardianDeity"))
                 };
             }
 
-            private static LobbyCoverageRowSpec[] CreateStartSystemSettingsCoverageRows()
+            private static LobbyCoverageRowSpec[] CreateFullSheetCoverageRows(params string[] sheets)
             {
-                List<LobbyCoverageRowSpec> rows = new List<LobbyCoverageRowSpec>();
-                for (int i = 0; i < LobbyScaledHangulPhrases.StartScreenSystemSettingsAddonRowRanges.Length; i++)
+                LobbyCoverageRowSpec[] rows = new LobbyCoverageRowSpec[sheets.Length];
+                for (int i = 0; i < sheets.Length; i++)
                 {
-                    AddonRowRange range = LobbyScaledHangulPhrases.StartScreenSystemSettingsAddonRowRanges[i];
-                    rows.Add(new LobbyCoverageRowSpec("Addon", range.StartId, range.EndId));
+                    rows[i] = new LobbyCoverageRowSpec(sheets[i], 0, uint.MaxValue);
                 }
 
-                return rows.ToArray();
+                return rows;
             }
 
             private HashSet<string> ResolveCoverageGroupFonts(
@@ -1271,9 +1267,17 @@ namespace FfxivKoreanPatch.PatchRouteVerifier
             private static List<LobbySourceCandidate> CreateLobbySourceCandidates(string targetFontPath)
             {
                 List<LobbySourceCandidate> candidates = new List<LobbySourceCandidate>();
+                string normalized = targetFontPath.Replace('\\', '/');
+                for (int i = 0; i < LobbyHangulSourceFontPairs.GetLength(0); i++)
+                {
+                    if (string.Equals(normalized, LobbyHangulSourceFontPairs[i, 0], StringComparison.OrdinalIgnoreCase))
+                    {
+                        AddSourceCandidate(candidates, LobbyHangulSourceFontPairs[i, 1], true);
+                    }
+                }
+
                 AddSourceCandidate(candidates, targetFontPath, true);
 
-                string normalized = targetFontPath.Replace('\\', '/');
                 if (normalized.EndsWith("_lobby.fdt", StringComparison.OrdinalIgnoreCase))
                 {
                     AddSourceCandidate(candidates, normalized.Substring(0, normalized.Length - "_lobby.fdt".Length) + ".fdt", true);

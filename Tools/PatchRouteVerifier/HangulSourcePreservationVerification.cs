@@ -195,7 +195,7 @@ namespace FfxivKoreanPatch.PatchRouteVerifier
                 string normalized = fontPath.Replace('\\', '/');
                 if (actionDetailHighScaleCodepoints != null &&
                     actionDetailHighScaleCodepoints.Contains(codepoint) &&
-                    ActionDetailHighScaleHangulGlyphs.IsTargetFontPath(normalized))
+                    ActionDetailHighScaleHangulGlyphs.IsVisualScaleTargetFontPath(normalized))
                 {
                     return true;
                 }

@@ -43,6 +43,7 @@
     <Compile Include="CliOptions.cs" />
     <Compile Include="CleanAsciiKerningRouteVerification.cs" />
     <Compile Include="CleanAsciiFontRouteVerification.cs" />
+    <Compile Include="CombatFlyTextDamageVerification.cs" />
     <Compile Include="ConfigurationSharingVerification.cs" />
     <Compile Include="DataCenterLabelAssertions.cs" />
     <Compile Include="DataCenterLabelExpectations.cs" />
@@ -61,6 +62,7 @@
     <Compile Include="FdtKerningParsing.cs" />
     <Compile Include="FontGuardVerificationData.cs" />
     <Compile Include="FontGuardVerification.cs" />
+    <Compile Include="FontOnlyOutputScopeVerification.cs" />
     <Compile Include="FontGlyphRendering.cs" />
     <Compile Include="FontTextureLoading.cs" />
     <Compile Include="FontRouteVerification.cs" />
@@ -84,6 +86,8 @@
     <Compile Include="GlyphTextureNeighborhoodVerification.cs" />
     <Compile Include="GlyphVisibilityAssertions.cs" />
     <Compile Include="HangulSourcePreservationVerification.cs" />
+    <Compile Include="InGameCleanAsciiGlyphVerification.cs" />
+    <Compile Include="InGameFontRiskSurveyVerification.cs" />
     <Compile Include="InGameTextureNeighborhoodVerification.cs" />
     <Compile Include="KoreanLobbyFontSourceVerification.cs" />
     <Compile Include="LobbyGlyphDiagnosticComparison.cs" />
@@ -98,6 +102,7 @@
     <Compile Include="LobbyRouteSurveyVerification.cs" />
     <Compile Include="LobbyHangulSourceCellVerification.cs" />
     <Compile Include="LobbyScaleFontSourceVerification.cs" />
+    <Compile Include="LobbyLargeLabelScaleVerification.cs" />
     <Compile Include="LobbySourceCellConflictVerification.cs" />
     <Compile Include="LobbyTtmpAsciiDeltaVerification.cs" />
     <Compile Include="LobbyTtmpPayloadVerification.cs" />
@@ -113,6 +118,7 @@
     <Compile Include="PhraseOverlapVerification.cs" />
     <Compile Include="ProtectedGlyphVerification.cs" />
     <Compile Include="ReportedInGamePhraseVerification.cs" />
+    <Compile Include="ThirdPartyGameFontSafetyVerification.cs" />
     <Compile Include="TtmpFontPackage.cs" />
     <Compile Include="TtmpGlyphRendering.cs" />
     <Compile Include="UldFontPathResolver.cs" />

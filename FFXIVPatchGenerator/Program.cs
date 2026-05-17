@@ -109,7 +109,7 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
             Console.WriteLine("  --sheet            Limit to one root.exl sheet name for testing.");
             Console.WriteLine("  --policy           Optional JSON patch policy file.");
             Console.WriteLine("  --anonymize-quest-chat-phrases");
-            Console.WriteLine("                     Replace quest /say input phrases with short ASCII tokens.");
+            Console.WriteLine("                     Disabled/no-op until quest say sheet coverage is complete.");
             Console.WriteLine("  --diagnostic-csv   Export row/column comparison CSV for a sheet.");
             Console.WriteLine("  --base-index       Clean global 0a0000.win32.index to use instead of installed index.");
             Console.WriteLine("  --base-index2      Clean global 0a0000.win32.index2 to use instead of installed index2.");
@@ -232,11 +232,15 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
         public bool AllowVersionMismatch;
         public bool SkipUiTextureFix;
         public bool IncludeCommandSheets = true;
-        public bool AnonymizeQuestChatPhrases;
+        public bool AnonymizeQuestChatPhrasesRequested;
+        public bool AnonymizeQuestChatPhrases
+        {
+            get { return AnonymizeQuestChatPhrasesRequested && QuestChatPhraseAnonymizationFeature.Enabled; }
+        }
 
         public bool ShouldBuildUiTextureFix
         {
-            get { return IncludeFont && !SkipUiTextureFix; }
+            get { return IncludeFont && !FontOnly && !SkipUiTextureFix; }
         }
 
         public static BuildOptions Parse(string[] args)
@@ -278,7 +282,7 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
 
                 if (string.Equals(arg, "--anonymize-quest-chat-phrases", StringComparison.OrdinalIgnoreCase))
                 {
-                    options.AnonymizeQuestChatPhrases = true;
+                    options.AnonymizeQuestChatPhrasesRequested = true;
                     continue;
                 }
 

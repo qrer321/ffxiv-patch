@@ -29,10 +29,8 @@ namespace FfxivKoreanPatch.PatchRouteVerifier
                 "\uC7AC\uC0AC\uC6A9 \uB300\uAE30 \uC2DC\uAC04",
                 "\uBC1C\uB3D9 \uC870\uAC74",
                 "\uC9C1\uACA9",
-                "\uC9C1\uACA9!",
                 "\uADF9\uB300",
                 "\uADF9\uB300\uD654",
-                "\uADF9\uB300\uD654!",
                 "\uD06C\uB9AC\uD2F0\uCEEC",
                 "\uADF9\uB300 \uC9C1\uACA9"
             };

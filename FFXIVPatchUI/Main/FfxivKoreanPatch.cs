@@ -4369,7 +4369,10 @@ namespace FFXIVKoreanPatch.Main
             if (includeFontPatch)
             {
                 files.AddRange(fontPatchFiles);
-                files.AddRange(uiPatchFiles);
+                if (includeTextPatch)
+                {
+                    files.AddRange(uiPatchFiles);
+                }
             }
 
             return files.Distinct(StringComparer.OrdinalIgnoreCase).ToArray();
@@ -4453,8 +4456,7 @@ namespace FFXIVKoreanPatch.Main
                 }
                 else if (buildTextPatch)
                 {
-                    arguments += " --anonymize-quest-chat-phrases";
-                    logLines.Add("Say quest chat phrase anonymization: enabled");
+                    logLines.Add("Say quest chat phrase anonymization: disabled (sheet coverage incomplete)");
                 }
 
                 string patchPolicyPath = FindPatchPolicyPath(patchGeneratorPath);

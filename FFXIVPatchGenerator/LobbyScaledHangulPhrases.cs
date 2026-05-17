@@ -96,12 +96,23 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
             "\uC885\uB8CC"
         };
 
+        public static readonly string[] CharacterSelectLargeLabels = new string[]
+        {
+            "\uB85C\uC2A4\uAC00\uB974 \uC5EC",
+            "\uB5A0\uB3C4\uB294 \uBCC4",
+            "\uADF8\uB9BC\uC790 5\uC6D4 11\uC77C",
+            "\uB2C8\uBA54\uC774\uC544",
+            "\uB808\uBCA8 100 \uC554\uD751\uAE30\uC0AC",
+            "\uC9C0\uACE0\uCC9C \uAC70\uB9AC"
+        };
+
         public static readonly string[] All = Combine(
             Core,
             StartScreenSystemSettings,
             HighResolutionUiScaleOptions,
             StartScreenSystemSettingsResultMessages,
-            StartScreenMainMenu);
+            StartScreenMainMenu,
+            CharacterSelectLargeLabels);
 
         private static string[] Combine(params string[][] groups)
         {

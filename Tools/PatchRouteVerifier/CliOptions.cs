@@ -12,6 +12,8 @@ namespace FfxivKoreanPatch.PatchRouteVerifier
             public string GlobalTextGamePath;
             public string GlobalFontGamePath;
             public string GlobalUiGamePath;
+            public string CleanFontIndexPath;
+            public string CleanUiIndexPath;
             public string KoreaGamePath;
             public string FontPackDir;
             public string TargetLanguage = "ja";
@@ -50,6 +52,14 @@ namespace FfxivKoreanPatch.PatchRouteVerifier
                     else if (string.Equals(arg, "--global-ui", StringComparison.OrdinalIgnoreCase))
                     {
                         options.GlobalUiGamePath = RequireValue(args, ref i, arg);
+                    }
+                    else if (string.Equals(arg, "--clean-font-index", StringComparison.OrdinalIgnoreCase))
+                    {
+                        options.CleanFontIndexPath = RequireValue(args, ref i, arg);
+                    }
+                    else if (string.Equals(arg, "--clean-ui-index", StringComparison.OrdinalIgnoreCase))
+                    {
+                        options.CleanUiIndexPath = RequireValue(args, ref i, arg);
                     }
                     else if (string.Equals(arg, "--korea", StringComparison.OrdinalIgnoreCase))
                     {

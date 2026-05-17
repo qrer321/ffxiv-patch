@@ -11,6 +11,10 @@ param(
 
     [string]$GlobalUi,
 
+    [string]$CleanFontIndex,
+
+    [string]$CleanUiIndex,
+
     [string]$Korea,
 
     [string]$AppliedGame,
@@ -52,6 +56,12 @@ if (![string]::IsNullOrWhiteSpace($GlobalFont)) {
 }
 if (![string]::IsNullOrWhiteSpace($GlobalUi)) {
     $arguments += @("--global-ui", $GlobalUi)
+}
+if (![string]::IsNullOrWhiteSpace($CleanFontIndex)) {
+    $arguments += @("--clean-font-index", $CleanFontIndex)
+}
+if (![string]::IsNullOrWhiteSpace($CleanUiIndex)) {
+    $arguments += @("--clean-ui-index", $CleanUiIndex)
 }
 if (![string]::IsNullOrWhiteSpace($Korea)) {
     $arguments += @("--korea", $Korea)

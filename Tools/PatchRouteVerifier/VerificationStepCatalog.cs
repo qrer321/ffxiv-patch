@@ -8,6 +8,7 @@ namespace FfxivKoreanPatch.PatchRouteVerifier
             {
                 return new VerificationStep[]
                 {
+                    new VerificationStep("font-only-output-scope", VerifyFontOnlyOutputScope),
                     new VerificationStep("applied-output-files", VerifyAppliedOutputFiles),
                     new VerificationStep("applied-lobby-routes", VerifyAppliedLobbyRoutes),
                     new VerificationStep("lobby-route-survey", VerifyLobbyRouteSurvey),
@@ -33,6 +34,7 @@ namespace FfxivKoreanPatch.PatchRouteVerifier
                     new VerificationStep("system-settings-scaled-phrase-layouts", VerifySystemSettingsScaledPhraseLayouts),
                     new VerificationStep("system-settings-mixed-scale-layouts", VerifySystemSettingsMixedScalePhraseLayouts),
                     new VerificationStep("start-main-menu-phrase-layouts", VerifyStartScreenMainMenuPhraseLayouts),
+                    new VerificationStep("lobby-large-label-scale-layouts", VerifyLobbyLargeLabelScaleLayouts),
                     new VerificationStep("lobby-scale-font-sources", VerifyLobbyScaleFontSourceRoutes),
                     new VerificationStep("korean-lobby-font-sources", VerifyKoreanLobbyFontSourceRoutes),
                     new VerificationStep("lobby-ttmp-payloads", VerifyLobbyTtmpPayloads),
@@ -42,7 +44,11 @@ namespace FfxivKoreanPatch.PatchRouteVerifier
                     new VerificationStep("numeric-glyphs", VerifyNumericGlyphs),
                     new VerificationStep("protected-hangul-glyphs", VerifyProtectedHangulGlyphs),
                     new VerificationStep("hangul-source-preservation", VerifyHangulSourcePreservation),
+                    new VerificationStep("ingame-font-risk-survey", VerifyInGameFontRiskSurvey),
+                    new VerificationStep("third-party-game-font-safety", VerifyThirdPartyGameFontSafety),
+                    new VerificationStep("ingame-clean-ascii-glyphs", VerifyInGameCleanAsciiGlyphs),
                     new VerificationStep("ingame-ttmp-texture-neighborhoods", VerifyInGameTtmpTextureNeighborhoods),
+                    new VerificationStep("combat-flytext-damage-glyphs", VerifyCombatFlyTextDamageGlyphs),
                     new VerificationStep("reported-ingame-hangul-phrases", VerifyReportedInGameHangulPhraseSourcePreservation),
                     new VerificationStep("action-detail-scale-layouts", VerifyActionDetailScaleLayouts),
                     new VerificationStep("party-list-self-marker", VerifyPartyListSelfMarker),

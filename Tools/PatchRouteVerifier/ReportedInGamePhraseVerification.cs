@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using FfxivKoreanPatch.FFXIVPatchGenerator;
 
 namespace FfxivKoreanPatch.PatchRouteVerifier
 {
@@ -35,6 +36,15 @@ namespace FfxivKoreanPatch.PatchRouteVerifier
                 int compared = 0;
                 foreach (string fontPath in fontPaths)
                 {
+                    // Visual-scale TrumpGothic routes are intentionally validated
+                    // by action-detail-scale-layouts. This phrase-level source
+                    // check remains strict for combat terms and other fonts.
+                    if (ActionDetailHighScaleHangulGlyphs.IsVisualScaleTargetFontPath(fontPath) &&
+                        !ActionDetailHighScaleHangulGlyphs.IsCombatFlyTextPreservePhrase(phrase))
+                    {
+                        continue;
+                    }
+
                     if (!_ttmpFont.ContainsPath(fontPath))
                     {
                         continue;
@@ -167,6 +177,11 @@ namespace FfxivKoreanPatch.PatchRouteVerifier
                 PhraseLayoutResult targetLayout)
             {
                 if (!PhraseUsesActionDetailHighScaleRepairedHangul(fontPath, phrase, actionDetailHighScaleCodepoints))
+                {
+                    return false;
+                }
+
+                if (ActionDetailHighScaleHangulGlyphs.IsCombatFlyTextPreservePhrase(phrase))
                 {
                     return false;
                 }

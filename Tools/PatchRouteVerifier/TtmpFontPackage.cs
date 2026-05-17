@@ -56,6 +56,14 @@ namespace FfxivKoreanPatch.PatchRouteVerifier
                 return _payloadsByPath.ContainsKey(NormalizeGamePath(gamePath));
             }
 
+            public string[] GetPayloadPaths()
+            {
+                string[] paths = new string[_payloadsByPath.Count];
+                _payloadsByPath.Keys.CopyTo(paths, 0);
+                Array.Sort(paths, StringComparer.OrdinalIgnoreCase);
+                return paths;
+            }
+
             public byte[] ReadFile(string gamePath)
             {
                 byte[] packed;

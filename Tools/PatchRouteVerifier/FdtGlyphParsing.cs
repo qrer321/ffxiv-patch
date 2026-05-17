@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Text;
 using FfxivKoreanPatch.FFXIVPatchGenerator;
 
 namespace FfxivKoreanPatch.PatchRouteVerifier
@@ -146,6 +147,30 @@ namespace FfxivKoreanPatch.PatchRouteVerifier
                 }
             }
 
+            ushort shiftJisValue;
+            if (TryEncodeShiftJisValue(codepoint, out shiftJisValue))
+            {
+                for (int i = 0; i < glyphCount; i++)
+                {
+                    int offset = glyphStart + i * FdtGlyphEntrySize;
+                    if (Endian.ReadUInt16LE(fdt, offset + 4) == shiftJisValue)
+                    {
+                        glyph = new FdtGlyphEntry
+                        {
+                            ShiftJisValue = Endian.ReadUInt16LE(fdt, offset + 4),
+                            ImageIndex = Endian.ReadUInt16LE(fdt, offset + 6),
+                            X = Endian.ReadUInt16LE(fdt, offset + 8),
+                            Y = Endian.ReadUInt16LE(fdt, offset + 10),
+                            Width = fdt[offset + 12],
+                            Height = fdt[offset + 13],
+                            OffsetX = unchecked((sbyte)fdt[offset + 14]),
+                            OffsetY = unchecked((sbyte)fdt[offset + 15])
+                        };
+                        return true;
+                    }
+                }
+            }
+
             glyph = new FdtGlyphEntry();
             return false;
         }
@@ -224,6 +249,46 @@ namespace FfxivKoreanPatch.PatchRouteVerifier
                           (0x80 | ((codepoint >> 12) & 0x3F)) << 16 |
                           (0x80 | ((codepoint >> 6) & 0x3F)) << 8 |
                           (0x80 | (codepoint & 0x3F)));
+        }
+
+        private static bool TryEncodeShiftJisValue(uint codepoint, out ushort shiftJis)
+        {
+            shiftJis = 0;
+            if (codepoint > 0x10FFFFu)
+            {
+                return false;
+            }
+
+            try
+            {
+                string text = char.ConvertFromUtf32(checked((int)codepoint));
+                Encoding encoding = Encoding.GetEncoding(
+                    932,
+                    EncoderFallback.ExceptionFallback,
+                    DecoderFallback.ExceptionFallback);
+                byte[] bytes = encoding.GetBytes(text);
+                if (bytes.Length == 1)
+                {
+                    shiftJis = bytes[0];
+                    return true;
+                }
+
+                if (bytes.Length == 2)
+                {
+                    shiftJis = (ushort)((bytes[0] << 8) | bytes[1]);
+                    return true;
+                }
+            }
+            catch (EncoderFallbackException)
+            {
+                return false;
+            }
+            catch (ArgumentOutOfRangeException)
+            {
+                return false;
+            }
+
+            return false;
         }
 
         private static bool TryDecodeFdtUtf8Value(uint value, out uint codepoint)
