@@ -40,6 +40,7 @@
     <Compile Include="TextPatchGenerator.cs" />
     <Compile Include="FontPatchGenerator.cs" />
     <Compile Include="ActionDetailHighScaleHangulGlyphs.cs" />
+    <Compile Include="PvpProfileVisualScaleGlyphs.cs" />
     <Compile Include="LobbyScaledHangulPhrases.cs" />
     <Compile Include="LobbyHangulCoverage.cs" />
     <Compile Include="UiPatchGenerator.cs" />

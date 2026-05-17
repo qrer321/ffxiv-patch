@@ -16,6 +16,7 @@ $sources = @(
     "TextPatchGenerator.cs",
     "FontPatchGenerator.cs",
     "ActionDetailHighScaleHangulGlyphs.cs",
+    "PvpProfileVisualScaleGlyphs.cs",
     "LobbyScaledHangulPhrases.cs",
     "LobbyHangulCoverage.cs",
     "UiPatchGenerator.cs",

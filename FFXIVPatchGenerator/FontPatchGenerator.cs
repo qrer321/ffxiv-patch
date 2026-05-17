@@ -211,6 +211,9 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
             uint[] actionDetailHighScaleHangulCodepoints = _options.FontOnly
                 ? null
                 : CreateActionDetailHighScaleHangulCodepoints(outputDir, globalSqpack);
+            uint[] pvpProfileVisualScaleCodepoints = _options.FontOnly
+                ? null
+                : CreatePvpProfileVisualScaleCodepoints(outputDir, globalSqpack);
             LobbyHangulCodepointSets lobbyHangulCodepoints = _options.FontOnly
                 ? null
                 : CreateLobbyHangulCodepointSets(koreaSqpack);
@@ -277,7 +280,7 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
 
                 if (fontPackage != null)
                 {
-                    WriteTtmpFontFiles(fontPackage, globalArchive, mutableIndex, mutableIndex2, datWriter, actionDetailHighScaleHangulCodepoints, lobbyHangulCodepoints);
+                    WriteTtmpFontFiles(fontPackage, globalArchive, mutableIndex, mutableIndex2, datWriter, actionDetailHighScaleHangulCodepoints, pvpProfileVisualScaleCodepoints, lobbyHangulCodepoints);
                 }
                 else
                 {
@@ -341,7 +344,7 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
                 }
 
                 int normalized;
-                long datOffset = WriteFontPayload(datWriter, path, packedFile, null, null, null, null, null, null, null, null, null, out normalized);
+                long datOffset = WriteFontPayload(datWriter, path, packedFile, null, null, null, null, null, null, null, null, null, null, out normalized);
                 LogFontPayloadAdjustments(path, normalized);
                 mutableIndex.SetFileOffset(path, 1, datOffset);
                 mutableIndex2.SetFileOffset(path, 1, datOffset);
@@ -356,6 +359,7 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
             SqPackIndex2File mutableIndex2,
             SqPackDatWriter datWriter,
             uint[] actionDetailHighScaleHangulCodepoints,
+            uint[] pvpProfileVisualScaleCodepoints,
             LobbyHangulCodepointSets lobbyHangulCodepoints)
         {
             using (FileStream mpdStream = new FileStream(fontPackage.MpdPath, FileMode.Open, FileAccess.Read, FileShare.ReadWrite))
@@ -471,7 +475,7 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
                     }
                     else
                     {
-                        datOffset = WriteFontPayload(datWriter, path, packedFile, mpdStream, payloadsByPath, dialogueGlyphRepair, glyphRepair, globalArchive, texturePatches, lobbyHangulAllocationCache, actionDetailHighScaleHangulCodepoints, lobbyHangulCodepoints, out normalized);
+                        datOffset = WriteFontPayload(datWriter, path, packedFile, mpdStream, payloadsByPath, dialogueGlyphRepair, glyphRepair, globalArchive, texturePatches, lobbyHangulAllocationCache, actionDetailHighScaleHangulCodepoints, pvpProfileVisualScaleCodepoints, lobbyHangulCodepoints, out normalized);
                     }
 
                     LogFontPayloadAdjustments(path, normalized);
@@ -492,6 +496,7 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
                     texturePatches,
                     lobbyHangulAllocationCache,
                     actionDetailHighScaleHangulCodepoints,
+                    pvpProfileVisualScaleCodepoints,
                     lobbyHangulCodepoints);
 
                 foreach (KeyValuePair<string, List<FontTexturePatch>> pair in texturePatches)
@@ -554,6 +559,7 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
             Dictionary<string, List<FontTexturePatch>> texturePatches,
             LobbyHangulGlyphAllocationCache lobbyHangulAllocationCache,
             uint[] actionDetailHighScaleHangulCodepoints,
+            uint[] pvpProfileVisualScaleCodepoints,
             LobbyHangulCodepointSets lobbyHangulCodepoints)
         {
             for (int i = 0; i < Derived4kLobbyFonts.Length; i++)
@@ -610,6 +616,7 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
                     texturePatches,
                     lobbyHangulAllocationCache,
                     actionDetailHighScaleHangulCodepoints,
+                    pvpProfileVisualScaleCodepoints,
                     lobbyHangulCodepoints,
                     out normalized);
 
@@ -919,6 +926,7 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
             Dictionary<string, List<FontTexturePatch>> texturePatches,
             LobbyHangulGlyphAllocationCache lobbyHangulAllocationCache,
             uint[] actionDetailHighScaleHangulCodepoints,
+            uint[] pvpProfileVisualScaleCodepoints,
             LobbyHangulCodepointSets lobbyHangulCodepoints,
             out int normalized)
         {
@@ -929,7 +937,7 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
             }
 
             byte[] fdt = SqPackArchive.UnpackStandardFile(packedFile);
-            return WritePreparedFontFdtPayload(datWriter, path, fdt, packedFile, 0, mpdStream, payloadsByPath, dialogueGlyphRepair, glyphRepair, globalArchive, texturePatches, lobbyHangulAllocationCache, actionDetailHighScaleHangulCodepoints, lobbyHangulCodepoints, out normalized);
+            return WritePreparedFontFdtPayload(datWriter, path, fdt, packedFile, 0, mpdStream, payloadsByPath, dialogueGlyphRepair, glyphRepair, globalArchive, texturePatches, lobbyHangulAllocationCache, actionDetailHighScaleHangulCodepoints, pvpProfileVisualScaleCodepoints, lobbyHangulCodepoints, out normalized);
         }
 
         private long WritePreparedFontFdtPayload(
@@ -946,6 +954,7 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
             Dictionary<string, List<FontTexturePatch>> texturePatches,
             LobbyHangulGlyphAllocationCache lobbyHangulAllocationCache,
             uint[] actionDetailHighScaleHangulCodepoints,
+            uint[] pvpProfileVisualScaleCodepoints,
             LobbyHangulCodepointSets lobbyHangulCodepoints,
             out int normalized)
         {
@@ -961,6 +970,7 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
             }
 
             actionDetailHighScaleFixes = ApplyLargeUiLabelVisualScaleGlyphs(path, ref fdt, mpdStream, payloadsByPath, glyphRepair, texturePatches, actionDetailHighScaleHangulCodepoints);
+            int pvpProfileVisualScaleFixes = ApplyPvpProfileVisualScaleGlyphs(path, ref fdt, mpdStream, payloadsByPath, glyphRepair, texturePatches, pvpProfileVisualScaleCodepoints);
             int partyShapeFixes = ApplyPartyListSelfMarkerCleanShapes(path, ref fdt, glyphRepair, globalArchive, texturePatches);
             int cleanAsciiFixes = ApplyCleanAsciiGlyphShapes(path, fdt, glyphRepair, globalArchive, texturePatches);
             int cleanAsciiKerningFixes = ApplyCleanAsciiKerning(path, ref fdt, globalArchive);
@@ -974,6 +984,7 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
                 relocatedSkippedTextureHangulGlyphs == 0 &&
                 dialogueGlyphFixes == 0 &&
                 actionDetailHighScaleFixes == 0 &&
+                pvpProfileVisualScaleFixes == 0 &&
                 lobbyHangulFixes == 0 &&
                 partyShapeFixes == 0 &&
                 cleanAsciiFixes == 0 &&
@@ -1002,6 +1013,11 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
             if (actionDetailHighScaleFixes > 0)
             {
                 Console.WriteLine("  Queued large UI high-scale Hangul glyph cells: {0} ({1})", actionDetailHighScaleFixes, path);
+            }
+
+            if (pvpProfileVisualScaleFixes > 0)
+            {
+                Console.WriteLine("  Queued PvP profile Hangul visual-scale glyph cells: {0} ({1})", pvpProfileVisualScaleFixes, path);
             }
 
             if (lobbyHangulFixes > 0)
@@ -1626,6 +1642,211 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
             if (allocationFailures > 0)
             {
                 AddLimitedWarning("Large UI label Hangul atlas allocation failures for " + normalizedPath + ": " + allocationFailures.ToString());
+            }
+
+            return changed;
+        }
+
+        private int ApplyPvpProfileVisualScaleGlyphs(
+            string path,
+            ref byte[] targetFdt,
+            FileStream mpdStream,
+            Dictionary<string, FontPayload> payloadsByPath,
+            FontGlyphRepairContext glyphRepair,
+            Dictionary<string, List<FontTexturePatch>> texturePatches,
+            uint[] requiredCodepoints)
+        {
+            string normalizedPath = NormalizeGamePath(path);
+            if (!PvpProfileVisualScaleGlyphs.IsTargetFontPath(normalizedPath) ||
+                targetFdt == null ||
+                mpdStream == null ||
+                payloadsByPath == null ||
+                glyphRepair == null ||
+                texturePatches == null ||
+                requiredCodepoints == null ||
+                requiredCodepoints.Length == 0)
+            {
+                return 0;
+            }
+
+            byte[] sourceFdt = TryLoadTtmpStandardPayload(payloadsByPath, mpdStream, normalizedPath);
+            if (sourceFdt == null)
+            {
+                AddLimitedWarning("PvP profile visual-scale source font missing: " + normalizedPath);
+                return 0;
+            }
+
+            Dictionary<uint, byte[]> sourceEntries = ReadGlyphEntriesByUtf8Value(sourceFdt);
+            if (sourceEntries.Count == 0)
+            {
+                return 0;
+            }
+
+            int fontTableOffset;
+            uint glyphCount;
+            int glyphStart;
+            if (!TryGetFdtGlyphTable(targetFdt, out fontTableOffset, out glyphCount, out glyphStart))
+            {
+                return 0;
+            }
+
+            Dictionary<string, byte[]> sourceTextures = new Dictionary<string, byte[]>(StringComparer.OrdinalIgnoreCase);
+            double targetDigitHeight = MeasureMeanVisibleHeightFromTtmpPayloads(
+                sourceFdt,
+                normalizedPath,
+                ActionDetailNumericCodepoints,
+                payloadsByPath,
+                mpdStream);
+            if (targetDigitHeight <= 0d)
+            {
+                return 0;
+            }
+
+            double targetHangulVisibleHeight = targetDigitHeight * PvpProfileVisualScaleGlyphs.HangulToDigitRatio;
+            int changed = 0;
+            int allocationFailures = 0;
+            for (int codepointIndex = 0; codepointIndex < requiredCodepoints.Length; codepointIndex++)
+            {
+                uint codepoint = requiredCodepoints[codepointIndex];
+                if (!IsHangulCodepoint(codepoint))
+                {
+                    continue;
+                }
+
+                uint utf8Value = PackFdtUtf8Value(codepoint);
+                int targetOffset;
+                if (!TryFindGlyphEntryOffset(targetFdt, glyphStart, glyphCount, utf8Value, out targetOffset))
+                {
+                    continue;
+                }
+
+                byte[] sourceEntryBytes;
+                if (!sourceEntries.TryGetValue(utf8Value, out sourceEntryBytes))
+                {
+                    continue;
+                }
+
+                FdtGlyphEntry sourceEntry = ReadFdtGlyphEntry(sourceEntryBytes, 0);
+                if (sourceEntry.Width == 0 || sourceEntry.Height == 0)
+                {
+                    continue;
+                }
+
+                string sourceTexturePath = ResolveFontTexturePath(normalizedPath, sourceEntry.ImageIndex);
+                if (sourceTexturePath == null)
+                {
+                    continue;
+                }
+
+                byte[] sourceTexture;
+                if (!sourceTextures.TryGetValue(sourceTexturePath, out sourceTexture))
+                {
+                    sourceTexture = TryLoadTtmpTexturePayload(payloadsByPath, mpdStream, sourceTexturePath);
+                    if (sourceTexture == null)
+                    {
+                        continue;
+                    }
+
+                    sourceTextures.Add(sourceTexturePath, sourceTexture);
+                }
+
+                byte[] sourceAlpha;
+                try
+                {
+                    sourceAlpha = ExtractFontTextureAlpha(sourceTexture, sourceEntry);
+                }
+                catch (ArgumentOutOfRangeException)
+                {
+                    continue;
+                }
+                catch (IndexOutOfRangeException)
+                {
+                    continue;
+                }
+
+                int sourceMinY;
+                int sourceMaxY;
+                if (!TryFindAlphaVisibleYBounds(sourceAlpha, sourceEntry.Width, sourceEntry.Height, out sourceMinY, out sourceMaxY))
+                {
+                    continue;
+                }
+
+                int sourceVisibleHeight = sourceMaxY - sourceMinY + 1;
+                double visualScale = sourceVisibleHeight > 0
+                    ? (targetHangulVisibleHeight / sourceVisibleHeight) * PvpProfileVisualScaleGlyphs.JupiterCanvasScaleCompensation
+                    : 0d;
+                if (visualScale <= 0d || visualScale >= 0.98d)
+                {
+                    continue;
+                }
+
+                int scaledWidth = ClampInt(
+                    (int)Math.Round(sourceEntry.Width * visualScale),
+                    1,
+                    byte.MaxValue);
+                int scaledHeight = ClampInt(
+                    (int)Math.Round(sourceEntry.Height * visualScale),
+                    1,
+                    byte.MaxValue);
+                byte[] scaledAlpha = ScaleGlyphAlphaBilinear(
+                    sourceAlpha,
+                    sourceEntry.Width,
+                    sourceEntry.Height,
+                    scaledWidth,
+                    scaledHeight);
+
+                int sourceAdvance = Math.Max(1, sourceEntry.Width + sourceEntry.OffsetX);
+                int scaledAdvance = ClampInt((int)Math.Round(sourceAdvance * visualScale), 1, byte.MaxValue);
+                scaledAdvance = Math.Max(scaledAdvance, Math.Min(byte.MaxValue, scaledWidth + 1));
+                int scaledOffsetX = ClampInt(scaledAdvance - scaledWidth, sbyte.MinValue, sbyte.MaxValue);
+
+                AllocatedFontGlyphCell allocatedCell;
+                string allocatedTexturePath;
+                int paddedWidth = checked(scaledWidth + ActionDetailHighScaleGlyphTexturePadding * 2);
+                int paddedHeight = checked(scaledHeight + ActionDetailHighScaleGlyphTexturePadding * 2);
+                if (!TryAllocateActionDetailHighScaleGlyphCell(
+                    glyphRepair,
+                    sourceTexturePath,
+                    paddedWidth,
+                    paddedHeight,
+                    out allocatedTexturePath,
+                    out allocatedCell))
+                {
+                    allocationFailures++;
+                    continue;
+                }
+
+                FontTexturePatch patch = new FontTexturePatch();
+                patch.TargetX = allocatedCell.X;
+                patch.TargetY = allocatedCell.Y;
+                patch.TargetChannel = allocatedCell.Channel;
+                patch.ClearWidth = paddedWidth;
+                patch.ClearHeight = paddedHeight;
+                patch.SourceWidth = paddedWidth;
+                patch.SourceHeight = paddedHeight;
+                patch.SourceAlpha = PadGlyphAlpha(
+                    scaledAlpha,
+                    scaledWidth,
+                    scaledHeight,
+                    ActionDetailHighScaleGlyphTexturePadding);
+                patch.SourceFdtPath = normalizedPath;
+                patch.SourceCodepoint = codepoint;
+                AddTexturePatch(texturePatches, allocatedTexturePath, patch);
+
+                Buffer.BlockCopy(sourceEntryBytes, 0, targetFdt, targetOffset, FdtGlyphEntrySize);
+                Endian.WriteUInt16LE(targetFdt, targetOffset + 6, checked((ushort)allocatedCell.ImageIndex));
+                Endian.WriteUInt16LE(targetFdt, targetOffset + 8, checked((ushort)(allocatedCell.X + ActionDetailHighScaleGlyphTexturePadding)));
+                Endian.WriteUInt16LE(targetFdt, targetOffset + 10, checked((ushort)(allocatedCell.Y + ActionDetailHighScaleGlyphTexturePadding)));
+                targetFdt[targetOffset + 12] = checked((byte)scaledWidth);
+                targetFdt[targetOffset + 13] = checked((byte)scaledHeight);
+                targetFdt[targetOffset + 14] = unchecked((byte)(sbyte)scaledOffsetX);
+                targetFdt[targetOffset + 15] = unchecked((byte)sourceEntry.OffsetY);
+                changed++;
+            }
+
+            if (allocationFailures > 0)
+            {
+                AddLimitedWarning("PvP profile visual-scale atlas allocation failures for " + normalizedPath + ": " + allocationFailures.ToString());
             }
 
             return changed;
@@ -4359,6 +4580,40 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
             uint[] values = ToSortedCodepointArray(codepoints);
             Console.WriteLine(
                 "Large UI high-scale Hangul codepoints: {0} static, {1} sheet-derived, {2} addon-range-derived, {3} combat-flytext-preserved, {4} total",
+                staticCount,
+                sheetDerived,
+                addonRangeDerived,
+                combatFlyTextExcluded,
+                values.Length);
+            return values;
+        }
+
+        private uint[] CreatePvpProfileVisualScaleCodepoints(string patchedTextSqpack, string fallbackTextSqpack)
+        {
+            HashSet<uint> codepoints = new HashSet<uint>();
+            AddHangulPhraseCodepoints(codepoints, PvpProfileVisualScaleGlyphs.FallbackPhrases);
+            int staticCount = codepoints.Count;
+            int sheetDerived = AddSheetHangulCodepoints(
+                codepoints,
+                patchedTextSqpack,
+                fallbackTextSqpack,
+                _options.TargetLanguage,
+                PvpProfileVisualScaleGlyphs.SheetNames,
+                "PvP profile visual-scale glyph coverage");
+            int addonRangeDerived = AddAddonHangulCodepoints(
+                codepoints,
+                patchedTextSqpack,
+                fallbackTextSqpack,
+                _options.TargetLanguage,
+                PvpProfileVisualScaleGlyphs.AddonRowRanges,
+                "PvP profile visual-scale Addon glyph coverage");
+            int beforeCombatFlyTextExclusion = codepoints.Count;
+            RemoveHangulPhraseCodepoints(codepoints, ActionDetailHighScaleHangulGlyphs.CombatFlyTextPreservePhrases);
+            int combatFlyTextExcluded = beforeCombatFlyTextExclusion - codepoints.Count;
+
+            uint[] values = ToSortedCodepointArray(codepoints);
+            Console.WriteLine(
+                "PvP profile visual-scale Hangul codepoints: {0} static, {1} sheet-derived, {2} addon-range-derived, {3} combat-flytext-preserved, {4} total",
                 staticCount,
                 sheetDerived,
                 addonRangeDerived,
