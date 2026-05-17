@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Globalization;
+using System.Text;
 using FfxivKoreanPatch.FFXIVPatchGenerator;
 
 namespace FfxivKoreanPatch.PatchRouteVerifier
@@ -314,7 +315,7 @@ namespace FfxivKoreanPatch.PatchRouteVerifier
                 if (ratio < minimum || ratio > maximum)
                 {
                     Fail(
-                        "{0} action-detail [{1}] Hangul/digit visual height ratio {2} outside {3}..{4}: hangul={5}, digit={6}, bounds={7}",
+                        "{0} action-detail [{1}] Hangul/digit visual height ratio {2} outside {3}..{4}: hangul={5}, digit={6}, bounds={7}, glyphs={8}",
                         fontPath,
                         Escape(phrase),
                         FormatRatio(ratio),
@@ -322,7 +323,8 @@ namespace FfxivKoreanPatch.PatchRouteVerifier
                         FormatRatio(maximum),
                         FormatDouble(target.MeanHangulHeight),
                         FormatDouble(numeric.MeanDigitHeight),
-                        FormatPhraseBounds(target));
+                        FormatPhraseBounds(target),
+                        FormatPhraseGlyphBreakdown(fontPath, phrase));
                     return;
                 }
 
@@ -437,7 +439,7 @@ namespace FfxivKoreanPatch.PatchRouteVerifier
                 if (relative < minimum || relative > maximum)
                 {
                     Fail(
-                        "{0}->{1} action-detail [{2}] {3} scale ratio {4} outside {5}..{6}: numericScale={7}, hangulScale={8}, low={9}, high={10}",
+                        "{0}->{1} action-detail [{2}] {3} scale ratio {4} outside {5}..{6}: numericScale={7}, hangulScale={8}, low={9}, high={10}, lowGlyphs={11}, highGlyphs={12}",
                         pair.SourceFontPath,
                         pair.TargetFontPath,
                         Escape(phrase),
@@ -448,7 +450,9 @@ namespace FfxivKoreanPatch.PatchRouteVerifier
                         FormatRatio(numericScale),
                         FormatRatio(hangulScale),
                         FormatDouble(lowValue),
-                        FormatDouble(highValue));
+                        FormatDouble(highValue),
+                        FormatPhraseGlyphBreakdown(pair.SourceFontPath, phrase),
+                        FormatPhraseGlyphBreakdown(pair.TargetFontPath, phrase));
                     return;
                 }
 
@@ -744,6 +748,73 @@ namespace FfxivKoreanPatch.PatchRouteVerifier
                 {
                     error = ex.Message;
                     return false;
+                }
+            }
+
+            private string FormatPhraseGlyphBreakdown(string fontPath, string phrase)
+            {
+                try
+                {
+                    byte[] fdt = _patchedFont.ReadFile(fontPath);
+                    StringBuilder builder = new StringBuilder();
+                    for (int i = 0; i < phrase.Length; i++)
+                    {
+                        uint codepoint = ReadCodepoint(phrase, ref i);
+                        if (IsPhraseLayoutSpace(codepoint))
+                        {
+                            continue;
+                        }
+
+                        FdtGlyphEntry glyph;
+                        if (!TryFindGlyph(fdt, codepoint, out glyph))
+                        {
+                            AppendGlyphBreakdownSeparator(builder);
+                            builder.Append("U+");
+                            builder.Append(codepoint.ToString("X4", CultureInfo.InvariantCulture));
+                            builder.Append(":missing");
+                            continue;
+                        }
+
+                        GlyphCanvas canvas = RenderGlyph(_patchedFont, fontPath, codepoint);
+                        GlyphStats stats = AnalyzeGlyph(canvas);
+                        AppendGlyphBreakdownSeparator(builder);
+                        builder.Append("U+");
+                        builder.Append(codepoint.ToString("X4", CultureInfo.InvariantCulture));
+                        builder.Append(":adv=");
+                        builder.Append(GetGlyphAdvance(glyph).ToString(CultureInfo.InvariantCulture));
+                        builder.Append(",size=");
+                        builder.Append(glyph.Width.ToString(CultureInfo.InvariantCulture));
+                        builder.Append("x");
+                        builder.Append(glyph.Height.ToString(CultureInfo.InvariantCulture));
+                        builder.Append(",off=");
+                        builder.Append(glyph.OffsetX.ToString(CultureInfo.InvariantCulture));
+                        builder.Append("/");
+                        builder.Append(glyph.OffsetY.ToString(CultureInfo.InvariantCulture));
+                        builder.Append(",bbox=");
+                        builder.Append(stats.MinX <= stats.MaxX ? stats.MinX.ToString(CultureInfo.InvariantCulture) : "-");
+                        builder.Append("-");
+                        builder.Append(stats.MaxX >= stats.MinX ? stats.MaxX.ToString(CultureInfo.InvariantCulture) : "-");
+                        builder.Append("/");
+                        builder.Append(stats.MinY <= stats.MaxY ? stats.MinY.ToString(CultureInfo.InvariantCulture) : "-");
+                        builder.Append("-");
+                        builder.Append(stats.MaxY >= stats.MinY ? stats.MaxY.ToString(CultureInfo.InvariantCulture) : "-");
+                        builder.Append(",visible=");
+                        builder.Append(canvas.VisiblePixels.ToString(CultureInfo.InvariantCulture));
+                    }
+
+                    return builder.Length == 0 ? "(none)" : builder.ToString();
+                }
+                catch (Exception ex)
+                {
+                    return "diagnostic-error:" + ex.Message;
+                }
+            }
+
+            private static void AppendGlyphBreakdownSeparator(StringBuilder builder)
+            {
+                if (builder.Length > 0)
+                {
+                    builder.Append("; ");
                 }
             }
 
