@@ -117,6 +117,7 @@
     <Compile Include="PhraseMetricsVerification.cs" />
     <Compile Include="PhraseOverlapVerification.cs" />
     <Compile Include="ProtectedGlyphVerification.cs" />
+    <Compile Include="PvpProfileFontVerification.cs" />
     <Compile Include="ReportedInGamePhraseVerification.cs" />
     <Compile Include="ThirdPartyGameFontSafetyVerification.cs" />
     <Compile Include="TtmpFontPackage.cs" />

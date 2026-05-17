@@ -51,6 +51,7 @@ namespace FfxivKoreanPatch.PatchRouteVerifier
                     new VerificationStep("combat-flytext-damage-glyphs", VerifyCombatFlyTextDamageGlyphs),
                     new VerificationStep("reported-ingame-hangul-phrases", VerifyReportedInGameHangulPhraseSourcePreservation),
                     new VerificationStep("action-detail-scale-layouts", VerifyActionDetailScaleLayouts),
+                    new VerificationStep("pvp-profile-font-routes", VerifyPvpProfileFontRoutes),
                     new VerificationStep("party-list-self-marker", VerifyPartyListSelfMarker),
                     new VerificationStep("lobby-hangul-visibility", VerifyLobbyHangulVisibility),
                     new VerificationStep("lobby-render-snapshots", VerifyLobbyRenderSnapshots),
