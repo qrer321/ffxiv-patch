@@ -1,5 +1,28 @@
 # 현재 미해결 항목과 추가 작업 목록
 
+## 2026-05-17 Shared Font Correction
+
+- Damage fly text is user-confirmed fixed for the current full patch. Treat `Jupiter_45.fdt`, `Jupiter_90.fdt`, and their `font3.tex` damage-number base/mip neighborhoods as protected.
+- The latest Dalamud/third-party overlay break was caused by full `--include-font` shared game-font edits, not by a confirmed safe `font-only` path. The bad apply touched broad `000000/common/font` FDTs and atlases; clean ASCII/damage repair then overwrote TTMP Hangul-owned shared atlas cells, especially `font3.tex` cells used by `TrumpGothic_68.fdt`.
+- The stale `.tmp\font-only-dalamud-axis-ja-r4` direction is rejected. `font-only` is back to strict `KrnAXIS_120/140/180/360.fdt` plus `font_krn_1.tex`; do not add AXIS/Jupiter/TrumpGothic/Miedinger/Meidinger/font1/font2/font3 to font-only without a route-specific verifier proving safety.
+- Current code-level generated check `.tmp\thirdparty-safe-ja-r7` passes `third-party-game-font-safety` (`fonts=14`, `glyphs=159889`) plus combat damage, in-game clean ASCII, TTMP Hangul neighborhood, reported Hangul phrase, and ActionDetail checks. The user confirmed the live Dalamud/third-party Korean font break is fixed on 2026-05-17.
+
+## 2026-05-17 Quest Say Anonymization Disabled
+
+- Quest say anonymization does not cover every relevant sheet yet, so it is disabled before it can create partial or inconsistent quest text patches.
+- The implementation remains in `QuestChatPhraseAnonymizer`, but `QuestChatPhraseAnonymizationFeature.Enabled` is false. The CLI flag is accepted as no-op with a warning, and the UI no longer appends `--anonymize-quest-chat-phrases` automatically for full text patches.
+- Do not re-enable this feature until a sheet/row coverage verifier proves all required say quest prompt/input sheets are covered.
+
+## 2026-05-17 Large UI Label Font Scope
+
+- The `즉시 발동`/`초` report is a symptom of a shared large UI label font route, not a request to patch only those words. Do not fix only user-reported phrases/chars and mark the issue done.
+- The verifier and generator must cover the font route plus sheet-derived UI label Hangul that can use it. Include representative labels such as `임무 찾기`, `퀘스트`, and `시스템 설정`, but also collect broader UI label coverage from the relevant sheets so unreported labels do not regress elsewhere.
+- Coverage fixes must be route/sheet scoped, not symptom-string scoped. A build is not considered fixed just because the exact phrase the user reported renders correctly; the same font route must be checked for other UI locations before reporting progress.
+- Coverage collection must use the patched target output text plus clean/global fallback for untouched entries, not raw Korean source text alone. Raw Korean source can contain unused rows/chars; adding those to a shared font route can contaminate unrelated UI/third-party routes even when the reported phrase itself renders.
+- Any fix in this area must keep damage fly text and confirmed third-party shared-font routes protected.
+- 2026-05-17 verifier correction: `.tmp\large-ui-visual-scale-ja-r10` is rejected by the strengthened verifier. The previous PASS was a false positive because it validated height only and missed width/advance. The fixed path is `.tmp\large-ui-biaxial-scale-ja-r1`, where non-lobby `TrumpGothic_23/34/68.fdt` large UI Hangul alpha, width, and advance are scaled together. Focused and regression verifier logs pass, but keep the live issue open until the user confirms the ActionDetail/large-label size in client.
+- 2026-05-17 r10 verifier guard: before reporting progress in this area, run at least `action-detail-scale-layouts,lobby-scale-font-sources,third-party-game-font-safety,combat-flytext-damage-glyphs` from local origin/restore baseline. The expected focused result for the current code is `RESULT: PASS`, with `TrumpGothic_68.fdt` high-scale Hangul coverage `889/889` and no `TrumpGothic_68_lobby` contamination.
+
 이 문서는 현재 확인된 문제와 다음 작업자가 이어서 처리해야 할 항목을 정리합니다. 아래 항목은 “구현 완료”가 아니라 “작업 필요” 상태입니다.
 
 ## 최근 보고 후 처리됨
@@ -26,7 +49,7 @@
 
 ### 0. 2026-05-09 재보고: 시작 화면 데이터센터/시스템 설정 실사용 경로 미검증
 
-상태: 코드 산출물 verifier PASS, 사용자 OK 대기
+상태: 사용자 확인 완료 (2026-05-16)
 
 최근 verifier는 통과했지만 실제 클라이언트에서 아래 문제가 계속 재현되었습니다. 이는 기존 검증이 실제 시작 화면 UI route를 충분히 잡지 못했다는 뜻으로 취급합니다.
 
@@ -56,14 +79,33 @@
 - 2026-05-12 reset: 위 PASS 이후에도 사용자가 로비 150%+ pixelation/blur/spacing이 전혀 개선되지 않았다고 재보고했다. 따라서 로비 glyph 재조합을 더 얹는 방식은 폐기하고, 기본 생성에서 derived 4K lobby FDT 생성, `AXIS_12/14/18_lobby` Hangul advance 정규화, `AXIS_14_lobby` blank Hangul alias, start-screen kerning 우회를 제거했다.
 - 2026-05-12 reset 검증: `lobby-ttmp-payloads` verifier를 추가했다. TTMP에 포함된 lobby FDT/TEX는 TTMP payload와 byte-for-byte 동일해야 하고, TTMP에 없는 high-scale lobby target은 clean global payload와 동일해야 한다. `.tmp\lobby-reset-ja`는 핵심 회귀 묶음에서 PASS했지만, `lobby-render-snapshots`는 의도대로 남은 문제를 FAIL로 보고한다.
 - 2026-05-12 reset 후 남은 실패: `Jupiter_20_lobby` world list의 `A/t` overlap, `TrumpGothic_23_lobby` title의 `A/T` minGap -2, `AXIS_12/18_lobby` 설정 완료 문구 한글 minGap -1, `AXIS_36_lobby`의 `U+C124` missing, non-lobby `AXIS_12/14` 150/200/300% 후보의 minGap < 1. 이 항목들은 사용자 OK 전까지 열린 이슈이며, 다음 구현은 route-specific source manifest와 render snapshot 실패 조건을 먼저 세운 뒤 최소 재조합으로 다시 시작한다.
+- 2026-05-16 사용자 확인: full-sheet/shared-source 산출물 기반 릴리즈 적용 후 “전체적으로 로비에서 폰트가 다 잘 나온다”고 확인됨. 기준 산출물은 `.tmp\lobby-fullsheet-sharedsource-pad0-ja-r3`, 릴리즈는 `Release\Public\FFXIVKoreanPatch.exe`, embedded generator SHA-256은 `7243DCA02C167EA5D9AEA1F212ECDD63BDD9241E878A541FA50DE4F2C8F36DEC`.
+- 2026-05-16 in-game combat fly-text follow-up: clean 비교 기준은 설치된 게임 클라이언트가 아니라 local `.tmp`/origin backup과 explicit `orig.*` base index여야 한다. `.tmp\ingame-combat-flytext-clean-ja-r3`는 local `.tmp\clean-global-full-input-game` + `.tmp\lobby-fullsheet-sharedsource-pad0-ja-r3\orig.*` 기준으로 생성했고, `직격`/`극대`/`극대화`/`크리티컬`/`극대 직격` 계열은 `TrumpGothic_68.fdt`에서도 TTMP source와 일치해야 하도록 verifier를 강화했다. 같은 검증에서 `action-detail-scale-layouts`는 local clean UI dat0 부재 시 ULD route probing을 경고로 낮추고 정적 font probe를 계속 수행한다.
+- 2026-05-16 in-game font risk survey: `ingame-font-risk-survey`를 추가했다. local temp/origin 기준으로 인게임 ULD font route, 인게임 관련 sheet Hangul 후보, PUA glyph visibility를 TSV로 남긴다. local origin index는 `%LOCALAPPDATA%\FFXIVKoreanPatch\restore-baseline\ja\2026.05.01.0000.0000\orig.060000.win32.index/index2`에 있다. 단, `%LOCALAPPDATA%`에는 raw `060000.win32.dat0`~`dat3` 복사본이 없으므로 ULD route clean read는 origin index와 원본 dat shard source를 함께 써야 한다. `PatchRouteVerifier`는 이제 `--clean-font-index`/`--clean-ui-index`를 받고, output-local `orig.*`가 없으면 `%LOCALAPPDATA%\FFXIVKoreanPatch\restore-baseline\<target-language>\<latest>`를 자동 탐색한다.
+- 2026-05-16 current in-game survey result: 오래된 generated release `20260516-212522`는 `TrumpGothic_68.fdt`의 `극대화`, `극대화!`, `크리티컬`, `극대 직격`이 TTMP 원본보다 커져 strong verifier에서 실패했다. 현재 코드로 `%LOCALAPPDATA%` restore-baseline을 `-BaseIndexDirectory`로 지정해 만든 `.tmp\ingame-combat-current-ja-r1`은 `reported-ingame-hangul-phrases,ingame-ttmp-texture-neighborhoods,action-detail-scale-layouts,protected-hangul-glyphs,numeric-glyphs` PASS. 같은 산출물의 `ingame-font-risk-survey`는 ULD 201 rows, sheet 후보 172266 rows, unique Hangul 1540개, PUA 130 rows를 기록했고 clean-visible PUA regression은 0이다. 추가 위험 지점은 route 변경이 아니라 shared font 사용이다: `TrumpGothic_23.fdt`는 ActionDetail/ActionMenu/ItemDetail/Character/ContentsFinder/ContentsInfo/HudLayout/Teleport에서 쓰이고, `AXIS_12/14/18`은 여러 HUD와 party PUA를 공유한다.
+- 2026-05-16 follow-up: applied-output comparison had a false drift when reading installed game folders without sibling `orig.*.index`; `CompositeArchive` now uses explicit clean font/UI baseline indexes for applied comparisons. Current generated/applied sqpack file hashes matched, and the fixed verifier reports font/UI payload matches instead of false `Jupiter_45.fdt`/`font5.tex` drift.
+- 2026-05-16 follow-up correction: critical/direct-hit fly text breakage is the damage-number glyphs before the large `!`/`!!`, not Korean phrase text such as `극대 직격!`. Added `combat-flytext-damage-glyphs` to verify auto-discovered non-lobby `TrumpGothic_*.fdt` candidates for digits, number+`!`/`!!` phrases, and all non-Hangul combat glyph 8px neighborhoods against clean source. The first run `.tmp\combat-damage-glyphs-ja-r1` failed because non-Hangul glyph neighborhoods in `font1/font2` were polluted by nearby patches; the generator now reserves 8px around every glyph in those combat fonts. `.tmp\combat-damage-glyphs-ja-r2` passes the focused combat verifier set; user confirmation is still required before closing the live critical/direct-hit blur report.
+- 2026-05-17 broader in-game blur guard: the clean-source verifier showed that protecting only TrumpGothic damage digits is too narrow because other non-lobby fonts can have clean glyph interiors but polluted 8px texture neighborhoods. Added `ingame-clean-ascii-glyphs` and changed generation so repaired non-lobby ASCII/number/symbol glyphs copy the clean source with 8px neighborhoods. Clean `Jupiter_45.fdt` ASCII neighborhoods are also restored after shared global texture patches. Fresh font-only output `.tmp\ingame-clean-ascii-broad-ja-r2` passes the broad in-game ASCII verifier plus combat damage, TTMP Hangul neighborhood, reported Hangul phrase, and action-detail scale checks.
+- 2026-05-17 live correction: damage fly text is still blurred in the client. The previous combat verifier is now considered insufficient because it focused on `TrumpGothic_*` instead of forcing `Jupiter_45/Jupiter_90` damage-number routes. Keep the issue open until the expanded Jupiter clean-cell protection and 16px neighborhood verifier are validated and the user confirms the live result.
+- 2026-05-17 implementation update: damage-number protection is now scoped to clean `Jupiter_45/Jupiter_90` FDTs and their visible glyph cells, with 16px texture-neighborhood restoration after shared `font3.tex` patches. The stronger verifier fails the older `.tmp\full-flytext-check-ja-r1` output and passes fresh `.tmp\full-flytext-jupiter-guard-ja-r2` together with in-game ASCII, TTMP Hangul neighborhood, reported phrase, and ActionDetail scale checks. Do not close the live issue before user confirmation.
+- 2026-05-17 live rejection: the Jupiter whole-FDT clean-preservation attempt is not accepted. The user reports that damage fly text is still not original-looking and that a third-party notification overlay using the patched game font path now renders Korean as broken glyphs. Do not preserve shared in-game Jupiter FDTs wholesale for damage text; keep Korean-capable FDT payloads and protect only clean damage-number ASCII/`!` texture neighborhoods from the local origin baseline.
+- 2026-05-17 verifier correction: matching rendered pixels is not enough for damage fly text. The verifier must also require `Jupiter_45/Jupiter_90` damage glyph `ImageIndex/X/Y` routes to match clean source, because relocating clean-looking glyphs to new atlas cells can still differ from the original client path.
+- 2026-05-17 mip correction: the third-party overlay report is not a direct game-resource patch target, but it exposes that shared in-game font paths must remain Korean-capable while damage-number glyphs are restored from clean. Damage fly-text verification now also compares the clean glyph texture neighborhoods across available mip levels, not only the base texture, because scaled rendering can sample polluted lower mips and appear blurred even when the base glyph cell matches.
+- 2026-05-17 font-only scope: `font-only` is now tracked separately from the full text/UI patch. It should only generate/apply `000000` font files for Korean input/readability support, not `0a0000` text or `060000` UI/image resources. It also skips full-patch-only lobby Hangul allocation, supplemental lobby font generation, ActionDetail high-scale Hangul repair, and start-screen system-settings kerning. See `Docs/FONT_ONLY_PATCH_SCOPE.md`; use `font-only-output-scope` before deeper glyph checks.
+- 2026-05-17 font-only contamination correction: the first strict scope still allowed `AXIS_*` plus `font1/font2`, but `ingame-clean-ascii-glyphs` failed because those shared textures are also sampled by `Jupiter/TrumpGothic/Miedinger` routes that third-party overlays can use.
+- 2026-05-17 font-only/Dalamud correction: the AXIS/font1/font2/font3 expansion trial is rejected. The live third-party break was traced to full `--include-font` shared font atlas contamination, not to a safe `font-only` fix. `font-only` stays strict `KrnAXIS_120/140/180/360.fdt` plus `font_krn_1.tex`; shared game-font safety is verified separately by `third-party-game-font-safety`.
+- 2026-05-17 user confirmation: damage fly text is now accepted as fixed for the current build. Treat `Jupiter_45/Jupiter_90` damage-number glyph routes and their `font3.tex` base/mip neighborhoods as protected. Do not touch this area while fixing Dalamud/font-only/ActionDetail issues unless a focused verifier first proves a regression.
+- 2026-05-17 user confirmation: Dalamud/third-party overlay Korean font break is fixed in-client. Keep `third-party-game-font-safety` as a required regression guard before widening any shared game-font allowlist or reintroducing broad AXIS/Jupiter/TrumpGothic/Miedinger/Meidinger edits.
+- 2026-05-17 new priority: ActionDetail/skill-detail font scale still looks wrong at high UI scales. Existing `action-detail-scale-layouts` PASS is insufficient; the next version must compare live-like ActionDetail/tooltip phrases at 100/150/200/300% against numeric baseline ratios and fail the current bad output before any broad in-game font edit.
+- 2026-05-16 credit check: current generated `CreditListText` rows for the reported credit area are text-correct (`Lead Artist`, `Bryan Ding`), and only seven Hangul rows exist in the generated sheet; those seven are also present in both global/Korean source. Treat old credit-screen garbling as not reproduced in current EXD text, while keeping font/payload verification open until the user confirms.
 
 재보고 항목:
 
 - 시작 화면의 `종료`가 `EXIT`로 표시됨. 처리됨
 - 데이터 센터 선택 화면을 나가는 버튼이 `-로?` / `-료?`처럼 깨져 보임. `Lobby#2009/#2052` 뒤로 row와 관련 ULD font phrase 검증을 추가해 처리됨
-- 데이터 센터 선택 화면의 group label은 영어로 나오지만 흐리게 보임. 코드 산출물 verifier PASS, 사용자 OK 대기
-- 데이터 센터 선택 화면의 서버명/데이터센터명은 영어로 나오지만 문자 간격이 서로 침범함. 코드 산출물 verifier PASS, 사용자 OK 대기
-- 시작 화면 시스템 설정에서 UI 배율을 150/200/300%로 키우면 한글이 `=`로 깨지고 문자 간격이 침범함. `=` fallback 및 코드 산출물 verifier PASS, 사용자 OK 대기
+- 데이터 센터 선택 화면의 group label은 영어로 나오지만 흐리게 보임. 사용자 확인 완료
+- 데이터 센터 선택 화면의 서버명/데이터센터명은 영어로 나오지만 문자 간격이 서로 침범함. 사용자 확인 완료
+- 시작 화면 시스템 설정에서 UI 배율을 150/200/300%로 키우면 한글이 `=`로 깨지고 문자 간격이 침범함. 사용자 확인 완료
 - `데이터 센터 Mana에 입장합니다` 계열 팝업 문구는 처리됨. 재발 시 sheet/row/column 추적 verifier를 먼저 보강
 - 인게임 `즉시 발동`/`초`가 UI 배율별 상대 크기를 제대로 따라가지 않는 문제는 `action-detail-scale-layouts` verifier와 `TrumpGothic_68.fdt` route 단위 glyph 보정으로 처리됨. 실제 클라이언트 복사는 파일 잠금 해제 후 재적용 필요
 - 스토리 종료 후 컷씬/이벤트 이미지 설명문이 베이스 클라이언트 언어로 표시됨. 폰트 패치가 아니라 지역 이동 타이틀처럼 실제 표시 리소스를 한국 클라이언트 리소스로 교체해야 할 가능성이 높음. 단, 아직 scene 리소스로 단정하지 않고 `EventImage` 등 sheet 기반 이미지 가능성부터 확인해야 함
@@ -129,7 +171,7 @@
 
 ### 3. 150% 이상 UI에서 문자 간격이 좁아 폰트가 겹쳐 보임
 
-상태: 코드 산출물 verifier PASS, 사용자 OK 대기
+상태: 비로비 큰 UI 라벨은 코드 산출물 verifier PASS, 로비/실사용 사용자 OK 대기
 
 150% 이상 UI, 특히 시스템 설정 창에서 space 또는 문자 간격이 좁아 glyph가 겹쳐 보이는 현상이 있습니다. 4K lobby/in-game FDT의 advance 값, offset, glyph width를 잘못 가져오거나 normalize가 부족한 가능성이 있습니다.
 
@@ -147,6 +189,11 @@
 - broad `KrnAXIS` lobby Hangul 치환은 제거하고 TTMP source glyph 크기/pixel 보존으로 되돌렸다.
 - `AXIS_12/14/18_lobby`는 glyph pixel을 바꾸지 않고 Hangul advance만 필요한 경우 `OffsetX=0`으로 보정한다.
 - `lobby-scale-font-sources`, `start-system-settings-uld`, `system-settings-mixed-scale-layouts`, `start-main-menu-phrase-layouts`, `hangul-source-preservation` 기준으로 `.tmp\lobby-ttmp-source-advance-ja` PASS.
+
+2026-05-17 r10 정정:
+
+- 로비 `_lobby.fdt`에 큰 UI visual-scale glyph를 얹는 방식은 폐기했다. atlas 용량 부족과 다른 로비 폰트 route 오염을 만들었으므로, 현재 코드는 비로비 `TrumpGothic_23/34/68.fdt`에만 큰 UI 라벨 visual-scale 보정을 적용한다.
+- `.tmp\large-ui-visual-scale-ja-r10`의 PASS 기록은 폐기한다. height-only 검증이라 width/advance가 0.56 수준으로 남는 false positive였다. `.tmp\large-ui-biaxial-scale-ja-r1`은 `TrumpGothic_34 -> TrumpGothic_68` `시스템 설정`의 height/width/advance relative가 `1.072/1.110/1.104`로 통과하며, broad regression도 PASS한다. 이는 코드 검증 결과이며, 사용자 확인 전까지 live ActionDetail/large-label 이슈를 닫지 않는다.
 
 필요 작업:
 
@@ -314,3 +361,5 @@
 - 한 글자 문제는 해당 글자 codepoint와 FDT를 특정한 뒤 좁게 수리할 것
 - “한글로 나오게 만들기”보다 “베이스 클라이언트 원문 유지가 안전한 글로벌 전용 UI인지” 먼저 판단할 것
 - 커밋/푸시/릴리즈 배포는 사용자가 명시적으로 요청했을 때만 진행할 것
+- 2026-05-16 route-scoped multi-texture lobby result: `.tmp\lobby-routed-multitex-ja-r8` passes focused lobby checks and the strong regression set `lobby-render-snapshots,clean-ascii-font-routes,lobby-multitexture-font-set,reported-ingame-hangul-phrases,ingame-ttmp-texture-neighborhoods,action-detail-scale-layouts,protected-hangul-glyphs`. The generator prioritizes high-scale system-setting/result-message Hangul, compares data-center ASCII spacing against clean baseline instead of an absolute alpha gap, and reserves 2px around global in-game Hangul cells before ASCII allocation. Keep the live lobby issue open until the user explicitly OKs it.
+- 2026-05-16 full-sheet lobby result: route-scoped coverage can miss unreported lobby strings, so the accepted candidate is `.tmp\lobby-fullsheet-sharedsource-pad0-ja-r3`. It covers full `Lobby/Error/Addon/ClassJob/Race/Tribe/GuardianDeity` Hangul coverage, excludes `CharaMakeName`, shares canonical Hangul source glyphs across compatible lobby fonts to avoid duplicate atlas use, and keeps lobby texture dimensions unchanged. Focused lobby checks and strong in-game/configuration regression checks passed, and the user confirmed the lobby fonts render correctly overall after the release build.

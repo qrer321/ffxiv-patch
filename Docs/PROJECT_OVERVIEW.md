@@ -78,7 +78,7 @@ UI에서 내부 실행되는 콘솔형 release 생성기입니다.
 - `Addon`, `AddonTransient`의 짧은 UI 토큰 보호
 - SeString macro/lookup 구조가 다를 때 안전 병합
 - 병합이 불가능하면 글로벌 원본 구조 유지
-- `quest/*`의 `TEXT_*_SAY_*` 입력 문구를 백틱 `` ` `` 으로 익명화하는 옵션 제공
+- `quest/*`의 `TEXT_*_SAY_*` 입력 문구 익명화 코드는 보존하되, 시트 커버리지가 불완전하므로 현재 옵션은 비활성화/no-op으로 둠
 - `_rsv_` 토큰 통계 수집
 - diagnostic CSV 출력 지원
 

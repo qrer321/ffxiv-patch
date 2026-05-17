@@ -68,7 +68,7 @@
 
 ## 금지할 접근
 
-- `Lobby`, `Error`, `Addon` 전체 row를 한 번에 커버하지 않는다.
+- `Lobby`, `Error`, `Addon` 등 전체 sheet를 source/atlas 공유 없이 brute-force로 주입하지 않는다. 전체 sheet 대응은 중복 source 공유, atlas capacity PASS, `allocation-failures=0`, render/coverage verifier PASS 조건에서만 허용한다.
 - `Jupiter_*_lobby`, `TrumpGothic_*_lobby`에 AXIS glyph를 무차별 리맵하지 않는다.
 - 100%에서 정상인 clean ASCII/영어/숫자 metrics를 바꾸지 않는다.
 - `=`/`-`가 사라졌다는 이유만으로 완료 처리하지 않는다.
@@ -113,3 +113,10 @@
 6. complete lobby font package를 만들거나 소비하는 경로를 설계한다. 이때 FDT와 `font_lobby*.tex`의 page 수를 같은 단위로 다룬다.
 7. capacity가 부족한 font는 새 texture page 또는 font별 분리 atlas 전략을 검토한 뒤 구현한다.
 8. verifier가 100/150/200/300 배율을 모두 통과한 뒤에만 릴리즈 빌드를 만든다.
+- 2026-05-16 result note: `.tmp\lobby-routed-multitex-ja-r8` is the current reference output for the route-scoped multi-texture approach. It passes lobby render/coverage/multitexture checks and strong in-game regression checks, but remains user-confirmation pending. Keep high-scale lobby glyph allocation phrase-prioritized and keep data-center ASCII gap checks relative to clean baseline.
+- 2026-05-16 full-sheet direction update: route-scoped coverage can miss strings the user has not reported. The current trial output `.tmp\lobby-fullsheet-sharedsource-pad0-ja-r3` covers full `Lobby/Error/Addon/ClassJob/Race/Tribe/GuardianDeity` Hangul codepoints for the lobby target set while excluding `CharaMakeName`. It avoids duplicate atlas use by sharing canonical Hangul source glyphs across compatible lobby fonts, keeps existing lobby texture dimensions unchanged, and requires zero aggregate allocation failures before it can be considered for release.
+- 2026-05-16 verification note: padding `4`, `2`, and `1` exceeded capacity for the full-sheet set; padding `0` is the only tested mode that fits the current six lobby texture pages. Because that reduces reserved neighborhood space, the required verifier set must include `lobby-source-cell-conflicts`, `clean-ascii-font-routes`, `lobby-render-snapshots`, and in-game texture neighborhood regression checks.
+- 2026-05-16 user confirmation: release build `Release\Public\FFXIVKoreanPatch.exe` with embedded generator SHA-256 `7243DCA02C167EA5D9AEA1F212ECDD63BDD9241E878A541FA50DE4F2C8F36DEC` was applied and the user confirmed that lobby fonts render correctly overall. Keep this full-sheet/shared-source route as the current accepted lobby font baseline.
+- 2026-05-16 verification baseline rule: generated-output/clean comparison must use local `.tmp`/origin backups with explicit `orig.*` base indexes. The installed game folder can be used only for applied-state drift checks, not as the clean baseline.
+- 2026-05-17 clean-context rule: for lobby fonts too, the preferred result is the closest possible clean/origin behavior. Preserve clean ASCII/numeric/Latin metrics and texture neighborhoods first. Add Korean glyphs only through route-proven lobby font pages, and do not use atlas resize, broad source-cell grafting, or cross-family glyph remapping as a shortcut.
+- 2026-05-17 rejected experiment: do not apply the large UI visual-scale path to `_lobby.fdt` fonts. The `TrumpGothic_68_lobby` trial either could not allocate the required glyphs or reused fallback cells in a way that contaminated `AXIS_36_lobby`, `Jupiter_*_lobby`, `Meidinger_40_lobby`, and `MiedingerMid_36_lobby`. The code path was removed; reintroducing it requires a new texture-page design and a verifier that proves zero contamination.
