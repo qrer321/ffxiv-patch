@@ -121,6 +121,12 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
             data[offset + 3] = (byte)(value >> 24);
         }
 
+        public static void WriteUInt64LE(byte[] data, int offset, ulong value)
+        {
+            WriteUInt32LE(data, offset, (uint)value);
+            WriteUInt32LE(data, offset + 4, (uint)(value >> 32));
+        }
+
         public static void WriteUInt16BE(Stream stream, ushort value)
         {
             stream.WriteByte((byte)(value >> 8));

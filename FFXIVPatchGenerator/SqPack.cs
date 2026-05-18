@@ -390,7 +390,7 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
     internal sealed class SqPackIndexFile : IDisposable
     {
         private readonly string _path;
-        private readonly byte[] _bytes;
+        private byte[] _bytes;
         private readonly Dictionary<ulong, SqPackIndexEntry> _entries = new Dictionary<ulong, SqPackIndexEntry>();
         private readonly int _sqpackHeaderSize;
         private readonly int _indexHeaderOffset;
@@ -406,9 +406,15 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
             uint indexDataSize = Endian.ReadUInt32LE(_bytes, _indexHeaderOffset + 0x0C);
             int entryCount = (int)(indexDataSize / 16);
 
+            LoadEntries((int)indexDataOffset, entryCount);
+        }
+
+        private void LoadEntries(int indexDataOffset, int entryCount)
+        {
+            _entries.Clear();
             for (int i = 0; i < entryCount; i++)
             {
-                int entryOffset = (int)indexDataOffset + i * 16;
+                int entryOffset = indexDataOffset + i * 16;
                 ulong hash = Endian.ReadUInt64LE(_bytes, entryOffset);
                 uint data = Endian.ReadUInt32LE(_bytes, entryOffset + 8);
 
@@ -457,6 +463,17 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
             SetEntryFileOffset(hash, entry, datId, absoluteOffset);
         }
 
+        public void SetOrAddFileOffset(string gamePath, byte datId, long absoluteOffset)
+        {
+            ulong hash = SqPackHash.GetIndexHash(gamePath);
+            if (TrySetFileOffset(hash, datId, absoluteOffset))
+            {
+                return;
+            }
+
+            AddFileOffset(hash, datId, absoluteOffset);
+        }
+
         public bool TrySetFileOffset(ulong hash, byte datId, long absoluteOffset)
         {
             if (datId > 7)
@@ -488,6 +505,68 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
             Endian.WriteUInt32LE(_bytes, entry.EntryOffset + 8, data);
             entry.Data = data;
             _entries[hash] = entry;
+        }
+
+        private void AddFileOffset(ulong hash, byte datId, long absoluteOffset)
+        {
+            if (datId > 7)
+            {
+                throw new ArgumentOutOfRangeException("datId");
+            }
+
+            if (absoluteOffset < 0 || (absoluteOffset % 0x80) != 0)
+            {
+                throw new ArgumentException("SqPack file offsets must be 0x80-aligned.");
+            }
+
+            uint indexDataOffset = Endian.ReadUInt32LE(_bytes, _indexHeaderOffset + 0x08);
+            uint indexDataSize = Endian.ReadUInt32LE(_bytes, _indexHeaderOffset + 0x0C);
+            int entryCount = (int)(indexDataSize / 16);
+            int insertIndex = 0;
+            while (insertIndex < entryCount)
+            {
+                ulong existingHash = Endian.ReadUInt64LE(_bytes, (int)indexDataOffset + insertIndex * 16);
+                if (hash < existingHash)
+                {
+                    break;
+                }
+
+                insertIndex++;
+            }
+
+            int insertOffset = checked((int)indexDataOffset + insertIndex * 16);
+            InsertIndexBytes(insertOffset, 16);
+            ShiftDataFileSegmentOffset(16);
+
+            uint encodedOffset = checked((uint)(absoluteOffset / 8));
+            uint data = (encodedOffset & 0xFFFFFFF0u) | ((uint)datId << 1);
+            Endian.WriteUInt64LE(_bytes, insertOffset, hash);
+            Endian.WriteUInt32LE(_bytes, insertOffset + 8, data);
+            Endian.WriteUInt32LE(_bytes, _indexHeaderOffset + 0x0C, checked(indexDataSize + 16));
+            LoadEntries((int)indexDataOffset, entryCount + 1);
+        }
+
+        private void InsertIndexBytes(int offset, int count)
+        {
+            byte[] expanded = new byte[checked(_bytes.Length + count)];
+            Buffer.BlockCopy(_bytes, 0, expanded, 0, offset);
+            Buffer.BlockCopy(_bytes, offset, expanded, offset + count, _bytes.Length - offset);
+            _bytes = expanded;
+        }
+
+        private void ShiftDataFileSegmentOffset(uint delta)
+        {
+            int dataFileSegmentOffsetPtr = _indexHeaderOffset + 0x54;
+            if (dataFileSegmentOffsetPtr > _bytes.Length - 4)
+            {
+                return;
+            }
+
+            uint offset = Endian.ReadUInt32LE(_bytes, dataFileSegmentOffsetPtr);
+            if (offset != 0)
+            {
+                Endian.WriteUInt32LE(_bytes, dataFileSegmentOffsetPtr, checked(offset + delta));
+            }
         }
 
         public void EnsureDataFileCount(uint count)
@@ -545,7 +624,7 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
     internal sealed class SqPackIndex2File : IDisposable
     {
         private readonly string _path;
-        private readonly byte[] _bytes;
+        private byte[] _bytes;
         private readonly Dictionary<uint, SqPackIndex2Entry> _entries = new Dictionary<uint, SqPackIndex2Entry>();
         private readonly int _sqpackHeaderSize;
         private readonly int _indexHeaderOffset;
@@ -561,9 +640,15 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
             uint indexDataSize = Endian.ReadUInt32LE(_bytes, _indexHeaderOffset + 0x0C);
             int entryCount = (int)(indexDataSize / 8);
 
+            LoadEntries((int)indexDataOffset, entryCount);
+        }
+
+        private void LoadEntries(int indexDataOffset, int entryCount)
+        {
+            _entries.Clear();
             for (int i = 0; i < entryCount; i++)
             {
-                int entryOffset = (int)indexDataOffset + i * 8;
+                int entryOffset = indexDataOffset + i * 8;
                 uint hash = Endian.ReadUInt32LE(_bytes, entryOffset);
                 uint data = Endian.ReadUInt32LE(_bytes, entryOffset + 4);
 
@@ -578,6 +663,19 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
         public bool ContainsPath(string gamePath)
         {
             return _entries.ContainsKey(SqPackHash.GetIndex2Hash(gamePath));
+        }
+
+        public void SetOrAddFileOffset(string gamePath, byte datId, long absoluteOffset)
+        {
+            uint hash = SqPackHash.GetIndex2Hash(gamePath);
+            SqPackIndex2Entry entry;
+            if (_entries.TryGetValue(hash, out entry))
+            {
+                SetFileOffset(gamePath, datId, absoluteOffset);
+                return;
+            }
+
+            AddFileOffset(hash, datId, absoluteOffset);
         }
 
         public void SetFileOffset(string gamePath, byte datId, long absoluteOffset)
@@ -606,6 +704,68 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
             Endian.WriteUInt32LE(_bytes, entry.EntryOffset + 4, data);
             entry.Data = data;
             _entries[hash] = entry;
+        }
+
+        private void AddFileOffset(uint hash, byte datId, long absoluteOffset)
+        {
+            if (datId > 7)
+            {
+                throw new ArgumentOutOfRangeException("datId");
+            }
+
+            if (absoluteOffset < 0 || (absoluteOffset % 0x80) != 0)
+            {
+                throw new ArgumentException("SqPack file offsets must be 0x80-aligned.");
+            }
+
+            uint indexDataOffset = Endian.ReadUInt32LE(_bytes, _indexHeaderOffset + 0x08);
+            uint indexDataSize = Endian.ReadUInt32LE(_bytes, _indexHeaderOffset + 0x0C);
+            int entryCount = (int)(indexDataSize / 8);
+            int insertIndex = 0;
+            while (insertIndex < entryCount)
+            {
+                uint existingHash = Endian.ReadUInt32LE(_bytes, (int)indexDataOffset + insertIndex * 8);
+                if (hash < existingHash)
+                {
+                    break;
+                }
+
+                insertIndex++;
+            }
+
+            int insertOffset = checked((int)indexDataOffset + insertIndex * 8);
+            InsertIndexBytes(insertOffset, 8);
+            ShiftDataFileSegmentOffset(8);
+
+            uint encodedOffset = checked((uint)(absoluteOffset / 8));
+            uint data = (encodedOffset & 0xFFFFFFF0u) | ((uint)datId << 1);
+            Endian.WriteUInt32LE(_bytes, insertOffset, hash);
+            Endian.WriteUInt32LE(_bytes, insertOffset + 4, data);
+            Endian.WriteUInt32LE(_bytes, _indexHeaderOffset + 0x0C, checked(indexDataSize + 8));
+            LoadEntries((int)indexDataOffset, entryCount + 1);
+        }
+
+        private void InsertIndexBytes(int offset, int count)
+        {
+            byte[] expanded = new byte[checked(_bytes.Length + count)];
+            Buffer.BlockCopy(_bytes, 0, expanded, 0, offset);
+            Buffer.BlockCopy(_bytes, offset, expanded, offset + count, _bytes.Length - offset);
+            _bytes = expanded;
+        }
+
+        private void ShiftDataFileSegmentOffset(uint delta)
+        {
+            int dataFileSegmentOffsetPtr = _indexHeaderOffset + 0x54;
+            if (dataFileSegmentOffsetPtr > _bytes.Length - 4)
+            {
+                return;
+            }
+
+            uint offset = Endian.ReadUInt32LE(_bytes, dataFileSegmentOffsetPtr);
+            if (offset != 0)
+            {
+                Endian.WriteUInt32LE(_bytes, dataFileSegmentOffsetPtr, checked(offset + delta));
+            }
         }
 
         public bool TrySetFileOffsetByLocation(byte oldDatId, long oldAbsoluteOffset, byte newDatId, long newAbsoluteOffset)

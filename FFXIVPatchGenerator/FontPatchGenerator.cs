@@ -526,17 +526,21 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
                             continue;
                         }
 
-                        if (!mutableIndex.ContainsPath(pair.Key) || !mutableIndex2.ContainsPath(pair.Key))
+                        byte[] basePackedTexture;
+                        if (!patchedTexturePayloadsByPath.TryGetValue(pair.Key, out basePackedTexture) &&
+                            !globalArchive.TryReadPackedFile(pair.Key, out basePackedTexture) &&
+                            (!IsAdditionalLobbyFontTexturePath(pair.Key) ||
+                             !TryCreateBlankAdditionalLobbyTexturePayload(globalArchive, out basePackedTexture)))
                         {
-                            AddLimitedWarning("Pending font texture target was not found: " + pair.Key);
+                            AddLimitedWarning("Pending font texture source was not found: " + pair.Key);
                             continue;
                         }
 
-                        byte[] basePackedTexture;
-                        if (!patchedTexturePayloadsByPath.TryGetValue(pair.Key, out basePackedTexture) &&
-                            !globalArchive.TryReadPackedFile(pair.Key, out basePackedTexture))
+                        bool additionalLobbyTexture = IsAdditionalLobbyFontTexturePath(pair.Key);
+                        if (!additionalLobbyTexture &&
+                            (!mutableIndex.ContainsPath(pair.Key) || !mutableIndex2.ContainsPath(pair.Key)))
                         {
-                            AddLimitedWarning("Pending font texture source was not found: " + pair.Key);
+                            AddLimitedWarning("Pending font texture target was not found: " + pair.Key);
                             continue;
                         }
 
@@ -544,8 +548,17 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
                         byte[] patchedPackedTexture = PatchPackedFontTexture(pair.Key, basePackedTexture, pair.Value);
                         patchedTexturePayloadsByPath[pair.Key] = patchedPackedTexture;
                         long datOffset = datWriter.WritePackedFile(patchedPackedTexture);
-                        mutableIndex.SetFileOffset(pair.Key, 1, datOffset);
-                        mutableIndex2.SetFileOffset(pair.Key, 1, datOffset);
+                        if (additionalLobbyTexture)
+                        {
+                            mutableIndex.SetOrAddFileOffset(pair.Key, 1, datOffset);
+                            mutableIndex2.SetOrAddFileOffset(pair.Key, 1, datOffset);
+                        }
+                        else
+                        {
+                            mutableIndex.SetFileOffset(pair.Key, 1, datOffset);
+                            mutableIndex2.SetFileOffset(pair.Key, 1, datOffset);
+                        }
+
                         _report.FontFilesPatched++;
                         if (protectedRestores > 0)
                         {
@@ -4304,6 +4317,11 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
                    NormalizeGamePath(path).IndexOf("/font_lobby", StringComparison.OrdinalIgnoreCase) >= 0;
         }
 
+        private static bool IsAdditionalLobbyFontTexturePath(string path)
+        {
+            return string.Equals(NormalizeGamePath(path), FontLobby7TexturePath, StringComparison.OrdinalIgnoreCase);
+        }
+
         private static bool IsGlobalFontTexturePath(string path)
         {
             string normalized = NormalizeGamePath(path);
@@ -4792,7 +4810,7 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
 
             if (IsLobbyLargeLabelVisualScaleFont(normalized))
             {
-                return sets.LargeLabels;
+                return sets.SystemAndCharacter;
             }
 
             if (IsCharacterSelectOnlyLobbyFont(normalized))
@@ -5817,6 +5835,7 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
             AddGlobalFontAtlasAllocator(context, globalArchive, FontLobby5TexturePath);
             AddGlobalFontAtlasAllocator(context, globalArchive, FontLobby6TexturePath);
             AddGlobalFontAtlasAllocator(context, globalArchive, FontLobby7TexturePath);
+            AddBlankLobbyFontAtlasAllocatorIfMissing(context, globalArchive, FontLobby7TexturePath);
             AddGlobalFontAtlasAllocator(context, globalArchive, Font3TexturePath);
             AddGlobalFontAtlasAllocator(context, globalArchive, Font4TexturePath);
             AddGlobalFontAtlasAllocator(context, globalArchive, Font5TexturePath);
@@ -6233,6 +6252,33 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
             context.AddAllocator(texturePath, new FontAtlasAllocator(rawTexture));
         }
 
+        private static void AddBlankLobbyFontAtlasAllocatorIfMissing(
+            FontGlyphRepairContext context,
+            SqPackArchive globalArchive,
+            string texturePath)
+        {
+            if (context == null || globalArchive == null || !IsAdditionalLobbyFontTexturePath(texturePath))
+            {
+                return;
+            }
+
+            FontAtlasAllocator existing;
+            if (context.TryGetAllocator(texturePath, out existing))
+            {
+                return;
+            }
+
+            byte[] packedTexture;
+            if (!TryCreateBlankAdditionalLobbyTexturePayload(globalArchive, out packedTexture))
+            {
+                return;
+            }
+
+            List<TextureSubBlock> ignored;
+            byte[] rawTexture = UnpackTextureFile(packedTexture, out ignored);
+            context.AddAllocator(texturePath, new FontAtlasAllocator(rawTexture));
+        }
+
         private static void MarkFontGlyphOccupancy(FontGlyphRepairContext context, string fdtPath, byte[] fdt)
         {
             int fontTableOffset;
@@ -6338,6 +6384,34 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
             rawTexture = EnsureFontTextureCapacityForPatches(texturePath, rawTexture, patches);
             ApplyFontTexturePatches(rawTexture, patches);
             return PackTextureFile(rawTexture);
+        }
+
+        private static bool TryCreateBlankAdditionalLobbyTexturePayload(SqPackArchive globalArchive, out byte[] packedTexture)
+        {
+            packedTexture = null;
+            if (globalArchive == null)
+            {
+                return false;
+            }
+
+            byte[] templatePackedTexture;
+            if (!globalArchive.TryReadPackedFile(FontLobby6TexturePath, out templatePackedTexture) &&
+                !globalArchive.TryReadPackedFile(FontLobby1TexturePath, out templatePackedTexture))
+            {
+                return false;
+            }
+
+            List<TextureSubBlock> ignored;
+            byte[] rawTexture = UnpackTextureFile(templatePackedTexture, out ignored);
+            ClearFontTexturePixels(rawTexture);
+            packedTexture = PackTextureFile(rawTexture);
+            return true;
+        }
+
+        private static void ClearFontTexturePixels(byte[] rawTexture)
+        {
+            FontTexture texture = ReadFontTexture(rawTexture);
+            Array.Clear(rawTexture, texture.DataOffset, rawTexture.Length - texture.DataOffset);
         }
 
         private static byte[] EnsureFontTextureCapacityForPatches(string texturePath, byte[] rawTexture, List<FontTexturePatch> patches)

@@ -167,6 +167,7 @@ namespace FfxivKoreanPatch.PatchRouteVerifier
                 };
 
                 int checkedTextures = 0;
+                int addedTextures = 0;
                 for (int i = 0; i < paths.Length; i++)
                 {
                     string texturePath = paths[i];
@@ -177,6 +178,25 @@ namespace FfxivKoreanPatch.PatchRouteVerifier
 
                     if (!_cleanFont.ContainsPath(texturePath))
                     {
+                        if (string.Equals(texturePath, FontLobby7TexturePath, StringComparison.OrdinalIgnoreCase))
+                        {
+                            try
+                            {
+                                ReadFontTexture(_patchedFont, texturePath);
+                                addedTextures++;
+                            }
+                            catch (Exception ex)
+                            {
+                                failures = FailLobbyMultiTextureOnce(
+                                    failures,
+                                    "{0} added lobby texture page is not readable: {1}",
+                                    texturePath,
+                                    ex.Message);
+                            }
+
+                            continue;
+                        }
+
                         Warn("{0} exists in patched font archive without a clean baseline entry; verify index addition separately", texturePath);
                         continue;
                     }
@@ -210,7 +230,7 @@ namespace FfxivKoreanPatch.PatchRouteVerifier
 
                 if (failures == 0)
                 {
-                    Pass("lobby texture dimensions are not expanded: textures={0}", checkedTextures);
+                    Pass("lobby texture dimensions are not expanded: textures={0}, added_pages={1}", checkedTextures, addedTextures);
                 }
             }
 
