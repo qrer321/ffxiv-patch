@@ -45,6 +45,46 @@ namespace FfxivKoreanPatch.PatchRouteVerifier
                     stats.ActionableCandidateRanges);
             }
 
+            private void VerifyLobbyFullCoverageCapacity()
+            {
+                Console.WriteLine("[FDT] Lobby full coverage capacity");
+                string reportDir = ResolveLobbyReportDir();
+                Directory.CreateDirectory(reportDir);
+
+                Dictionary<string, HashSet<string>> fontsByScreen = CollectLobbyFontsByScreen();
+                Dictionary<string, LobbyFontGlyphRequirement> requirements =
+                    CollectLobbyFontGlyphRequirements(fontsByScreen, reportDir);
+                LobbyAtlasCapacityStats stats = WriteLobbyAtlasCapacityReports(requirements, fontsByScreen, reportDir);
+
+                if (stats.SourceCoveredGlyphs < stats.MissingTargetGlyphs)
+                {
+                    Warn(
+                        "lobby full coverage has missing TTMP/source glyphs: missing_target={0}, source_covered={1}, source_missing={2}",
+                        stats.MissingTargetGlyphs,
+                        stats.SourceCoveredGlyphs,
+                        stats.MissingTargetGlyphs - stats.SourceCoveredGlyphs);
+                }
+
+                if (stats.AggregateAllocationFailures > 0)
+                {
+                    Fail(
+                        "lobby full coverage does not fit current font_lobby pages: target_fonts={0}, required={1}, missing_target={2}, source_covered={3}, aggregate_allocation_failures={4}. Do not expand phrase coverage until texture-page split or a complete lobby font set is implemented.",
+                        stats.TargetFonts,
+                        stats.RequiredCodepoints,
+                        stats.MissingTargetGlyphs,
+                        stats.SourceCoveredGlyphs,
+                        stats.AggregateAllocationFailures);
+                    return;
+                }
+
+                Pass(
+                    "lobby full coverage fits current font_lobby pages: target_fonts={0}, required={1}, missing_target={2}, source_covered={3}",
+                    stats.TargetFonts,
+                    stats.RequiredCodepoints,
+                    stats.MissingTargetGlyphs,
+                    stats.SourceCoveredGlyphs);
+            }
+
             private void VerifyLobbyCoverageGlyphs()
             {
                 Console.WriteLine("[FDT] Lobby coverage glyphs");
