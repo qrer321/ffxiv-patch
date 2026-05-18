@@ -8,8 +8,7 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
         public static readonly string[] TargetFontPaths = new string[]
         {
             "common/font/Jupiter_16.fdt",
-            "common/font/Jupiter_20.fdt",
-            "common/font/Jupiter_23.fdt"
+            "common/font/Jupiter_20.fdt"
         };
 
         public static readonly string[] SheetNames = new string[]

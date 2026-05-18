@@ -27,8 +27,7 @@ namespace FfxivKoreanPatch.PatchRouteVerifier
             private static readonly string[] PvpVisualScaleCandidateFonts = new string[]
             {
                 "common/font/Jupiter_16.fdt",
-                "common/font/Jupiter_20.fdt",
-                "common/font/Jupiter_23.fdt"
+                "common/font/Jupiter_20.fdt"
             };
 
             private static readonly PvpProfileRoutePhrase[] PvpProfileRoutePhrases = new PvpProfileRoutePhrase[]
