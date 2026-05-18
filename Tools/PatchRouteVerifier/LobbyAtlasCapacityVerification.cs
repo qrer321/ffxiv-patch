@@ -11,6 +11,7 @@ namespace FfxivKoreanPatch.PatchRouteVerifier
         private sealed partial class Verifier
         {
             private const int LobbyAtlasPadding = 0;
+            private const int LobbyPageSplitMaxExtraPages = 16;
             private const int MaxLobbyCoverageGlyphFailures = 80;
 
             private static readonly string[] LobbyAtlasTexturePaths = new string[]
@@ -83,6 +84,84 @@ namespace FfxivKoreanPatch.PatchRouteVerifier
                     stats.RequiredCodepoints,
                     stats.MissingTargetGlyphs,
                     stats.SourceCoveredGlyphs);
+            }
+
+            private void VerifyLobbyPageSplitCapacity()
+            {
+                Console.WriteLine("[REPORT] lobby page-split capacity");
+                string reportDir = ResolveLobbyReportDir();
+                Directory.CreateDirectory(reportDir);
+
+                Dictionary<string, HashSet<string>> fontsByScreen = CollectLobbyFontsByScreen();
+                Dictionary<string, LobbyFontGlyphRequirement> requirements =
+                    CollectLobbyFontGlyphRequirements(fontsByScreen, reportDir);
+                LobbyAtlasAllocator baseAllocator = TryCreateLobbyAtlasAllocator();
+                if (baseAllocator == null)
+                {
+                    Fail("lobby page-split capacity could not create a base lobby atlas allocator");
+                    return;
+                }
+
+                int templateWidth;
+                int templateHeight;
+                if (!baseAllocator.TryGetLargestTextureDimensions(out templateWidth, out templateHeight))
+                {
+                    Fail("lobby page-split capacity could not determine a template texture size");
+                    return;
+                }
+
+                string reportPath = Path.Combine(reportDir, "lobby-page-split-capacity.tsv");
+                int existingPages = CountExistingLobbyTexturePages();
+                int zeroExtraFailures = 0;
+                int requiredExtraPages = -1;
+                using (StreamWriter writer = CreateUtf8Writer(reportPath))
+                {
+                    writer.WriteLine("extra_pages\ttotal_pages\ttemplate_width\ttemplate_height\taggregate_allocation_failures");
+                    for (int extraPages = 0; extraPages <= LobbyPageSplitMaxExtraPages; extraPages++)
+                    {
+                        LobbyAtlasAllocator allocator = baseAllocator.Clone();
+                        AddSyntheticLobbyTexturePages(allocator, existingPages, extraPages, templateWidth, templateHeight);
+                        int failures = CountLobbyFullCoverageAllocationFailures(requirements, allocator);
+                        if (extraPages == 0)
+                        {
+                            zeroExtraFailures = failures;
+                        }
+
+                        WriteTsvRow(
+                            writer,
+                            extraPages.ToString(),
+                            (existingPages + extraPages).ToString(),
+                            templateWidth.ToString(),
+                            templateHeight.ToString(),
+                            failures.ToString());
+
+                        if (failures == 0 && requiredExtraPages < 0)
+                        {
+                            requiredExtraPages = extraPages;
+                        }
+                    }
+                }
+
+                if (requiredExtraPages < 0)
+                {
+                    Fail(
+                        "lobby full coverage still does not fit with {0} synthetic {1}x{2} pages; current_failures={3}. See {4}",
+                        LobbyPageSplitMaxExtraPages,
+                        templateWidth,
+                        templateHeight,
+                        zeroExtraFailures,
+                        reportPath);
+                    return;
+                }
+
+                Pass(
+                    "lobby full coverage fits with {0} extra synthetic {1}x{2} pages: existing_pages={3}, current_failures={4}, report={5}",
+                    requiredExtraPages,
+                    templateWidth,
+                    templateHeight,
+                    existingPages,
+                    zeroExtraFailures,
+                    reportPath);
             }
 
             private void VerifyLobbyCoverageGlyphs()
@@ -1262,6 +1341,91 @@ namespace FfxivKoreanPatch.PatchRouteVerifier
                        texturePath.Replace('\\', '/').IndexOf("common/font/font_lobby", StringComparison.OrdinalIgnoreCase) >= 0;
             }
 
+            private int CountExistingLobbyTexturePages()
+            {
+                int count = 0;
+                for (int i = 0; i < LobbyAtlasTexturePaths.Length; i++)
+                {
+                    if (_patchedFont.ContainsPath(LobbyAtlasTexturePaths[i]))
+                    {
+                        count++;
+                    }
+                }
+
+                return count;
+            }
+
+            private static void AddSyntheticLobbyTexturePages(
+                LobbyAtlasAllocator allocator,
+                int existingPages,
+                int extraPages,
+                int width,
+                int height)
+            {
+                if (allocator == null)
+                {
+                    return;
+                }
+
+                for (int i = 0; i < extraPages; i++)
+                {
+                    string texturePath = "common/font/font_lobby_synthetic" + (existingPages + i + 1).ToString() + ".tex";
+                    allocator.AddEmptyTexture(texturePath, width, height);
+                }
+            }
+
+            private int CountLobbyFullCoverageAllocationFailures(
+                Dictionary<string, LobbyFontGlyphRequirement> requirements,
+                LobbyAtlasAllocator aggregateAllocator)
+            {
+                if (requirements == null || aggregateAllocator == null)
+                {
+                    return int.MaxValue;
+                }
+
+                Dictionary<string, byte[]> fdtCache = new Dictionary<string, byte[]>(StringComparer.OrdinalIgnoreCase);
+                List<string> fonts = new List<string>(requirements.Keys);
+                fonts.Sort(StringComparer.OrdinalIgnoreCase);
+
+                int failures = 0;
+                for (int fontIndex = 0; fontIndex < fonts.Count; fontIndex++)
+                {
+                    string fontPath = fonts[fontIndex];
+                    if (!IsLobbyFontPath(fontPath))
+                    {
+                        continue;
+                    }
+
+                    LobbyFontGlyphRequirement requirement = requirements[fontPath];
+                    byte[] targetFdt = TryReadFdt(_patchedFont, fontPath, fdtCache);
+                    List<uint> codepoints = new List<uint>(requirement.Codepoints);
+                    codepoints.Sort();
+                    for (int i = 0; i < codepoints.Count; i++)
+                    {
+                        uint codepoint = codepoints[i];
+                        FdtGlyphEntry ignored;
+                        if (targetFdt != null && TryFindGlyph(targetFdt, codepoint, out ignored))
+                        {
+                            continue;
+                        }
+
+                        LobbySourceGlyph sourceGlyph;
+                        if (!TryResolveLobbySourceGlyph(fontPath, codepoint, fdtCache, out sourceGlyph))
+                        {
+                            failures++;
+                            continue;
+                        }
+
+                        if (!aggregateAllocator.TryAllocate(sourceGlyph.Width, sourceGlyph.Height))
+                        {
+                            failures++;
+                        }
+                    }
+                }
+
+                return failures;
+            }
+
             private bool TryResolveLobbySourceGlyph(
                 string targetFontPath,
                 uint codepoint,
@@ -1563,6 +1727,7 @@ namespace FfxivKoreanPatch.PatchRouteVerifier
             {
                 private readonly Dictionary<string, LobbyTextureAllocator> _textures =
                     new Dictionary<string, LobbyTextureAllocator>(StringComparer.OrdinalIgnoreCase);
+                private readonly List<string> _textureOrder = new List<string>();
 
                 public int TextureCount
                 {
@@ -1571,7 +1736,22 @@ namespace FfxivKoreanPatch.PatchRouteVerifier
 
                 public void AddTexture(string path, Texture texture)
                 {
-                    _textures[path] = new LobbyTextureAllocator(texture);
+                    AddAllocator(path, new LobbyTextureAllocator(texture));
+                }
+
+                public void AddEmptyTexture(string path, int width, int height)
+                {
+                    AddAllocator(path, new LobbyTextureAllocator(width, height));
+                }
+
+                private void AddAllocator(string path, LobbyTextureAllocator allocator)
+                {
+                    if (!_textures.ContainsKey(path))
+                    {
+                        _textureOrder.Add(path);
+                    }
+
+                    _textures[path] = allocator;
                 }
 
                 public void MarkOccupied(string texturePath, int channel, int x, int y, int width, int height)
@@ -1585,10 +1765,10 @@ namespace FfxivKoreanPatch.PatchRouteVerifier
 
                 public bool TryAllocate(int width, int height)
                 {
-                    for (int i = 0; i < LobbyAtlasTexturePaths.Length; i++)
+                    for (int i = 0; i < _textureOrder.Count; i++)
                     {
                         LobbyTextureAllocator texture;
-                        if (_textures.TryGetValue(LobbyAtlasTexturePaths[i], out texture) &&
+                        if (_textures.TryGetValue(_textureOrder[i], out texture) &&
                             texture.TryAllocate(width, height))
                         {
                             return true;
@@ -1598,12 +1778,33 @@ namespace FfxivKoreanPatch.PatchRouteVerifier
                     return false;
                 }
 
+                public bool TryGetLargestTextureDimensions(out int width, out int height)
+                {
+                    width = 0;
+                    height = 0;
+                    foreach (LobbyTextureAllocator texture in _textures.Values)
+                    {
+                        if (texture.Width * texture.Height > width * height)
+                        {
+                            width = texture.Width;
+                            height = texture.Height;
+                        }
+                    }
+
+                    return width > 0 && height > 0;
+                }
+
                 public LobbyAtlasAllocator Clone()
                 {
                     LobbyAtlasAllocator clone = new LobbyAtlasAllocator();
-                    foreach (KeyValuePair<string, LobbyTextureAllocator> pair in _textures)
+                    for (int i = 0; i < _textureOrder.Count; i++)
                     {
-                        clone._textures.Add(pair.Key, pair.Value.Clone());
+                        string texturePath = _textureOrder[i];
+                        LobbyTextureAllocator texture;
+                        if (_textures.TryGetValue(texturePath, out texture))
+                        {
+                            clone.AddAllocator(texturePath, texture.Clone());
+                        }
                     }
 
                     return clone;
@@ -1616,17 +1817,19 @@ namespace FfxivKoreanPatch.PatchRouteVerifier
                 private readonly int _height;
                 private readonly bool[][] _occupied;
 
-                public LobbyTextureAllocator(Texture texture)
+                public int Width
                 {
-                    _width = texture.Width;
-                    _height = texture.Height;
-                    _occupied = new bool[4][];
-                    int pixels = checked(_width * _height);
-                    for (int channel = 0; channel < _occupied.Length; channel++)
-                    {
-                        _occupied[channel] = new bool[pixels];
-                    }
+                    get { return _width; }
+                }
 
+                public int Height
+                {
+                    get { return _height; }
+                }
+
+                public LobbyTextureAllocator(Texture texture)
+                    : this(texture.Width, texture.Height)
+                {
                     int pixel = 0;
                     for (int y = 0; y < _height; y++)
                     {
@@ -1657,6 +1860,18 @@ namespace FfxivKoreanPatch.PatchRouteVerifier
 
                             pixel++;
                         }
+                    }
+                }
+
+                public LobbyTextureAllocator(int width, int height)
+                {
+                    _width = width;
+                    _height = height;
+                    _occupied = new bool[4][];
+                    int pixels = checked(_width * _height);
+                    for (int channel = 0; channel < _occupied.Length; channel++)
+                    {
+                        _occupied[channel] = new bool[pixels];
                     }
                 }
 
