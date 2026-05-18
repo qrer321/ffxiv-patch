@@ -75,6 +75,7 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
         private const int InGameGlyphTextureNeighborhoodPadding = 8;
         private const int DamageNumberGlyphTextureNeighborhoodPadding = 16;
         private const int ActionDetailHighScaleGlyphTexturePadding = 2;
+        private const double LobbyLargeLabelVisualScaleMinAdvanceRatio = 0.88d;
         private static readonly bool EnableLobbyHangulAllocatedGlyphs = true;
         private static readonly bool EnableLegacyLobbyHangulSourceCellGrafting = false;
 
@@ -190,7 +191,23 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
 
         private static readonly LobbyLargeLabelVisualScaleSpec[] LobbyLargeLabelVisualScaleFonts = new LobbyLargeLabelVisualScaleSpec[]
         {
+            new LobbyLargeLabelVisualScaleSpec("common/font/TrumpGothic_23_lobby.fdt", "common/font/AXIS_18_lobby.fdt", 0.98d),
+            new LobbyLargeLabelVisualScaleSpec("common/font/TrumpGothic_34_lobby.fdt", "common/font/AXIS_18_lobby.fdt", 0.98d)
         };
+
+        private static readonly string[] LobbyLargeLabelCleanReferencePhrases = new string[]
+        {
+            "\u30B7\u30B9\u30C6\u30E0\u30B3\u30F3\u30D5\u30A3\u30B0",
+            "\u30ED\u30B9\u30AC\u30EB",
+            "\u30ED\u30B9\u30C8",
+            "\u970A5\u670811\u65E5",
+            "\u30CB\u30E1\u30FC\u30E4",
+            "\u30EC\u30D9\u30EB100\u6697\u9ED2\u9A0E\u58EB",
+            "\u30B8\u30B4\u30C6\u30F3\u8857"
+        };
+
+        private static readonly uint[] LobbyLargeLabelCleanReferenceCodepoints =
+            CreatePhraseCodepointArray(LobbyLargeLabelCleanReferencePhrases);
 
         private readonly BuildOptions _options;
         private readonly BuildReport _report;
@@ -1973,21 +1990,27 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
             double visualScale = 0d;
             if (hasVisualScaleSpec)
             {
-                double targetDigitHeight = MeasureMeanVisibleHeightFromArchive(
-                    targetFdt,
-                    normalizedPath,
-                    ActionDetailNumericCodepoints,
-                    globalArchive,
-                    targetTextures);
+                double targetReferenceHeight = 0d;
+                byte[] cleanReferenceFdt = TryReadArchiveStandardFile(globalArchive, sourceFdtPath);
+                if (cleanReferenceFdt != null)
+                {
+                    targetReferenceHeight = MeasureMeanVisibleHeightFromArchive(
+                        cleanReferenceFdt,
+                        sourceFdtPath,
+                        LobbyLargeLabelCleanReferenceCodepoints,
+                        globalArchive,
+                        targetTextures);
+                }
+
                 double sourceHangulHeight = MeasureMeanVisibleHeightFromTtmpPayloads(
                     sourceFdt,
                     sourceFdtPath,
                     requiredCodepoints,
                     payloadsByPath,
                     mpdStream);
-                if (targetDigitHeight > 0d && sourceHangulHeight > 0d)
+                if (targetReferenceHeight > 0d && sourceHangulHeight > 0d)
                 {
-                    visualScale = (targetDigitHeight * visualScaleSpec.HangulToDigitRatio) / sourceHangulHeight;
+                    visualScale = (targetReferenceHeight * visualScaleSpec.HangulToReferenceRatio) / sourceHangulHeight;
                 }
             }
 
@@ -2093,6 +2116,12 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
                         (int)Math.Round(sourceAdvance * visualScale),
                         1,
                         byte.MaxValue);
+                    scaledAdvance = Math.Max(
+                        scaledAdvance,
+                        ClampInt(
+                            (int)Math.Round(sourceAdvance * LobbyLargeLabelVisualScaleMinAdvanceRatio),
+                            1,
+                            byte.MaxValue));
                     replacementOffsetX = ClampInt(scaledAdvance - replacementWidth, sbyte.MinValue, sbyte.MaxValue);
                     patchAlpha = ScaleGlyphAlphaBilinear(
                         sourceRegion.Alpha,
@@ -2298,7 +2327,7 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
             for (int i = 0; i < codepoints.Length; i++)
             {
                 uint codepoint = codepoints[i];
-                if (!IsHangulCodepoint(codepoint) && (codepoint < '0' || codepoint > '9'))
+                if (!IsMeasurableFontMetricCodepoint(codepoint))
                 {
                     continue;
                 }
@@ -2391,7 +2420,7 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
             for (int i = 0; i < codepoints.Length; i++)
             {
                 uint codepoint = codepoints[i];
-                if (!IsHangulCodepoint(codepoint) && (codepoint < '0' || codepoint > '9'))
+                if (!IsMeasurableFontMetricCodepoint(codepoint))
                 {
                     continue;
                 }
@@ -2446,6 +2475,39 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
             }
 
             return measured > 0 ? total / measured : 0d;
+        }
+
+        private static bool IsMeasurableFontMetricCodepoint(uint codepoint)
+        {
+            return IsHangulCodepoint(codepoint) ||
+                   (codepoint >= '0' && codepoint <= '9') ||
+                   IsReferenceCjkCodepoint(codepoint);
+        }
+
+        private static bool IsReferenceCjkCodepoint(uint codepoint)
+        {
+            return (codepoint >= 0x3040u && codepoint <= 0x309Fu) ||
+                   (codepoint >= 0x30A0u && codepoint <= 0x30FFu) ||
+                   (codepoint >= 0x4E00u && codepoint <= 0x9FFFu) ||
+                   codepoint == 0x3005u ||
+                   codepoint == 0x30FCu;
+        }
+
+        private static byte[] TryReadArchiveStandardFile(SqPackArchive archive, string path)
+        {
+            if (archive == null || string.IsNullOrWhiteSpace(path))
+            {
+                return null;
+            }
+
+            try
+            {
+                return archive.ReadFile(path);
+            }
+            catch
+            {
+                return null;
+            }
         }
 
         private static bool TryFindAlphaVisibleYBounds(byte[] alpha, int width, int height, out int minY, out int maxY)
@@ -4729,7 +4791,7 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
 
             if (IsLobbyLargeLabelVisualScaleFont(normalized))
             {
-                return sets.LargeCharacterLabels;
+                return sets.LargeLabels;
             }
 
             if (IsCharacterSelectOnlyLobbyFont(normalized))
@@ -5291,6 +5353,30 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
             codepoints.CopyTo(values);
             Array.Sort(values);
             return values;
+        }
+
+        private static uint[] CreatePhraseCodepointArray(string[] phrases)
+        {
+            HashSet<uint> seen = new HashSet<uint>();
+            List<uint> values = new List<uint>();
+            if (phrases != null)
+            {
+                for (int phraseIndex = 0; phraseIndex < phrases.Length; phraseIndex++)
+                {
+                    string phrase = phrases[phraseIndex] ?? string.Empty;
+                    for (int charIndex = 0; charIndex < phrase.Length; charIndex++)
+                    {
+                        uint codepoint = ReadCodepoint(phrase, ref charIndex);
+                        if (seen.Add(codepoint))
+                        {
+                            values.Add(codepoint);
+                        }
+                    }
+                }
+            }
+
+            values.Sort();
+            return values.ToArray();
         }
 
         private static uint ReadCodepoint(string value, ref int index)
@@ -7401,22 +7487,22 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
             public readonly string TargetFontPath;
             public readonly string SourceFontPath;
             public readonly string PlacementFontPath;
-            public readonly double HangulToDigitRatio;
+            public readonly double HangulToReferenceRatio;
             public readonly bool UsePlacementCells;
 
-            public LobbyLargeLabelVisualScaleSpec(string targetFontPath, string sourceFontPath, double hangulToDigitRatio)
-                : this(targetFontPath, sourceFontPath, null, hangulToDigitRatio)
+            public LobbyLargeLabelVisualScaleSpec(string targetFontPath, string sourceFontPath, double hangulToReferenceRatio)
+                : this(targetFontPath, sourceFontPath, null, hangulToReferenceRatio)
             {
             }
 
-            public LobbyLargeLabelVisualScaleSpec(string targetFontPath, string sourceFontPath, string placementFontPath, double hangulToDigitRatio)
+            public LobbyLargeLabelVisualScaleSpec(string targetFontPath, string sourceFontPath, string placementFontPath, double hangulToReferenceRatio)
             {
                 TargetFontPath = NormalizeGamePath(targetFontPath);
                 SourceFontPath = NormalizeGamePath(sourceFontPath);
                 PlacementFontPath = string.IsNullOrWhiteSpace(placementFontPath)
                     ? SourceFontPath
                     : NormalizeGamePath(placementFontPath);
-                HangulToDigitRatio = hangulToDigitRatio;
+                HangulToReferenceRatio = hangulToReferenceRatio <= 0d ? 1d : hangulToReferenceRatio;
                 UsePlacementCells = !string.Equals(PlacementFontPath, SourceFontPath, StringComparison.OrdinalIgnoreCase);
             }
         }

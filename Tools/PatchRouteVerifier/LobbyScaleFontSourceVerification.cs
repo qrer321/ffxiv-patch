@@ -67,6 +67,9 @@ namespace FfxivKoreanPatch.PatchRouteVerifier
             private uint[] CollectLobbyLargeLabelHangulCodepoints()
             {
                 HashSet<uint> codepoints = new HashSet<uint>();
+                AddDynamicHangulCodepoints(codepoints, LobbyScaledHangulPhrases.StartScreenSystemSettings);
+                AddDynamicHangulCodepoints(codepoints, LobbyScaledHangulPhrases.HighResolutionUiScaleOptions);
+                AddDynamicHangulCodepoints(codepoints, LobbyScaledHangulPhrases.StartScreenSystemSettingsResultMessages);
                 AddDynamicHangulCodepoints(codepoints, LobbyScaledHangulPhrases.CharacterSelectLargeLabels);
                 AddPatchedLobbyCoverageRangeHangulCodepoints(
                     codepoints,
@@ -328,7 +331,9 @@ namespace FfxivKoreanPatch.PatchRouteVerifier
 
             private static bool IsVisualScaledLobbyTrumpGothic(string fontPath)
             {
-                return false;
+                string normalized = (fontPath ?? string.Empty).Replace('\\', '/');
+                return string.Equals(normalized, "common/font/trumpgothic_23_lobby.fdt", StringComparison.OrdinalIgnoreCase) ||
+                       string.Equals(normalized, "common/font/trumpgothic_34_lobby.fdt", StringComparison.OrdinalIgnoreCase);
             }
 
             private struct LobbyScaleFontSourceRoute
