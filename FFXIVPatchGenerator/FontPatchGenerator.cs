@@ -144,7 +144,6 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
             "common/font/font_lobby4.tex",
             "common/font/font_lobby5.tex",
             "common/font/font_lobby6.tex",
-            "common/font/font_lobby7.tex",
             "common/font/font_krn_1.tex"
         };
 
@@ -723,8 +722,7 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
                         FontLobby3TexturePath,
                         FontLobby4TexturePath,
                         FontLobby5TexturePath,
-                        FontLobby6TexturePath,
-                        FontLobby7TexturePath
+                        FontLobby6TexturePath
                     },
                     width,
                     height,
@@ -805,8 +803,7 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
                         FontLobby3TexturePath,
                         FontLobby4TexturePath,
                         FontLobby5TexturePath,
-                        FontLobby6TexturePath,
-                        FontLobby7TexturePath
+                        FontLobby6TexturePath
                     },
                     width,
                     height,
@@ -2849,8 +2846,7 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
                         FontLobby3TexturePath,
                         FontLobby4TexturePath,
                         FontLobby5TexturePath,
-                        FontLobby6TexturePath,
-                        FontLobby7TexturePath
+                        FontLobby6TexturePath
                     },
                     width,
                     height,
@@ -2864,7 +2860,6 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
                     glyphRepair,
                     new string[]
                     {
-                        FontLobby7TexturePath,
                         FontLobby6TexturePath,
                         FontLobby5TexturePath,
                         FontLobby4TexturePath,
@@ -2886,7 +2881,6 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
                     FontLobby4TexturePath,
                     FontLobby5TexturePath,
                     FontLobby6TexturePath,
-                    FontLobby7TexturePath,
                     FontLobby2TexturePath,
                     FontLobby1TexturePath
                 },
@@ -4810,7 +4804,7 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
 
             if (IsLobbyLargeLabelVisualScaleFont(normalized))
             {
-                return sets.SystemAndCharacter;
+                return sets.LargeLabels;
             }
 
             if (IsCharacterSelectOnlyLobbyFont(normalized))
@@ -5834,8 +5828,6 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
             AddGlobalFontAtlasAllocator(context, globalArchive, FontLobby4TexturePath);
             AddGlobalFontAtlasAllocator(context, globalArchive, FontLobby5TexturePath);
             AddGlobalFontAtlasAllocator(context, globalArchive, FontLobby6TexturePath);
-            AddGlobalFontAtlasAllocator(context, globalArchive, FontLobby7TexturePath);
-            AddBlankLobbyFontAtlasAllocatorIfMissing(context, globalArchive, FontLobby7TexturePath);
             AddGlobalFontAtlasAllocator(context, globalArchive, Font3TexturePath);
             AddGlobalFontAtlasAllocator(context, globalArchive, Font4TexturePath);
             AddGlobalFontAtlasAllocator(context, globalArchive, Font5TexturePath);
