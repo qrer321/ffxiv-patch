@@ -70,6 +70,7 @@ namespace FfxivKoreanPatch.PatchRouteVerifier
                 AddDynamicHangulCodepoints(codepoints, LobbyScaledHangulPhrases.StartScreenSystemSettings);
                 AddDynamicHangulCodepoints(codepoints, LobbyScaledHangulPhrases.HighResolutionUiScaleOptions);
                 AddDynamicHangulCodepoints(codepoints, LobbyScaledHangulPhrases.StartScreenSystemSettingsResultMessages);
+                AddDynamicHangulCodepoints(codepoints, LobbyScaledHangulPhrases.StartScreenMainMenu);
                 AddDynamicHangulCodepoints(codepoints, LobbyScaledHangulPhrases.CharacterSelectLargeLabels);
                 AddPatchedLobbyCoverageRangeHangulCodepoints(
                     codepoints,

@@ -4712,6 +4712,7 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
                     LobbyScaledHangulPhrases.StartScreenSystemSettings,
                     LobbyScaledHangulPhrases.HighResolutionUiScaleOptions,
                     LobbyScaledHangulPhrases.StartScreenSystemSettingsResultMessages,
+                    LobbyScaledHangulPhrases.StartScreenMainMenu,
                     LobbyScaledHangulPhrases.CharacterSelectLargeLabels),
                 "lobby large-label glyph coverage");
             sets.LargeCharacterLabels = CreateLobbyHangulCodepoints(
