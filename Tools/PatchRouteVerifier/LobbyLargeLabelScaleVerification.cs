@@ -64,9 +64,9 @@ namespace FfxivKoreanPatch.PatchRouteVerifier
 
                 if (IsVisualScaledLobbyLargeLabelFont(testCase.FontPath))
                 {
-                    VerifyLobbyLargeLabelRatio(testCase, "source-height-upper", korean.MeanHangulHeight, referenceHeight, 0.70d, 1.04d);
-                    VerifyLobbyLargeLabelRatio(testCase, "source-width-upper", korean.MeanHangulWidth, reference.MeanHangulWidth, 0.70d, 1.08d);
-                    VerifyLobbyLargeLabelRatio(testCase, "source-advance-upper", korean.MeanHangulAdvance, reference.MeanHangulAdvance, 0.70d, 1.08d);
+                    VerifyLobbyLargeLabelRatio(testCase, "source-height", korean.MeanHangulHeight, referenceHeight, 0.96d, 1.08d);
+                    VerifyLobbyLargeLabelRatio(testCase, "source-width", korean.MeanHangulWidth, reference.MeanHangulWidth, 0.96d, 1.12d);
+                    VerifyLobbyLargeLabelRatio(testCase, "source-advance", korean.MeanHangulAdvance, reference.MeanHangulAdvance, 0.96d, 1.12d);
                 }
                 else
                 {
@@ -84,10 +84,15 @@ namespace FfxivKoreanPatch.PatchRouteVerifier
             {
                 PhraseVisualBounds cleanReference;
                 string error;
-                if (!TryMeasurePhraseVisualBounds(_cleanFont, testCase.ReferenceFontPath, testCase.CleanReferencePhrase, false, out cleanReference, out error))
+                string cleanReferenceFontPath = testCase.FontPath;
+                if (!TryMeasurePhraseVisualBounds(_cleanFont, cleanReferenceFontPath, testCase.CleanReferencePhrase, false, out cleanReference, out error))
                 {
-                    Fail("{0} lobby large-label clean reference [{1}] layout error in {2}: {3}", testCase.FontPath, Escape(testCase.CleanReferencePhrase), testCase.ReferenceFontPath, error);
-                    return;
+                    cleanReferenceFontPath = testCase.ReferenceFontPath;
+                    if (!TryMeasurePhraseVisualBounds(_cleanFont, cleanReferenceFontPath, testCase.CleanReferencePhrase, false, out cleanReference, out error))
+                    {
+                        Fail("{0} lobby large-label clean reference [{1}] layout error: {2}", testCase.FontPath, Escape(testCase.CleanReferencePhrase), error);
+                        return;
+                    }
                 }
 
                 double referenceHeight = cleanReference.MeanReferenceHeight;
@@ -103,8 +108,7 @@ namespace FfxivKoreanPatch.PatchRouteVerifier
                     return;
                 }
 
-                double maximum = referenceHeight < 13d ? 1.40d : 1.12d;
-                VerifyLobbyLargeLabelRatio(testCase, "clean-height", korean.MeanHangulHeight, referenceHeight, 0.82d, maximum);
+                VerifyLobbyLargeLabelRatio(testCase, "clean-reference-height", korean.MeanHangulHeight, referenceHeight, 0.82d, 1.80d);
             }
 
             private static bool IsVisualScaledLobbyLargeLabelFont(string fontPath)

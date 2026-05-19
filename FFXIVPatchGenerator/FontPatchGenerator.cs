@@ -2001,15 +2001,33 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
             if (hasVisualScaleSpec)
             {
                 double targetReferenceHeight = 0d;
-                byte[] cleanReferenceFdt = TryReadArchiveStandardFile(globalArchive, sourceFdtPath);
+                string cleanReferenceFdtPath = visualScaleSpec.TargetFontPath;
+                byte[] cleanReferenceFdt = TryReadArchiveStandardFile(globalArchive, cleanReferenceFdtPath);
                 if (cleanReferenceFdt != null)
                 {
                     targetReferenceHeight = MeasureMeanVisibleHeightFromArchive(
                         cleanReferenceFdt,
-                        sourceFdtPath,
+                        cleanReferenceFdtPath,
                         LobbyLargeLabelCleanReferenceCodepoints,
                         globalArchive,
-                        targetTextures);
+                        targetTextures,
+                        true);
+                }
+
+                if (targetReferenceHeight <= 0d)
+                {
+                    cleanReferenceFdtPath = sourceFdtPath;
+                    cleanReferenceFdt = TryReadArchiveStandardFile(globalArchive, cleanReferenceFdtPath);
+                    if (cleanReferenceFdt != null)
+                    {
+                        targetReferenceHeight = MeasureMeanVisibleHeightFromArchive(
+                            cleanReferenceFdt,
+                            cleanReferenceFdtPath,
+                            LobbyLargeLabelCleanReferenceCodepoints,
+                            globalArchive,
+                            targetTextures,
+                            true);
+                    }
                 }
 
                 double sourceHangulHeight = MeasureMeanVisibleHeightFromTtmpPayloads(
@@ -2021,6 +2039,10 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
                 if (targetReferenceHeight > 0d && sourceHangulHeight > 0d)
                 {
                     visualScale = (targetReferenceHeight * visualScaleSpec.HangulToReferenceRatio) / sourceHangulHeight;
+                    if (visualScale < 1d)
+                    {
+                        visualScale = 1d;
+                    }
                 }
             }
 
@@ -2111,7 +2133,10 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
                 int replacementHeight = sourceEntry.Height;
                 int replacementOffsetX = sourceEntry.OffsetX;
                 int replacementOffsetY = sourceEntry.OffsetY;
-                if (hasVisualScaleSpec && visualScale > 0d)
+                bool applyVisualScale = hasVisualScaleSpec &&
+                    visualScale > 0d &&
+                    Math.Abs(visualScale - 1d) > 0.001d;
+                if (applyVisualScale)
                 {
                     replacementWidth = ClampInt(
                         (int)Math.Round(sourceEntry.Width * visualScale),
@@ -2147,7 +2172,7 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
                 bool hasAllocation = false;
                 bool addTexturePatch = false;
                 string allocationKey = CreateLobbyHangulAllocationKey(sourceFdtPath, codepoint, sourceEntry, sourceRegion);
-                if (hasVisualScaleSpec)
+                if (applyVisualScale)
                 {
                     allocationKey = "visual-scale|" +
                         replacementWidth.ToString() + "x" + replacementHeight.ToString() + "|" +
@@ -2225,7 +2250,7 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
                     patch.ClearHeight = patchClearHeight;
                     patch.SourceWidth = sourceRegion.Width;
                     patch.SourceHeight = sourceRegion.Height;
-                    if (hasVisualScaleSpec && visualScale > 0d)
+                    if (applyVisualScale)
                     {
                         patch.SourceWidth = replacementWidth;
                         patch.SourceHeight = replacementHeight;
@@ -2244,7 +2269,7 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
                 Endian.WriteUInt16LE(replacementEntry, 6, checked((ushort)allocation.Cell.ImageIndex));
                 Endian.WriteUInt16LE(replacementEntry, 8, checked((ushort)(allocation.Cell.X + allocation.LeftPadding)));
                 Endian.WriteUInt16LE(replacementEntry, 10, checked((ushort)(allocation.Cell.Y + allocation.TopPadding)));
-                if (hasVisualScaleSpec && visualScale > 0d)
+                if (applyVisualScale)
                 {
                     replacementEntry[12] = checked((byte)replacementWidth);
                     replacementEntry[13] = checked((byte)replacementHeight);
@@ -2405,7 +2430,8 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
             string fdtPath,
             uint[] codepoints,
             SqPackArchive archive,
-            Dictionary<string, byte[]> textures)
+            Dictionary<string, byte[]> textures,
+            bool referenceCjkOnly)
         {
             if (fdt == null ||
                 string.IsNullOrWhiteSpace(fdtPath) ||
@@ -2430,6 +2456,11 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
             for (int i = 0; i < codepoints.Length; i++)
             {
                 uint codepoint = codepoints[i];
+                if (referenceCjkOnly && !IsReferenceCjkCodepoint(codepoint))
+                {
+                    continue;
+                }
+
                 if (!IsMeasurableFontMetricCodepoint(codepoint))
                 {
                     continue;
