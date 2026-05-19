@@ -2149,7 +2149,7 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
                 string allocationKey = CreateLobbyHangulAllocationKey(sourceFdtPath, codepoint, sourceEntry, sourceRegion);
                 if (hasVisualScaleSpec)
                 {
-                    allocationKey = normalizedPath + "|visual-scale|" +
+                    allocationKey = "visual-scale|" +
                         replacementWidth.ToString() + "x" + replacementHeight.ToString() + "|" +
                         replacementOffsetX.ToString() + "|" +
                         allocationKey;
@@ -4804,7 +4804,7 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
 
             if (IsLobbyLargeLabelVisualScaleFont(normalized))
             {
-                return sets.LargeLabels;
+                return sets.SystemAndCharacter;
             }
 
             if (IsCharacterSelectOnlyLobbyFont(normalized))
@@ -7380,7 +7380,9 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
         private sealed class FontAtlasAllocator
         {
             private readonly FontTexture _texture;
-            private readonly bool[][] _occupied;
+            private readonly ulong[][][] _occupiedBits;
+            private readonly Dictionary<ulong, int> _denseScanCursors = new Dictionary<ulong, int>();
+            private readonly int _wordsPerRow;
 
             public int Width
             {
@@ -7395,11 +7397,15 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
             public FontAtlasAllocator(byte[] rawTexture)
             {
                 _texture = ReadFontTexture(rawTexture);
-                _occupied = new bool[4][];
-                int pixels = checked(_texture.Width * _texture.Height);
-                for (int channel = 0; channel < _occupied.Length; channel++)
+                _wordsPerRow = checked((_texture.Width + 63) / 64);
+                _occupiedBits = new ulong[4][][];
+                for (int channel = 0; channel < _occupiedBits.Length; channel++)
                 {
-                    _occupied[channel] = new bool[pixels];
+                    _occupiedBits[channel] = new ulong[_texture.Height][];
+                    for (int y = 0; y < _texture.Height; y++)
+                    {
+                        _occupiedBits[channel][y] = new ulong[_wordsPerRow];
+                    }
                 }
 
                 int p = 0;
@@ -7412,22 +7418,22 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
                         byte hi = _texture.Raw[offset + 1];
                         if ((hi & 0x0F) != 0)
                         {
-                            _occupied[0][p] = true;
+                            SetOccupiedBit(0, x, y);
                         }
 
                         if ((lo & 0xF0) != 0)
                         {
-                            _occupied[1][p] = true;
+                            SetOccupiedBit(1, x, y);
                         }
 
                         if ((lo & 0x0F) != 0)
                         {
-                            _occupied[2][p] = true;
+                            SetOccupiedBit(2, x, y);
                         }
 
                         if ((hi & 0xF0) != 0)
                         {
-                            _occupied[3][p] = true;
+                            SetOccupiedBit(3, x, y);
                         }
 
                         p++;
@@ -7437,7 +7443,7 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
 
             public void MarkOccupied(int x, int y, int width, int height, int channel)
             {
-                if (channel < 0 || channel >= _occupied.Length)
+                if (channel < 0 || channel >= _occupiedBits.Length)
                 {
                     return;
                 }
@@ -7448,11 +7454,7 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
                 int bottom = Math.Min(_texture.Height, y + Math.Max(0, height));
                 for (int yy = top; yy < bottom; yy++)
                 {
-                    int row = yy * _texture.Width;
-                    for (int xx = left; xx < right; xx++)
-                    {
-                        _occupied[channel][row + xx] = true;
-                    }
+                    MarkOccupiedRow(channel, yy, left, right);
                 }
             }
 
@@ -7463,7 +7465,7 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
                 int h = Math.Max(1, height);
                 int stepX = Math.Max(1, w + 1);
                 int stepY = Math.Max(1, h + 1);
-                for (int channel = 0; channel < _occupied.Length; channel++)
+                for (int channel = 0; channel < _occupiedBits.Length; channel++)
                 {
                     for (int y = _texture.Height - h - 1; y >= 0; y -= stepY)
                     {
@@ -7483,24 +7485,125 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
                     }
                 }
 
+                return TryAllocateDense(w, h, out cell);
+            }
+
+            private bool TryAllocateDense(int width, int height, out AllocatedFontGlyphCell cell)
+            {
+                cell = new AllocatedFontGlyphCell();
+                int maxY = _texture.Height - height - 1;
+                int maxX = _texture.Width - width;
+                if (maxY < 0 || maxX < 0)
+                {
+                    return false;
+                }
+
+                int positionsPerRow = maxX + 1;
+                int totalPositions = checked((maxY + 1) * positionsPerRow);
+                for (int channel = 0; channel < _occupiedBits.Length; channel++)
+                {
+                    ulong cursorKey = CreateDenseScanCursorKey(channel, width, height);
+                    int cursor;
+                    if (!_denseScanCursors.TryGetValue(cursorKey, out cursor))
+                    {
+                        cursor = 0;
+                    }
+
+                    for (int position = cursor; position < totalPositions; position++)
+                    {
+                        int row = position / positionsPerRow;
+                        int x = position - row * positionsPerRow;
+                        int y = maxY - row;
+                        if (!IsFree(x, y, width, height, channel))
+                        {
+                            continue;
+                        }
+
+                        MarkOccupied(x, y, width, height, channel);
+                        _denseScanCursors[cursorKey] = position + 1;
+                        cell.X = x;
+                        cell.Y = y;
+                        cell.Channel = channel;
+                        return true;
+                    }
+
+                    _denseScanCursors[cursorKey] = totalPositions;
+                }
+
                 return false;
+            }
+
+            private static ulong CreateDenseScanCursorKey(int channel, int width, int height)
+            {
+                return ((ulong)(uint)channel << 48) |
+                       ((ulong)(uint)(width & 0xFFFF) << 24) |
+                       (ulong)(uint)(height & 0xFFFF);
             }
 
             private bool IsFree(int x, int y, int width, int height, int channel)
             {
                 for (int yy = 0; yy < height; yy++)
                 {
-                    int row = (y + yy) * _texture.Width;
-                    for (int xx = 0; xx < width; xx++)
+                    if (HasOccupiedBits(channel, y + yy, x, x + width))
                     {
-                        if (_occupied[channel][row + x + xx])
-                        {
-                            return false;
-                        }
+                        return false;
                     }
                 }
 
                 return true;
+            }
+
+            private void SetOccupiedBit(int channel, int x, int y)
+            {
+                _occupiedBits[channel][y][x >> 6] |= 1UL << (x & 63);
+            }
+
+            private void MarkOccupiedRow(int channel, int y, int left, int right)
+            {
+                if (left >= right)
+                {
+                    return;
+                }
+
+                int firstWord = left >> 6;
+                int lastWord = (right - 1) >> 6;
+                ulong[] row = _occupiedBits[channel][y];
+                for (int word = firstWord; word <= lastWord; word++)
+                {
+                    int wordLeft = word == firstWord ? left & 63 : 0;
+                    int wordRight = word == lastWord ? (right - 1) & 63 : 63;
+                    row[word] |= CreateBitRangeMask(wordLeft, wordRight);
+                }
+            }
+
+            private bool HasOccupiedBits(int channel, int y, int left, int right)
+            {
+                if (left >= right)
+                {
+                    return false;
+                }
+
+                int firstWord = left >> 6;
+                int lastWord = (right - 1) >> 6;
+                ulong[] row = _occupiedBits[channel][y];
+                for (int word = firstWord; word <= lastWord; word++)
+                {
+                    int wordLeft = word == firstWord ? left & 63 : 0;
+                    int wordRight = word == lastWord ? (right - 1) & 63 : 63;
+                    if ((row[word] & CreateBitRangeMask(wordLeft, wordRight)) != 0UL)
+                    {
+                        return true;
+                    }
+                }
+
+                return false;
+            }
+
+            private static ulong CreateBitRangeMask(int leftBit, int rightBit)
+            {
+                ulong leftMask = ulong.MaxValue << leftBit;
+                ulong rightMask = ulong.MaxValue >> (63 - rightBit);
+                return leftMask & rightMask;
             }
         }
 
