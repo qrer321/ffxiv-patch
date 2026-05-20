@@ -209,11 +209,6 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
                     mutableIndex2,
                     datWriter,
                     copiedTargets);
-                patched += PatchPvpProfileUldFontRoutes(
-                    globalUiArchive,
-                    mutableIndex,
-                    mutableIndex2,
-                    datWriter);
 
                 mutableIndex.Save();
                 mutableIndex2.Save();
@@ -222,41 +217,6 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
             }
 
             ProgressReporter.Report(99, "UI texture patch saved");
-        }
-
-        private int PatchPvpProfileUldFontRoutes(
-            SqPackArchive globalUiArchive,
-            SqPackIndexFile mutableIndex,
-            SqPackIndex2File mutableIndex2,
-            SqPackDatWriter datWriter)
-        {
-            int patchedFiles = 0;
-            for (int i = 0; i < PvpProfileUldFontRoutes.TargetUldPaths.Length; i++)
-            {
-                string path = PvpProfileUldFontRoutes.TargetUldPaths[i];
-                byte[] uld;
-                if (!globalUiArchive.TryReadFile(path, out uld))
-                {
-                    continue;
-                }
-
-                int changedNodes = PvpProfileUldFontRoutes.PatchAxisTextRoutes(uld);
-                if (changedNodes == 0)
-                {
-                    continue;
-                }
-
-                long offset = datWriter.WriteStandardFile(uld);
-                mutableIndex.SetFileOffset(path, PatchDatId, offset);
-                mutableIndex2.SetFileOffset(path, PatchDatId, offset);
-                patchedFiles++;
-                Console.WriteLine(
-                    "PvP profile ULD font routes patched: {0} ({1} text nodes)",
-                    path,
-                    changedNodes);
-            }
-
-            return patchedFiles;
         }
 
         private string ResolveExcelIndexForRead(string globalSqpack)

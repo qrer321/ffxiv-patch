@@ -144,9 +144,6 @@
     <Compile Include="..\..\FFXIVPatchGenerator\LobbyHangulCoverage.cs">
       <Link>Generator\LobbyHangulCoverage.cs</Link>
     </Compile>
-    <Compile Include="..\..\FFXIVPatchGenerator\PvpProfileUldFontRoutes.cs">
-      <Link>Generator\PvpProfileUldFontRoutes.cs</Link>
-    </Compile>
     <Compile Include="..\..\FFXIVPatchGenerator\SqPack.cs">
       <Link>Generator\SqPack.cs</Link>
     </Compile>
