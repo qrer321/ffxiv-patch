@@ -64,9 +64,9 @@ namespace FfxivKoreanPatch.PatchRouteVerifier
 
                 if (IsVisualScaledLobbyLargeLabelFont(testCase.FontPath))
                 {
-                    VerifyLobbyLargeLabelRatio(testCase, "source-height", korean.MeanHangulHeight, referenceHeight, 0.96d, 1.08d);
-                    VerifyLobbyLargeLabelRatio(testCase, "source-width", korean.MeanHangulWidth, reference.MeanHangulWidth, 0.96d, 1.12d);
-                    VerifyLobbyLargeLabelRatio(testCase, "source-advance", korean.MeanHangulAdvance, reference.MeanHangulAdvance, 0.96d, 1.12d);
+                    VerifyLobbyLargeLabelRatio(testCase, "source-height", korean.MeanHangulHeight, referenceHeight, 1.04d, 1.16d);
+                    VerifyLobbyLargeLabelRatio(testCase, "source-width", korean.MeanHangulWidth, reference.MeanHangulWidth, 1.02d, 1.18d);
+                    VerifyLobbyLargeLabelRatio(testCase, "source-advance", korean.MeanHangulAdvance, reference.MeanHangulAdvance, 1.02d, 1.18d);
                 }
                 else
                 {

@@ -190,8 +190,8 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
 
         private static readonly LobbyLargeLabelVisualScaleSpec[] LobbyLargeLabelVisualScaleFonts = new LobbyLargeLabelVisualScaleSpec[]
         {
-            new LobbyLargeLabelVisualScaleSpec("common/font/TrumpGothic_23_lobby.fdt", "common/font/AXIS_18_lobby.fdt", 0.98d),
-            new LobbyLargeLabelVisualScaleSpec("common/font/TrumpGothic_34_lobby.fdt", "common/font/AXIS_18_lobby.fdt", 0.98d)
+            new LobbyLargeLabelVisualScaleSpec("common/font/TrumpGothic_23_lobby.fdt", "common/font/AXIS_18_lobby.fdt", 1.08d, 1.08d),
+            new LobbyLargeLabelVisualScaleSpec("common/font/TrumpGothic_34_lobby.fdt", "common/font/AXIS_18_lobby.fdt", 1.08d, 1.08d)
         };
 
         private static readonly string[] LobbyLargeLabelCleanReferencePhrases = new string[]
@@ -990,7 +990,17 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
             int relocatedSkippedTextureHangulGlyphs = RelocateHangulGlyphsFromSkippedTextures(path, fdt, mpdStream, payloadsByPath, glyphRepair, texturePatches);
             int dialogueGlyphFixes = _options.FontOnly ? 0 : ApplyDialogueGlyphArtifactFix(path, fdt, dialogueGlyphRepair, glyphRepair, texturePatches);
             int actionDetailHighScaleFixes = 0;
-            int lobbyHangulFixes = ApplyLobbyHangulAllocatedGlyphs(path, ref fdt, mpdStream, payloadsByPath, glyphRepair, globalArchive, texturePatches, lobbyHangulAllocationCache, SelectLobbyHangulCodepointsForFont(path, lobbyHangulCodepoints));
+            int lobbyHangulFixes = ApplyLobbyHangulAllocatedGlyphs(
+                path,
+                ref fdt,
+                mpdStream,
+                payloadsByPath,
+                glyphRepair,
+                globalArchive,
+                texturePatches,
+                lobbyHangulAllocationCache,
+                SelectLobbyHangulCodepointsForFont(path, lobbyHangulCodepoints),
+                SelectLobbyVisualScaleCodepointsForFont(path, lobbyHangulCodepoints));
             if (EnableLegacyLobbyHangulSourceCellGrafting)
             {
                 lobbyHangulFixes = ApplyLobbyHangulSourceCells(path, ref fdt, mpdStream, payloadsByPath, texturePatches, SelectLobbyHangulCodepointsForFont(path, lobbyHangulCodepoints));
@@ -1920,7 +1930,8 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
             SqPackArchive globalArchive,
             Dictionary<string, List<FontTexturePatch>> texturePatches,
             LobbyHangulGlyphAllocationCache lobbyHangulAllocationCache,
-            uint[] requiredCodepoints)
+            uint[] requiredCodepoints,
+            uint[] visualScaleCodepoints)
         {
             if (!ShouldPatchLobbyHangulFont(path, requiredCodepoints) ||
                 targetFdt == null ||
@@ -1997,6 +2008,7 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
 
             Dictionary<string, byte[]> sourceTextures = new Dictionary<string, byte[]>(StringComparer.OrdinalIgnoreCase);
             Dictionary<string, byte[]> targetTextures = new Dictionary<string, byte[]>(StringComparer.OrdinalIgnoreCase);
+            HashSet<uint> visualScaleSet = CreateCodepointSet(visualScaleCodepoints);
             double visualScale = 0d;
             if (hasVisualScaleSpec)
             {
@@ -2039,10 +2051,11 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
                 if (targetReferenceHeight > 0d && sourceHangulHeight > 0d)
                 {
                     visualScale = (targetReferenceHeight * visualScaleSpec.HangulToReferenceRatio) / sourceHangulHeight;
-                    if (visualScale < 1d)
-                    {
-                        visualScale = 1d;
-                    }
+                }
+
+                if (visualScale < visualScaleSpec.MinimumScale)
+                {
+                    visualScale = visualScaleSpec.MinimumScale;
                 }
             }
 
@@ -2134,6 +2147,8 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
                 int replacementOffsetX = sourceEntry.OffsetX;
                 int replacementOffsetY = sourceEntry.OffsetY;
                 bool applyVisualScale = hasVisualScaleSpec &&
+                    visualScaleSet != null &&
+                    visualScaleSet.Contains(codepoint) &&
                     visualScale > 0d &&
                     Math.Abs(visualScale - 1d) > 0.001d;
                 if (applyVisualScale)
@@ -4849,6 +4864,34 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
             }
 
             return sets.SystemAndCharacter;
+        }
+
+        private static uint[] SelectLobbyVisualScaleCodepointsForFont(
+            string path,
+            LobbyHangulCodepointSets sets)
+        {
+            if (sets == null || !IsLobbyLargeLabelVisualScaleFont(path))
+            {
+                return null;
+            }
+
+            return sets.LargeLabels;
+        }
+
+        private static HashSet<uint> CreateCodepointSet(uint[] codepoints)
+        {
+            if (codepoints == null || codepoints.Length == 0)
+            {
+                return null;
+            }
+
+            HashSet<uint> set = new HashSet<uint>();
+            for (int i = 0; i < codepoints.Length; i++)
+            {
+                set.Add(codepoints[i]);
+            }
+
+            return set;
         }
 
         private static bool IsCharacterSelectOnlyLobbyFont(string path)
@@ -7689,14 +7732,25 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
             public readonly string SourceFontPath;
             public readonly string PlacementFontPath;
             public readonly double HangulToReferenceRatio;
+            public readonly double MinimumScale;
             public readonly bool UsePlacementCells;
 
             public LobbyLargeLabelVisualScaleSpec(string targetFontPath, string sourceFontPath, double hangulToReferenceRatio)
-                : this(targetFontPath, sourceFontPath, null, hangulToReferenceRatio)
+                : this(targetFontPath, sourceFontPath, null, hangulToReferenceRatio, 1d)
+            {
+            }
+
+            public LobbyLargeLabelVisualScaleSpec(string targetFontPath, string sourceFontPath, double hangulToReferenceRatio, double minimumScale)
+                : this(targetFontPath, sourceFontPath, null, hangulToReferenceRatio, minimumScale)
             {
             }
 
             public LobbyLargeLabelVisualScaleSpec(string targetFontPath, string sourceFontPath, string placementFontPath, double hangulToReferenceRatio)
+                : this(targetFontPath, sourceFontPath, placementFontPath, hangulToReferenceRatio, 1d)
+            {
+            }
+
+            public LobbyLargeLabelVisualScaleSpec(string targetFontPath, string sourceFontPath, string placementFontPath, double hangulToReferenceRatio, double minimumScale)
             {
                 TargetFontPath = NormalizeGamePath(targetFontPath);
                 SourceFontPath = NormalizeGamePath(sourceFontPath);
@@ -7704,6 +7758,7 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
                     ? SourceFontPath
                     : NormalizeGamePath(placementFontPath);
                 HangulToReferenceRatio = hangulToReferenceRatio <= 0d ? 1d : hangulToReferenceRatio;
+                MinimumScale = minimumScale <= 0d ? 1d : minimumScale;
                 UsePlacementCells = !string.Equals(PlacementFontPath, SourceFontPath, StringComparison.OrdinalIgnoreCase);
             }
         }
