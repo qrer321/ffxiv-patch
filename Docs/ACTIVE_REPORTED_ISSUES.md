@@ -22,6 +22,14 @@
 사용자가 "아직 안 된다"고 재보고한 항목은 구현만 다시 보지 않고,
 먼저 검증 방식 자체가 실패를 잡도록 강화한 뒤 수정한다.
 
+## 2026-05-20 PvP ULD Route Correction
+
+- Fresh output `.tmp\pvp-profile-uld-ja-r1` changes only PvP profile/action/team ULD text nodes from `AXIS_12/14/18` to already-routed PvP `Jupiter_16/20` routes.
+- The generator patches `PvPCharacter.uld` 23 nodes, `PvPAction.uld` 9 nodes, and `PvPTeam.uld` 9 nodes; no global AXIS glyphs are resized.
+- `pvp-profile-font-routes` now validates those exact route changes and fails unexpected ULD render-byte edits instead of accepting advisory warnings as success.
+- Focused result: `pvp-profile-font-routes,third-party-game-font-safety,combat-flytext-damage-glyphs,action-detail-scale-layouts` -> `RESULT: PASS`.
+- `ingame-font-risk-survey` confirms zero remaining PvP `AXIS_*` ULD routes. This is code-level verification only; wait for user confirmation before closing the live PvP visual-size item.
+
 ## Current Checklist
 
 - [x] Quest say phrase anonymization disabled until sheet coverage is complete
