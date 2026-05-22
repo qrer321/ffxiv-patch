@@ -1,5 +1,19 @@
 # 현재 미해결 항목과 추가 작업 목록
 
+## Future Feature: Base-Language Patch Profiles
+
+- Requested: 2026-05-22.
+- This is a future feature candidate only. Do not change current patch behavior until the scope is explicitly approved.
+- Candidate `common-base` profile: preserve common/system boilerplate text in the selected base client language while keeping the normal full Korean patch for the rest.
+- Candidate `story-only` profile: preserve non-story UI/system/combat/gameplay text in the selected base client language and patch only story, quest, and dialogue-related text to Korean.
+- Implementation must be policy-driven by sheet/row/column groups, not by one-off phrase hardcoding.
+- Required verifier before enabling:
+  - preserved rows match local clean/global base language data for the selected target language;
+  - story-only output leaves non-story sheets in base language and applies Korean only to approved story/dialogue/quest scopes;
+  - SeString control codes, icons, links, and macro tokens are byte-preserved where text is preserved;
+  - `ja` and `en` base-client outputs are checked separately.
+- Do not implement or expose this profile as a UI/CLI option until the policy scope and verifier are ready.
+
 ## 2026-05-22 Low-Scale Party Number Marker Contamination
 
 - Report: in-game UI scale 120% or below can show polluted pixels around party-list/chat party number markers. The reported visible marker can be `1` or another party number.
