@@ -100,6 +100,8 @@ namespace FfxivKoreanPatch.PatchRouteVerifier
         {
             0xE031, // self marker
             0xE037, // Occult Crescent / phantom level
+            0xE0B1, 0xE0B2, 0xE0B3, 0xE0B4, // circled instance/legacy party marker digits
+            0xE0B5, 0xE0B6, 0xE0B7, 0xE0B8,
             0xE0E1, 0xE0E2, 0xE0E3, 0xE0E4,
             0xE0E5, 0xE0E6, 0xE0E7, 0xE0E8
         };
