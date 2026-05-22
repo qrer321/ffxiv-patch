@@ -163,6 +163,7 @@
 - `Addon` row `2338`, `6166`은 글로벌 영어 시간 템플릿을 사용해 버프/남은시간 UI의 `시간/분` overflow 완화
 - `Addon` row `10952`는 파티 리스트 본인 표시 glyph가 `=`로 보이는 문제를 피하기 위해 대상 글로벌 언어의 원본 PUA 토큰 유지
 - 파티 리스트 번호 표시 설정이 1~8로 바뀌는 경우를 고려해 본인 번호 PUA glyph(`U+E0E1`~`U+E0E8`)를 clean global의 속 빈 네모 번호 모양으로 복원. FDT 엔트리와 glyph 픽셀을 함께 이식해 `U+E0B1`~`U+E0B8` 동그라미 번호와 섞이지 않도록 처리
+- 2026-05-22 보강: 저배율/작은 채팅창에서 번호 glyph 주변 픽셀이 섞이지 않도록 `U+E031`, `U+E037`, `U+E0E1`~`U+E0E8`은 dirty target cell을 재사용하지 않고 8px base/mip 주변 영역까지 clean PUA cell로 검증한다.
 - `--anonymize-quest-chat-phrases`는 현재 비활성화/no-op입니다. `quest/*` sheet 커버리지가 불완전하므로 기존 구현은 feature gate 뒤에 보존하고, UI 전체 패치/테스트 자동 패치는 더 이상 퀘스트 채팅 문구 익명화를 자동 활성화하지 않습니다.
 - `patch-policy.json` 기반 sheet/row/column 보존과 row/column remap
 - `patch-diagnostics.tsv` 생성

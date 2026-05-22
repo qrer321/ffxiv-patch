@@ -74,6 +74,7 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
         private const int LobbyGlyphTextureNeighborhoodPadding = 0;
         private const int InGameGlyphTextureNeighborhoodPadding = 8;
         private const int DamageNumberGlyphTextureNeighborhoodPadding = 16;
+        private const int PartyListProtectedPuaGlyphTexturePadding = 8;
         private const int ActionDetailHighScaleGlyphTexturePadding = 2;
         private const double LobbyLargeLabelVisualScaleMinAdvanceRatio = 0.88d;
         private static readonly bool EnableLobbyHangulAllocatedGlyphs = true;
@@ -3197,47 +3198,53 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
                     sourceTextures.Add(sourceTexturePath, sourceTexture);
                 }
 
+                CleanAsciiTextureRegion sourceRegion = ExtractFontTextureAlphaRegion(
+                    sourceTexture,
+                    sourceEntry,
+                    PartyListProtectedPuaGlyphTexturePadding);
+                if (!sourceRegion.IsValid)
+                {
+                    continue;
+                }
+
                 AllocatedFontGlyphCell allocatedCell = new AllocatedFontGlyphCell();
                 string allocatedTexturePath = targetTexturePath;
-                bool useAllocatedCell = false;
+                bool useAllocatedCell = TryAllocateProtectedPuaGlyphCell(
+                    glyphRepair,
+                    normalizedPath,
+                    targetTexturePath,
+                    sourceRegion.Width,
+                    sourceRegion.Height,
+                    out allocatedTexturePath,
+                    out allocatedCell);
                 bool canReuseTargetCell =
+                    !useAllocatedCell &&
                     hasTargetEntry &&
                     PatchFitsAllocatedFontTexture(
                         glyphRepair,
                         targetTexturePath,
-                        targetEntry.X,
-                        targetEntry.Y,
-                        sourceEntry.Width,
-                        sourceEntry.Height);
-                if (!canReuseTargetCell)
-                {
-                    useAllocatedCell = TryAllocateProtectedPuaGlyphCell(
-                        glyphRepair,
-                        normalizedPath,
-                        targetTexturePath,
-                        sourceEntry.Width,
-                        sourceEntry.Height,
-                        out allocatedTexturePath,
-                        out allocatedCell);
-                }
+                        targetEntry.X - sourceRegion.LeftPadding,
+                        targetEntry.Y - sourceRegion.TopPadding,
+                        sourceRegion.Width,
+                        sourceRegion.Height);
 
                 if (!canReuseTargetCell && !useAllocatedCell)
                 {
                     continue;
                 }
 
-                int patchTargetX = useAllocatedCell ? allocatedCell.X : targetEntry.X;
-                int patchTargetY = useAllocatedCell ? allocatedCell.Y : targetEntry.Y;
-                int patchClearWidth = sourceEntry.Width;
-                int patchClearHeight = sourceEntry.Height;
+                int patchTargetX = useAllocatedCell ? allocatedCell.X : targetEntry.X - sourceRegion.LeftPadding;
+                int patchTargetY = useAllocatedCell ? allocatedCell.Y : targetEntry.Y - sourceRegion.TopPadding;
+                int patchClearWidth = sourceRegion.Width;
+                int patchClearHeight = sourceRegion.Height;
                 string patchTexturePath = useAllocatedCell ? allocatedTexturePath : targetTexturePath;
                 if (!PatchFitsAllocatedFontTexture(
                     glyphRepair,
                     patchTexturePath,
                     patchTargetX,
                     patchTargetY,
-                    Math.Max(patchClearWidth, sourceEntry.Width),
-                    Math.Max(patchClearHeight, sourceEntry.Height)))
+                    patchClearWidth,
+                    patchClearHeight))
                 {
                     continue;
                 }
@@ -3248,9 +3255,10 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
                 patch.TargetChannel = useAllocatedCell ? allocatedCell.Channel : targetEntry.ImageIndex % 4;
                 patch.ClearWidth = patchClearWidth;
                 patch.ClearHeight = patchClearHeight;
-                patch.SourceWidth = sourceEntry.Width;
-                patch.SourceHeight = sourceEntry.Height;
-                patch.SourceAlpha = ExtractFontTextureAlpha(sourceTexture, sourceEntry);
+                patch.SourceWidth = sourceRegion.Width;
+                patch.SourceHeight = sourceRegion.Height;
+                patch.SourceAlpha = sourceRegion.Alpha;
+                patch.SourceMipRegions = sourceRegion.MipRegions;
                 patch.SourceFdtPath = sourceFdtPath;
                 patch.SourceCodepoint = codepoint;
                 AddTexturePatch(texturePatches, patchTexturePath, patch);
@@ -3260,8 +3268,8 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
                 if (useAllocatedCell)
                 {
                     Endian.WriteUInt16LE(replacementEntry, 6, checked((ushort)allocatedCell.ImageIndex));
-                    Endian.WriteUInt16LE(replacementEntry, 8, checked((ushort)allocatedCell.X));
-                    Endian.WriteUInt16LE(replacementEntry, 10, checked((ushort)allocatedCell.Y));
+                    Endian.WriteUInt16LE(replacementEntry, 8, checked((ushort)(allocatedCell.X + sourceRegion.LeftPadding)));
+                    Endian.WriteUInt16LE(replacementEntry, 10, checked((ushort)(allocatedCell.Y + sourceRegion.TopPadding)));
                 }
                 else
                 {
@@ -6227,7 +6235,7 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
                     }
 
                     overlapsAnyPatch = true;
-                    if (IsCriticalAsciiTexturePatch(pendingPatch))
+                    if (IsCriticalCleanGlyphTexturePatch(pendingPatch))
                     {
                         overlapsCriticalAsciiPatch = true;
                     }
@@ -6250,6 +6258,30 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
             return patch != null &&
                    patch.SourceCodepoint >= 0x20 &&
                    patch.SourceCodepoint <= 0x7E;
+        }
+
+        private static bool IsCriticalCleanGlyphTexturePatch(FontTexturePatch patch)
+        {
+            return IsCriticalAsciiTexturePatch(patch) ||
+                   IsPartyListProtectedPuaTexturePatch(patch);
+        }
+
+        private static bool IsPartyListProtectedPuaTexturePatch(FontTexturePatch patch)
+        {
+            if (patch == null)
+            {
+                return false;
+            }
+
+            for (int i = 0; i < PartyListProtectedPuaGlyphs.Length; i++)
+            {
+                if (patch.SourceCodepoint == PartyListProtectedPuaGlyphs[i])
+                {
+                    return true;
+                }
+            }
+
+            return false;
         }
 
         private static bool IsProtectedCleanAsciiTexturePatch(FontTexturePatch patch)

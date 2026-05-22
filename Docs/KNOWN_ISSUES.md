@@ -1,5 +1,13 @@
 # 현재 미해결 항목과 추가 작업 목록
 
+## 2026-05-22 Low-Scale Party Number Marker Contamination
+
+- Report: in-game UI scale 120% or below can show polluted pixels around party-list/chat party number markers. The reported visible marker can be `1` or another party number.
+- Scope: this is the party marker PUA route, not a one-off ASCII digit fix. Guard `U+E031`, `U+E037`, and `U+E0E1`-`U+E0E8` across `AXIS_*` and `KrnAXIS_*`.
+- Implementation rule: use isolated clean PUA cells with 8px base/mip texture neighborhoods. Do not reuse dirty target cells, and do not let protected Hangul texture restores overwrite these clean PUA patches.
+- Verification rule: run `party-list-self-marker` after any shared font/texture work. It must compare glyph pixels plus base and mip texture neighborhoods against local restore-baseline/orig clean sources. Current code-level passing outputs: `.tmp\party-number-low-scale-ja-r3` and `.tmp\party-number-regression-ja-r1`.
+- Live status: pending user confirmation. Do not say this is fixed in-client until confirmed.
+
 ## 2026-05-17 Shared Font Correction
 
 - Damage fly text is user-confirmed fixed for the current full patch. Treat `Jupiter_45.fdt`, `Jupiter_90.fdt`, and their `font3.tex` damage-number base/mip neighborhoods as protected.

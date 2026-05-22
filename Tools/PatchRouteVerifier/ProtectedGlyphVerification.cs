@@ -6,6 +6,8 @@ namespace FfxivKoreanPatch.PatchRouteVerifier
     {
         private sealed partial class Verifier
         {
+            private const int PartyListSelfMarkerTexturePadding = 8;
+
             private void VerifyPartyListSelfMarker()
             {
                 Console.WriteLine("[EXD/FDT] Party-list self marker");
@@ -36,12 +38,71 @@ namespace FfxivKoreanPatch.PatchRouteVerifier
             {
                 for (int i = 0; i < PartyListSelfMarkerSameFontChecks.Length; i++)
                 {
-                    ExpectGlyphEqualIfSourceExists(_cleanFont, PartyListSelfMarkerSameFontChecks[i], codepoint, _patchedFont, PartyListSelfMarkerSameFontChecks[i], codepoint);
+                    VerifyPartyListSelfMarkerGlyphRoute(PartyListSelfMarkerSameFontChecks[i], PartyListSelfMarkerSameFontChecks[i], codepoint);
                 }
 
                 for (int i = 0; i < PartyListSelfMarkerKoreanFontChecks.GetLength(0); i++)
                 {
-                    ExpectGlyphEqualIfSourceExists(_cleanFont, PartyListSelfMarkerKoreanFontChecks[i, 0], codepoint, _patchedFont, PartyListSelfMarkerKoreanFontChecks[i, 1], codepoint);
+                    VerifyPartyListSelfMarkerGlyphRoute(PartyListSelfMarkerKoreanFontChecks[i, 0], PartyListSelfMarkerKoreanFontChecks[i, 1], codepoint);
+                }
+            }
+
+            private void VerifyPartyListSelfMarkerGlyphRoute(string sourceFontPath, string targetFontPath, uint codepoint)
+            {
+                byte[] sourceFdt = _cleanFont.ReadFile(sourceFontPath);
+                FdtGlyphEntry ignored;
+                if (!TryFindGlyph(sourceFdt, codepoint, out ignored))
+                {
+                    return;
+                }
+
+                ExpectGlyphEqual(_cleanFont, sourceFontPath, codepoint, _patchedFont, targetFontPath, codepoint);
+
+                string error;
+                if (!VerifyGlyphTextureNeighborhoodMatchesClean(
+                    sourceFontPath,
+                    targetFontPath,
+                    codepoint,
+                    PartyListSelfMarkerTexturePadding,
+                    out error))
+                {
+                    Fail(
+                        "{0} U+{1:X4} -> {2} party-list marker base texture neighborhood differs: {3}",
+                        sourceFontPath,
+                        codepoint,
+                        targetFontPath,
+                        error);
+                }
+                else
+                {
+                    Pass(
+                        "{0} U+{1:X4} -> {2} party-list marker base texture neighborhood matches clean",
+                        sourceFontPath,
+                        codepoint,
+                        targetFontPath);
+                }
+
+                if (!VerifyGlyphTextureMipNeighborhoodsMatchClean(
+                    sourceFontPath,
+                    targetFontPath,
+                    codepoint,
+                    PartyListSelfMarkerTexturePadding,
+                    out error))
+                {
+                    Fail(
+                        "{0} U+{1:X4} -> {2} party-list marker mip texture neighborhood differs: {3}",
+                        sourceFontPath,
+                        codepoint,
+                        targetFontPath,
+                        error);
+                }
+                else
+                {
+                    Pass(
+                        "{0} U+{1:X4} -> {2} party-list marker mip texture neighborhood matches clean",
+                        sourceFontPath,
+                        codepoint,
+                        targetFontPath);
                 }
             }
 

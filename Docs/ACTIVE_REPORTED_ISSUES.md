@@ -34,6 +34,14 @@
 
 ## Current Checklist
 
+- [ ] Low-scale party-list/chat party number marker contamination
+  - Reported: 2026-05-22
+  - Symptom: at in-game UI scale 120% or below, party-list and narrow chat-log party number markers can show polluted pixels around the local player's number marker. The visible marker may be any party number, not only `1`.
+  - Root cause found in code-level verification: `U+E0E1`-`U+E0E8` party-number PUA glyphs were copied into reusable/dirty target cells, and later shared font texture patches could contaminate the base texture even when mip checks happened to look clean.
+  - Current code-level correction: party protected PUA glyphs (`U+E031`, `U+E037`, `U+E0E1`-`U+E0E8`) are written into isolated clean cells with 8px base/mip neighborhoods. Protected Hangul restores are not allowed to overwrite these clean PUA patches.
+  - Verification: `.tmp\party-number-low-scale-ja-r3` passes `party-list-self-marker,ingame-clean-ascii-glyphs`; `.tmp\party-number-regression-ja-r1` passes `party-list-self-marker,ingame-clean-ascii-glyphs,third-party-game-font-safety,combat-flytext-damage-glyphs,action-detail-scale-layouts,pvp-profile-font-routes,lobby-large-label-scale-layouts,lobby-full-coverage-capacity` with `Verifier failures: 0`.
+  - Do not close this live issue until the user confirms the client result. Keep `party-list-self-marker` in the regression set for any shared font or texture work.
+
 - [x] Quest say phrase anonymization disabled until sheet coverage is complete
   - 요청일: 2026-05-17
   - 이유: 관련 시트 전체 커버리지가 아직 검증되지 않았으므로 partial 익명화가 quest text patch를 불안정하게 만들 수 있다.
