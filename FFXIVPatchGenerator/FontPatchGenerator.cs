@@ -41,7 +41,7 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
         private const int FdtKerningEntrySize = 0x10;
         private static readonly uint[] PartyListSelfMarkerPrimaryStarts = new uint[] { 0xE031u, 0xE0E1u };
         private static readonly int[] PartyListSelfMarkerPrimaryCounts = new int[] { 1, 8 };
-        private static readonly uint[] PartyListProtectedPuaGlyphs = new uint[]
+        private static readonly uint[] PartyListProtectedPuaGlyphSeeds = new uint[]
         {
             0xE031u,
             0xE037u,
@@ -3140,7 +3140,7 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
             }
 
             int glyphEnd = checked(glyphStart + checked((int)glyphCount) * FdtGlyphEntrySize);
-            List<byte[]> targetEntries = new List<byte[]>(checked((int)glyphCount + PartyListProtectedPuaGlyphs.Length));
+            List<byte[]> targetEntries = new List<byte[]>(checked((int)glyphCount + PartyListProtectedPuaGlyphSeeds.Length));
             Dictionary<uint, int> targetEntryIndexes = new Dictionary<uint, int>();
             for (int glyphIndex = 0; glyphIndex < glyphCount; glyphIndex++)
             {
@@ -3155,11 +3155,12 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
                 targetEntries.Add(entry);
             }
 
+            uint[] protectedPuaGlyphs = CollectProtectedPuaGlyphs(sourceEntries, targetEntryIndexes);
             Dictionary<string, byte[]> sourceTextures = new Dictionary<string, byte[]>(StringComparer.OrdinalIgnoreCase);
             int changed = 0;
-            for (int codepointIndex = 0; codepointIndex < PartyListProtectedPuaGlyphs.Length; codepointIndex++)
+            for (int codepointIndex = 0; codepointIndex < protectedPuaGlyphs.Length; codepointIndex++)
             {
-                uint codepoint = PartyListProtectedPuaGlyphs[codepointIndex];
+                uint codepoint = protectedPuaGlyphs[codepointIndex];
                 uint utf8Value = PackFdtUtf8Value(codepoint);
                 byte[] sourceEntryBytes;
                 if (!sourceEntries.TryGetValue(utf8Value, out sourceEntryBytes))
@@ -3299,6 +3300,44 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
             }
 
             return changed;
+        }
+
+        private static uint[] CollectProtectedPuaGlyphs(
+            Dictionary<uint, byte[]> sourceEntries,
+            Dictionary<uint, int> targetEntryIndexes)
+        {
+            SortedSet<uint> codepoints = new SortedSet<uint>();
+            if (sourceEntries == null || targetEntryIndexes == null)
+            {
+                return new uint[0];
+            }
+
+            for (int i = 0; i < PartyListProtectedPuaGlyphSeeds.Length; i++)
+            {
+                uint codepoint = PartyListProtectedPuaGlyphSeeds[i];
+                uint utf8Value = PackFdtUtf8Value(codepoint);
+                if (sourceEntries.ContainsKey(utf8Value))
+                {
+                    codepoints.Add(codepoint);
+                }
+            }
+
+            foreach (uint utf8Value in targetEntryIndexes.Keys)
+            {
+                uint codepoint;
+                if (!TryDecodeFdtUtf8Value(utf8Value, out codepoint) ||
+                    !IsPrivateUseCodepoint(codepoint) ||
+                    !sourceEntries.ContainsKey(utf8Value))
+                {
+                    continue;
+                }
+
+                codepoints.Add(codepoint);
+            }
+
+            uint[] result = new uint[codepoints.Count];
+            codepoints.CopyTo(result);
+            return result;
         }
 
         private static string ResolvePartyListSelfMarkerSourceFdtPath(string path)
@@ -6270,20 +6309,7 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
 
         private static bool IsPartyListProtectedPuaTexturePatch(FontTexturePatch patch)
         {
-            if (patch == null)
-            {
-                return false;
-            }
-
-            for (int i = 0; i < PartyListProtectedPuaGlyphs.Length; i++)
-            {
-                if (patch.SourceCodepoint == PartyListProtectedPuaGlyphs[i])
-                {
-                    return true;
-                }
-            }
-
-            return false;
+            return patch != null && IsPrivateUseCodepoint(patch.SourceCodepoint);
         }
 
         private static bool IsProtectedCleanAsciiTexturePatch(FontTexturePatch patch)
@@ -6315,6 +6341,13 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
                    leftRight > right.TargetX &&
                    left.TargetY < rightBottom &&
                    leftBottom > right.TargetY;
+        }
+
+        private static bool IsPrivateUseCodepoint(uint codepoint)
+        {
+            return (codepoint >= 0xE000u && codepoint <= 0xF8FFu) ||
+                   (codepoint >= 0xF0000u && codepoint <= 0xFFFFDu) ||
+                   (codepoint >= 0x100000u && codepoint <= 0x10FFFDu);
         }
 
         private static void AddFontAtlasAllocator(FontGlyphRepairContext context, FontPatchPackage fontPackage, FileStream mpdStream, string texturePath)

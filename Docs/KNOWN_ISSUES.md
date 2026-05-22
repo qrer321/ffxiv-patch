@@ -17,9 +17,9 @@
 ## 2026-05-22 Low-Scale Party Number Marker Contamination
 
 - Report: in-game UI scale 120% or below can show polluted pixels around party-list/chat party number markers. The reported visible marker can be `1` or another party number.
-- Scope: this is the shared marker PUA route, not a one-off ASCII digit fix. Guard `U+E031`, `U+E037`, `U+E0B1`-`U+E0B8`, and `U+E0E1`-`U+E0E8` across `AXIS_*` and `KrnAXIS_*`. `U+E0B1`-`U+E0B8` covers the reported zone/instance circled-number marker class and must be preserved as its own clean glyphs, not remapped into the self-marker shape.
-- Implementation rule: use isolated clean PUA cells with 8px base/mip texture neighborhoods. Do not reuse dirty target cells, and do not let protected Hangul texture restores overwrite these clean PUA patches.
-- Verification rule: run `party-list-self-marker` after any shared font/texture work. It must compare glyph pixels plus base and mip texture neighborhoods against local restore-baseline/orig clean sources. Current code-level passing outputs: `.tmp\instance-marker-pua-ja-r1` and `.tmp\instance-marker-regression-ja-r1`.
+- Scope: this is the shared marker PUA route, not a one-off ASCII digit fix. Seed glyphs `U+E031`, `U+E037`, `U+E0B1`-`U+E0B8`, and `U+E0E1`-`U+E0E8` are always guarded across `AXIS_*` and `KrnAXIS_*`. In addition, each route now auto-collects clean/source PUA glyphs that already exist in the patched target FDT. `U+E0B1`-`U+E0B8` covers the reported zone/instance circled-number marker class and must be preserved as its own clean glyphs, not remapped into the self-marker shape.
+- Implementation rule: use isolated clean PUA cells with 8px base/mip texture neighborhoods. Do not reuse dirty target cells, and do not let protected Hangul texture restores overwrite these clean PUA patches. Do not grow this by manually adding one reported glyph at a time unless it is a required seed; prefer route-local auto collection.
+- Verification rule: run `party-list-self-marker` after any shared font/texture work. It must compare glyph pixels plus base and mip texture neighborhoods against local restore-baseline/orig clean sources for the collected PUA route set. Current code-level passing outputs: `.tmp\auto-pua-protect-ja-r1` and `.tmp\auto-pua-regression-ja-r1`.
 - Live status: pending user confirmation. Do not say this is fixed in-client until confirmed.
 
 ## 2026-05-17 Shared Font Correction

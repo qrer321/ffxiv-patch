@@ -392,9 +392,9 @@ namespace FfxivKoreanPatch.PatchRouteVerifier
                     writer.WriteLine("font\tcodepoint\tpatched_visible\tclean_visible\tstatus");
                     foreach (string fontPath in fonts)
                     {
-                        for (int i = 0; i < PartyListProtectedPuaGlyphs.Length; i++)
+                        for (int i = 0; i < PartyListProtectedPuaGlyphSeeds.Length; i++)
                         {
-                            uint codepoint = PartyListProtectedPuaGlyphs[i];
+                            uint codepoint = PartyListProtectedPuaGlyphSeeds[i];
                             int cleanVisible;
                             int patchedVisible;
                             string cleanError;

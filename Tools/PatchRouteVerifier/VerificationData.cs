@@ -96,7 +96,7 @@ namespace FfxivKoreanPatch.PatchRouteVerifier
             new UldRouteCandidate("ui/uld/TitleSystemConfig.uld", true)
         };
 
-        private static readonly uint[] PartyListProtectedPuaGlyphs = new uint[]
+        private static readonly uint[] PartyListProtectedPuaGlyphSeeds = new uint[]
         {
             0xE031, // self marker
             0xE037, // Occult Crescent / phantom level
