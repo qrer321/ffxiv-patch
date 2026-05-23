@@ -42,7 +42,7 @@
   - Verification: `.tmp\lobby-uires-safe-ja-r6` passes `lobby-texture-cell-margin,lobby-multitexture-font-set,lobby-coverage-glyphs,lobby-scale-font-sources`, focused lobby/PvP/in-game regressions, and broad lobby capacity checks with `Verifier failures: 0`.
   - Caveat: `lobby-multitexture-font-set` still warns when a lobby FDT references a clean-unused page. Keep that as a diagnostic warning for now; making it a hard failure breaks full lobby coverage. Do not mark the live boot crash fixed until the user confirms the client result.
 
-- [ ] Low-scale party-list/chat party number marker contamination
+- [x] Low-scale party-list/chat party number marker contamination
   - Reported: 2026-05-22
   - Symptom: at in-game UI scale 120% or below, party-list and narrow chat-log party number markers can show polluted pixels around the local player's number marker. The visible marker may be any party number, not only `1`.
   - Root cause found in code-level verification: `U+E0E1`-`U+E0E8` party-number PUA glyphs were copied into reusable/dirty target cells, and later shared font texture patches could contaminate the base texture even when mip checks happened to look clean.
@@ -50,7 +50,8 @@
   - 2026-05-22 follow-up: zone/instance circled-number markers such as `갈레말드① (1)` use the legacy/circled marker class, so `U+E0B1`-`U+E0B8` are now covered by the same clean-cell/base+mip verifier. These glyphs must stay their own clean shapes and must not be aliased into the `U+E0E1` self-marker shape.
   - 2026-05-23 auto coverage: `.tmp\auto-pua-protect-ja-r1` collected and verified 173 protected PUA glyphs on each AXIS/KrnAXIS route, including the seed ranges above.
   - Verification: `.tmp\auto-pua-protect-ja-r1` passes `party-list-self-marker,ingame-clean-ascii-glyphs`; `.tmp\auto-pua-regression-ja-r1` passes `party-list-self-marker,ingame-clean-ascii-glyphs,third-party-game-font-safety,combat-flytext-damage-glyphs,action-detail-scale-layouts,pvp-profile-font-routes,lobby-large-label-scale-layouts,lobby-full-coverage-capacity` with `Verifier failures: 0`.
-  - Do not close this live issue until the user confirms the client result. Keep `party-list-self-marker` in the regression set for any shared font or texture work.
+  - 2026-05-23 user confirmation: low-scale party-list/chat number marker contamination and zone/instance circled-number contamination are fixed in-client.
+  - Keep `party-list-self-marker` in the regression set for any shared font or texture work.
 
 - [x] Quest say phrase anonymization disabled until sheet coverage is complete
   - 요청일: 2026-05-17
@@ -82,14 +83,16 @@
   - 검증 보강: “한글 glyph가 보인다” smoke check만으로 통과시키지 않는다. 실제 overlay가 쓰는 것으로 확인된 font route에서 Hangul readability, clean ASCII/number/symbol preservation, texture neighborhood/mip 오염 여부를 한 번에 잡는 verifier를 먼저 만든다.
   - clean 기준: 설치된 게임 클라이언트 폴더를 clean baseline으로 쓰지 않는다. `%LOCALAPPDATA%\FFXIVKoreanPatch\restore-baseline\<lang>\<version>` 또는 generated output의 `orig.*` local origin index를 사용한다.
 
-- [ ] Priority 2: ActionDetail/스킬 상세 폰트의 UI 배율별 상대 크기가 이상함
+- [x] Priority 2: In-game ActionDetail/skill-detail font scale
   - 재보고일: 2026-05-17
+  - 2026-05-23 user confirmation: in-game `즉시 발동` / `초` output is acceptable enough in client. Do not continue reshaping this route unless a focused clean/origin comparison proves a new regression.
+  - Remaining follow-up: numeric value position/alignment can look slightly awkward. Compare the same ActionDetail/tooltip numeric routes against clean/global first before changing any shared font route.
   - 증상: `즉시 발동`, `초`, 스킬 상세/툴팁 계열 한글이 UI 배율에 비해 상대적으로 커 보이거나 작아 보인다. 200%/300%에서 더 어색하지만 깨지는 문제는 아니다.
   - 사용자 스크린샷 기준: `다리 쳐내기`, `피의 갈증`, `시전 시간`, `재사용`, `즉시 발동`, `초`, `거리/m`, `범위/m` 같은 ActionDetail/tooltip route를 우선 본다.
   - 2026-05-17 scope correction: reported phrases such as `즉시 발동` are examples, not the full fix scope. Do not patch only the reported words/chars and call the issue fixed. The fix must treat the shared large UI label font route as the target, including other visible large UI labels/tabs such as `임무 찾기`, `퀘스트`, `시스템 설정`, and the sheet-derived Hangul that can render through the same route.
   - 2026-05-17 coverage correction: generator/verifier coverage must be collected from the patched target output text, with clean/global fallback for untouched entries, instead of raw Korean source only. The rejected direction queued Korean-source-only chars that did not exist in the target output and changed shared `TrumpGothic_68.fdt` routes unnecessarily.
   - 2026-05-17 current code-level result: `.tmp\large-ui-label-ja-r3` queues `TrumpGothic_68.fdt` large UI high-scale Hangul from 30 static, 868 target sheet-derived, and 9 combat-preserved codepoints, 889 total. It passes `action-detail-scale-layouts,third-party-game-font-safety,combat-flytext-damage-glyphs,ingame-clean-ascii-glyphs,ingame-ttmp-texture-neighborhoods,reported-ingame-hangul-phrases` with `RESULT: PASS`.
-  - 상태 주의: this is code-level verification only. Do not mark the live skill-detail/large-label scale issue fixed until the user confirms it in-client. A separate broad lobby verifier run still reports old data-center strict ASCII/Jupiter lobby failures, so that check is not being used as proof that all lobby routes are fixed.
+  - Historical status caution: this was code-level verification only until the 2026-05-23 in-game confirmation above. A separate broad lobby verifier run still reports old data-center strict ASCII/Jupiter lobby failures, so this check is not proof that all lobby routes are fixed.
   - 2026-05-17 clean-context rule: previous good results came from making patched routes as close as possible to clean/origin. Keep that as the default rule. Do not resize, repack, remap, or normalize a glyph route unless a verifier proves that the same clean/origin route is wrong for the Korean target.
   - 2026-05-17 current focused output: `.tmp\clean-context-largeui-ja-r1` passes `action-detail-scale-layouts,lobby-scale-font-sources,third-party-game-font-safety,combat-flytext-damage-glyphs` in `.tmp\clean-context-largeui-ja-r1.focused-verifier-r3.log`.
   - 2026-05-17 narrow exception: clean/TTMP `TrumpGothic_68.fdt` Hangul source preserved the target route but rendered high-scale Korean at roughly half the digit height, while the older full-cell `TrumpGothic_34 -> 68` scaling made labels too large. The current code keeps the `TrumpGothic_68` target line box and scales only Hangul alpha toward the target digit visual height. This is an exception, not a new general atlas recomposition rule.
@@ -240,11 +243,12 @@
   - 2026-05-16 baseline correction: verification must not use the installed game client as the clean font source. Re-run checks with local `.tmp`/origin backups and explicit `orig.*` base indexes. `.tmp\ingame-combat-flytext-clean-ja-r3` passes the in-game TTMP neighborhood and reported phrase checks with this baseline.
   - 2026-05-16 risk survey: added `ingame-font-risk-survey` to report in-game ULD font routes, in-game sheet Hangul coverage candidates, and PUA glyph visibility before further font edits. Current local temp/origin run wrote 172266 sheet candidate rows, 1540 unique Hangul codepoints, and 130 PUA glyph rows under `.tmp\ingame-combat-flytext-clean-ja-r3\patch-route-glyph-dumps`; clean-visible PUA glyphs are not missing in patched output. ULD route rows are blocked by the known incomplete local clean UI dat shards, so this survey is a diagnostic report, not a user-visible fix signal.
 
-- [ ] Occult Crescent: 메인은 `PHANTOM KNIGHT` / `Ph. Knight`, 서브는 `서포트 나이트`
+- [x] Occult Crescent: 메인은 `PHANTOM KNIGHT` / `Ph. Knight`, 서브는 `서포트 나이트`
   - 검증 보강: `MkdSupportJob` playable row 전체의 메인 full/short column과 support 설명 column을 확인한다.
   - 수정 방향: 특정 Knight만 예외 처리하지 않고, column 역할 기준으로 매핑한다.
+  - 2026-05-23 user confirmation: Occult Crescent appears to render correctly in-client. Keep `MkdSupportJob` route/column verification as a regression guard.
 
-- [ ] Story completion card: 스토리 종료 후 컷씬/이벤트 이미지 설명문이 base client 언어로 나옴
+- [x] Story completion card: 스토리 종료 후 컷씬/이벤트 이미지 설명문이 base client 언어로 나옴
   - 보고일: 2026-05-09
   - 사용자 기대: 폰트만 교체해서 한글이 보이게 하는 방식이 아니라, 지역 이동 시 나오는 이미지형 지역명처럼 실제 표시 리소스를 한국 클라이언트 리소스로 바꿔야 함.
   - 현재 판단: 아직 scene 리소스라고 단정하지 않는다. `EventImage`일 가능성도 있으므로 먼저 어떤 sheet/resource가 표시를 담당하는지 판별한다.
@@ -252,6 +256,8 @@
   - 검증 보강: story 완료 화면에서 표시되는 image ID와 실제 `ui/icon/...`, `ui/loadingimage/...`, event/cutscene texture path를 diagnostics에 남기고, global target 리소스와 Korean source 리소스의 packed bytes/hash가 다르면 Korean source가 output index에 매핑되었는지 확인한다.
   - 수정 방향: 1) 완료 설명문이 텍스트 EXD인지 이미지 texture인지 먼저 판별한다. 2) 이미지라면 global row의 icon ID만 기준으로 삼지 말고 Korean EXD row도 비교해 한국 서버에서 다른 image ID를 쓰는 경우를 추적한다. 3) 언어 폴더형 리소스는 target language 폴더에 `ko` source를 복사하고, same-path 리소스는 동일 path의 Korean packed texture를 복사한다. 4) sheet 기반으로 잡히지 않을 때만 event/cutscene bundle 단위로 global clean과 Korean source를 비교해 안전하게 교체 가능한 최소 파일을 찾는다.
   - 주의 사항: 일반 자막/대사 텍스트와 혼동하지 않는다. story 종료 카드처럼 장면에 박혀 있는 설명문은 폰트 FDT 수리 대상이 아니라 image/event resource localization 대상이다.
+
+  - 2026-05-23 user confirmation: story completion image/card description appears in Korean. `つづく` remains Japanese and is acceptable for now.
 
 - [ ] Follow-up: 기존 한글 폰트와 달라져 보이는 glyph 대응 어색함
   - 2026-05-09 처리: `hangul-source-preservation` verifier 추가, 전역 Hangul offset 정규화 제거.
