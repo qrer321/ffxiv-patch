@@ -14,13 +14,8 @@ namespace FfxivKoreanPatch.PatchRouteVerifier
                 new LobbyScaleFontSourceRoute("common/font/AXIS_14_lobby.fdt", "common/font/AXIS_14_lobby.fdt"),
                 new LobbyScaleFontSourceRoute("common/font/AXIS_18_lobby.fdt", "common/font/AXIS_18_lobby.fdt"),
                 new LobbyScaleFontSourceRoute("common/font/AXIS_36_lobby.fdt", "common/font/AXIS_36.fdt"),
-                new LobbyScaleFontSourceRoute("common/font/Jupiter_46_lobby.fdt", "common/font/AXIS_36.fdt"),
-                new LobbyScaleFontSourceRoute("common/font/Jupiter_90_lobby.fdt", "common/font/AXIS_36.fdt"),
-                new LobbyScaleFontSourceRoute("common/font/Meidinger_40_lobby.fdt", "common/font/AXIS_36.fdt"),
-                new LobbyScaleFontSourceRoute("common/font/MiedingerMid_36_lobby.fdt", "common/font/AXIS_36.fdt"),
                 new LobbyScaleFontSourceRoute("common/font/TrumpGothic_23_lobby.fdt", "common/font/AXIS_18_lobby.fdt"),
-                new LobbyScaleFontSourceRoute("common/font/TrumpGothic_34_lobby.fdt", "common/font/AXIS_18_lobby.fdt"),
-                new LobbyScaleFontSourceRoute("common/font/TrumpGothic_68_lobby.fdt", "common/font/AXIS_36.fdt")
+                new LobbyScaleFontSourceRoute("common/font/TrumpGothic_34_lobby.fdt", "common/font/TrumpGothic_34.fdt")
             };
 
             private void VerifyLobbyScaleFontSourceRoutes()
@@ -38,10 +33,42 @@ namespace FfxivKoreanPatch.PatchRouteVerifier
                     LobbyScaleFontSourceRoute route = LobbyScaleFontSourceRoutes[routeIndex];
                     VerifyLobbyScaleFontSourceRoute(
                         route,
-                        IsVisualScaledLobbyTrumpGothic(route.TargetFontPath)
+                        IsSystemSettingsLobbyAxisFont(route.TargetFontPath)
+                            ? CollectLobbySystemSettingsHangulCodepoints(route.TargetFontPath)
+                            : IsVisualScaledLobbyTrumpGothic(route.TargetFontPath)
                             ? CollectLobbyLargeLabelHangulCodepoints(route.TargetFontPath)
                             : codepoints);
                 }
+            }
+
+            private uint[] CollectLobbySystemSettingsHangulCodepoints(string fontPath)
+            {
+                HashSet<uint> codepoints = new HashSet<uint>();
+                string normalized = (fontPath ?? string.Empty).Replace('\\', '/');
+                if (string.Equals(normalized, "common/font/AXIS_12_lobby.fdt", StringComparison.OrdinalIgnoreCase))
+                {
+                    AddDynamicHangulCodepoints(codepoints, LobbyScaledHangulPhrases.StartScreenSystemSettings);
+                    AddDynamicHangulCodepoints(codepoints, LobbyScaledHangulPhrases.StartScreenSystemSettingsResultMessages);
+                }
+                else if (string.Equals(normalized, "common/font/AXIS_14_lobby.fdt", StringComparison.OrdinalIgnoreCase))
+                {
+                    AddDynamicHangulCodepoints(codepoints, LobbyScaledHangulPhrases.HighResolutionUiScaleOptions);
+                }
+                else
+                {
+                    AddDynamicHangulCodepoints(codepoints, LobbyScaledHangulPhrases.StartScreenSystemSettings);
+                    AddDynamicHangulCodepoints(codepoints, LobbyScaledHangulPhrases.HighResolutionUiScaleOptions);
+                    AddDynamicHangulCodepoints(codepoints, LobbyScaledHangulPhrases.StartScreenSystemSettingsResultMessages);
+                    AddPatchedAddonRangeHangulCodepoints(
+                        codepoints,
+                        LobbyScaledHangulPhrases.StartScreenSystemSettingsAddonRowRanges,
+                        "lobby system-settings scale source verification");
+                }
+
+                uint[] values = new uint[codepoints.Count];
+                codepoints.CopyTo(values);
+                Array.Sort(values);
+                return values;
             }
 
             private uint[] CollectLobbyScaleSensitiveHangulCodepoints()
@@ -235,7 +262,7 @@ namespace FfxivKoreanPatch.PatchRouteVerifier
                     return false;
                 }
 
-                bool visualScaled = IsVisualScaledLobbyTrumpGothic(route.TargetFontPath);
+                bool visualScaled = IsVisualScaledLobbyFont(route.TargetFontPath);
                 if (!visualScaled &&
                     (targetGlyph.Width != sourceGlyph.Width ||
                      targetGlyph.Height != sourceGlyph.Height))
@@ -340,6 +367,25 @@ namespace FfxivKoreanPatch.PatchRouteVerifier
                 string normalized = (fontPath ?? string.Empty).Replace('\\', '/');
                 return string.Equals(normalized, "common/font/trumpgothic_23_lobby.fdt", StringComparison.OrdinalIgnoreCase) ||
                        string.Equals(normalized, "common/font/trumpgothic_34_lobby.fdt", StringComparison.OrdinalIgnoreCase);
+            }
+
+            private static bool IsSystemSettingsLobbyAxisFont(string fontPath)
+            {
+                string normalized = (fontPath ?? string.Empty).Replace('\\', '/');
+                return string.Equals(normalized, "common/font/AXIS_12_lobby.fdt", StringComparison.OrdinalIgnoreCase) ||
+                       string.Equals(normalized, "common/font/AXIS_14_lobby.fdt", StringComparison.OrdinalIgnoreCase) ||
+                       string.Equals(normalized, "common/font/AXIS_18_lobby.fdt", StringComparison.OrdinalIgnoreCase);
+            }
+
+            private static bool IsVisualScaledLobbyFont(string fontPath)
+            {
+                string normalized = (fontPath ?? string.Empty).Replace('\\', '/');
+                return string.Equals(normalized, "common/font/AXIS_12_lobby.fdt", StringComparison.OrdinalIgnoreCase) ||
+                       string.Equals(normalized, "common/font/AXIS_14_lobby.fdt", StringComparison.OrdinalIgnoreCase) ||
+                       string.Equals(normalized, "common/font/AXIS_18_lobby.fdt", StringComparison.OrdinalIgnoreCase) ||
+                       string.Equals(normalized, "common/font/AXIS_36_lobby.fdt", StringComparison.OrdinalIgnoreCase) ||
+                       string.Equals(normalized, "common/font/TrumpGothic_23_lobby.fdt", StringComparison.OrdinalIgnoreCase) ||
+                       string.Equals(normalized, "common/font/TrumpGothic_34_lobby.fdt", StringComparison.OrdinalIgnoreCase);
             }
 
             private struct LobbyScaleFontSourceRoute

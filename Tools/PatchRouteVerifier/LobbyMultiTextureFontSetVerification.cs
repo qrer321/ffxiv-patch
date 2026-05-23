@@ -389,12 +389,6 @@ namespace FfxivKoreanPatch.PatchRouteVerifier
                             continue;
                         }
 
-                        if (LobbyHangulCoverage.IsHighScaleTargetFontPath(fontPath))
-                        {
-                            checkedGlyphs++;
-                            continue;
-                        }
-
                         uint utf8Value = Endian.ReadUInt32LE(patchedFdt, glyphOffset);
                         FdtGlyphEntry cleanGlyph;
                         bool cleanAlreadyTouched = cleanGlyphs.TryGetValue(utf8Value, out cleanGlyph) &&

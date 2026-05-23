@@ -194,6 +194,10 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
 
         private static readonly LobbyLargeLabelVisualScaleSpec[] LobbyLargeLabelVisualScaleFonts = new LobbyLargeLabelVisualScaleSpec[]
         {
+            new LobbyLargeLabelVisualScaleSpec("common/font/AXIS_12_lobby.fdt", "common/font/AXIS_12_lobby.fdt", 1.00d, 0.60d),
+            new LobbyLargeLabelVisualScaleSpec("common/font/AXIS_14_lobby.fdt", "common/font/AXIS_14_lobby.fdt", 1.00d, 0.60d),
+            new LobbyLargeLabelVisualScaleSpec("common/font/AXIS_18_lobby.fdt", "common/font/AXIS_18_lobby.fdt", 1.00d, 0.60d),
+            new LobbyLargeLabelVisualScaleSpec("common/font/AXIS_36_lobby.fdt", "common/font/AXIS_36.fdt", 1.00d, 0.60d),
             new LobbyLargeLabelVisualScaleSpec("common/font/TrumpGothic_23_lobby.fdt", "common/font/AXIS_18_lobby.fdt", 1.08d, 1.08d),
             new LobbyLargeLabelVisualScaleSpec("common/font/TrumpGothic_34_lobby.fdt", "common/font/TrumpGothic_34.fdt", 1.00d, 1.00d)
         };
@@ -814,7 +818,7 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
                     height,
                     out allocatedTexturePath,
                     out allocatedCell,
-                    allowBottomEdge: IsHighScaleLobbyFont(normalizedFdtPath));
+                    allowBottomEdge: false);
             }
 
             return TryAllocateFromCandidateTextures(
@@ -2104,6 +2108,8 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
             int textureFailures = 0;
             int allocationFailures = 0;
             int fallbackAllocations = 0;
+            int reclaimedAllocations = 0;
+            int directSourceAllocations = 0;
             for (int codepointIndex = 0; codepointIndex < requiredCodepoints.Length; codepointIndex++)
             {
                 uint codepoint = requiredCodepoints[codepointIndex];
@@ -2224,6 +2230,9 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
                             (int)Math.Round(sourceAdvance * LobbyLargeLabelVisualScaleMinAdvanceRatio),
                             1,
                             byte.MaxValue));
+                    scaledAdvance = Math.Max(
+                        scaledAdvance,
+                        ClampInt(replacementWidth + 2, 1, byte.MaxValue));
                     replacementOffsetX = ClampInt(scaledAdvance - replacementWidth, sbyte.MinValue, sbyte.MaxValue);
                     patchAlpha = ScaleGlyphAlphaBilinear(
                         sourceRegion.Alpha,
@@ -2238,6 +2247,7 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
                 LobbyHangulGlyphAllocation allocation = new LobbyHangulGlyphAllocation();
                 bool hasAllocation = false;
                 bool addTexturePatch = false;
+                bool directSourceAllocation = false;
                 string allocationKey = CreateLobbyHangulAllocationKey(sourceFdtPath, codepoint, sourceEntry, sourceRegion);
                 if (applyVisualScale)
                 {
@@ -2247,7 +2257,23 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
                         allocationKey;
                 }
 
-                if (hasVisualScaleSpec && visualScaleSpec.UsePlacementCells)
+                if (!applyVisualScale &&
+                    TryUseCleanEmptyLobbySourceCell(
+                        globalArchive,
+                        sourceTexturePath,
+                        sourceEntry,
+                        lobbyTextureCandidates,
+                        targetTextures,
+                        activeTexturePatches,
+                        patchClearWidth,
+                        patchClearHeight,
+                        out allocation))
+                {
+                    hasAllocation = true;
+                    addTexturePatch = true;
+                    directSourceAllocation = true;
+                }
+                else if (hasVisualScaleSpec && visualScaleSpec.UsePlacementCells)
                 {
                     string placementTexturePath = ResolveFontTexturePath(placementFdtPath, placementEntry.ImageIndex);
                     if (!IsLobbyFontTexturePath(placementTexturePath) ||
@@ -2262,6 +2288,8 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
                     placementCell.X = placementEntry.X;
                     placementCell.Y = placementEntry.Y;
                     placementCell.Channel = placementEntry.ImageIndex % 4;
+                    placementCell.ClearWidth = placementEntry.Width;
+                    placementCell.ClearHeight = placementEntry.Height;
                     allocation = new LobbyHangulGlyphAllocation(
                         placementTexturePath,
                         placementCell,
@@ -2328,6 +2356,11 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
 
                     if (!hasAllocation)
                     {
+                        if (allocatedCell.Reclaimed)
+                        {
+                            reclaimedAllocations++;
+                        }
+
                         allocation = new LobbyHangulGlyphAllocation(
                             allocatedTexturePath,
                             allocatedCell,
@@ -2344,12 +2377,17 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
 
                 if (addTexturePatch)
                 {
+                    if (directSourceAllocation)
+                    {
+                        directSourceAllocations++;
+                    }
+
                     FontTexturePatch patch = new FontTexturePatch();
                     patch.TargetX = allocation.Cell.X;
                     patch.TargetY = allocation.Cell.Y;
                     patch.TargetChannel = allocation.Cell.Channel;
-                    patch.ClearWidth = patchClearWidth;
-                    patch.ClearHeight = patchClearHeight;
+                    patch.ClearWidth = Math.Max(patchClearWidth, allocation.Cell.ClearWidth);
+                    patch.ClearHeight = Math.Max(patchClearHeight, allocation.Cell.ClearHeight);
                     patch.SourceWidth = sourceRegion.Width;
                     patch.SourceHeight = sourceRegion.Height;
                     if (applyVisualScale)
@@ -2443,6 +2481,16 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
                 AddLimitedWarning("Lobby high-scale fallback glyph allocations for " + normalizedPath + ": " + fallbackAllocations.ToString());
             }
 
+            if (reclaimedAllocations > 0)
+            {
+                AddLimitedWarning("Lobby clean-page CJK reclaim glyph allocations for " + normalizedPath + ": " + reclaimedAllocations.ToString());
+            }
+
+            if (directSourceAllocations > 0)
+            {
+                AddLimitedWarning("Lobby clean-empty source-cell glyph allocations for " + normalizedPath + ": " + directSourceAllocations.ToString());
+            }
+
             return changed;
         }
 
@@ -2488,6 +2536,95 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
             }
 
             return false;
+        }
+
+        private static bool TryUseCleanEmptyLobbySourceCell(
+            SqPackArchive globalArchive,
+            string sourceTexturePath,
+            FdtGlyphEntry sourceEntry,
+            string[] lobbyTextureCandidates,
+            Dictionary<string, byte[]> cleanTextureCache,
+            Dictionary<string, List<FontTexturePatch>> pendingTexturePatches,
+            int clearWidth,
+            int clearHeight,
+            out LobbyHangulGlyphAllocation allocation)
+        {
+            allocation = new LobbyHangulGlyphAllocation();
+            string normalizedTexturePath = NormalizeGamePath(sourceTexturePath);
+            if (globalArchive == null ||
+                !IsLobbyFontTexturePath(normalizedTexturePath) ||
+                IsRuntimeUnsafeLobbyTexturePath(normalizedTexturePath) ||
+                !LobbyTextureCandidateContains(lobbyTextureCandidates, normalizedTexturePath) ||
+                cleanTextureCache == null)
+            {
+                return false;
+            }
+
+            byte[] cleanTexture;
+            if (!TryReadCachedRawTexture(globalArchive, cleanTextureCache, normalizedTexturePath, out cleanTexture))
+            {
+                return false;
+            }
+
+            FontTexture texture = ReadFontTexture(cleanTexture);
+            int targetX = sourceEntry.X;
+            int targetY = sourceEntry.Y;
+            int targetChannel = sourceEntry.ImageIndex % 4;
+            int width = Math.Max(clearWidth, sourceEntry.Width);
+            int height = Math.Max(clearHeight, sourceEntry.Height);
+            if (targetX < 0 ||
+                targetY < 0 ||
+                targetX + width > texture.Width ||
+                targetY + height >= texture.Height)
+            {
+                return false;
+            }
+
+            for (int y = 0; y < height; y++)
+            {
+                for (int x = 0; x < width; x++)
+                {
+                    if (GetFontTextureChannel(texture, targetX + x, targetY + y, targetChannel) != 0)
+                    {
+                        return false;
+                    }
+                }
+            }
+
+            FontTexturePatch probe = new FontTexturePatch();
+            probe.TargetX = targetX;
+            probe.TargetY = targetY;
+            probe.TargetChannel = targetChannel;
+            probe.ClearWidth = width;
+            probe.ClearHeight = height;
+            probe.SourceWidth = width;
+            probe.SourceHeight = height;
+            List<FontTexturePatch> existingPatches;
+            if (pendingTexturePatches != null &&
+                pendingTexturePatches.TryGetValue(normalizedTexturePath, out existingPatches))
+            {
+                for (int i = 0; i < existingPatches.Count; i++)
+                {
+                    if (OverlapsTexturePatch(probe, existingPatches[i]))
+                    {
+                        return false;
+                    }
+                }
+            }
+
+            AllocatedFontGlyphCell cell = new AllocatedFontGlyphCell();
+            cell.ImageIndex = sourceEntry.ImageIndex;
+            cell.X = targetX;
+            cell.Y = targetY;
+            cell.Channel = targetChannel;
+            cell.ClearWidth = width;
+            cell.ClearHeight = height;
+            allocation = new LobbyHangulGlyphAllocation(
+                normalizedTexturePath,
+                cell,
+                0,
+                0);
+            return true;
         }
 
         private static readonly uint[] ActionDetailNumericCodepoints = new uint[]
@@ -3050,7 +3187,14 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
                 height,
                 out allocatedTexturePath,
                 out allocatedCell,
-                allowBottomEdge: IsHighScaleLobbyFont(normalizedFdtPath));
+                allowBottomEdge: false) ||
+                   glyphRepair.TryAllocateReclaimedLobbyCell(
+                       normalizedFdtPath,
+                       preferredCandidates,
+                       width,
+                       height,
+                       out allocatedTexturePath,
+                       out allocatedCell);
         }
 
         private static string[] GetCleanLobbyTextureCandidates(SqPackArchive globalArchive, string fdtPath)
@@ -3255,6 +3399,18 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
             }
 
             return value;
+        }
+
+        private static bool RectanglesOverlap(int leftX, int leftY, int leftWidth, int leftHeight, int rightX, int rightY, int rightWidth, int rightHeight)
+        {
+            return leftWidth > 0 &&
+                   leftHeight > 0 &&
+                   rightWidth > 0 &&
+                   rightHeight > 0 &&
+                   leftX < rightX + rightWidth &&
+                   leftX + leftWidth > rightX &&
+                   leftY < rightY + rightHeight &&
+                   leftY + leftHeight > rightY;
         }
 
         private static bool ShouldPatchDialogueGlyphArtifactFont(string path)
@@ -5090,6 +5246,7 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
                     LobbyScaledHangulPhrases.StartScreenSystemSettings,
                     LobbyScaledHangulPhrases.StartScreenMainMenu),
                 sets.SystemSettings,
+                sets.CharacterSelect,
                 sets.LargeLabels,
                 sets.StartMainMenu);
             Console.WriteLine(
@@ -5147,19 +5304,14 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
                 return sets.StartMainMenu;
             }
 
-            if (IsLobbyLargeLabelVisualScaleFont(normalized))
-            {
-                if (string.Equals(normalized, "common/font/TrumpGothic_34_lobby.fdt", StringComparison.OrdinalIgnoreCase))
-                {
-                    return sets.LargeCharacterLabels;
-                }
-
-                return sets.LargeLabels;
-            }
-
             if (IsSystemSettingsLobbyAxisFont(normalized))
             {
                 return sets.SystemSettings;
+            }
+
+            if (string.Equals(normalized, "common/font/TrumpGothic_34_lobby.fdt", StringComparison.OrdinalIgnoreCase))
+            {
+                return sets.LargeCharacterLabels;
             }
 
             if (IsCharacterSelectOnlyLobbyFont(normalized))
@@ -5169,7 +5321,22 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
 
             if (IsHighScaleLobbyFont(normalized))
             {
-                return sets.HighScale;
+                if (string.Equals(normalized, "common/font/AXIS_36_lobby.fdt", StringComparison.OrdinalIgnoreCase))
+                {
+                    return sets.HighScale;
+                }
+
+                return new uint[0];
+            }
+
+            if (IsLobbyLargeLabelVisualScaleFont(normalized))
+            {
+                if (string.Equals(normalized, "common/font/TrumpGothic_34_lobby.fdt", StringComparison.OrdinalIgnoreCase))
+                {
+                    return sets.LargeCharacterLabels;
+                }
+
+                return sets.LargeLabels;
             }
 
             return sets.SystemAndCharacter;
@@ -5185,6 +5352,16 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
             }
 
             string normalized = NormalizeGamePath(path);
+            if (IsSystemSettingsLobbyAxisFont(normalized))
+            {
+                return sets.SystemSettings;
+            }
+
+            if (IsHighScaleLobbyFont(normalized))
+            {
+                return sets.HighScale;
+            }
+
             if (string.Equals(normalized, "common/font/TrumpGothic_34_lobby.fdt", StringComparison.OrdinalIgnoreCase))
             {
                 return sets.LargeCharacterLabels;
@@ -6237,6 +6414,7 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
             }
 
             MarkGlobalFontGlyphOccupancy(context, globalArchive);
+            AddLobbyCleanCellReclaimPools(context, globalArchive);
 
             for (int i = 0; i < fontPackage.Payloads.Count; i++)
             {
@@ -6293,6 +6471,258 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
 
                 MarkFontGlyphOccupancy(context, path, fdt);
             }
+        }
+
+        private static void AddLobbyCleanCellReclaimPools(FontGlyphRepairContext context, SqPackArchive globalArchive)
+        {
+            if (context == null || globalArchive == null)
+            {
+                return;
+            }
+
+            Dictionary<string, List<ReclaimableFontGlyphCell>> protectedCells =
+                CollectProtectedCleanLobbyCells(context, globalArchive);
+            int total = 0;
+            for (int i = 0; i < LobbyHangulCoverage.TargetFontPaths.Length; i++)
+            {
+                string fontPath = NormalizeGamePath(LobbyHangulCoverage.TargetFontPaths[i]);
+                byte[] fdt = TryReadArchiveStandardFile(globalArchive, fontPath);
+                if (fdt == null)
+                {
+                    continue;
+                }
+
+                string[] cleanPages = GetCleanLobbyTextureCandidates(globalArchive, fontPath);
+                int fontTableOffset;
+                uint glyphCount;
+                int glyphStart;
+                if (!TryGetFdtGlyphTable(fdt, out fontTableOffset, out glyphCount, out glyphStart))
+                {
+                    continue;
+                }
+
+                int fontTotal = 0;
+                for (int glyphIndex = 0; glyphIndex < glyphCount; glyphIndex++)
+                {
+                    int offset = glyphStart + glyphIndex * FdtGlyphEntrySize;
+                    uint codepoint;
+                    if (!TryDecodeFdtUtf8Value(Endian.ReadUInt32LE(fdt, offset), out codepoint) ||
+                        !IsReclaimableCleanLobbyGlyphCodepoint(codepoint))
+                    {
+                        continue;
+                    }
+
+                    FdtGlyphEntry glyph = ReadFdtGlyphEntry(fdt, offset);
+                    ReclaimableFontGlyphCell cell;
+                    if (!TryCreateCleanLobbyReclaimableCell(
+                            context,
+                            fontPath,
+                            cleanPages,
+                            glyph,
+                            protectedCells,
+                            out cell))
+                    {
+                        continue;
+                    }
+
+                    context.AddReclaimableLobbyCell(fontPath, cell);
+                    fontTotal++;
+                    total++;
+                }
+
+                if (fontTotal > 0)
+                {
+                    Console.WriteLine("  Prepared clean-page lobby CJK reclaim cells: {0} ({1})", fontTotal, fontPath);
+                }
+            }
+
+            if (total > 0)
+            {
+                Console.WriteLine("  Prepared clean-page lobby CJK reclaim cells: {0}", total);
+            }
+        }
+
+        private static Dictionary<string, List<ReclaimableFontGlyphCell>> CollectProtectedCleanLobbyCells(
+            FontGlyphRepairContext context,
+            SqPackArchive globalArchive)
+        {
+            Dictionary<string, List<ReclaimableFontGlyphCell>> protectedCells =
+                new Dictionary<string, List<ReclaimableFontGlyphCell>>(StringComparer.OrdinalIgnoreCase);
+            for (int i = 0; i < FontPaths.Length; i++)
+            {
+                string fontPath = NormalizeGamePath(FontPaths[i]);
+                if (!IsLobbyFontPath(fontPath))
+                {
+                    continue;
+                }
+
+                byte[] fdt = TryReadArchiveStandardFile(globalArchive, fontPath);
+                if (fdt == null)
+                {
+                    continue;
+                }
+
+                int fontTableOffset;
+                uint glyphCount;
+                int glyphStart;
+                if (!TryGetFdtGlyphTable(fdt, out fontTableOffset, out glyphCount, out glyphStart))
+                {
+                    continue;
+                }
+
+                for (int glyphIndex = 0; glyphIndex < glyphCount; glyphIndex++)
+                {
+                    int offset = glyphStart + glyphIndex * FdtGlyphEntrySize;
+                    uint codepoint;
+                    if (!TryDecodeFdtUtf8Value(Endian.ReadUInt32LE(fdt, offset), out codepoint) ||
+                        !IsProtectedCleanLobbyGlyphCodepoint(codepoint))
+                    {
+                        continue;
+                    }
+
+                    FdtGlyphEntry glyph = ReadFdtGlyphEntry(fdt, offset);
+                    ReclaimableFontGlyphCell cell;
+                    if (!TryCreateCleanLobbyCell(context, fontPath, glyph, out cell))
+                    {
+                        continue;
+                    }
+
+                    List<ReclaimableFontGlyphCell> cells;
+                    if (!protectedCells.TryGetValue(cell.TexturePath, out cells))
+                    {
+                        cells = new List<ReclaimableFontGlyphCell>();
+                        protectedCells.Add(cell.TexturePath, cells);
+                    }
+
+                    cells.Add(cell);
+                }
+            }
+
+            return protectedCells;
+        }
+
+        private static bool TryCreateCleanLobbyReclaimableCell(
+            FontGlyphRepairContext context,
+            string fontPath,
+            string[] cleanPages,
+            FdtGlyphEntry glyph,
+            Dictionary<string, List<ReclaimableFontGlyphCell>> protectedCells,
+            out ReclaimableFontGlyphCell cell)
+        {
+            cell = new ReclaimableFontGlyphCell();
+            if (!TryCreateCleanLobbyCell(context, fontPath, glyph, out cell) ||
+                !LobbyTextureCandidateContains(cleanPages, cell.TexturePath) ||
+                CleanLobbyCellTouchesBottomEdge(context, cell) ||
+                CleanLobbyCellOverlapsProtectedCell(cell, protectedCells))
+            {
+                return false;
+            }
+
+            return true;
+        }
+
+        private static bool TryCreateCleanLobbyCell(
+            FontGlyphRepairContext context,
+            string fontPath,
+            FdtGlyphEntry glyph,
+            out ReclaimableFontGlyphCell cell)
+        {
+            cell = new ReclaimableFontGlyphCell();
+            if (glyph.Width == 0 || glyph.Height == 0)
+            {
+                return false;
+            }
+
+            string texturePath = ResolveFontTexturePath(fontPath, glyph.ImageIndex);
+            if (!IsLobbyFontTexturePath(texturePath) ||
+                IsRuntimeUnsafeLobbyTexturePath(texturePath))
+            {
+                return false;
+            }
+
+            FontAtlasAllocator allocator;
+            if (!context.TryGetAllocator(texturePath, out allocator) ||
+                glyph.X < 0 ||
+                glyph.Y < 0 ||
+                glyph.X + glyph.Width > allocator.Width ||
+                glyph.Y + glyph.Height > allocator.Height)
+            {
+                return false;
+            }
+
+            cell.TexturePath = NormalizeGamePath(texturePath);
+            cell.ImageIndex = glyph.ImageIndex;
+            cell.X = glyph.X;
+            cell.Y = glyph.Y;
+            cell.Width = glyph.Width;
+            cell.Height = glyph.Height;
+            cell.Channel = glyph.ImageIndex % 4;
+            return true;
+        }
+
+        private static bool CleanLobbyCellOverlapsProtectedCell(
+            ReclaimableFontGlyphCell cell,
+            Dictionary<string, List<ReclaimableFontGlyphCell>> protectedCells)
+        {
+            if (protectedCells == null)
+            {
+                return false;
+            }
+
+            List<ReclaimableFontGlyphCell> cells;
+            if (!protectedCells.TryGetValue(NormalizeGamePath(cell.TexturePath), out cells))
+            {
+                return false;
+            }
+
+            for (int i = 0; i < cells.Count; i++)
+            {
+                ReclaimableFontGlyphCell protectedCell = cells[i];
+                if (cell.Channel == protectedCell.Channel &&
+                    RectanglesOverlap(
+                        cell.X,
+                        cell.Y,
+                        cell.Width,
+                        cell.Height,
+                        protectedCell.X,
+                        protectedCell.Y,
+                        protectedCell.Width,
+                        protectedCell.Height))
+                {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
+        private static bool CleanLobbyCellTouchesBottomEdge(FontGlyphRepairContext context, ReclaimableFontGlyphCell cell)
+        {
+            FontAtlasAllocator allocator;
+            return context != null &&
+                   context.TryGetAllocator(cell.TexturePath, out allocator) &&
+                   cell.Y + cell.Height >= allocator.Height;
+        }
+
+        private static bool IsProtectedCleanLobbyGlyphCodepoint(uint codepoint)
+        {
+            return !IsReclaimableCleanLobbyGlyphCodepoint(codepoint);
+        }
+
+        private static bool IsReclaimableCleanLobbyGlyphCodepoint(uint codepoint)
+        {
+            return (codepoint >= 0x3041u && codepoint <= 0x3096u) ||
+                   (codepoint >= 0x30A1u && codepoint <= 0x30FAu) ||
+                   (codepoint >= 0x3400u && codepoint <= 0x4DBFu) ||
+                   (codepoint >= 0x4E00u && codepoint <= 0x9FFFu);
+        }
+
+        private static bool IsRuntimeUnsafeLobbyTexturePath(string texturePath)
+        {
+            return string.Equals(
+                NormalizeGamePath(texturePath),
+                FontLobby7TexturePath,
+                StringComparison.OrdinalIgnoreCase);
         }
 
         private static ProtectedHangulGlyphContext TryCreateProtectedHangulGlyphContext(FontPatchPackage fontPackage, FileStream mpdStream, SqPackArchive globalArchive)
@@ -7613,6 +8043,21 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
             public int X;
             public int Y;
             public int Channel;
+            public int ClearWidth;
+            public int ClearHeight;
+            public bool Reclaimed;
+        }
+
+        private struct ReclaimableFontGlyphCell
+        {
+            public string TexturePath;
+            public int ImageIndex;
+            public int X;
+            public int Y;
+            public int Width;
+            public int Height;
+            public int Channel;
+            public bool Used;
         }
 
         private sealed class TargetedGlyphRepairContext
@@ -7646,6 +8091,10 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
         {
             private readonly Dictionary<string, FontAtlasAllocator> _allocators =
                 new Dictionary<string, FontAtlasAllocator>(StringComparer.OrdinalIgnoreCase);
+            private readonly Dictionary<string, List<ReclaimableFontGlyphCell>> _reclaimableLobbyCellsByFont =
+                new Dictionary<string, List<ReclaimableFontGlyphCell>>(StringComparer.OrdinalIgnoreCase);
+            private readonly Dictionary<string, List<ReclaimableFontGlyphCell>> _usedReclaimedLobbyCellsByTexture =
+                new Dictionary<string, List<ReclaimableFontGlyphCell>>(StringComparer.OrdinalIgnoreCase);
 
             public int AllocatorCount
             {
@@ -7681,12 +8130,162 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
                 return cell.ImageIndex >= 0;
             }
 
+            public void AddReclaimableLobbyCell(string fontPath, ReclaimableFontGlyphCell reclaimableCell)
+            {
+                string normalized = NormalizeGamePath(fontPath);
+                List<ReclaimableFontGlyphCell> cells;
+                if (!_reclaimableLobbyCellsByFont.TryGetValue(normalized, out cells))
+                {
+                    cells = new List<ReclaimableFontGlyphCell>();
+                    _reclaimableLobbyCellsByFont.Add(normalized, cells);
+                }
+
+                cells.Add(reclaimableCell);
+            }
+
+            public bool TryAllocateReclaimedLobbyCell(
+                string fontPath,
+                string[] textureCandidates,
+                int width,
+                int height,
+                out string allocatedTexturePath,
+                out AllocatedFontGlyphCell allocatedCell)
+            {
+                allocatedTexturePath = null;
+                allocatedCell = new AllocatedFontGlyphCell();
+                List<ReclaimableFontGlyphCell> cells;
+                if (!_reclaimableLobbyCellsByFont.TryGetValue(NormalizeGamePath(fontPath), out cells) ||
+                    cells.Count == 0)
+                {
+                    return false;
+                }
+
+                int bestIndex = -1;
+                int bestArea = int.MaxValue;
+                for (int i = 0; i < cells.Count; i++)
+                {
+                    ReclaimableFontGlyphCell candidate = cells[i];
+                    if (candidate.Used ||
+                        candidate.Width < width ||
+                        candidate.Height < height ||
+                        ReclaimableCellOverlapsUsedCell(candidate) ||
+                        !LobbyTextureCandidateContains(textureCandidates, candidate.TexturePath))
+                    {
+                        continue;
+                    }
+
+                    int area = candidate.Width * candidate.Height;
+                    if (area < bestArea)
+                    {
+                        bestArea = area;
+                        bestIndex = i;
+                    }
+                }
+
+                if (bestIndex < 0)
+                {
+                    return false;
+                }
+
+                ReclaimableFontGlyphCell selected = cells[bestIndex];
+                selected.Used = true;
+                cells[bestIndex] = selected;
+                MarkReclaimedLobbyCellUsed(selected);
+                for (int i = 0; i < cells.Count; i++)
+                {
+                    if (i == bestIndex)
+                    {
+                        continue;
+                    }
+
+                    ReclaimableFontGlyphCell other = cells[i];
+                    if (!other.Used &&
+                        string.Equals(other.TexturePath, selected.TexturePath, StringComparison.OrdinalIgnoreCase) &&
+                        other.Channel == selected.Channel &&
+                        RectanglesOverlap(
+                            other.X,
+                            other.Y,
+                            other.Width,
+                            other.Height,
+                            selected.X,
+                            selected.Y,
+                            selected.Width,
+                            selected.Height))
+                    {
+                        other.Used = true;
+                        cells[i] = other;
+                    }
+                }
+
+                allocatedTexturePath = selected.TexturePath;
+                allocatedCell.ImageIndex = selected.ImageIndex;
+                allocatedCell.X = selected.X;
+                allocatedCell.Y = selected.Y;
+                allocatedCell.Channel = selected.Channel;
+                allocatedCell.ClearWidth = selected.Width;
+                allocatedCell.ClearHeight = selected.Height;
+                allocatedCell.Reclaimed = true;
+                return true;
+            }
+
+            private bool ReclaimableCellOverlapsUsedCell(ReclaimableFontGlyphCell candidate)
+            {
+                List<ReclaimableFontGlyphCell> usedCells;
+                if (!_usedReclaimedLobbyCellsByTexture.TryGetValue(NormalizeGamePath(candidate.TexturePath), out usedCells))
+                {
+                    return false;
+                }
+
+                for (int i = 0; i < usedCells.Count; i++)
+                {
+                    ReclaimableFontGlyphCell used = usedCells[i];
+                    if (candidate.Channel == used.Channel &&
+                        RectanglesOverlap(
+                            candidate.X,
+                            candidate.Y,
+                            candidate.Width,
+                            candidate.Height,
+                            used.X,
+                            used.Y,
+                            used.Width,
+                            used.Height))
+                    {
+                        return true;
+                    }
+                }
+
+                return false;
+            }
+
+            private void MarkReclaimedLobbyCellUsed(ReclaimableFontGlyphCell cell)
+            {
+                string texturePath = NormalizeGamePath(cell.TexturePath);
+                List<ReclaimableFontGlyphCell> usedCells;
+                if (!_usedReclaimedLobbyCellsByTexture.TryGetValue(texturePath, out usedCells))
+                {
+                    usedCells = new List<ReclaimableFontGlyphCell>();
+                    _usedReclaimedLobbyCellsByTexture.Add(texturePath, usedCells);
+                }
+
+                usedCells.Add(cell);
+            }
+
             public FontGlyphRepairContext Clone()
             {
                 FontGlyphRepairContext clone = new FontGlyphRepairContext();
                 foreach (KeyValuePair<string, FontAtlasAllocator> pair in _allocators)
                 {
                     clone._allocators.Add(pair.Key, pair.Value.Clone());
+                }
+
+                foreach (KeyValuePair<string, List<ReclaimableFontGlyphCell>> pair in _reclaimableLobbyCellsByFont)
+                {
+                    clone._reclaimableLobbyCellsByFont.Add(pair.Key, CloneReclaimableCells(pair.Value));
+                }
+
+                foreach (KeyValuePair<string, List<ReclaimableFontGlyphCell>> pair in _usedReclaimedLobbyCellsByTexture)
+                {
+                    clone._usedReclaimedLobbyCellsByTexture.Add(pair.Key, CloneReclaimableCells(pair.Value));
                 }
 
                 return clone;
@@ -7704,6 +8303,34 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
                 {
                     _allocators.Add(pair.Key, pair.Value.Clone());
                 }
+
+                _reclaimableLobbyCellsByFont.Clear();
+                foreach (KeyValuePair<string, List<ReclaimableFontGlyphCell>> pair in source._reclaimableLobbyCellsByFont)
+                {
+                    _reclaimableLobbyCellsByFont.Add(pair.Key, CloneReclaimableCells(pair.Value));
+                }
+
+                _usedReclaimedLobbyCellsByTexture.Clear();
+                foreach (KeyValuePair<string, List<ReclaimableFontGlyphCell>> pair in source._usedReclaimedLobbyCellsByTexture)
+                {
+                    _usedReclaimedLobbyCellsByTexture.Add(pair.Key, CloneReclaimableCells(pair.Value));
+                }
+            }
+
+            private static List<ReclaimableFontGlyphCell> CloneReclaimableCells(List<ReclaimableFontGlyphCell> cells)
+            {
+                List<ReclaimableFontGlyphCell> clone = new List<ReclaimableFontGlyphCell>();
+                if (cells == null)
+                {
+                    return clone;
+                }
+
+                for (int i = 0; i < cells.Count; i++)
+                {
+                    clone.Add(cells[i]);
+                }
+
+                return clone;
             }
         }
 
@@ -8012,10 +8639,12 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
                             }
 
                             MarkOccupied(x, y, w, h, channel);
-                            cell.X = x;
-                            cell.Y = y;
-                            cell.Channel = channel;
-                            return true;
+                cell.X = x;
+                cell.Y = y;
+                cell.Channel = channel;
+                cell.ClearWidth = w;
+                cell.ClearHeight = h;
+                return true;
                         }
                     }
                 }
@@ -8059,6 +8688,8 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
                         cell.X = x;
                         cell.Y = y;
                         cell.Channel = channel;
+                        cell.ClearWidth = width;
+                        cell.ClearHeight = height;
                         return true;
                     }
 

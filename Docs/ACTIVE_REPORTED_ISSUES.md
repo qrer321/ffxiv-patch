@@ -42,6 +42,7 @@
   - Current code-level mitigation: each lobby FDT must keep new glyph routes inside the same lobby texture pages that the clean FDT already referenced. Clean-unused lobby texture page references are now hard failures, not warnings. Allocation-cache reuse and high-scale fallback reuse must also pass the target FDT clean-page check.
   - Additional guard: high-scale lobby FDT changes are transactional. If a high-scale FDT cannot allocate the complete requested glyph set inside its clean page set, the FDT edit, atlas allocation, cache entries, and texture patches are discarded rather than leaving partial large glyphs that can mix with fallback glyphs.
   - Verification: `.tmp\lobby-system-priority-ja-r1` passes `lobby-multitexture-font-set,lobby-texture-cell-margin` and the confirmed in-game regression set `combat-flytext-damage-glyphs,third-party-game-font-safety,party-list-self-marker,action-detail-scale-layouts,pvp-profile-font-routes`.
+  - 2026-05-23 r25 update: `.tmp\lobby-route-scoped-ja-r1` strengthens the crash guard by forbidding bottom-edge placement for all lobby glyph allocations and by reclaiming only clean Japanese/CJK cells inside the target FDT's own clean lobby page set. Focused lobby route checks and confirmed in-game regressions pass, but this remains generated-output verification only.
   - Remaining: do not mark the live boot crash fixed until the user confirms the client result. Also do not reintroduce `font_lobby7.tex`, lobby `image_index >= 24`, or clean-unused page reuse to regain coverage.
 
 - [ ] Lobby high-UI-scale font coverage under clean-page safety
@@ -50,6 +51,7 @@
   - Current finding: enforcing clean-page safety prevents the previous full-coverage route. `Jupiter_46_lobby`, `Jupiter_90_lobby`, `Meidinger_40_lobby`, `MiedingerMid_36_lobby`, and `TrumpGothic_68_lobby` cannot fit the 327 high-scale glyph set inside their clean page sets; partial edits are now skipped to avoid mixed-size glyph fallback.
   - Current partial mitigation: system-settings glyph ordering now prioritizes the reported result/high-resolution phrases before broader sheet-derived glyphs, so limited low-scale lobby pages cover the most visible phrases first.
   - Verification state: `.tmp\lobby-system-priority-ja-r1` still fails `lobby-scale-font-sources` and one `lobby-render-snapshots` route because `AXIS_12_lobby`/`AXIS_14_lobby` compete for the same limited clean page capacity. Treat this as open. The next fix should be a route-level or clean-page-compatible design, not added pages or partial high-scale glyph injection.
+  - 2026-05-23 r25 update: `.tmp\lobby-route-scoped-ja-r1` passes the focused active routes by limiting scale-source validation to ULD-observed/reported fonts (`AXIS_12_lobby`, `AXIS_14_lobby`, `AXIS_18_lobby`, `AXIS_36_lobby`, `TrumpGothic_23_lobby`, `TrumpGothic_34_lobby`). Unobserved high-scale derived lobby fonts are left untouched until a ULD route survey proves they are used. This avoids another partial high-scale patch, but it does not prove every 150%+ lobby/character-select route is live-correct.
 
 - [x] Low-scale party-list/chat party number marker contamination
   - Reported: 2026-05-22
