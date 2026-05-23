@@ -1812,12 +1812,36 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
                     continue;
                 }
 
+                int sourceMinX;
                 int sourceMinY;
+                int sourceMaxX;
                 int sourceMaxY;
-                if (!TryFindAlphaVisibleYBounds(sourceAlpha, sourceEntry.Width, sourceEntry.Height, out sourceMinY, out sourceMaxY))
+                if (!TryFindAlphaVisibleBounds(
+                    sourceAlpha,
+                    sourceEntry.Width,
+                    sourceEntry.Height,
+                    out sourceMinX,
+                    out sourceMinY,
+                    out sourceMaxX,
+                    out sourceMaxY))
                 {
                     continue;
                 }
+
+                const int sourceVisiblePadding = 1;
+                int cropMinX = Math.Max(0, sourceMinX - sourceVisiblePadding);
+                int cropMinY = Math.Max(0, sourceMinY - sourceVisiblePadding);
+                int cropMaxX = Math.Min(sourceEntry.Width - 1, sourceMaxX + sourceVisiblePadding);
+                int cropMaxY = Math.Min(sourceEntry.Height - 1, sourceMaxY + sourceVisiblePadding);
+                int cropWidth = cropMaxX - cropMinX + 1;
+                int cropHeight = cropMaxY - cropMinY + 1;
+                byte[] croppedAlpha = CropGlyphAlpha(
+                    sourceAlpha,
+                    sourceEntry.Width,
+                    cropMinX,
+                    cropMinY,
+                    cropWidth,
+                    cropHeight);
 
                 int sourceVisibleHeight = sourceMaxY - sourceMinY + 1;
                 double visualScale = sourceVisibleHeight > 0
@@ -1829,24 +1853,28 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
                 }
 
                 int scaledWidth = ClampInt(
-                    (int)Math.Round(sourceEntry.Width * visualScale),
+                    (int)Math.Floor(cropWidth * visualScale),
                     1,
                     byte.MaxValue);
                 int scaledHeight = ClampInt(
-                    (int)Math.Round(sourceEntry.Height * visualScale),
+                    (int)Math.Floor(cropHeight * visualScale),
                     1,
                     byte.MaxValue);
                 byte[] scaledAlpha = ScaleGlyphAlphaBilinear(
-                    sourceAlpha,
-                    sourceEntry.Width,
-                    sourceEntry.Height,
+                    croppedAlpha,
+                    cropWidth,
+                    cropHeight,
                     scaledWidth,
                     scaledHeight);
 
-                int sourceAdvance = Math.Max(1, sourceEntry.Width + sourceEntry.OffsetX);
+                int sourceAdvance = Math.Max(1, sourceEntry.Width + sourceEntry.OffsetX - cropMinX);
                 int scaledAdvance = ClampInt((int)Math.Round(sourceAdvance * visualScale), 1, byte.MaxValue);
-                scaledAdvance = Math.Max(scaledAdvance, Math.Min(byte.MaxValue, scaledWidth + 1));
+                scaledAdvance = Math.Max(scaledAdvance, Math.Min(byte.MaxValue, scaledWidth + 2));
                 int scaledOffsetX = ClampInt(scaledAdvance - scaledWidth, sbyte.MinValue, sbyte.MaxValue);
+                int scaledOffsetY = ClampInt(
+                    sourceEntry.OffsetY + (int)Math.Round(cropMinY * visualScale),
+                    sbyte.MinValue,
+                    sbyte.MaxValue);
 
                 AllocatedFontGlyphCell allocatedCell;
                 string allocatedTexturePath;
@@ -1888,7 +1916,7 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
                 targetFdt[targetOffset + 12] = checked((byte)scaledWidth);
                 targetFdt[targetOffset + 13] = checked((byte)scaledHeight);
                 targetFdt[targetOffset + 14] = unchecked((byte)(sbyte)scaledOffsetX);
-                targetFdt[targetOffset + 15] = unchecked((byte)sourceEntry.OffsetY);
+                targetFdt[targetOffset + 15] = unchecked((byte)(sbyte)scaledOffsetY);
                 changed++;
             }
 
@@ -2893,6 +2921,86 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
             }
 
             return minY <= maxY;
+        }
+
+        private static bool TryFindAlphaVisibleBounds(
+            byte[] alpha,
+            int width,
+            int height,
+            out int minX,
+            out int minY,
+            out int maxX,
+            out int maxY)
+        {
+            minX = width;
+            minY = height;
+            maxX = -1;
+            maxY = -1;
+            if (alpha == null || width <= 0 || height <= 0)
+            {
+                return false;
+            }
+
+            for (int y = 0; y < height; y++)
+            {
+                int row = y * width;
+                for (int x = 0; x < width; x++)
+                {
+                    if (alpha[row + x] == 0)
+                    {
+                        continue;
+                    }
+
+                    if (x < minX)
+                    {
+                        minX = x;
+                    }
+
+                    if (x > maxX)
+                    {
+                        maxX = x;
+                    }
+
+                    if (y < minY)
+                    {
+                        minY = y;
+                    }
+
+                    if (y > maxY)
+                    {
+                        maxY = y;
+                    }
+                }
+            }
+
+            return minX <= maxX && minY <= maxY;
+        }
+
+        private static byte[] CropGlyphAlpha(
+            byte[] sourceAlpha,
+            int sourceWidth,
+            int sourceX,
+            int sourceY,
+            int width,
+            int height)
+        {
+            byte[] target = new byte[checked(width * height)];
+            if (sourceAlpha == null || sourceWidth <= 0 || width <= 0 || height <= 0)
+            {
+                return target;
+            }
+
+            for (int y = 0; y < height; y++)
+            {
+                Buffer.BlockCopy(
+                    sourceAlpha,
+                    (sourceY + y) * sourceWidth + sourceX,
+                    target,
+                    y * width,
+                    width);
+            }
+
+            return target;
         }
 
         private static byte[] PlaceGlyphAlphaAtTop(byte[] sourceAlpha, int sourceWidth, int sourceHeight, int targetWidth, int targetHeight)

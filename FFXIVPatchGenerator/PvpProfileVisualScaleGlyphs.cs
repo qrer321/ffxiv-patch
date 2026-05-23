@@ -2,14 +2,17 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
 {
     internal static class PvpProfileVisualScaleGlyphs
     {
-        public const double HangulToDigitRatio = 1.08d;
-        public const double JupiterCanvasScaleCompensation = 0.76d;
+        public const double HangulToDigitRatio = 1.03d;
+        public const double JupiterCanvasScaleCompensation = 1.0d;
 
         public static readonly string[] TargetFontPaths = new string[]
         {
-            // Keep PvP routed fonts at the TTMP source scale. Earlier Jupiter
-            // downscaling made PvP profile labels thin and smaller than clean-like
-            // in-game UI text.
+            // Source-preserving these routes makes Korean PvP labels overflow
+            // their ULD areas. The generator crops visible source pixels before
+            // scaling, so this target renders around the verifier's 1.16..1.42
+            // digit-height window rather than the raw source ratio.
+            "common/font/Jupiter_16.fdt",
+            "common/font/Jupiter_20.fdt"
         };
 
         public static readonly string[] SheetNames = new string[]
