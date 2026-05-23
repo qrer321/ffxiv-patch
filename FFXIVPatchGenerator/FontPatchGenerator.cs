@@ -403,6 +403,21 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
                     }
                 }
 
+                WriteSupplementalLobbyFontFiles(
+                    globalArchive,
+                    mutableIndex,
+                    mutableIndex2,
+                    datWriter,
+                    mpdStream,
+                    payloadsByPath,
+                    dialogueGlyphRepair,
+                    glyphRepair,
+                    texturePatches,
+                    lobbyHangulAllocationCache,
+                    actionDetailHighScaleHangulCodepoints,
+                    pvpProfileVisualScaleCodepoints,
+                    lobbyHangulCodepoints);
+
                 for (int i = 0; i < fontPackage.Payloads.Count; i++)
                 {
                     FontPayload payload = fontPackage.Payloads[i];
@@ -503,21 +518,6 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
                     mutableIndex2.SetFileOffset(path, 1, datOffset);
                     _report.FontFilesPatched++;
                 }
-
-                WriteSupplementalLobbyFontFiles(
-                    globalArchive,
-                    mutableIndex,
-                    mutableIndex2,
-                    datWriter,
-                    mpdStream,
-                    payloadsByPath,
-                    dialogueGlyphRepair,
-                    glyphRepair,
-                    texturePatches,
-                    lobbyHangulAllocationCache,
-                    actionDetailHighScaleHangulCodepoints,
-                    pvpProfileVisualScaleCodepoints,
-                    lobbyHangulCodepoints);
 
                 foreach (KeyValuePair<string, List<FontTexturePatch>> pair in texturePatches)
                 {
@@ -731,7 +731,8 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
                     width,
                     height,
                     out allocatedTexturePath,
-                    out allocatedCell);
+                    out allocatedCell,
+                    allowBottomEdge: IsHighScaleLobbyFont(normalizedFdtPath));
             }
 
             return TryAllocateFromCandidateTextures(
@@ -812,7 +813,8 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
                     width,
                     height,
                     out allocatedTexturePath,
-                    out allocatedCell);
+                    out allocatedCell,
+                    allowBottomEdge: IsHighScaleLobbyFont(normalizedFdtPath));
             }
 
             return TryAllocateFromCandidateTextures(
@@ -830,7 +832,8 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
             int width,
             int height,
             out string allocatedTexturePath,
-            out AllocatedFontGlyphCell allocatedCell)
+            out AllocatedFontGlyphCell allocatedCell,
+            bool allowBottomEdge = true)
         {
             allocatedTexturePath = null;
             allocatedCell = new AllocatedFontGlyphCell();
@@ -848,7 +851,7 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
                     continue;
                 }
 
-                if (glyphRepair.TryAllocate(candidate, width, height, out allocatedCell))
+                if (glyphRepair.TryAllocate(candidate, width, height, out allocatedCell, allowBottomEdge: allowBottomEdge))
                 {
                     allocatedTexturePath = NormalizeGamePath(candidate);
                     return true;
@@ -2981,59 +2984,55 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
                 return false;
             }
 
+            string[] preferredCandidates = GetPreferredLobbyTextureCandidates(normalizedFdtPath);
+            return TryAllocateFromCandidateTextures(
+                glyphRepair,
+                preferredCandidates,
+                width,
+                height,
+                out allocatedTexturePath,
+                out allocatedCell,
+                allowBottomEdge: IsHighScaleLobbyFont(normalizedFdtPath));
+        }
+
+        private static string[] GetPreferredLobbyTextureCandidates(string fdtPath)
+        {
+            string normalizedFdtPath = NormalizeGamePath(fdtPath);
             if (IsLobbyLargeLabelVisualScaleFont(normalizedFdtPath))
             {
-                return TryAllocateFromCandidateTextures(
-                    glyphRepair,
-                    new string[]
-                    {
-                        FontLobby2TexturePath,
-                        FontLobby1TexturePath,
-                        FontLobby3TexturePath,
-                        FontLobby4TexturePath,
-                        FontLobby5TexturePath,
-                        FontLobby6TexturePath
-                    },
-                    width,
-                    height,
-                    out allocatedTexturePath,
-                    out allocatedCell);
+                return new string[]
+                {
+                    FontLobby2TexturePath,
+                    FontLobby1TexturePath,
+                    FontLobby3TexturePath,
+                    FontLobby4TexturePath,
+                    FontLobby5TexturePath,
+                    FontLobby6TexturePath
+                };
             }
 
             if (IsHighScaleLobbyFont(normalizedFdtPath))
             {
-                return TryAllocateFromCandidateTextures(
-                    glyphRepair,
-                    new string[]
-                    {
-                        FontLobby6TexturePath,
-                        FontLobby5TexturePath,
-                        FontLobby4TexturePath,
-                        FontLobby3TexturePath,
-                        FontLobby2TexturePath,
-                        FontLobby1TexturePath
-                    },
-                    width,
-                    height,
-                    out allocatedTexturePath,
-                    out allocatedCell);
-            }
-
-            return TryAllocateFromCandidateTextures(
-                glyphRepair,
-                new string[]
+                return new string[]
                 {
-                    FontLobby3TexturePath,
-                    FontLobby4TexturePath,
-                    FontLobby5TexturePath,
                     FontLobby6TexturePath,
+                    FontLobby5TexturePath,
+                    FontLobby4TexturePath,
+                    FontLobby3TexturePath,
                     FontLobby2TexturePath,
                     FontLobby1TexturePath
-                },
-                width,
-                height,
-                out allocatedTexturePath,
-                out allocatedCell);
+                };
+            }
+
+            return new string[]
+            {
+                FontLobby3TexturePath,
+                FontLobby4TexturePath,
+                FontLobby5TexturePath,
+                FontLobby6TexturePath,
+                FontLobby2TexturePath,
+                FontLobby1TexturePath
+            };
         }
 
         private static bool TryAllocateActionDetailHighScaleGlyphCell(
@@ -7491,7 +7490,7 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
                 return _allocators.TryGetValue(NormalizeGamePath(texturePath), out allocator);
             }
 
-            public bool TryAllocate(string texturePath, int width, int height, out AllocatedFontGlyphCell cell)
+            public bool TryAllocate(string texturePath, int width, int height, out AllocatedFontGlyphCell cell, bool allowBottomEdge = true)
             {
                 cell = new AllocatedFontGlyphCell();
                 FontAtlasAllocator allocator;
@@ -7501,7 +7500,7 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
                     return false;
                 }
 
-                if (!allocator.TryAllocate(width, height, out cell))
+                if (!allocator.TryAllocate(width, height, out cell, allowBottomEdge: allowBottomEdge))
                 {
                     return false;
                 }
@@ -7720,18 +7719,25 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
                 }
             }
 
-            public bool TryAllocate(int width, int height, out AllocatedFontGlyphCell cell)
+            public bool TryAllocate(int width, int height, out AllocatedFontGlyphCell cell, bool allowBottomEdge = true)
             {
                 cell = new AllocatedFontGlyphCell();
                 int w = Math.Max(1, width);
                 int h = Math.Max(1, height);
                 int stepX = Math.Max(1, w + 1);
                 int stepY = Math.Max(1, h + 1);
+                int maxX = _texture.Width - w;
+                int maxY = _texture.Height - h - (allowBottomEdge ? 0 : 1);
+                if (maxY < 0 || maxX < 0)
+                {
+                    return false;
+                }
+
                 for (int channel = 0; channel < _occupiedBits.Length; channel++)
                 {
-                    for (int y = _texture.Height - h; y >= 0; y -= stepY)
+                    for (int y = maxY; y >= 0; y -= stepY)
                     {
-                        for (int x = 0; x <= _texture.Width - w; x += stepX)
+                        for (int x = 0; x <= maxX; x += stepX)
                         {
                             if (!IsFree(x, y, w, h, channel))
                             {
@@ -7747,13 +7753,13 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
                     }
                 }
 
-                return TryAllocateDense(w, h, out cell);
+                return TryAllocateDense(w, h, allowBottomEdge, out cell);
             }
 
-            private bool TryAllocateDense(int width, int height, out AllocatedFontGlyphCell cell)
+            private bool TryAllocateDense(int width, int height, bool allowBottomEdge, out AllocatedFontGlyphCell cell)
             {
                 cell = new AllocatedFontGlyphCell();
-                int maxY = _texture.Height - height;
+                int maxY = _texture.Height - height - (allowBottomEdge ? 0 : 1);
                 int maxX = _texture.Width - width;
                 if (maxY < 0 || maxX < 0)
                 {

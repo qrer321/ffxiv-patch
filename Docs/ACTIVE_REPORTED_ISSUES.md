@@ -35,6 +35,13 @@
 
 ## Current Checklist
 
+- [ ] Lobby boot crash when UI resolution is not 4K
+  - Reported: 2026-05-23.
+  - Symptom: game can crash on boot when the system UI resolution setting is set to a non-4K value. This is not the same as UI scale.
+  - Current code-level mitigation: newly allocated non-high-scale lobby glyphs must not touch the bottom edge of a lobby texture. High-scale lobby supplemental fonts are allowed to keep the old edge behavior so their large source glyphs do not fall back to small `AXIS_18_lobby` cells.
+  - Verification: `.tmp\lobby-uires-safe-ja-r6` passes `lobby-texture-cell-margin,lobby-multitexture-font-set,lobby-coverage-glyphs,lobby-scale-font-sources`, focused lobby/PvP/in-game regressions, and broad lobby capacity checks with `Verifier failures: 0`.
+  - Caveat: `lobby-multitexture-font-set` still warns when a lobby FDT references a clean-unused page. Keep that as a diagnostic warning for now; making it a hard failure breaks full lobby coverage. Do not mark the live boot crash fixed until the user confirms the client result.
+
 - [ ] Low-scale party-list/chat party number marker contamination
   - Reported: 2026-05-22
   - Symptom: at in-game UI scale 120% or below, party-list and narrow chat-log party number markers can show polluted pixels around the local player's number marker. The visible marker may be any party number, not only `1`.

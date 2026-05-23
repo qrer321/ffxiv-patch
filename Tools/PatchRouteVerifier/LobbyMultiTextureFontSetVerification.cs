@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using FfxivKoreanPatch.FFXIVPatchGenerator;
 
 namespace FfxivKoreanPatch.PatchRouteVerifier
 {
@@ -18,6 +19,7 @@ namespace FfxivKoreanPatch.PatchRouteVerifier
                 int checkedFonts = 0;
                 int checkedGlyphs = 0;
                 int failures = 0;
+                int pageCeilingWarnings = 0;
 
                 for (int fontIndex = 0; fontIndex < LobbyPhraseFontPaths.Length; fontIndex++)
                 {
@@ -48,6 +50,7 @@ namespace FfxivKoreanPatch.PatchRouteVerifier
                         continue;
                     }
 
+                    HashSet<string> cleanTexturePages = CollectCleanLobbyFontTexturePages(fontPath, ref failures);
                     checkedFonts++;
                     for (int glyphIndex = 0; glyphIndex < glyphCount; glyphIndex++)
                     {
@@ -80,6 +83,22 @@ namespace FfxivKoreanPatch.PatchRouteVerifier
                                 glyph.ImageIndex,
                                 texturePath);
                             continue;
+                        }
+
+                        if (cleanTexturePages != null &&
+                            !cleanTexturePages.Contains(texturePath))
+                        {
+                            if (pageCeilingWarnings < 20)
+                            {
+                                Warn(
+                                "{0} glyph#{1} image_index={2} references {3}, but clean {0} never references that lobby texture page; keep each lobby FDT inside its clean page set for non-4K UI-resolution boot safety",
+                                fontPath,
+                                glyphIndex,
+                                glyph.ImageIndex,
+                                texturePath);
+                            }
+
+                            pageCeilingWarnings++;
                         }
 
                         referencedTextures.Add(texturePath);
@@ -143,6 +162,55 @@ namespace FfxivKoreanPatch.PatchRouteVerifier
                         checkedGlyphs,
                         referencedTextures.Count);
                 }
+            }
+
+            private HashSet<string> CollectCleanLobbyFontTexturePages(string fontPath, ref int failures)
+            {
+                byte[] cleanFdt;
+                try
+                {
+                    cleanFdt = _cleanFont.ReadFile(fontPath);
+                }
+                catch (Exception ex)
+                {
+                    failures = FailLobbyMultiTextureOnce(
+                        failures,
+                        "{0} clean lobby FDT is missing or unreadable for page-ceiling check: {1}",
+                        fontPath,
+                        ex.Message);
+                    return null;
+                }
+
+                int fontTableOffset;
+                uint glyphCount;
+                int glyphStart;
+                if (!TryGetFdtGlyphTable(cleanFdt, out fontTableOffset, out glyphCount, out glyphStart))
+                {
+                    failures = FailLobbyMultiTextureOnce(
+                        failures,
+                        "{0} clean lobby FDT glyph table is invalid for page-ceiling check",
+                        fontPath);
+                    return null;
+                }
+
+                HashSet<string> pages = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+                for (int glyphIndex = 0; glyphIndex < glyphCount; glyphIndex++)
+                {
+                    int glyphOffset = glyphStart + glyphIndex * FdtGlyphEntrySize;
+                    FdtGlyphEntry glyph = ReadGlyphEntry(cleanFdt, glyphOffset);
+                    if (glyph.Width == 0 || glyph.Height == 0)
+                    {
+                        continue;
+                    }
+
+                    string texturePath = ResolveFontTexturePath(fontPath, glyph.ImageIndex);
+                    if (!string.IsNullOrEmpty(texturePath))
+                    {
+                        pages.Add(texturePath);
+                    }
+                }
+
+                return pages;
             }
 
             private bool TryReadLobbyTexture(Dictionary<string, Texture> cache, string texturePath, out Texture texture)
@@ -242,6 +310,136 @@ namespace FfxivKoreanPatch.PatchRouteVerifier
                 }
 
                 return failures + 1;
+            }
+
+            private void VerifyLobbyTextureCellMargin()
+            {
+                Console.WriteLine("[FDT] Lobby texture cell margin");
+
+                Dictionary<string, Texture> textureCache = new Dictionary<string, Texture>(StringComparer.OrdinalIgnoreCase);
+                int checkedFonts = 0;
+                int checkedGlyphs = 0;
+                int failures = 0;
+
+                for (int fontIndex = 0; fontIndex < LobbyPhraseFontPaths.Length; fontIndex++)
+                {
+                    string fontPath = LobbyPhraseFontPaths[fontIndex];
+                    byte[] patchedFdt;
+                    byte[] cleanFdt;
+                    try
+                    {
+                        patchedFdt = _patchedFont.ReadFile(fontPath);
+                        cleanFdt = _cleanFont.ReadFile(fontPath);
+                    }
+                    catch (Exception ex)
+                    {
+                        failures = FailLobbyMultiTextureOnce(
+                            failures,
+                            "{0} could not be read for texture margin check: {1}",
+                            fontPath,
+                            ex.Message);
+                        continue;
+                    }
+
+                    int patchedFontTableOffset;
+                    uint patchedGlyphCount;
+                    int patchedGlyphStart;
+                    if (!TryGetFdtGlyphTable(patchedFdt, out patchedFontTableOffset, out patchedGlyphCount, out patchedGlyphStart))
+                    {
+                        failures = FailLobbyMultiTextureOnce(failures, "{0} patched FDT glyph table is invalid for texture margin check", fontPath);
+                        continue;
+                    }
+
+                    Dictionary<uint, FdtGlyphEntry> cleanGlyphs = ReadGlyphEntriesByUtf8(cleanFdt);
+                    checkedFonts++;
+                    for (int glyphIndex = 0; glyphIndex < patchedGlyphCount; glyphIndex++)
+                    {
+                        int glyphOffset = patchedGlyphStart + glyphIndex * FdtGlyphEntrySize;
+                        FdtGlyphEntry glyph = ReadGlyphEntry(patchedFdt, glyphOffset);
+                        if (glyph.Width == 0 || glyph.Height == 0)
+                        {
+                            continue;
+                        }
+
+                        string texturePath = ResolveFontTexturePath(fontPath, glyph.ImageIndex);
+                        if (string.IsNullOrEmpty(texturePath) || !_patchedFont.ContainsPath(texturePath))
+                        {
+                            continue;
+                        }
+
+                        Texture texture;
+                        if (!TryReadLobbyTexture(textureCache, texturePath, out texture))
+                        {
+                            continue;
+                        }
+
+                        bool touchesBottom = glyph.Y + glyph.Height >= texture.Height;
+                        if (!touchesBottom)
+                        {
+                            checkedGlyphs++;
+                            continue;
+                        }
+
+                        if (LobbyHangulCoverage.IsHighScaleTargetFontPath(fontPath))
+                        {
+                            checkedGlyphs++;
+                            continue;
+                        }
+
+                        uint utf8Value = Endian.ReadUInt32LE(patchedFdt, glyphOffset);
+                        FdtGlyphEntry cleanGlyph;
+                        bool cleanAlreadyTouched = cleanGlyphs.TryGetValue(utf8Value, out cleanGlyph) &&
+                            cleanGlyph.ImageIndex == glyph.ImageIndex &&
+                            cleanGlyph.Y + cleanGlyph.Height >= texture.Height;
+                        if (!cleanAlreadyTouched)
+                        {
+                            failures = FailLobbyMultiTextureOnce(
+                                failures,
+                                "{0} glyph#{1} image_index={2} cell {3},{4} {5}x{6} touches texture bottom edge {7} {8}x{9}; keep a 1px bottom margin for UI-resolution reload safety",
+                                fontPath,
+                                glyphIndex,
+                                glyph.ImageIndex,
+                                glyph.X,
+                                glyph.Y,
+                                glyph.Width,
+                                glyph.Height,
+                                texturePath,
+                                texture.Width,
+                                texture.Height);
+                        }
+
+                        checkedGlyphs++;
+                    }
+                }
+
+                if (failures == 0)
+                {
+                    Pass("lobby texture cells keep clean-safe edge margins: fonts={0}, glyphs={1}", checkedFonts, checkedGlyphs);
+                }
+            }
+
+            private static Dictionary<uint, FdtGlyphEntry> ReadGlyphEntriesByUtf8(byte[] fdt)
+            {
+                Dictionary<uint, FdtGlyphEntry> entries = new Dictionary<uint, FdtGlyphEntry>();
+                int fontTableOffset;
+                uint glyphCount;
+                int glyphStart;
+                if (!TryGetFdtGlyphTable(fdt, out fontTableOffset, out glyphCount, out glyphStart))
+                {
+                    return entries;
+                }
+
+                for (int glyphIndex = 0; glyphIndex < glyphCount; glyphIndex++)
+                {
+                    int glyphOffset = glyphStart + glyphIndex * FdtGlyphEntrySize;
+                    uint utf8Value = Endian.ReadUInt32LE(fdt, glyphOffset);
+                    if (!entries.ContainsKey(utf8Value))
+                    {
+                        entries.Add(utf8Value, ReadGlyphEntry(fdt, glyphOffset));
+                    }
+                }
+
+                return entries;
             }
 
         }

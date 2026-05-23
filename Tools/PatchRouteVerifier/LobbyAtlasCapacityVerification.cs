@@ -1921,11 +1921,18 @@ namespace FfxivKoreanPatch.PatchRouteVerifier
                     int h = Math.Max(1, height);
                     int stepX = Math.Max(1, w + 2);
                     int stepY = Math.Max(1, h + 2);
+                    int maxX = _width - w;
+                    int maxY = _height - h - 1;
+                    if (maxY < 0 || maxX < 0)
+                    {
+                        return false;
+                    }
+
                     for (int channel = 0; channel < _occupied.Length; channel++)
                     {
-                        for (int y = _height - h; y >= 0; y -= stepY)
+                        for (int y = maxY; y >= 0; y -= stepY)
                         {
-                            for (int x = 0; x <= _width - w; x += stepX)
+                            for (int x = 0; x <= maxX; x += stepX)
                             {
                                 if (!IsFree(channel, x, y, w, h))
                                 {
