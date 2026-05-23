@@ -39,7 +39,7 @@ namespace FfxivKoreanPatch.PatchRouteVerifier
                     VerifyLobbyScaleFontSourceRoute(
                         route,
                         IsVisualScaledLobbyTrumpGothic(route.TargetFontPath)
-                            ? CollectLobbyLargeLabelHangulCodepoints()
+                            ? CollectLobbyLargeLabelHangulCodepoints(route.TargetFontPath)
                             : codepoints);
                 }
             }
@@ -64,13 +64,18 @@ namespace FfxivKoreanPatch.PatchRouteVerifier
                 return values;
             }
 
-            private uint[] CollectLobbyLargeLabelHangulCodepoints()
+            private uint[] CollectLobbyLargeLabelHangulCodepoints(string fontPath)
             {
                 HashSet<uint> codepoints = new HashSet<uint>();
-                AddDynamicHangulCodepoints(codepoints, LobbyScaledHangulPhrases.StartScreenSystemSettings);
-                AddDynamicHangulCodepoints(codepoints, LobbyScaledHangulPhrases.HighResolutionUiScaleOptions);
-                AddDynamicHangulCodepoints(codepoints, LobbyScaledHangulPhrases.StartScreenSystemSettingsResultMessages);
-                AddDynamicHangulCodepoints(codepoints, LobbyScaledHangulPhrases.StartScreenMainMenu);
+                string normalized = (fontPath ?? string.Empty).Replace('\\', '/');
+                if (!string.Equals(normalized, "common/font/TrumpGothic_34_lobby.fdt", StringComparison.OrdinalIgnoreCase))
+                {
+                    AddDynamicHangulCodepoints(codepoints, LobbyScaledHangulPhrases.StartScreenSystemSettings);
+                    AddDynamicHangulCodepoints(codepoints, LobbyScaledHangulPhrases.HighResolutionUiScaleOptions);
+                    AddDynamicHangulCodepoints(codepoints, LobbyScaledHangulPhrases.StartScreenSystemSettingsResultMessages);
+                    AddDynamicHangulCodepoints(codepoints, LobbyScaledHangulPhrases.StartScreenMainMenu);
+                }
+
                 AddDynamicHangulCodepoints(codepoints, LobbyScaledHangulPhrases.CharacterSelectLargeLabels);
                 AddPatchedLobbyCoverageRangeHangulCodepoints(
                     codepoints,

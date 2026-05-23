@@ -7,8 +7,9 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
 
         public static readonly string[] TargetFontPaths = new string[]
         {
-            "common/font/Jupiter_16.fdt",
-            "common/font/Jupiter_20.fdt"
+            // Keep PvP routed fonts at the TTMP source scale. Earlier Jupiter
+            // downscaling made PvP profile labels thin and smaller than clean-like
+            // in-game UI text.
         };
 
         public static readonly string[] SheetNames = new string[]

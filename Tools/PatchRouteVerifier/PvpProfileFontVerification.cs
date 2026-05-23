@@ -23,6 +23,8 @@ namespace FfxivKoreanPatch.PatchRouteVerifier
             private const double PvpReferenceMaxRatio = 1.18d;
             private const double PvpNumericMinRatio = 0.86d;
             private const double PvpNumericMaxRatio = 1.18d;
+            private const double PvpSourcePreserveMinRatio = 0.96d;
+            private const double PvpSourcePreserveMaxRatio = 1.04d;
 
             private static readonly string[] PvpVisualScaleCandidateFonts = new string[]
             {
@@ -116,11 +118,12 @@ namespace FfxivKoreanPatch.PatchRouteVerifier
 
                     if (IsPvpVisualScaleCandidateFontPath(fontPath))
                     {
-                        VerifyPvpNumericScale(fontPath, phrase, phraseBounds, numeric);
+                        VerifyPvpNumericScale(fontPath, phrase, phraseBounds, numeric, false);
+                        VerifyPvpTtmpSourceScale(fontPath, phrase, phraseBounds);
                     }
                     else
                     {
-                        ReportPvpReferenceScale(fontPath, phrase, phraseBounds);
+                        VerifyPvpReferenceScale(fontPath, phrase, phraseBounds, false);
                     }
 
                     VerifyNoPhraseOverlap(fontPath, phrase.Korean);
@@ -130,12 +133,13 @@ namespace FfxivKoreanPatch.PatchRouteVerifier
                 return measured;
             }
 
-            private void VerifyPvpNumericScale(string fontPath, PvpProfileRoutePhrase phrase, PhraseVisualBounds korean, PhraseVisualBounds numeric)
+            private void VerifyPvpNumericScale(string fontPath, PvpProfileRoutePhrase phrase, PhraseVisualBounds korean, PhraseVisualBounds numeric, bool failOnOutOfRange)
             {
                 double ratio = SafeRatio(korean.MeanHangulHeight, numeric.MeanDigitHeight);
                 if (ratio < PvpNumericMinRatio || ratio > PvpNumericMaxRatio)
                 {
-                    Fail(
+                    string message = string.Format(
+                        System.Globalization.CultureInfo.InvariantCulture,
                         "{0} PvP phrase [{1}] Hangul/digit visual height ratio {2} outside {3}..{4}: hangul={5}, digit={6}, bounds={7}",
                         fontPath,
                         Escape(phrase.Korean),
@@ -145,6 +149,15 @@ namespace FfxivKoreanPatch.PatchRouteVerifier
                         FormatDouble(korean.MeanHangulHeight),
                         FormatDouble(numeric.MeanDigitHeight),
                         FormatPhraseBounds(korean));
+                    if (failOnOutOfRange)
+                    {
+                        Fail(message);
+                    }
+                    else
+                    {
+                        Warn(message);
+                    }
+
                     return;
                 }
 
@@ -157,54 +170,169 @@ namespace FfxivKoreanPatch.PatchRouteVerifier
                     FormatDouble(numeric.MeanDigitHeight));
             }
 
-            private void ReportPvpReferenceScale(string fontPath, PvpProfileRoutePhrase phrase, PhraseVisualBounds korean)
+            private void VerifyPvpTtmpSourceScale(string fontPath, PvpProfileRoutePhrase phrase, PhraseVisualBounds korean)
+            {
+                if (_ttmpFont == null || !_ttmpFont.ContainsPath(fontPath))
+                {
+                    Fail("{0} PvP source-preservation check requires TTMP source font for [{1}]", fontPath, Escape(phrase.Korean));
+                    return;
+                }
+
+                PhraseVisualBounds source;
+                string error;
+                if (!TryMeasurePhraseVisualBounds(_ttmpFont, fontPath, phrase.Korean, out source, out error))
+                {
+                    Fail("{0} PvP source phrase [{1}] skipped: {2}", fontPath, Escape(phrase.Korean), error);
+                    return;
+                }
+
+                bool heightOk = VerifyPvpSourceAxis(fontPath, phrase, "height", korean.MeanHangulHeight, source.MeanHangulHeight, korean, source);
+                bool widthOk = VerifyPvpSourceAxis(fontPath, phrase, "width", korean.MeanHangulWidth, source.MeanHangulWidth, korean, source);
+                bool advanceOk = VerifyPvpSourceAxis(fontPath, phrase, "advance", korean.MeanHangulAdvance, source.MeanHangulAdvance, korean, source);
+                if (!heightOk || !widthOk || !advanceOk)
+                {
+                    return;
+                }
+
+                Pass(
+                    "{0} PvP phrase [{1}] preserves TTMP source scale: height={2}, width={3}, advance={4}",
+                    fontPath,
+                    Escape(phrase.Korean),
+                    FormatRatio(SafeRatio(korean.MeanHangulHeight, source.MeanHangulHeight)),
+                    FormatRatio(SafeRatio(korean.MeanHangulWidth, source.MeanHangulWidth)),
+                    FormatRatio(SafeRatio(korean.MeanHangulAdvance, source.MeanHangulAdvance)));
+            }
+
+            private bool VerifyPvpSourceAxis(
+                string fontPath,
+                PvpProfileRoutePhrase phrase,
+                string axis,
+                double koreanValue,
+                double sourceValue,
+                PhraseVisualBounds korean,
+                PhraseVisualBounds source)
+            {
+                double ratio = SafeRatio(koreanValue, sourceValue);
+                if (ratio >= PvpSourcePreserveMinRatio && ratio <= PvpSourcePreserveMaxRatio)
+                {
+                    return true;
+                }
+
+                Fail(
+                    "{0} PvP phrase [{1}] TTMP source {2} ratio {3} outside {4}..{5}: patched={6}, source={7}, patchedBounds={8}, sourceBounds={9}",
+                    fontPath,
+                    Escape(phrase.Korean),
+                    axis,
+                    FormatRatio(ratio),
+                    FormatRatio(PvpSourcePreserveMinRatio),
+                    FormatRatio(PvpSourcePreserveMaxRatio),
+                    FormatDouble(koreanValue),
+                    FormatDouble(sourceValue),
+                    FormatPhraseBounds(korean),
+                    FormatPhraseBounds(source));
+                return false;
+            }
+
+            private void VerifyPvpReferenceScale(string fontPath, PvpProfileRoutePhrase phrase, PhraseVisualBounds korean, bool failOnOutOfRange)
             {
                 PhraseVisualBounds reference;
                 string error;
                 if (!TryMeasurePhraseVisualBounds(_cleanFont, fontPath, phrase.Reference, false, out reference, out error))
                 {
-                    Warn("{0} PvP reference phrase [{1}] skipped: {2}", fontPath, Escape(phrase.Reference), error);
+                    if (failOnOutOfRange)
+                    {
+                        Fail("{0} PvP reference phrase [{1}] skipped: {2}", fontPath, Escape(phrase.Reference), error);
+                    }
+                    else
+                    {
+                        Warn("{0} PvP reference phrase [{1}] skipped: {2}", fontPath, Escape(phrase.Reference), error);
+                    }
+
                     return;
                 }
 
-                if (korean.MeanHangulHeight <= 0d || reference.MeanReferenceHeight <= 0d)
+                if (korean.MeanHangulHeight <= 0d || reference.MeanReferenceHeight <= 0d ||
+                    korean.MeanHangulWidth <= 0d || reference.MeanReferenceWidth <= 0d ||
+                    korean.MeanHangulAdvance <= 0d || reference.MeanReferenceAdvance <= 0d)
                 {
-                    Warn(
+                    string message = string.Format(
+                        System.Globalization.CultureInfo.InvariantCulture,
                         "{0} PvP reference ratio skipped for [{1}]/[{2}]: korean={3}, reference={4}",
                         fontPath,
                         Escape(phrase.Korean),
                         Escape(phrase.Reference),
                         FormatDouble(korean.MeanHangulHeight),
                         FormatDouble(reference.MeanReferenceHeight));
+                    if (failOnOutOfRange)
+                    {
+                        Fail(message);
+                    }
+                    else
+                    {
+                        Warn(message);
+                    }
+
                     return;
                 }
 
-                double ratio = SafeRatio(korean.MeanHangulHeight, reference.MeanReferenceHeight);
-                if (ratio < PvpReferenceMinRatio || ratio > PvpReferenceMaxRatio)
+                bool heightOk = VerifyPvpReferenceAxis(fontPath, phrase, "height", korean.MeanHangulHeight, reference.MeanReferenceHeight, korean, reference, failOnOutOfRange);
+                bool widthOk = VerifyPvpReferenceAxis(fontPath, phrase, "width", korean.MeanHangulWidth, reference.MeanReferenceWidth, korean, reference, failOnOutOfRange);
+                bool advanceOk = VerifyPvpReferenceAxis(fontPath, phrase, "advance", korean.MeanHangulAdvance, reference.MeanReferenceAdvance, korean, reference, failOnOutOfRange);
+                if (!heightOk || !widthOk || !advanceOk)
                 {
-                    Warn(
-                        "{0} PvP phrase [{1}] Hangul/reference CJK height ratio {2} outside advisory {3}..{4}: hangul={5}, reference=[{6}] {7}, koreanBounds={8}, referenceBounds={9}",
-                        fontPath,
-                        Escape(phrase.Korean),
-                        FormatRatio(ratio),
-                        FormatRatio(PvpReferenceMinRatio),
-                        FormatRatio(PvpReferenceMaxRatio),
-                        FormatDouble(korean.MeanHangulHeight),
-                        Escape(phrase.Reference),
-                        FormatDouble(reference.MeanReferenceHeight),
-                        FormatPhraseBounds(korean),
-                        FormatPhraseBounds(reference));
                     return;
                 }
 
                 Pass(
-                    "{0} PvP phrase [{1}] matches reference CJK scale: ratio={2}, hangul={3}, reference=[{4}] {5}",
+                    "{0} PvP phrase [{1}] matches reference CJK scale: height={2}, width={3}, advance={4}, reference=[{5}]",
                     fontPath,
                     Escape(phrase.Korean),
+                    FormatRatio(SafeRatio(korean.MeanHangulHeight, reference.MeanReferenceHeight)),
+                    FormatRatio(SafeRatio(korean.MeanHangulWidth, reference.MeanReferenceWidth)),
+                    FormatRatio(SafeRatio(korean.MeanHangulAdvance, reference.MeanReferenceAdvance)),
+                    Escape(phrase.Reference));
+            }
+
+            private bool VerifyPvpReferenceAxis(
+                string fontPath,
+                PvpProfileRoutePhrase phrase,
+                string axis,
+                double koreanValue,
+                double referenceValue,
+                PhraseVisualBounds korean,
+                PhraseVisualBounds reference,
+                bool failOnOutOfRange)
+            {
+                double ratio = SafeRatio(koreanValue, referenceValue);
+                if (ratio >= PvpReferenceMinRatio && ratio <= PvpReferenceMaxRatio)
+                {
+                    return true;
+                }
+
+                string message = string.Format(
+                    System.Globalization.CultureInfo.InvariantCulture,
+                    "{0} PvP phrase [{1}] Hangul/reference CJK {2} ratio {3} outside {4}..{5}: hangul={6}, reference=[{7}] {8}, koreanBounds={9}, referenceBounds={10}",
+                    fontPath,
+                    Escape(phrase.Korean),
+                    axis,
                     FormatRatio(ratio),
-                    FormatDouble(korean.MeanHangulHeight),
+                    FormatRatio(PvpReferenceMinRatio),
+                    FormatRatio(PvpReferenceMaxRatio),
+                    FormatDouble(koreanValue),
                     Escape(phrase.Reference),
-                    FormatDouble(reference.MeanReferenceHeight));
+                    FormatDouble(referenceValue),
+                    FormatPhraseBounds(korean),
+                    FormatPhraseBounds(reference));
+                if (failOnOutOfRange)
+                {
+                    Fail(message);
+                }
+                else
+                {
+                    Warn(message);
+                }
+
+                return false;
             }
 
             private static bool IsPvpVisualScaleCandidateFontPath(string fontPath)

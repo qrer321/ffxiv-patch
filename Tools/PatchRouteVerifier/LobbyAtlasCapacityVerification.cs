@@ -1923,7 +1923,7 @@ namespace FfxivKoreanPatch.PatchRouteVerifier
                     int stepY = Math.Max(1, h + 2);
                     for (int channel = 0; channel < _occupied.Length; channel++)
                     {
-                        for (int y = _height - h - 1; y >= 0; y -= stepY)
+                        for (int y = _height - h; y >= 0; y -= stepY)
                         {
                             for (int x = 0; x <= _width - w; x += stepX)
                             {

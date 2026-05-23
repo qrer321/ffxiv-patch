@@ -751,6 +751,64 @@ namespace FfxivKoreanPatch.PatchRouteVerifier
                 }
             }
 
+            private bool TryMeasurePhraseVisualBounds(
+                TtmpFontPackage package,
+                string fontPath,
+                string phrase,
+                out PhraseVisualBounds bounds,
+                out string error)
+            {
+                bounds = new PhraseVisualBounds();
+                error = null;
+
+                try
+                {
+                    byte[] fdt = package.ReadFile(fontPath);
+                    Dictionary<string, int> kerningAdjustments = ReadKerningAdjustments(fdt);
+                    int cursor = 0;
+                    bool hasPreviousCodepoint = false;
+                    uint previousCodepoint = 0;
+                    for (int i = 0; i < phrase.Length; i++)
+                    {
+                        uint codepoint = ReadCodepoint(phrase, ref i);
+                        if (hasPreviousCodepoint)
+                        {
+                            cursor += GetKerningAdjustment(kerningAdjustments, previousCodepoint, codepoint);
+                        }
+
+                        if (IsPhraseLayoutSpace(codepoint))
+                        {
+                            cursor += PhraseLayoutSpaceAdvance;
+                            previousCodepoint = codepoint;
+                            hasPreviousCodepoint = true;
+                            continue;
+                        }
+
+                        FdtGlyphEntry glyph;
+                        if (!TryFindGlyph(fdt, codepoint, out glyph))
+                        {
+                            error = "missing U+" + codepoint.ToString("X4");
+                            return false;
+                        }
+
+                        GlyphCanvas canvas = RenderGlyph(package, fontPath, codepoint);
+                        GlyphStats stats = AnalyzeGlyph(canvas);
+                        bounds.AddGlyph(codepoint, cursor, glyph, stats, canvas.VisiblePixels);
+                        cursor += GetGlyphAdvance(glyph);
+                        previousCodepoint = codepoint;
+                        hasPreviousCodepoint = true;
+                    }
+
+                    bounds.Advance = cursor;
+                    return bounds.Glyphs > 0;
+                }
+                catch (Exception ex)
+                {
+                    error = ex.Message;
+                    return false;
+                }
+            }
+
             private string FormatPhraseGlyphBreakdown(string fontPath, string phrase)
             {
                 try

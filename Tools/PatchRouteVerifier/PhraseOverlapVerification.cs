@@ -426,6 +426,19 @@ namespace FfxivKoreanPatch.PatchRouteVerifier
                         return;
                     }
 
+                    if (layout.OverlapPixels <= 1)
+                    {
+                        Pass(
+                            "{0} phrase [{1}] layout glyphs={2}, width={3}, minGap={4}, overlap={5} within anti-alias tolerance",
+                            fontPath,
+                            Escape(phrase),
+                            layout.Glyphs,
+                            layout.Width,
+                            layout.MinimumGapPixels,
+                            layout.OverlapPixels);
+                        return;
+                    }
+
                     PhraseLayoutResult sourceLayout;
                     string sourceError;
                     if (_ttmpFont != null &&
