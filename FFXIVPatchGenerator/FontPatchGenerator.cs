@@ -407,26 +407,12 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
                     }
                 }
 
-                WriteSupplementalLobbyFontFiles(
-                    globalArchive,
-                    mutableIndex,
-                    mutableIndex2,
-                    datWriter,
-                    mpdStream,
-                    payloadsByPath,
-                    dialogueGlyphRepair,
-                    glyphRepair,
-                    texturePatches,
-                    lobbyHangulAllocationCache,
-                    actionDetailHighScaleHangulCodepoints,
-                    pvpProfileVisualScaleCodepoints,
-                    lobbyHangulCodepoints);
-
-                for (int i = 0; i < fontPackage.Payloads.Count; i++)
+                List<FontPayload> orderedPayloads = OrderFontPayloadsForPatch(fontPackage.Payloads);
+                for (int i = 0; i < orderedPayloads.Count; i++)
                 {
-                    FontPayload payload = fontPackage.Payloads[i];
+                    FontPayload payload = orderedPayloads[i];
                     string path = NormalizeGamePath(payload.FullPath);
-                    ProgressReporter.Report(90 + i * 8 / fontPackage.Payloads.Count, "Font patching " + (i + 1).ToString() + "/" + fontPackage.Payloads.Count.ToString());
+                    ProgressReporter.Report(90 + i * 8 / orderedPayloads.Count, "Font patching " + (i + 1).ToString() + "/" + orderedPayloads.Count.ToString());
 
                     if (!ShouldIncludeFontPath(path))
                     {
@@ -523,6 +509,21 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
                     _report.FontFilesPatched++;
                 }
 
+                WriteSupplementalLobbyFontFiles(
+                    globalArchive,
+                    mutableIndex,
+                    mutableIndex2,
+                    datWriter,
+                    mpdStream,
+                    payloadsByPath,
+                    dialogueGlyphRepair,
+                    glyphRepair,
+                    texturePatches,
+                    lobbyHangulAllocationCache,
+                    actionDetailHighScaleHangulCodepoints,
+                    pvpProfileVisualScaleCodepoints,
+                    lobbyHangulCodepoints);
+
                 foreach (KeyValuePair<string, List<FontTexturePatch>> pair in texturePatches)
                 {
                     if (pair.Value.Count > 0)
@@ -582,6 +583,80 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
                     }
                 }
             }
+        }
+
+        private static List<FontPayload> OrderFontPayloadsForPatch(List<FontPayload> payloads)
+        {
+            List<FontPayload> ordered = new List<FontPayload>();
+            if (payloads == null)
+            {
+                return ordered;
+            }
+
+            ordered.AddRange(payloads);
+            ordered.Sort(delegate(FontPayload left, FontPayload right)
+            {
+                int leftPriority = GetFontPayloadPatchPriority(left.FullPath);
+                int rightPriority = GetFontPayloadPatchPriority(right.FullPath);
+                int compare = leftPriority.CompareTo(rightPriority);
+                if (compare != 0)
+                {
+                    return compare;
+                }
+
+                return string.Compare(
+                    NormalizeGamePath(left.FullPath),
+                    NormalizeGamePath(right.FullPath),
+                    StringComparison.OrdinalIgnoreCase);
+            });
+
+            return ordered;
+        }
+
+        private static int GetFontPayloadPatchPriority(string path)
+        {
+            string normalized = NormalizeGamePath(path);
+            if (string.Equals(normalized, "common/font/AXIS_18_lobby.fdt", StringComparison.OrdinalIgnoreCase))
+            {
+                return 0;
+            }
+
+            if (string.Equals(normalized, "common/font/AXIS_12_lobby.fdt", StringComparison.OrdinalIgnoreCase) ||
+                string.Equals(normalized, "common/font/AXIS_14_lobby.fdt", StringComparison.OrdinalIgnoreCase))
+            {
+                return 1;
+            }
+
+            if (string.Equals(normalized, "common/font/MiedingerMid_18_lobby.fdt", StringComparison.OrdinalIgnoreCase) ||
+                string.Equals(normalized, "common/font/MiedingerMid_12_lobby.fdt", StringComparison.OrdinalIgnoreCase) ||
+                string.Equals(normalized, "common/font/MiedingerMid_14_lobby.fdt", StringComparison.OrdinalIgnoreCase) ||
+                string.Equals(normalized, "common/font/TrumpGothic_23_lobby.fdt", StringComparison.OrdinalIgnoreCase) ||
+                string.Equals(normalized, "common/font/TrumpGothic_34_lobby.fdt", StringComparison.OrdinalIgnoreCase))
+            {
+                return 2;
+            }
+
+            if (normalized.EndsWith("_lobby.fdt", StringComparison.OrdinalIgnoreCase))
+            {
+                return 3;
+            }
+
+            if (normalized.EndsWith(".fdt", StringComparison.OrdinalIgnoreCase))
+            {
+                return 4;
+            }
+
+            if (IsLobbyFontTexturePath(normalized))
+            {
+                return 5;
+            }
+
+            if (normalized.EndsWith(".tex", StringComparison.OrdinalIgnoreCase))
+            {
+                return 6;
+            }
+
+            return 7;
         }
 
         private void WriteSupplementalLobbyFontFiles(
@@ -1989,7 +2064,7 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
             string visualSourceFdtPath = hasVisualScaleSpec
                 ? visualScaleSpec.SourceFontPath
                 : baseSourceFdtPath;
-            string[] lobbyTextureCandidates = GetCleanLobbyTextureCandidates(globalArchive, normalizedPath);
+            string[] lobbyTextureCandidates = GetLobbyHangulTextureCandidates(globalArchive, normalizedPath);
             bool transactionalFontPatch = IsHighScaleLobbyFont(normalizedPath);
             FontGlyphRepairContext activeGlyphRepair = transactionalFontPatch
                 ? glyphRepair.Clone()
@@ -2407,6 +2482,13 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
                 {
                     if (directSourceAllocation)
                     {
+                        activeGlyphRepair.MarkOccupied(
+                            allocation.TexturePath,
+                            allocation.Cell.X,
+                            allocation.Cell.Y,
+                            allocation.Cell.ClearWidth,
+                            allocation.Cell.ClearHeight,
+                            allocation.Cell.Channel);
                         directSourceAllocations++;
                     }
 
@@ -2428,6 +2510,11 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
                     patch.SourceFdtPath = sourceFdtPath;
                     patch.SourceCodepoint = codepoint;
                     AddTexturePatch(activeTexturePatches, allocation.TexturePath, patch);
+                }
+
+                if (activeLobbyHangulAllocationCache != null)
+                {
+                    activeLobbyHangulAllocationCache.Add(allocationKey, sourceFdtPath, codepoint, allocation);
                 }
 
                 byte[] replacementEntry = new byte[FdtGlyphEntrySize];
@@ -2564,6 +2651,30 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
             }
 
             return false;
+        }
+
+        private static string[] GetLobbyHangulTextureCandidates(SqPackArchive globalArchive, string fdtPath)
+        {
+            string normalized = NormalizeGamePath(fdtPath);
+            if (ShouldAllowExtendedLobbyHangulTextureCandidates(normalized))
+            {
+                return GetPreferredLobbyTextureCandidates(normalized);
+            }
+
+            return GetCleanLobbyTextureCandidates(globalArchive, normalized);
+        }
+
+        private static bool ShouldAllowExtendedLobbyHangulTextureCandidates(string fdtPath)
+        {
+            string normalized = NormalizeGamePath(fdtPath);
+            return string.Equals(normalized, "common/font/AXIS_12_lobby.fdt", StringComparison.OrdinalIgnoreCase) ||
+                   string.Equals(normalized, "common/font/AXIS_14_lobby.fdt", StringComparison.OrdinalIgnoreCase) ||
+                   string.Equals(normalized, "common/font/AXIS_18_lobby.fdt", StringComparison.OrdinalIgnoreCase) ||
+                   string.Equals(normalized, "common/font/MiedingerMid_12_lobby.fdt", StringComparison.OrdinalIgnoreCase) ||
+                   string.Equals(normalized, "common/font/MiedingerMid_14_lobby.fdt", StringComparison.OrdinalIgnoreCase) ||
+                   string.Equals(normalized, "common/font/MiedingerMid_18_lobby.fdt", StringComparison.OrdinalIgnoreCase) ||
+                   string.Equals(normalized, "common/font/TrumpGothic_23_lobby.fdt", StringComparison.OrdinalIgnoreCase) ||
+                   string.Equals(normalized, "common/font/TrumpGothic_34_lobby.fdt", StringComparison.OrdinalIgnoreCase);
         }
 
         private static bool TryUseCleanEmptyLobbySourceCell(
@@ -5419,6 +5530,14 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
 
             if (IsSystemSettingsLobbyAxisFont(normalized))
             {
+                if (string.Equals(normalized, "common/font/AXIS_18_lobby.fdt", StringComparison.OrdinalIgnoreCase))
+                {
+                    return CreatePriorityCodepointArray(
+                        LobbyScaledHangulPhrases.StartScreenMainMenu,
+                        sets.StartMainMenu,
+                        sets.SystemSettings);
+                }
+
                 return sets.SystemSettings;
             }
 
@@ -8222,6 +8341,18 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
             public bool TryGetAllocator(string texturePath, out FontAtlasAllocator allocator)
             {
                 return _allocators.TryGetValue(NormalizeGamePath(texturePath), out allocator);
+            }
+
+            public bool MarkOccupied(string texturePath, int x, int y, int width, int height, int channel)
+            {
+                FontAtlasAllocator allocator;
+                if (!_allocators.TryGetValue(NormalizeGamePath(texturePath), out allocator))
+                {
+                    return false;
+                }
+
+                allocator.MarkOccupied(x, y, width, height, channel);
+                return true;
             }
 
             public bool TryAllocate(string texturePath, int width, int height, out AllocatedFontGlyphCell cell, bool allowBottomEdge = true)

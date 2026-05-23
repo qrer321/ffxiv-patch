@@ -85,7 +85,8 @@ namespace FfxivKoreanPatch.PatchRouteVerifier
                         }
 
                         if (cleanTexturePages != null &&
-                            !cleanTexturePages.Contains(texturePath))
+                            !cleanTexturePages.Contains(texturePath) &&
+                            !IsAllowedExtendedLobbyHangulTextureRoute(fontPath, texturePath, glyph.ImageIndex))
                         {
                             failures = FailLobbyMultiTextureOnce(
                                 failures,
@@ -207,6 +208,25 @@ namespace FfxivKoreanPatch.PatchRouteVerifier
                 }
 
                 return pages;
+            }
+
+            private static bool IsAllowedExtendedLobbyHangulTextureRoute(string fontPath, string texturePath, int imageIndex)
+            {
+                string normalized = (fontPath ?? string.Empty).Replace('\\', '/');
+                bool extendedLobbyHangul =
+                    string.Equals(normalized, "common/font/AXIS_12_lobby.fdt", StringComparison.OrdinalIgnoreCase) ||
+                    string.Equals(normalized, "common/font/AXIS_14_lobby.fdt", StringComparison.OrdinalIgnoreCase) ||
+                    string.Equals(normalized, "common/font/AXIS_18_lobby.fdt", StringComparison.OrdinalIgnoreCase) ||
+                    string.Equals(normalized, "common/font/MiedingerMid_12_lobby.fdt", StringComparison.OrdinalIgnoreCase) ||
+                    string.Equals(normalized, "common/font/MiedingerMid_14_lobby.fdt", StringComparison.OrdinalIgnoreCase) ||
+                    string.Equals(normalized, "common/font/MiedingerMid_18_lobby.fdt", StringComparison.OrdinalIgnoreCase) ||
+                    string.Equals(normalized, "common/font/TrumpGothic_23_lobby.fdt", StringComparison.OrdinalIgnoreCase) ||
+                    string.Equals(normalized, "common/font/TrumpGothic_34_lobby.fdt", StringComparison.OrdinalIgnoreCase);
+                return extendedLobbyHangul &&
+                       imageIndex >= 0 &&
+                       imageIndex < 24 &&
+                       IsLobbyTexturePath(texturePath) &&
+                       !IsClientUnsafeLobbyTexturePath(texturePath);
             }
 
             private static string FormatLobbyTexturePageSet(HashSet<string> pages)

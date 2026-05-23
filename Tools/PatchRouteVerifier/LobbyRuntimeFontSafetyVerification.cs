@@ -78,14 +78,17 @@ namespace FfxivKoreanPatch.PatchRouteVerifier
                         }
 
                         string texturePath = ResolveFontTexturePath(fontPath, glyph.ImageIndex);
-                        if (!IsLobbyTexturePath(texturePath))
+                        if (!IsLobbyTexturePath(texturePath) ||
+                            string.Equals(texturePath, "common/font/font_lobby7.tex", StringComparison.OrdinalIgnoreCase) ||
+                            glyph.ImageIndex >= 24)
                         {
                             failures = FailLobbyRuntimeSafetyOnce(
                                 failures,
-                                "{0} U+{1:X4} patched Hangul glyph uses non-lobby texture route image_index={2}",
+                                "{0} U+{1:X4} patched Hangul glyph uses unsafe lobby texture route image_index={2}, texture={3}",
                                 fontPath,
                                 codepoint,
-                                glyph.ImageIndex);
+                                glyph.ImageIndex,
+                                texturePath ?? "n/a");
                             continue;
                         }
 
