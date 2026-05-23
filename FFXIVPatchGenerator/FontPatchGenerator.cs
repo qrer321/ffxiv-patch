@@ -4112,6 +4112,11 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
                 return 0;
             }
 
+            if (IsLobbyFontPath(path))
+            {
+                return 0;
+            }
+
             return UpsertKerningEntries(
                 ref targetFdt,
                 CollectStartScreenKerningPairs(route),

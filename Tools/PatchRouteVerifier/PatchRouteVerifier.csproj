@@ -104,6 +104,7 @@
     <Compile Include="LobbyScaleFontSourceVerification.cs" />
     <Compile Include="LobbyLargeLabelScaleVerification.cs" />
     <Compile Include="LobbySourceCellConflictVerification.cs" />
+    <Compile Include="LobbyRuntimeFontSafetyVerification.cs" />
     <Compile Include="LobbyTtmpAsciiDeltaVerification.cs" />
     <Compile Include="LobbyTtmpPayloadVerification.cs" />
     <Compile Include="NumericGlyphVerification.cs" />
