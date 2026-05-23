@@ -19,7 +19,6 @@ namespace FfxivKoreanPatch.PatchRouteVerifier
                 int checkedFonts = 0;
                 int checkedGlyphs = 0;
                 int failures = 0;
-                int pageCeilingWarnings = 0;
 
                 for (int fontIndex = 0; fontIndex < LobbyPhraseFontPaths.Length; fontIndex++)
                 {
@@ -88,17 +87,14 @@ namespace FfxivKoreanPatch.PatchRouteVerifier
                         if (cleanTexturePages != null &&
                             !cleanTexturePages.Contains(texturePath))
                         {
-                            if (pageCeilingWarnings < 20)
-                            {
-                                Warn(
-                                "{0} glyph#{1} image_index={2} references {3}, but clean {0} never references that lobby texture page; keep each lobby FDT inside its clean page set for non-4K UI-resolution boot safety",
+                            failures = FailLobbyMultiTextureOnce(
+                                failures,
+                                "{0} glyph#{1} image_index={2} references {3}, but clean {0} never references that lobby texture page (clean pages: {4}); keep each lobby FDT inside its clean page set for non-4K UI-resolution boot safety",
                                 fontPath,
                                 glyphIndex,
                                 glyph.ImageIndex,
-                                texturePath);
-                            }
-
-                            pageCeilingWarnings++;
+                                texturePath,
+                                FormatLobbyTexturePageSet(cleanTexturePages));
                         }
 
                         referencedTextures.Add(texturePath);
@@ -211,6 +207,19 @@ namespace FfxivKoreanPatch.PatchRouteVerifier
                 }
 
                 return pages;
+            }
+
+            private static string FormatLobbyTexturePageSet(HashSet<string> pages)
+            {
+                if (pages == null || pages.Count == 0)
+                {
+                    return "<none>";
+                }
+
+                string[] values = new string[pages.Count];
+                pages.CopyTo(values);
+                Array.Sort(values, StringComparer.OrdinalIgnoreCase);
+                return string.Join(",", values);
             }
 
             private bool TryReadLobbyTexture(Dictionary<string, Texture> cache, string texturePath, out Texture texture)

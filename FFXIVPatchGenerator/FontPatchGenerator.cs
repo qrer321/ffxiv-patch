@@ -1957,6 +1957,18 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
             string visualSourceFdtPath = hasVisualScaleSpec
                 ? visualScaleSpec.SourceFontPath
                 : baseSourceFdtPath;
+            string[] lobbyTextureCandidates = GetCleanLobbyTextureCandidates(globalArchive, normalizedPath);
+            bool transactionalFontPatch = IsHighScaleLobbyFont(normalizedPath);
+            FontGlyphRepairContext activeGlyphRepair = transactionalFontPatch
+                ? glyphRepair.Clone()
+                : glyphRepair;
+            LobbyHangulGlyphAllocationCache activeLobbyHangulAllocationCache =
+                transactionalFontPatch && lobbyHangulAllocationCache != null
+                    ? lobbyHangulAllocationCache.Clone()
+                    : lobbyHangulAllocationCache;
+            Dictionary<string, List<FontTexturePatch>> activeTexturePatches = transactionalFontPatch
+                ? new Dictionary<string, List<FontTexturePatch>>(StringComparer.OrdinalIgnoreCase)
+                : texturePatches;
 
             byte[] baseSourceFdt = TryLoadTtmpStandardPayload(payloadsByPath, mpdStream, baseSourceFdtPath);
             if (baseSourceFdt == null)
@@ -2260,10 +2272,10 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
                     hasAllocation = true;
                     addTexturePatch = true;
                 }
-                else if (lobbyHangulAllocationCache != null &&
-                    lobbyHangulAllocationCache.TryGet(allocationKey, out allocation))
+                else if (activeLobbyHangulAllocationCache != null &&
+                    activeLobbyHangulAllocationCache.TryGet(allocationKey, out allocation))
                 {
-                    hasAllocation = true;
+                    hasAllocation = LobbyTextureCandidateContains(lobbyTextureCandidates, allocation.TexturePath);
                 }
 
                 if (!hasAllocation)
@@ -2271,8 +2283,9 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
                     AllocatedFontGlyphCell allocatedCell;
                     string allocatedTexturePath;
                     if (!TryAllocateLobbyHangulGlyphCell(
-                        glyphRepair,
+                        activeGlyphRepair,
                         normalizedPath,
+                        lobbyTextureCandidates,
                         patchClearWidth,
                         patchClearHeight,
                         out allocatedTexturePath,
@@ -2281,7 +2294,7 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
                         byte[] fallbackEntryBytes;
                         LobbyHangulGlyphAllocation fallbackAllocation;
                         if (IsHighScaleLobbyFont(normalizedPath) &&
-                            lobbyHangulAllocationCache != null &&
+                            activeLobbyHangulAllocationCache != null &&
                             TryGetHighScaleLobbyFallbackEntry(
                                 payloadsByPath,
                                 mpdStream,
@@ -2289,10 +2302,11 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
                                 ref highScaleFallbackSourceLoaded,
                                 ref highScaleFallbackSourceEntries,
                                 out fallbackEntryBytes) &&
-                            lobbyHangulAllocationCache.TryGetBySourceCodepoint(
+                            activeLobbyHangulAllocationCache.TryGetBySourceCodepoint(
                                 HighScaleLobbyFallbackSourceFontPath,
                                 codepoint,
-                                out fallbackAllocation))
+                                out fallbackAllocation) &&
+                            LobbyTextureCandidateContains(lobbyTextureCandidates, fallbackAllocation.TexturePath))
                         {
                             sourceEntryBytes = fallbackEntryBytes;
                             sourceEntry = ReadFdtGlyphEntry(sourceEntryBytes, 0);
@@ -2319,9 +2333,9 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
                             allocatedCell,
                             sourceRegion.LeftPadding,
                             sourceRegion.TopPadding);
-                        if (lobbyHangulAllocationCache != null)
+                        if (activeLobbyHangulAllocationCache != null)
                         {
-                            lobbyHangulAllocationCache.Add(allocationKey, sourceFdtPath, codepoint, allocation);
+                            activeLobbyHangulAllocationCache.Add(allocationKey, sourceFdtPath, codepoint, allocation);
                         }
 
                         addTexturePatch = true;
@@ -2347,7 +2361,7 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
                     patch.SourceAlpha = patchAlpha;
                     patch.SourceFdtPath = sourceFdtPath;
                     patch.SourceCodepoint = codepoint;
-                    AddTexturePatch(texturePatches, allocation.TexturePath, patch);
+                    AddTexturePatch(activeTexturePatches, allocation.TexturePath, patch);
                 }
 
                 byte[] replacementEntry = new byte[FdtGlyphEntrySize];
@@ -2384,6 +2398,28 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
 
             if (changed > 0)
             {
+                if (transactionalFontPatch && allocationFailures > 0)
+                {
+                    AddLimitedWarning(
+                        "Skipped partial high-scale lobby Hangul glyphs for " +
+                        normalizedPath +
+                        ": " +
+                        allocationFailures.ToString() +
+                        " allocation failures");
+                    return 0;
+                }
+
+                if (transactionalFontPatch)
+                {
+                    glyphRepair.CopyFrom(activeGlyphRepair);
+                    if (lobbyHangulAllocationCache != null && activeLobbyHangulAllocationCache != null)
+                    {
+                        lobbyHangulAllocationCache.CopyFrom(activeLobbyHangulAllocationCache);
+                    }
+
+                    MergeTexturePatches(texturePatches, activeTexturePatches);
+                }
+
                 targetFdt = RewriteFdtGlyphTable(targetFdt, fontTableOffset, glyphStart, glyphEnd, targetEntries);
             }
 
@@ -2433,6 +2469,25 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
 
             return fallbackSourceEntries != null &&
                    fallbackSourceEntries.TryGetValue(utf8Value, out entryBytes);
+        }
+
+        private static bool LobbyTextureCandidateContains(string[] candidates, string texturePath)
+        {
+            if (candidates == null || candidates.Length == 0 || string.IsNullOrEmpty(texturePath))
+            {
+                return false;
+            }
+
+            string normalized = NormalizeGamePath(texturePath);
+            for (int i = 0; i < candidates.Length; i++)
+            {
+                if (string.Equals(NormalizeGamePath(candidates[i]), normalized, StringComparison.OrdinalIgnoreCase))
+                {
+                    return true;
+                }
+            }
+
+            return false;
         }
 
         private static readonly uint[] ActionDetailNumericCodepoints = new uint[]
@@ -2971,6 +3026,7 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
         private static bool TryAllocateLobbyHangulGlyphCell(
             FontGlyphRepairContext glyphRepair,
             string fdtPath,
+            string[] textureCandidates,
             int width,
             int height,
             out string allocatedTexturePath,
@@ -2984,7 +3040,9 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
                 return false;
             }
 
-            string[] preferredCandidates = GetPreferredLobbyTextureCandidates(normalizedFdtPath);
+            string[] preferredCandidates = textureCandidates == null || textureCandidates.Length == 0
+                ? GetPreferredLobbyTextureCandidates(normalizedFdtPath)
+                : textureCandidates;
             return TryAllocateFromCandidateTextures(
                 glyphRepair,
                 preferredCandidates,
@@ -2993,6 +3051,66 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
                 out allocatedTexturePath,
                 out allocatedCell,
                 allowBottomEdge: IsHighScaleLobbyFont(normalizedFdtPath));
+        }
+
+        private static string[] GetCleanLobbyTextureCandidates(SqPackArchive globalArchive, string fdtPath)
+        {
+            string normalizedFdtPath = NormalizeGamePath(fdtPath);
+            if (globalArchive == null ||
+                normalizedFdtPath.IndexOf("_lobby.fdt", StringComparison.OrdinalIgnoreCase) < 0)
+            {
+                return GetPreferredLobbyTextureCandidates(normalizedFdtPath);
+            }
+
+            byte[] cleanFdt = TryReadArchiveStandardFile(globalArchive, normalizedFdtPath);
+            if (cleanFdt == null)
+            {
+                return GetPreferredLobbyTextureCandidates(normalizedFdtPath);
+            }
+
+            int fontTableOffset;
+            uint glyphCount;
+            int glyphStart;
+            if (!TryGetFdtGlyphTable(cleanFdt, out fontTableOffset, out glyphCount, out glyphStart))
+            {
+                return GetPreferredLobbyTextureCandidates(normalizedFdtPath);
+            }
+
+            HashSet<string> cleanPages = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            for (int glyphIndex = 0; glyphIndex < glyphCount; glyphIndex++)
+            {
+                FdtGlyphEntry glyph = ReadFdtGlyphEntry(cleanFdt, glyphStart + glyphIndex * FdtGlyphEntrySize);
+                if (glyph.Width == 0 || glyph.Height == 0)
+                {
+                    continue;
+                }
+
+                string texturePath = ResolveFontTexturePath(normalizedFdtPath, glyph.ImageIndex);
+                if (IsLobbyFontTexturePath(texturePath))
+                {
+                    cleanPages.Add(NormalizeGamePath(texturePath));
+                }
+            }
+
+            if (cleanPages.Count == 0)
+            {
+                return GetPreferredLobbyTextureCandidates(normalizedFdtPath);
+            }
+
+            string[] preferred = GetPreferredLobbyTextureCandidates(normalizedFdtPath);
+            List<string> filtered = new List<string>();
+            for (int i = 0; i < preferred.Length; i++)
+            {
+                string candidate = NormalizeGamePath(preferred[i]);
+                if (cleanPages.Contains(candidate))
+                {
+                    filtered.Add(candidate);
+                }
+            }
+
+            return filtered.Count == 0
+                ? GetPreferredLobbyTextureCandidates(normalizedFdtPath)
+                : filtered.ToArray();
         }
 
         private static string[] GetPreferredLobbyTextureCandidates(string fdtPath)
@@ -4663,13 +4781,43 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
         private static void AddTexturePatch(Dictionary<string, List<FontTexturePatch>> patchesByPath, string texturePath, FontTexturePatch patch)
         {
             List<FontTexturePatch> patches;
-            if (!patchesByPath.TryGetValue(texturePath, out patches))
+            string normalizedPath = NormalizeGamePath(texturePath);
+            if (!patchesByPath.TryGetValue(normalizedPath, out patches))
             {
                 patches = new List<FontTexturePatch>();
-                patchesByPath.Add(texturePath, patches);
+                patchesByPath.Add(normalizedPath, patches);
             }
 
             patches.Add(patch);
+        }
+
+        private static void MergeTexturePatches(
+            Dictionary<string, List<FontTexturePatch>> target,
+            Dictionary<string, List<FontTexturePatch>> source)
+        {
+            if (target == null || source == null || source.Count == 0)
+            {
+                return;
+            }
+
+            foreach (KeyValuePair<string, List<FontTexturePatch>> pair in source)
+            {
+                List<FontTexturePatch> patches = pair.Value;
+                if (patches == null || patches.Count == 0)
+                {
+                    continue;
+                }
+
+                List<FontTexturePatch> targetPatches;
+                string normalizedPath = NormalizeGamePath(pair.Key);
+                if (!target.TryGetValue(normalizedPath, out targetPatches))
+                {
+                    targetPatches = new List<FontTexturePatch>();
+                    target.Add(normalizedPath, targetPatches);
+                }
+
+                targetPatches.AddRange(patches);
+            }
         }
 
         private static int AddPartyListSelfMarkerAliasRange(
@@ -4895,7 +5043,7 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
                 LobbyHangulCoverage.Rows,
                 LobbyScaledHangulPhrases.All,
                 "lobby all-route glyph coverage");
-            sets.SystemSettings = CreateLobbyHangulCodepoints(
+            uint[] systemSettingsRaw = CreateLobbyHangulCodepoints(
                 koreaSqpack,
                 LobbyHangulCoverage.SystemSettingsRows,
                 CombinePhraseGroups(
@@ -4903,6 +5051,12 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
                     LobbyScaledHangulPhrases.HighResolutionUiScaleOptions,
                     LobbyScaledHangulPhrases.StartScreenSystemSettingsResultMessages),
                 "lobby system-settings glyph coverage");
+            sets.SystemSettings = CreatePriorityCodepointArray(
+                CombinePhraseGroups(
+                    LobbyScaledHangulPhrases.StartScreenSystemSettingsResultMessages,
+                    LobbyScaledHangulPhrases.HighResolutionUiScaleOptions,
+                    LobbyScaledHangulPhrases.StartScreenSystemSettings),
+                systemSettingsRaw);
             sets.CharacterSelect = CreateLobbyHangulCodepoints(
                 koreaSqpack,
                 LobbyHangulCoverage.CharacterSelectRows,
@@ -4936,7 +5090,7 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
                     LobbyScaledHangulPhrases.StartScreenSystemSettings,
                     LobbyScaledHangulPhrases.StartScreenMainMenu),
                 sets.SystemSettings,
-                sets.CharacterSelect,
+                sets.LargeLabels,
                 sets.StartMainMenu);
             Console.WriteLine(
                 "Lobby Hangul route sets: all={0}, system={1}, character={2}, main-menu={3}, system+character={4}, high-scale={5}",
@@ -4995,7 +5149,17 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
 
             if (IsLobbyLargeLabelVisualScaleFont(normalized))
             {
-                return sets.SystemAndCharacter;
+                if (string.Equals(normalized, "common/font/TrumpGothic_34_lobby.fdt", StringComparison.OrdinalIgnoreCase))
+                {
+                    return sets.LargeCharacterLabels;
+                }
+
+                return sets.LargeLabels;
+            }
+
+            if (IsSystemSettingsLobbyAxisFont(normalized))
+            {
+                return sets.SystemSettings;
             }
 
             if (IsCharacterSelectOnlyLobbyFont(normalized))
@@ -5051,6 +5215,14 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
             return string.Equals(normalized, "common/font/MiedingerMid_12_lobby.fdt", StringComparison.OrdinalIgnoreCase) ||
                    string.Equals(normalized, "common/font/MiedingerMid_14_lobby.fdt", StringComparison.OrdinalIgnoreCase) ||
                    string.Equals(normalized, "common/font/TrumpGothic_34_lobby.fdt", StringComparison.OrdinalIgnoreCase);
+        }
+
+        private static bool IsSystemSettingsLobbyAxisFont(string path)
+        {
+            string normalized = NormalizeGamePath(path);
+            return string.Equals(normalized, "common/font/AXIS_12_lobby.fdt", StringComparison.OrdinalIgnoreCase) ||
+                   string.Equals(normalized, "common/font/AXIS_14_lobby.fdt", StringComparison.OrdinalIgnoreCase) ||
+                   string.Equals(normalized, "common/font/AXIS_18_lobby.fdt", StringComparison.OrdinalIgnoreCase);
         }
 
         private static bool IsHighScaleLobbyFont(string path)
@@ -7509,6 +7681,30 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
                 return cell.ImageIndex >= 0;
             }
 
+            public FontGlyphRepairContext Clone()
+            {
+                FontGlyphRepairContext clone = new FontGlyphRepairContext();
+                foreach (KeyValuePair<string, FontAtlasAllocator> pair in _allocators)
+                {
+                    clone._allocators.Add(pair.Key, pair.Value.Clone());
+                }
+
+                return clone;
+            }
+
+            public void CopyFrom(FontGlyphRepairContext source)
+            {
+                if (source == null)
+                {
+                    return;
+                }
+
+                _allocators.Clear();
+                foreach (KeyValuePair<string, FontAtlasAllocator> pair in source._allocators)
+                {
+                    _allocators.Add(pair.Key, pair.Value.Clone());
+                }
+            }
         }
 
         private sealed class LobbyHangulCodepointSets
@@ -7557,6 +7753,42 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
                 if (!_allocationsBySourceCodepoint.ContainsKey(sourceKey))
                 {
                     _allocationsBySourceCodepoint.Add(sourceKey, allocation);
+                }
+            }
+
+            public LobbyHangulGlyphAllocationCache Clone()
+            {
+                LobbyHangulGlyphAllocationCache clone = new LobbyHangulGlyphAllocationCache();
+                foreach (KeyValuePair<string, LobbyHangulGlyphAllocation> pair in _allocations)
+                {
+                    clone._allocations.Add(pair.Key, pair.Value);
+                }
+
+                foreach (KeyValuePair<string, LobbyHangulGlyphAllocation> pair in _allocationsBySourceCodepoint)
+                {
+                    clone._allocationsBySourceCodepoint.Add(pair.Key, pair.Value);
+                }
+
+                return clone;
+            }
+
+            public void CopyFrom(LobbyHangulGlyphAllocationCache source)
+            {
+                if (source == null)
+                {
+                    return;
+                }
+
+                _allocations.Clear();
+                foreach (KeyValuePair<string, LobbyHangulGlyphAllocation> pair in source._allocations)
+                {
+                    _allocations.Add(pair.Key, pair.Value);
+                }
+
+                _allocationsBySourceCodepoint.Clear();
+                foreach (KeyValuePair<string, LobbyHangulGlyphAllocation> pair in source._allocationsBySourceCodepoint)
+                {
+                    _allocationsBySourceCodepoint.Add(pair.Key, pair.Value);
                 }
             }
 
@@ -7700,6 +7932,41 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
                         p++;
                     }
                 }
+            }
+
+            private FontAtlasAllocator(
+                FontTexture texture,
+                ulong[][][] occupiedBits,
+                Dictionary<ulong, int> denseScanCursors,
+                int wordsPerRow)
+            {
+                _texture = texture;
+                _occupiedBits = occupiedBits;
+                _denseScanCursors = denseScanCursors;
+                _wordsPerRow = wordsPerRow;
+            }
+
+            public FontAtlasAllocator Clone()
+            {
+                ulong[][][] occupiedBits = new ulong[_occupiedBits.Length][][];
+                for (int channel = 0; channel < _occupiedBits.Length; channel++)
+                {
+                    occupiedBits[channel] = new ulong[_occupiedBits[channel].Length][];
+                    for (int y = 0; y < _occupiedBits[channel].Length; y++)
+                    {
+                        occupiedBits[channel][y] = new ulong[_occupiedBits[channel][y].Length];
+                        Array.Copy(
+                            _occupiedBits[channel][y],
+                            occupiedBits[channel][y],
+                            _occupiedBits[channel][y].Length);
+                    }
+                }
+
+                return new FontAtlasAllocator(
+                    _texture,
+                    occupiedBits,
+                    new Dictionary<ulong, int>(_denseScanCursors),
+                    _wordsPerRow);
             }
 
             public void MarkOccupied(int x, int y, int width, int height, int channel)

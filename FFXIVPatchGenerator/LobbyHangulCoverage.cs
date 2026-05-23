@@ -41,23 +41,13 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
             "Tribe",
             "GuardianDeity");
 
-        public static readonly LobbyHangulCoverageRowSpec[] StartMainMenuRows = CreateFullSheetRows(
-            "Lobby",
-            "Error",
-            "Addon",
-            "ClassJob",
-            "Race",
-            "Tribe",
-            "GuardianDeity");
+        public static readonly LobbyHangulCoverageRowSpec[] StartMainMenuRows = new LobbyHangulCoverageRowSpec[0];
 
-        public static readonly LobbyHangulCoverageRowSpec[] SystemSettingsRows = CreateFullSheetRows(
-            "Lobby",
-            "Error",
-            "Addon",
-            "ClassJob",
-            "Race",
-            "Tribe",
-            "GuardianDeity");
+        public static readonly LobbyHangulCoverageRowSpec[] SystemSettingsRows = new LobbyHangulCoverageRowSpec[]
+        {
+            new LobbyHangulCoverageRowSpec("Addon", 4000, 4200),
+            new LobbyHangulCoverageRowSpec("Addon", 8683, 8722)
+        };
 
         public static readonly LobbyHangulCoverageRowSpec[] CharacterSelectRows = CreateFullSheetRows(
             "Lobby",

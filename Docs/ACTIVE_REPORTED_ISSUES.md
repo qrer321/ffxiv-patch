@@ -38,9 +38,18 @@
 - [ ] Lobby boot crash when UI resolution is not 4K
   - Reported: 2026-05-23.
   - Symptom: game can crash on boot when the system UI resolution setting is set to a non-4K value. This is not the same as UI scale.
-  - Current code-level mitigation: newly allocated non-high-scale lobby glyphs must not touch the bottom edge of a lobby texture. High-scale lobby supplemental fonts are allowed to keep the old edge behavior so their large source glyphs do not fall back to small `AXIS_18_lobby` cells.
-  - Verification: `.tmp\lobby-uires-safe-ja-r6` passes `lobby-texture-cell-margin,lobby-multitexture-font-set,lobby-coverage-glyphs,lobby-scale-font-sources`, focused lobby/PvP/in-game regressions, and broad lobby capacity checks with `Verifier failures: 0`.
-  - Caveat: `lobby-multitexture-font-set` still warns when a lobby FDT references a clean-unused page. Keep that as a diagnostic warning for now; making it a hard failure breaks full lobby coverage. Do not mark the live boot crash fixed until the user confirms the client result.
+  - 2026-05-23 live rejection: the user still reproduced the boot crash and provided a call stack through `Component::GUI::AtkFontAnalyzerRender` / `AtkTextNodeRenderer.Draw`. The previous `.tmp\lobby-uires-safe-ja-r6` verifier was insufficient.
+  - Current code-level mitigation: each lobby FDT must keep new glyph routes inside the same lobby texture pages that the clean FDT already referenced. Clean-unused lobby texture page references are now hard failures, not warnings. Allocation-cache reuse and high-scale fallback reuse must also pass the target FDT clean-page check.
+  - Additional guard: high-scale lobby FDT changes are transactional. If a high-scale FDT cannot allocate the complete requested glyph set inside its clean page set, the FDT edit, atlas allocation, cache entries, and texture patches are discarded rather than leaving partial large glyphs that can mix with fallback glyphs.
+  - Verification: `.tmp\lobby-system-priority-ja-r1` passes `lobby-multitexture-font-set,lobby-texture-cell-margin` and the confirmed in-game regression set `combat-flytext-damage-glyphs,third-party-game-font-safety,party-list-self-marker,action-detail-scale-layouts,pvp-profile-font-routes`.
+  - Remaining: do not mark the live boot crash fixed until the user confirms the client result. Also do not reintroduce `font_lobby7.tex`, lobby `image_index >= 24`, or clean-unused page reuse to regain coverage.
+
+- [ ] Lobby high-UI-scale font coverage under clean-page safety
+  - Reported: 2026-05-23.
+  - Symptom: lobby `시스템 설정` remains visually wrong at 150%+, and character-select 150%+ text is not fully handled.
+  - Current finding: enforcing clean-page safety prevents the previous full-coverage route. `Jupiter_46_lobby`, `Jupiter_90_lobby`, `Meidinger_40_lobby`, `MiedingerMid_36_lobby`, and `TrumpGothic_68_lobby` cannot fit the 327 high-scale glyph set inside their clean page sets; partial edits are now skipped to avoid mixed-size glyph fallback.
+  - Current partial mitigation: system-settings glyph ordering now prioritizes the reported result/high-resolution phrases before broader sheet-derived glyphs, so limited low-scale lobby pages cover the most visible phrases first.
+  - Verification state: `.tmp\lobby-system-priority-ja-r1` still fails `lobby-scale-font-sources` and one `lobby-render-snapshots` route because `AXIS_12_lobby`/`AXIS_14_lobby` compete for the same limited clean page capacity. Treat this as open. The next fix should be a route-level or clean-page-compatible design, not added pages or partial high-scale glyph injection.
 
 - [x] Low-scale party-list/chat party number marker contamination
   - Reported: 2026-05-22
