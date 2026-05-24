@@ -6073,7 +6073,7 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
             {
                 if (string.Equals(normalized, "common/font/TrumpGothic_34_lobby.fdt", StringComparison.OrdinalIgnoreCase))
                 {
-                    return sets.LargeCharacterLabels;
+                    return sets.LargeLabels;
                 }
 
                 return sets.SystemAndCharacter;
@@ -6110,11 +6110,6 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
             if (IsHighScaleLobbyFont(normalized))
             {
                 return sets.HighScale;
-            }
-
-            if (string.Equals(normalized, "common/font/TrumpGothic_34_lobby.fdt", StringComparison.OrdinalIgnoreCase))
-            {
-                return sets.LargeCharacterLabels;
             }
 
             return sets.LargeLabels;

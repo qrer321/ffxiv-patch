@@ -413,3 +413,29 @@
   - `.tmp\lobby-critical-fix-ja-r6` passes `lobby-critical`.
   - The same output passes `ingame-critical`.
 - Status: code-level/generated-output verification only. Keep live lobby/system-settings and high-scale UI font reports open until user confirmation on a release build.
+
+## 2026-05-24 live rejection after lobby-critical r6 release
+
+- User live report after release built from `ee2b8cc`: previous lobby/font problems are still reproducible.
+- Lobby/start system settings:
+  - At 150% UI scale, `시스템 설정` uses an oversized font and can render as `시스- --`.
+  - At 200% and higher, `시스템 설정` uses an undersized font.
+- Character select:
+  - Above 100% UI scale, some character-select labels still render as `=` or `-`.
+- PvP profile:
+  - `크리스탈라인 ...` related profile text is abnormal at 100% scale only.
+  - At 150% and higher, the same PvP profile font appears normal.
+- HD/non-4K UI resolution boot crash was not retested in this report; keep it open separately.
+- Verifier correction required: `lobby-critical` r6 was insufficient. It did not prove live scale-specific ULD font routing, actual 100/150/200/300% selected font paths, or PvP 100%-only visual scale. The next verifier update must fail on the r6 output before any code fix is considered credible.
+- Do not call these live issues fixed until the user confirms a release build. Do not reuse the r6 PASS as completion evidence.
+
+## 2026-05-25 runtime-scale lobby verifier correction
+
+- Added `lobby-runtime-scale-font-routes` to model the reported scale-specific font route class for lobby/start and character-select labels. It explicitly checks `TrumpGothic_23/34/68_lobby` routes for `시스템 설정`, `로스가르 여`, and `레벨 100 암흑기사` against clean/TTMP reference scale and fails if required Hangul glyphs are missing.
+- Regression proof: release output `%LOCALAPPDATA%\FFXIVKoreanPatch\generated-release\ja\2026.05.01.0000.0000\20260524-225140` now fails the new verifier. The key failure is `common/font/TrumpGothic_34_lobby.fdt` missing `U+D15C` for `시스템 설정`, matching the live `시스- --` report at 150%.
+- Generator correction: `TrumpGothic_34_lobby.fdt` must use `LargeLabels` for both normal lobby Hangul coverage and visual-scale coverage. Narrowing it to character labels only can pass older coverage checks while breaking the 150% lobby system-settings title.
+- Coverage correction: `LobbyHangulCoverage.HighScaleRows` now covers documented Lobby/Error/Addon-adjacent lobby rows plus `ClassJob`, `Race`, `Tribe`, and `GuardianDeity`, so character-select high-scale labels are not patched only by screenshot-reported characters.
+- PvP correction: `Jupiter_16.fdt` is no longer a `PvpProfileVisualScaleGlyphs` target. It is treated as the 100% PvP route and must preserve TTMP/source scale; `Jupiter_20.fdt` remains the higher-scale visual route.
+- Fresh generated output `.tmp\lobby-runtime-scale-ja-r3` passes the focused route set:
+  `lobby-runtime-scale-font-routes,lobby-coverage-glyphs,lobby-multitexture-font-set,lobby-texture-cell-margin,pvp-profile-font-routes,action-detail-scale-layouts,combat-flytext-damage-glyphs,third-party-game-font-safety`.
+- The same output passes the broader `lobby-critical,ingame-critical` verifier group. This is generated-output verification only; keep the live lobby/PvP reports open until user confirmation on a release build.

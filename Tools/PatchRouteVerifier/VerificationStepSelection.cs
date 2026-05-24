@@ -86,6 +86,7 @@ namespace FfxivKoreanPatch.PatchRouteVerifier
                         "lobby-scale-font-sources",
                         "lobby-render-snapshots",
                         "lobby-large-label-scale-layouts",
+                        "lobby-runtime-scale-font-routes",
                         "lobby-coverage-glyphs",
                         "lobby-runtime-font-safety",
                         "lobby-multitexture-font-set",

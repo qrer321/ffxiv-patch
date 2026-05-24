@@ -11,7 +11,6 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
             // their ULD areas. The generator crops visible source pixels before
             // scaling, so this target renders around the verifier's 1.16..1.42
             // digit-height window rather than the raw source ratio.
-            "common/font/Jupiter_16.fdt",
             "common/font/Jupiter_20.fdt"
         };
 

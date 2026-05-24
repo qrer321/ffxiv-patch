@@ -78,7 +78,16 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
 
         public static readonly LobbyHangulCoverageRowSpec[] HighScaleRows = new LobbyHangulCoverageRowSpec[]
         {
-            new LobbyHangulCoverageRowSpec("Lobby", 1, 40),
+            new LobbyHangulCoverageRowSpec("Lobby", 1, 53),
+            new LobbyHangulCoverageRowSpec("Lobby", 101, 101),
+            new LobbyHangulCoverageRowSpec("Lobby", 160, 160),
+            new LobbyHangulCoverageRowSpec("Lobby", 841, 850),
+            new LobbyHangulCoverageRowSpec("Lobby", 921, 921),
+            new LobbyHangulCoverageRowSpec("Lobby", 975, 975),
+            new LobbyHangulCoverageRowSpec("Lobby", 1100, 1150),
+            new LobbyHangulCoverageRowSpec("Lobby", 1223, 1223),
+            new LobbyHangulCoverageRowSpec("Lobby", 2003, 2059),
+            new LobbyHangulCoverageRowSpec("Addon", 2744, 2744),
             new LobbyHangulCoverageRowSpec("Addon", 4000, 4200),
             new LobbyHangulCoverageRowSpec("Addon", 8683, 8722),
             new LobbyHangulCoverageRowSpec("ClassJob", 0, uint.MaxValue),

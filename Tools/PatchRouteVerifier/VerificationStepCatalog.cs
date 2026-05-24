@@ -39,6 +39,7 @@ namespace FfxivKoreanPatch.PatchRouteVerifier
                     new VerificationStep("system-settings-mixed-scale-layouts", VerifySystemSettingsMixedScalePhraseLayouts),
                     new VerificationStep("start-main-menu-phrase-layouts", VerifyStartScreenMainMenuPhraseLayouts),
                     new VerificationStep("lobby-large-label-scale-layouts", VerifyLobbyLargeLabelScaleLayouts),
+                    new VerificationStep("lobby-runtime-scale-font-routes", VerifyLobbyRuntimeScaleFontRoutes),
                     new VerificationStep("lobby-scale-font-sources", VerifyLobbyScaleFontSourceRoutes),
                     new VerificationStep("korean-lobby-font-sources", VerifyKoreanLobbyFontSourceRoutes),
                     new VerificationStep("lobby-ttmp-payloads", VerifyLobbyTtmpPayloads),
