@@ -399,3 +399,17 @@
 - Fix applied while checking this: non-lobby `MiedingerMid_10/12/14/18/36.fdt` now keeps Korean-capable glyphs from the font pack but restores clean global ASCII/number/symbol glyphs. The previous current output failed `numeric-glyphs` because those fonts had TTMP-sized digits and symbols instead of clean global shapes.
 - Open, separate from the crash-class bounds result: broad `4k-lobby-font-derivations` still reports missing Hangul in some 4K lobby candidate fonts such as `Jupiter_46_lobby.fdt`. Runtime bounds/mip checks still pass, so treat this as a 4K lobby visual/coverage follow-up, not proof of the reported in-game boss-spawn crash.
 - Do not mark the live 4K crash report fixed until the user confirms on a release built from this code.
+
+## 2026-05-24 lobby-critical verifier correction and high-scale lobby fix
+
+- False PASS correction: the focused `.tmp\lobby-highscale-route-coverage-ja-r2` result is not valid completion evidence. The same output failed broader lobby checks, so lobby/font work must use `lobby-critical` or `font-critical` before reporting progress.
+- Root causes addressed:
+  - Generator lobby glyph collection used the Korean source sqpack while the verifier checked patched target text plus clean/global fallback. The generator now collects from the generated output route.
+  - Source FDT glyph lookup only used UTF-8 keys. Some source glyphs are discoverable through Shift-JIS fallback, so source entry lookup now canonicalizes through UTF-8 first and Shift-JIS second.
+  - High-scale lobby coverage was narrower than the verifier. `ClassJob`, `Race`, `Tribe`, and `GuardianDeity` are now full-row high-scale coverage sources, matching the verifier's scale-sensitive collection and preventing missing glyphs such as `U+ACA8`.
+  - Full ASCII injection into high-scale lobby fonts is rejected because it can exhaust safe atlas space. The current route adds only ASCII used by high-resolution UI/result-message phrases, with clean numeric-boundary kerning for digit-to-`%` and digit-to-`x`.
+  - Non-lobby `TrumpGothic_34/68/184.fdt` ASCII glyphs and kerning are restored from clean global so broader ASCII phrase checks no longer pass with TTMP-contaminated metrics.
+- Verification:
+  - `.tmp\lobby-critical-fix-ja-r6` passes `lobby-critical`.
+  - The same output passes `ingame-critical`.
+- Status: code-level/generated-output verification only. Keep live lobby/system-settings and high-scale UI font reports open until user confirmation on a release build.

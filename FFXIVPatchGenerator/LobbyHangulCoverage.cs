@@ -81,10 +81,10 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
             new LobbyHangulCoverageRowSpec("Lobby", 1, 40),
             new LobbyHangulCoverageRowSpec("Addon", 4000, 4200),
             new LobbyHangulCoverageRowSpec("Addon", 8683, 8722),
-            new LobbyHangulCoverageRowSpec("ClassJob", 0, 43),
-            new LobbyHangulCoverageRowSpec("Race", 1, 8),
-            new LobbyHangulCoverageRowSpec("Tribe", 1, 16),
-            new LobbyHangulCoverageRowSpec("GuardianDeity", 1, 12, 0)
+            new LobbyHangulCoverageRowSpec("ClassJob", 0, uint.MaxValue),
+            new LobbyHangulCoverageRowSpec("Race", 0, uint.MaxValue),
+            new LobbyHangulCoverageRowSpec("Tribe", 0, uint.MaxValue),
+            new LobbyHangulCoverageRowSpec("GuardianDeity", 0, uint.MaxValue)
         };
 
         public static bool IsTargetFontPath(string path)
