@@ -2329,9 +2329,6 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
                             (int)Math.Round(sourceAdvance * LobbyLargeLabelVisualScaleMinAdvanceRatio),
                             1,
                             byte.MaxValue));
-                    scaledAdvance = Math.Max(
-                        scaledAdvance,
-                        ClampInt(replacementWidth + 2, 1, byte.MaxValue));
                     replacementOffsetX = ClampInt(scaledAdvance - replacementWidth, sbyte.MinValue, sbyte.MaxValue);
                     patchAlpha = ScaleGlyphAlphaBilinear(
                         sourceRegion.Alpha,
