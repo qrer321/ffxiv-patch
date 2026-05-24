@@ -64,6 +64,7 @@
     <Compile Include="FontGuardVerification.cs" />
     <Compile Include="FontOnlyOutputScopeVerification.cs" />
     <Compile Include="FontGlyphRendering.cs" />
+    <Compile Include="FontRuntimeSafetyVerification.cs" />
     <Compile Include="FontTextureLoading.cs" />
     <Compile Include="FontRouteVerification.cs" />
     <Compile Include="FontTextureDecoding.cs" />

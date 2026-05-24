@@ -172,7 +172,12 @@ namespace FfxivKoreanPatch.PatchRouteVerifier
                 return string.Equals(normalized, "common/font/Jupiter_45.fdt", StringComparison.OrdinalIgnoreCase) ||
                        string.Equals(normalized, "common/font/Jupiter_90.fdt", StringComparison.OrdinalIgnoreCase) ||
                        normalized.IndexOf("/AXIS_", StringComparison.OrdinalIgnoreCase) >= 0 ||
-                       normalized.IndexOf("/KrnAXIS_", StringComparison.OrdinalIgnoreCase) >= 0;
+                       normalized.IndexOf("/KrnAXIS_", StringComparison.OrdinalIgnoreCase) >= 0 ||
+                       string.Equals(normalized, "common/font/MiedingerMid_10.fdt", StringComparison.OrdinalIgnoreCase) ||
+                       string.Equals(normalized, "common/font/MiedingerMid_12.fdt", StringComparison.OrdinalIgnoreCase) ||
+                       string.Equals(normalized, "common/font/MiedingerMid_14.fdt", StringComparison.OrdinalIgnoreCase) ||
+                       string.Equals(normalized, "common/font/MiedingerMid_18.fdt", StringComparison.OrdinalIgnoreCase) ||
+                       string.Equals(normalized, "common/font/MiedingerMid_36.fdt", StringComparison.OrdinalIgnoreCase);
             }
 
             private static int GetInGameCleanAsciiGlyphNeighborhoodPadding(string fontPath)

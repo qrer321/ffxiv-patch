@@ -46,6 +46,7 @@ namespace FfxivKoreanPatch.PatchRouteVerifier
                     new VerificationStep("4k-lobby-font-derivations", Verify4kLobbyFontDerivations),
                     new VerificationStep("4k-lobby-phrase-layouts", Verify4kLobbyPhraseLayouts),
                     new VerificationStep("numeric-glyphs", VerifyNumericGlyphs),
+                    new VerificationStep("font-runtime-glyph-bounds", VerifyFontRuntimeGlyphBounds),
                     new VerificationStep("protected-hangul-glyphs", VerifyProtectedHangulGlyphs),
                     new VerificationStep("hangul-source-preservation", VerifyHangulSourcePreservation),
                     new VerificationStep("ingame-font-risk-survey", VerifyInGameFontRiskSurvey),

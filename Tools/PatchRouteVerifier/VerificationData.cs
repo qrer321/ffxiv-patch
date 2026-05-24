@@ -136,6 +136,59 @@ namespace FfxivKoreanPatch.PatchRouteVerifier
             "common/font/TrumpGothic_184.fdt"
         };
 
+        private static readonly string[] RuntimeFontSafetyFontPaths = new string[]
+        {
+            "common/font/Jupiter_45.fdt",
+            "common/font/Jupiter_45_lobby.fdt",
+            "common/font/Jupiter_90.fdt",
+            "common/font/Jupiter_90_lobby.fdt",
+            "common/font/Jupiter_20_lobby.fdt",
+            "common/font/Jupiter_23_lobby.fdt",
+            "common/font/Jupiter_23.fdt",
+            "common/font/Jupiter_46.fdt",
+            "common/font/Jupiter_46_lobby.fdt",
+            "common/font/Jupiter_16_lobby.fdt",
+            "common/font/Meidinger_16_lobby.fdt",
+            "common/font/Meidinger_20_lobby.fdt",
+            "common/font/Meidinger_40.fdt",
+            "common/font/Meidinger_40_lobby.fdt",
+            "common/font/MiedingerMid_10_lobby.fdt",
+            "common/font/MiedingerMid_12_lobby.fdt",
+            "common/font/MiedingerMid_14_lobby.fdt",
+            "common/font/MiedingerMid_18_lobby.fdt",
+            "common/font/MiedingerMid_36.fdt",
+            "common/font/MiedingerMid_36_lobby.fdt",
+            "common/font/TrumpGothic_23.fdt",
+            "common/font/TrumpGothic_23_lobby.fdt",
+            "common/font/TrumpGothic_34.fdt",
+            "common/font/TrumpGothic_34_lobby.fdt",
+            "common/font/TrumpGothic_68.fdt",
+            "common/font/TrumpGothic_68_lobby.fdt",
+            "common/font/TrumpGothic_184.fdt",
+            "common/font/TrumpGothic_184_lobby.fdt",
+            "common/font/AXIS_12.fdt",
+            "common/font/AXIS_12_lobby.fdt",
+            "common/font/AXIS_14.fdt",
+            "common/font/AXIS_14_lobby.fdt",
+            "common/font/AXIS_18.fdt",
+            "common/font/AXIS_18_lobby.fdt",
+            "common/font/AXIS_36.fdt",
+            "common/font/AXIS_36_lobby.fdt",
+            "common/font/AXIS_96.fdt",
+            "common/font/KrnAXIS_120.fdt",
+            "common/font/KrnAXIS_140.fdt",
+            "common/font/KrnAXIS_180.fdt",
+            "common/font/KrnAXIS_360.fdt",
+            "common/font/Jupiter_16.fdt",
+            "common/font/Jupiter_20.fdt",
+            "common/font/Meidinger_16.fdt",
+            "common/font/Meidinger_20.fdt",
+            "common/font/MiedingerMid_10.fdt",
+            "common/font/MiedingerMid_12.fdt",
+            "common/font/MiedingerMid_14.fdt",
+            "common/font/MiedingerMid_18.fdt"
+        };
+
         private static bool IsCombatFlyTextSourceFontPath(string fontPath)
         {
             string normalized = (fontPath ?? string.Empty).Replace('\\', '/');

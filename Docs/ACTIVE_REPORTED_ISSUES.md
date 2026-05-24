@@ -372,3 +372,17 @@
 - 2026-05-24 follow-up direction: keep lobby AXIS fonts source-preserved instead of adding them back to visual-scale routing. The remaining AXIS min-gap issue is handled by route-derived per-left-glyph `OffsetX` advance compensation for `AXIS_12_lobby`, `AXIS_14_lobby`, and `AXIS_18_lobby`; this deliberately replaces the rejected `_lobby.fdt` synthetic Hangul kerning path.
 - Fresh generated output `.tmp\lobby-axis-advance-comp-ja-r1` passes focused lobby checks: `lobby-large-label-scale-layouts,lobby-render-snapshots,lobby-scale-font-sources,lobby-runtime-font-safety,lobby-multitexture-font-set,lobby-texture-cell-margin,start-main-menu-phrase-layouts`. The render snapshots now show non-negative gaps for the reported system-settings/result-message routes without `font_lobby7.tex`, `image_index >= 24`, texture resize, bottom-edge placement, or synthetic lobby kerning.
 - Regression verification on `.tmp\lobby-axis-advance-comp-ja-r1` passes `combat-flytext-damage-glyphs,third-party-game-font-safety,party-list-self-marker,action-detail-scale-layouts,pvp-profile-font-routes,configuration-sharing,occult-crescent-support-jobs`. This is code/generated-output verification only; keep the live lobby/system-settings issue open until explicit user confirmation.
+
+## 2026-05-24 4K font-size and boss-spawn crash follow-up
+
+- Live report from the deployed release: at 4K UI resolution, lowering font size below a certain point can crash; at 4K, some boss spawns can also crash, including the first bosses in Kugane Ohashi-style/Kang-en related content and The Puppets' Bunker-style military-base content reports.
+- Current investigation output: `.tmp\4k-crash-followup-ja-r1`, generated with the local restore baseline as `-BaseIndexDirectory`:
+  `%LOCALAPPDATA%\FFXIVKoreanPatch\restore-baseline\ja\2026.05.01.0000.0000`.
+- Added crash-class guard: `font-runtime-glyph-bounds`. It checks patched FDT texture route existence, glyph rectangle bounds, kerning-table offset bounds, and mip raw-data bounds across 49 font files. Current output passes with `fonts=49`, `glyphs=372464`, `textures=11`.
+- Focused verification on the same output passes:
+  `font-runtime-glyph-bounds,ingame-clean-ascii-glyphs,numeric-glyphs,party-list-self-marker,combat-flytext-damage-glyphs,third-party-game-font-safety,lobby-runtime-font-safety,lobby-multitexture-font-set,lobby-texture-cell-margin`.
+- In-game boss/nameplate risk survey passes:
+  `NamePlate.uld` routes to `common/font/AXIS_18.fdt`, `EnemyList.uld` routes to `common/font/AXIS_12.fdt`, and `BNpcName` contributes `14312` candidate rows with `1050` unique Hangul codepoints. The survey reports `0` clean-visible PUA regressions.
+- Fix applied while checking this: non-lobby `MiedingerMid_10/12/14/18/36.fdt` now keeps Korean-capable glyphs from the font pack but restores clean global ASCII/number/symbol glyphs. The previous current output failed `numeric-glyphs` because those fonts had TTMP-sized digits and symbols instead of clean global shapes.
+- Open, separate from the crash-class bounds result: broad `4k-lobby-font-derivations` still reports missing Hangul in some 4K lobby candidate fonts such as `Jupiter_46_lobby.fdt`. Runtime bounds/mip checks still pass, so treat this as a 4K lobby visual/coverage follow-up, not proof of the reported in-game boss-spawn crash.
+- Do not mark the live 4K crash report fixed until the user confirms on a release built from this code.

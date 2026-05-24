@@ -18,7 +18,7 @@ namespace FfxivKoreanPatch.PatchRouteVerifier
                 for (int i = 0; i < Derived4kLobbyFontPairs.GetLength(0); i++)
                 {
                     string targetFontPath = Derived4kLobbyFontPairs[i, 0];
-                    string sourceFontPath = Derived4kLobbyFontPairs[i, 1];
+                    string sourceFontPath = ResolveLobbyHangulSourceFontPath(targetFontPath);
 
                     byte[] sourceFdt;
                     try

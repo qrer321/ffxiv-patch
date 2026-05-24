@@ -4857,7 +4857,8 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
 
             return IsCleanDamageNumberFontPath(normalized) ||
                    ShouldRepairCleanDigitsOnlyFont(normalized) ||
-                   ShouldRepairCleanFullAsciiAxisFont(normalized);
+                   ShouldRepairCleanFullAsciiAxisFont(normalized) ||
+                   ShouldRepairCleanFullAsciiMiedingerMidFont(normalized);
         }
 
         private static bool ShouldPreserveTtmpCombatFlyTextGlyphs(string path)
@@ -4906,7 +4907,21 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
             string normalized = NormalizeGamePath(path);
             return IsCleanDamageNumberFontPath(normalized) ||
                    ShouldRepairCleanFullAsciiAxisFont(normalized) ||
+                   ShouldRepairCleanFullAsciiMiedingerMidFont(normalized) ||
                    IsDerived4kLobbyFont(normalized);
+        }
+
+        private static bool ShouldRepairCleanFullAsciiMiedingerMidFont(string path)
+        {
+            string normalized = NormalizeGamePath(path);
+            // MiedingerMid carries Korean glyphs from the font pack, but its
+            // ASCII/number/symbol glyphs must stay clean-global. The clean
+            // shapes are used by small UI labels and reduce low-size mip risk.
+            return string.Equals(normalized, "common/font/MiedingerMid_10.fdt", StringComparison.OrdinalIgnoreCase) ||
+                   string.Equals(normalized, "common/font/MiedingerMid_12.fdt", StringComparison.OrdinalIgnoreCase) ||
+                   string.Equals(normalized, "common/font/MiedingerMid_14.fdt", StringComparison.OrdinalIgnoreCase) ||
+                   string.Equals(normalized, "common/font/MiedingerMid_18.fdt", StringComparison.OrdinalIgnoreCase) ||
+                   string.Equals(normalized, "common/font/MiedingerMid_36.fdt", StringComparison.OrdinalIgnoreCase);
         }
 
         private static bool ShouldAllocateCleanAsciiCell(string path)
