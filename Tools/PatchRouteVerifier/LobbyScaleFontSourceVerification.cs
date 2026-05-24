@@ -308,7 +308,7 @@ namespace FfxivKoreanPatch.PatchRouteVerifier
                 bool spacingMatches =
                     GlyphSpacingMetricsMatch(sourceGlyph, targetGlyph) ||
                     (IsLobbyAxisHangulAdvanceNormalizedFont(route.TargetFontPath) &&
-                     LobbyAxisHangulAdvanceEntryMatchesExpected(sourceGlyph, targetGlyph));
+                     LobbyAxisHangulSpacingMetricsMatchExpected(route.TargetFontPath, codepoint, sourceGlyph, targetGlyph));
                 if (!spacingMatches)
                 {
                     Fail(

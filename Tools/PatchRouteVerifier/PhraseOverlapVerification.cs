@@ -670,7 +670,7 @@ namespace FfxivKoreanPatch.PatchRouteVerifier
                     int sourceAdvance = GetGlyphAdvance(sourceGlyph);
                     int targetAdvance = sourceAdvance;
                     if (IsHangulCodepoint(codepoint) &&
-                        LobbyAxisHangulSpacingEntryMatchesSource(sourceGlyph, targetGlyph))
+                        LobbyAxisHangulSpacingMetricsMatchExpected(fontPath, codepoint, sourceGlyph, targetGlyph))
                     {
                         targetAdvance = GetGlyphAdvance(targetGlyph);
                     }
@@ -691,15 +691,6 @@ namespace FfxivKoreanPatch.PatchRouteVerifier
                 }
 
                 return true;
-            }
-
-            private static bool LobbyAxisHangulSpacingEntryMatchesSource(FdtGlyphEntry sourceGlyph, FdtGlyphEntry targetGlyph)
-            {
-                return sourceGlyph.ShiftJisValue == targetGlyph.ShiftJisValue &&
-                       sourceGlyph.Width == targetGlyph.Width &&
-                       sourceGlyph.Height == targetGlyph.Height &&
-                       sourceGlyph.OffsetX == targetGlyph.OffsetX &&
-                       sourceGlyph.OffsetY == targetGlyph.OffsetY;
             }
 
             private static bool LobbyAsciiMatchesCleanTarget(

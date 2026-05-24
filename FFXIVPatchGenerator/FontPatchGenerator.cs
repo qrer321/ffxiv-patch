@@ -3146,8 +3146,145 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
 
         private static void NormalizeAllocatedLobbyHangulGlyphSpacing(string path, uint codepoint, byte[] glyphEntry)
         {
-            // Preserve the source FDT advance/offset. Earlier normalization made
-            // lobby Hangul wider than its TTMP source and regressed menu layout.
+            if (glyphEntry == null ||
+                glyphEntry.Length < FdtGlyphEntrySize ||
+                !IsHangulCodepoint(codepoint))
+            {
+                return;
+            }
+
+            int adjustment = GetLobbyAxisHangulAdvanceCompensation(path, codepoint);
+            if (adjustment <= 0)
+            {
+                return;
+            }
+
+            int offsetX = unchecked((sbyte)glyphEntry[14]);
+            int adjustedOffsetX = ClampInt(offsetX + adjustment, sbyte.MinValue, sbyte.MaxValue);
+            if (adjustedOffsetX > offsetX)
+            {
+                glyphEntry[14] = unchecked((byte)(sbyte)adjustedOffsetX);
+            }
+        }
+
+        private static int GetLobbyAxisHangulAdvanceCompensation(string path, uint codepoint)
+        {
+            if (!IsHangulCodepoint(codepoint) ||
+                !ShouldCompensateLobbyAxisHangulAdvance(path))
+            {
+                return 0;
+            }
+
+            StartScreenKerningRoute route;
+            if (!TryGetStartScreenKerningRoute(path, out route))
+            {
+                return 0;
+            }
+
+            int adjustment = 0;
+            if (route.IncludeResultMessageHangulPairs)
+            {
+                AddLeftCodepointAdvanceCompensation(
+                    ref adjustment,
+                    LobbyScaledHangulPhrases.StartScreenSystemSettingsResultMessages,
+                    codepoint,
+                    route.MinimumAdjustment,
+                    delegate(uint left, uint right)
+                    {
+                        return IsHangulCodepoint(left) && IsHangulCodepoint(right);
+                    });
+            }
+
+            if (route.IncludeSystemSettingsHangulPairs)
+            {
+                AddLeftCodepointAdvanceCompensation(
+                    ref adjustment,
+                    LobbyScaledHangulPhrases.StartScreenSystemSettings,
+                    codepoint,
+                    route.MinimumAdjustment,
+                    delegate(uint left, uint right)
+                    {
+                        return IsHangulCodepoint(left) && IsHangulCodepoint(right);
+                    });
+            }
+
+            if (route.IncludeHighResolutionHangulPairs)
+            {
+                AddLeftCodepointAdvanceCompensation(
+                    ref adjustment,
+                    LobbyScaledHangulPhrases.HighResolutionUiScaleOptions,
+                    codepoint,
+                    route.MinimumAdjustment,
+                    delegate(uint left, uint right)
+                    {
+                        return IsHangulCodepoint(left) && IsHangulCodepoint(right);
+                    });
+            }
+
+            if (route.IncludeTerminalPunctuationPairs)
+            {
+                AddLeftCodepointAdvanceCompensation(
+                    ref adjustment,
+                    LobbyScaledHangulPhrases.HighResolutionUiScaleOptions,
+                    codepoint,
+                    route.MinimumAdjustment,
+                    delegate(uint left, uint right)
+                    {
+                        return IsHangulCodepoint(left) && IsTerminalPunctuationCodepoint(right);
+                    });
+                AddLeftCodepointAdvanceCompensation(
+                    ref adjustment,
+                    LobbyScaledHangulPhrases.StartScreenSystemSettingsResultMessages,
+                    codepoint,
+                    route.MinimumAdjustment,
+                    delegate(uint left, uint right)
+                    {
+                        return IsHangulCodepoint(left) && IsTerminalPunctuationCodepoint(right);
+                    });
+            }
+
+            return adjustment;
+        }
+
+        private static void AddLeftCodepointAdvanceCompensation(
+            ref int currentAdjustment,
+            string[] phrases,
+            uint codepoint,
+            int adjustment,
+            KerningPairPredicate predicate)
+        {
+            if (phrases == null || adjustment <= currentAdjustment)
+            {
+                return;
+            }
+
+            for (int phraseIndex = 0; phraseIndex < phrases.Length; phraseIndex++)
+            {
+                string phrase = phrases[phraseIndex] ?? string.Empty;
+                uint previous = 0;
+                bool hasPrevious = false;
+                for (int i = 0; i < phrase.Length; i++)
+                {
+                    uint current = ReadCodepoint(phrase, ref i);
+                    if (hasPrevious &&
+                        previous == codepoint &&
+                        predicate(previous, current))
+                    {
+                        currentAdjustment = Math.Max(currentAdjustment, adjustment);
+                    }
+
+                    previous = current;
+                    hasPrevious = !IsPhraseSeparatorCodepoint(current);
+                }
+            }
+        }
+
+        private static bool ShouldCompensateLobbyAxisHangulAdvance(string path)
+        {
+            string normalized = NormalizeGamePath(path);
+            return string.Equals(normalized, "common/font/AXIS_12_lobby.fdt", StringComparison.OrdinalIgnoreCase) ||
+                   string.Equals(normalized, "common/font/AXIS_14_lobby.fdt", StringComparison.OrdinalIgnoreCase) ||
+                   string.Equals(normalized, "common/font/AXIS_18_lobby.fdt", StringComparison.OrdinalIgnoreCase);
         }
 
         private static string CreateLobbyHangulAllocationKey(

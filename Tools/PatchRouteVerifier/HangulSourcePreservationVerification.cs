@@ -99,7 +99,10 @@ namespace FfxivKoreanPatch.PatchRouteVerifier
                         }
 
                         long score = Diff(source.Alpha, target.Alpha);
-                        bool spacingMatch = GlyphSpacingMetricsMatch(sourceGlyph, targetGlyph);
+                        bool spacingMatch =
+                            GlyphSpacingMetricsMatch(sourceGlyph, targetGlyph) ||
+                            (IsLobbyAxisHangulAdvanceNormalizedFont(fontPath) &&
+                             LobbyAxisHangulSpacingMetricsMatchExpected(fontPath, codepoint, sourceGlyph, targetGlyph));
                         if (score == 0 && spacingMatch && target.VisiblePixels >= 10)
                         {
                             compared++;
@@ -253,7 +256,7 @@ namespace FfxivKoreanPatch.PatchRouteVerifier
                         continue;
                     }
 
-                    if (!LobbyAxisHangulAdvanceEntryMatchesExpected(sourceGlyph, targetGlyph))
+                    if (!LobbyAxisHangulAdvanceEntryMatchesExpected(fontPath, codepoint, sourceGlyph, targetGlyph))
                     {
                         Fail(
                             "{0} U+{1:X4} lobby AXIS Hangul source entry mismatch: target={2}, source={3}",
@@ -311,6 +314,8 @@ namespace FfxivKoreanPatch.PatchRouteVerifier
             }
 
             private static bool LobbyAxisHangulAdvanceEntryMatchesExpected(
+                string fontPath,
+                uint codepoint,
                 FdtGlyphEntry sourceGlyph,
                 FdtGlyphEntry targetGlyph)
             {
@@ -320,8 +325,165 @@ namespace FfxivKoreanPatch.PatchRouteVerifier
                        sourceGlyph.Y == targetGlyph.Y &&
                        sourceGlyph.Width == targetGlyph.Width &&
                        sourceGlyph.Height == targetGlyph.Height &&
-                       sourceGlyph.OffsetX == targetGlyph.OffsetX &&
+                       LobbyAxisHangulOffsetXMatchesExpected(fontPath, codepoint, sourceGlyph, targetGlyph) &&
                        sourceGlyph.OffsetY == targetGlyph.OffsetY;
+            }
+
+            private static bool LobbyAxisHangulSpacingMetricsMatchExpected(
+                string fontPath,
+                uint codepoint,
+                FdtGlyphEntry sourceGlyph,
+                FdtGlyphEntry targetGlyph)
+            {
+                return sourceGlyph.ShiftJisValue == targetGlyph.ShiftJisValue &&
+                       sourceGlyph.Width == targetGlyph.Width &&
+                       sourceGlyph.Height == targetGlyph.Height &&
+                       LobbyAxisHangulOffsetXMatchesExpected(fontPath, codepoint, sourceGlyph, targetGlyph) &&
+                       sourceGlyph.OffsetY == targetGlyph.OffsetY;
+            }
+
+            private static bool LobbyAxisHangulOffsetXMatchesExpected(
+                string fontPath,
+                uint codepoint,
+                FdtGlyphEntry sourceGlyph,
+                FdtGlyphEntry targetGlyph)
+            {
+                int advanceCompensation = GetLobbyAxisHangulAdvanceCompensation(fontPath, codepoint);
+                int maximumAdvanceCompensation = GetLobbyAxisMaximumHangulAdvanceCompensation(fontPath);
+                return sourceGlyph.OffsetX + advanceCompensation == targetGlyph.OffsetX ||
+                       (maximumAdvanceCompensation > 0 &&
+                        sourceGlyph.OffsetX + maximumAdvanceCompensation == targetGlyph.OffsetX);
+            }
+
+            private static int GetLobbyAxisHangulAdvanceCompensation(string fontPath, uint codepoint)
+            {
+                if (!IsHangulCodepoint(codepoint))
+                {
+                    return 0;
+                }
+
+                string normalized = (fontPath ?? string.Empty).Replace('\\', '/');
+                int adjustment;
+                bool includeHighResolutionHangulPairs;
+                if (string.Equals(normalized, "common/font/AXIS_12_lobby.fdt", StringComparison.OrdinalIgnoreCase))
+                {
+                    adjustment = 2;
+                    includeHighResolutionHangulPairs = true;
+                }
+                else if (string.Equals(normalized, "common/font/AXIS_14_lobby.fdt", StringComparison.OrdinalIgnoreCase) ||
+                         string.Equals(normalized, "common/font/AXIS_18_lobby.fdt", StringComparison.OrdinalIgnoreCase))
+                {
+                    adjustment = 1;
+                    includeHighResolutionHangulPairs = false;
+                }
+                else
+                {
+                    return 0;
+                }
+
+                int result = 0;
+                AddLobbyAxisLeftAdvanceCompensation(
+                    ref result,
+                    LobbyScaledHangulPhrases.StartScreenSystemSettingsResultMessages,
+                    codepoint,
+                    adjustment,
+                    delegate(uint left, uint right)
+                    {
+                        return IsHangulCodepoint(left) && IsHangulCodepoint(right);
+                    });
+                AddLobbyAxisLeftAdvanceCompensation(
+                    ref result,
+                    LobbyScaledHangulPhrases.StartScreenSystemSettings,
+                    codepoint,
+                    adjustment,
+                    delegate(uint left, uint right)
+                    {
+                        return IsHangulCodepoint(left) && IsHangulCodepoint(right);
+                    });
+
+                if (includeHighResolutionHangulPairs)
+                {
+                    AddLobbyAxisLeftAdvanceCompensation(
+                        ref result,
+                        LobbyScaledHangulPhrases.HighResolutionUiScaleOptions,
+                        codepoint,
+                        adjustment,
+                        delegate(uint left, uint right)
+                        {
+                            return IsHangulCodepoint(left) && IsHangulCodepoint(right);
+                        });
+                }
+
+                AddLobbyAxisLeftAdvanceCompensation(
+                    ref result,
+                    LobbyScaledHangulPhrases.HighResolutionUiScaleOptions,
+                    codepoint,
+                    adjustment,
+                    delegate(uint left, uint right)
+                    {
+                        return IsHangulCodepoint(left) && IsVerifierTerminalPunctuationCodepoint(right);
+                    });
+                AddLobbyAxisLeftAdvanceCompensation(
+                    ref result,
+                    LobbyScaledHangulPhrases.StartScreenSystemSettingsResultMessages,
+                    codepoint,
+                    adjustment,
+                    delegate(uint left, uint right)
+                    {
+                        return IsHangulCodepoint(left) && IsVerifierTerminalPunctuationCodepoint(right);
+                    });
+
+                return result;
+            }
+
+            private static int GetLobbyAxisMaximumHangulAdvanceCompensation(string fontPath)
+            {
+                string normalized = (fontPath ?? string.Empty).Replace('\\', '/');
+                if (string.Equals(normalized, "common/font/AXIS_12_lobby.fdt", StringComparison.OrdinalIgnoreCase))
+                {
+                    return 2;
+                }
+
+                if (string.Equals(normalized, "common/font/AXIS_14_lobby.fdt", StringComparison.OrdinalIgnoreCase) ||
+                    string.Equals(normalized, "common/font/AXIS_18_lobby.fdt", StringComparison.OrdinalIgnoreCase))
+                {
+                    return 1;
+                }
+
+                return 0;
+            }
+
+            private static void AddLobbyAxisLeftAdvanceCompensation(
+                ref int currentAdjustment,
+                string[] phrases,
+                uint codepoint,
+                int adjustment,
+                KerningPairPredicate predicate)
+            {
+                if (phrases == null || adjustment <= currentAdjustment)
+                {
+                    return;
+                }
+
+                for (int phraseIndex = 0; phraseIndex < phrases.Length; phraseIndex++)
+                {
+                    string phrase = phrases[phraseIndex] ?? string.Empty;
+                    uint previous = 0;
+                    bool hasPrevious = false;
+                    for (int i = 0; i < phrase.Length; i++)
+                    {
+                        uint current = ReadCodepoint(phrase, ref i);
+                        if (hasPrevious &&
+                            previous == codepoint &&
+                            predicate(previous, current))
+                        {
+                            currentAdjustment = Math.Max(currentAdjustment, adjustment);
+                        }
+
+                        previous = current;
+                        hasPrevious = !IsPhraseLayoutSpace(current);
+                    }
+                }
             }
 
             private static string FormatGlyphEntryRoute(FdtGlyphEntry glyph)
