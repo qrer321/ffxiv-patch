@@ -24,17 +24,100 @@ namespace FfxivKoreanPatch.PatchRouteVerifier
                         continue;
                     }
 
+                    string[] groupChecks = ResolveCheckGroup(check);
+                    if (groupChecks != null)
+                    {
+                        AddCheckGroup(steps, known, selected, check, groupChecks);
+                        continue;
+                    }
+
                     if (!known.Contains(check))
                     {
                         throw new ArgumentException(
                             "unknown check: " + check + Environment.NewLine +
-                            "available checks: " + FormatAvailableChecks(steps));
+                            "available checks: " + FormatAvailableChecks(steps) + Environment.NewLine +
+                            "available groups: lobby-critical,ingame-critical,font-critical");
                     }
 
                     selected.Add(check);
                 }
 
                 return selected;
+            }
+
+            private static void AddCheckGroup(
+                VerificationStep[] steps,
+                HashSet<string> known,
+                HashSet<string> selected,
+                string groupName,
+                string[] groupChecks)
+            {
+                for (int groupIndex = 0; groupIndex < groupChecks.Length; groupIndex++)
+                {
+                    string check = groupChecks[groupIndex];
+                    string[] nested = ResolveCheckGroup(check);
+                    if (nested != null)
+                    {
+                        AddCheckGroup(steps, known, selected, check, nested);
+                        continue;
+                    }
+
+                    if (!known.Contains(check))
+                    {
+                        throw new ArgumentException(
+                            "unknown check in group " + groupName + ": " + check + Environment.NewLine +
+                            "available checks: " + FormatAvailableChecks(steps));
+                    }
+
+                    selected.Add(check);
+                }
+            }
+
+            private static string[] ResolveCheckGroup(string check)
+            {
+                if (string.Equals(check, "lobby-critical", StringComparison.OrdinalIgnoreCase))
+                {
+                    return new string[]
+                    {
+                        "start-system-settings-uld",
+                        "system-settings-mixed-scale-layouts",
+                        "system-settings-scaled-phrase-layouts",
+                        "high-scale-ascii-phrase-layouts",
+                        "lobby-scale-font-sources",
+                        "lobby-render-snapshots",
+                        "lobby-large-label-scale-layouts",
+                        "lobby-coverage-glyphs",
+                        "lobby-runtime-font-safety",
+                        "lobby-multitexture-font-set",
+                        "lobby-texture-cell-margin"
+                    };
+                }
+
+                if (string.Equals(check, "ingame-critical", StringComparison.OrdinalIgnoreCase))
+                {
+                    return new string[]
+                    {
+                        "font-runtime-glyph-bounds",
+                        "ingame-clean-ascii-glyphs",
+                        "numeric-glyphs",
+                        "party-list-self-marker",
+                        "combat-flytext-damage-glyphs",
+                        "third-party-game-font-safety",
+                        "action-detail-scale-layouts",
+                        "pvp-profile-font-routes"
+                    };
+                }
+
+                if (string.Equals(check, "font-critical", StringComparison.OrdinalIgnoreCase))
+                {
+                    return new string[]
+                    {
+                        "lobby-critical",
+                        "ingame-critical"
+                    };
+                }
+
+                return null;
             }
 
             private static HashSet<string> CreateKnownCheckSet(VerificationStep[] steps)
