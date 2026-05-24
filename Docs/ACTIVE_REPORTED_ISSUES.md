@@ -1,5 +1,16 @@
 # Active Reported Issues
 
+## 2026-05-24 Lobby/Character High-Scale Coverage Rework
+
+- User report: lobby and character-select still have `-`/`=` fallback glyphs, and 150%+ lobby scale can render Korean with overlap. In-game fonts are mostly acceptable; PvP profile `Crystalline Conflict` remains lower priority.
+- Rejected approach: putting the full broad lobby sheet set into every high-scale lobby font is not viable under the current safety rules. The experimental output `.tmp\lobby-full-coverage-restore-ja-r1` produced hundreds of allocation failures per high-scale font and would require extra synthetic lobby pages, so it is discarded.
+- Current code direction: low-scale lobby routes use broad sheet-derived Hangul coverage, but high-scale lobby routes use `LobbyHangulCoverage.HighScaleRows` plus known start/system/character labels. This keeps coverage route-derived instead of adding only user-reported characters.
+- Current safety rule: high-scale lobby allocation reuse is allowed only from exact `AXIS_36.fdt` source allocations, only in existing lobby texture pages `font_lobby1..6`, only when `image_index < 24`, and only when the reused cell is large enough for the target glyph.
+- Current verification output: `.tmp\lobby-highscale-route-coverage-ja-r2` passes focused lobby/character/PvP checks: `lobby-coverage-glyphs,4k-lobby-font-derivations,lobby-runtime-font-safety,lobby-multitexture-font-set,lobby-texture-cell-margin,lobby-large-label-scale-layouts,lobby-render-snapshots,pvp-profile-font-routes`.
+- Capacity follow-up on the same output passes `lobby-route-survey,lobby-atlas-capacity,lobby-page-split-capacity,lobby-full-coverage-capacity` with zero allocation failures. Route survey currently sees 14 unique routed lobby fonts, 14072 Hangul text rows, and 900 unique Hangul codepoints.
+- In-game regression spot checks on the same output pass `font-runtime-glyph-bounds,ingame-clean-ascii-glyphs,numeric-glyphs,party-list-self-marker,combat-flytext-damage-glyphs,third-party-game-font-safety,pvp-profile-font-routes` and `action-detail-scale-layouts`.
+- Do not mark the live lobby issue fixed until user confirmation. This entry only records that the previous partial/high-scale-empty strategy has been replaced and code-level verification is now covering the reported route class.
+
 ## 2026-05-13 Lobby Route-Scoped Hangul Reinjection Attempt
 
 - 2026-05-16 route-scoped multi-texture follow-up: `.tmp\lobby-routed-multitex-ja-r8` passes focused lobby checks (`lobby-render-snapshots,clean-ascii-font-routes,lobby-coverage-glyphs,lobby-multitexture-font-set`) and strong regression checks (`reported-ingame-hangul-phrases,ingame-ttmp-texture-neighborhoods,action-detail-scale-layouts,protected-hangul-glyphs`) with `RESULT: PASS`. The high-scale lobby set prioritizes actual system-setting/result-message phrases before wider sheet coverage, data-center ASCII gap checks are clean-baseline-relative, and global in-game Hangul atlas neighborhoods reserve 2px before ASCII allocation. This remains open until explicit user OK.

@@ -368,6 +368,12 @@ namespace FfxivKoreanPatch.PatchRouteVerifier
 
                             foreach (string fontPath in groupFonts)
                             {
+                                if (IsLargeLabelOnlyLobbyCoverageFont(fontPath, group.Name) &&
+                                    !IsLargeLabelCoverageRow(row))
+                                {
+                                    continue;
+                                }
+
                                 LobbyFontGlyphRequirement requirement = GetOrAddRequirement(requirements, fontPath);
                                 requirement.Groups.Add(group.Name);
                                 requirement.Screens.UnionWith(group.Screens);
@@ -379,6 +385,45 @@ namespace FfxivKoreanPatch.PatchRouteVerifier
                 }
 
                 return requirements;
+            }
+
+            private static bool IsLargeLabelOnlyLobbyCoverageFont(string fontPath, string groupName)
+            {
+                return string.Equals(groupName, "character-select", StringComparison.OrdinalIgnoreCase) &&
+                       string.Equals(
+                           (fontPath ?? string.Empty).Replace('\\', '/'),
+                           "common/font/TrumpGothic_34_lobby.fdt",
+                           StringComparison.OrdinalIgnoreCase);
+            }
+
+            private static bool IsLargeLabelCoverageRow(LobbyCoverageTextRow row)
+            {
+                if (row == null)
+                {
+                    return false;
+                }
+
+                if (string.Equals(row.Sheet, "ClassJob", StringComparison.OrdinalIgnoreCase))
+                {
+                    return row.RowId <= 43;
+                }
+
+                if (string.Equals(row.Sheet, "Race", StringComparison.OrdinalIgnoreCase))
+                {
+                    return row.RowId >= 1 && row.RowId <= 8;
+                }
+
+                if (string.Equals(row.Sheet, "Tribe", StringComparison.OrdinalIgnoreCase))
+                {
+                    return row.RowId >= 1 && row.RowId <= 16;
+                }
+
+                if (string.Equals(row.Sheet, "GuardianDeity", StringComparison.OrdinalIgnoreCase))
+                {
+                    return row.RowId >= 1 && row.RowId <= 12 && row.ColumnOffset == 0;
+                }
+
+                return false;
             }
 
             private static LobbyCoverageGroup[] CreateLobbyCoverageGroups()
@@ -421,15 +466,27 @@ namespace FfxivKoreanPatch.PatchRouteVerifier
                     new LobbyCoverageGroup(
                         "high-scale-lobby",
                         new string[] { "high-scale-lobby" },
-                        CreateFullSheetCoverageRows(
-                            "Lobby",
-                            "Error",
-                            "Addon",
-                            "ClassJob",
-                            "Race",
-                            "Tribe",
-                            "GuardianDeity"))
+                        CreateHighScaleCoverageRows())
                 };
+            }
+
+            private static LobbyCoverageRowSpec[] CreateHighScaleCoverageRows()
+            {
+                LobbyHangulCoverageRowSpec[] source = LobbyHangulCoverage.HighScaleRows;
+                LobbyCoverageRowSpec[] rows = new LobbyCoverageRowSpec[source.Length];
+                for (int i = 0; i < source.Length; i++)
+                {
+                    int? columnOffset = source[i].ColumnOffset.HasValue
+                        ? (int?)source[i].ColumnOffset.Value
+                        : null;
+                    rows[i] = new LobbyCoverageRowSpec(
+                        source[i].Sheet,
+                        source[i].StartId,
+                        source[i].EndId,
+                        columnOffset);
+                }
+
+                return rows;
             }
 
             private static LobbyCoverageRowSpec[] CreateFullSheetCoverageRows(params string[] sheets)

@@ -41,13 +41,23 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
             "Tribe",
             "GuardianDeity");
 
-        public static readonly LobbyHangulCoverageRowSpec[] StartMainMenuRows = new LobbyHangulCoverageRowSpec[0];
+        public static readonly LobbyHangulCoverageRowSpec[] StartMainMenuRows = CreateFullSheetRows(
+            "Lobby",
+            "Error",
+            "Addon",
+            "ClassJob",
+            "Race",
+            "Tribe",
+            "GuardianDeity");
 
-        public static readonly LobbyHangulCoverageRowSpec[] SystemSettingsRows = new LobbyHangulCoverageRowSpec[]
-        {
-            new LobbyHangulCoverageRowSpec("Addon", 4000, 4200),
-            new LobbyHangulCoverageRowSpec("Addon", 8683, 8722)
-        };
+        public static readonly LobbyHangulCoverageRowSpec[] SystemSettingsRows = CreateFullSheetRows(
+            "Lobby",
+            "Error",
+            "Addon",
+            "ClassJob",
+            "Race",
+            "Tribe",
+            "GuardianDeity");
 
         public static readonly LobbyHangulCoverageRowSpec[] CharacterSelectRows = CreateFullSheetRows(
             "Lobby",
@@ -60,6 +70,17 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
 
         public static readonly LobbyHangulCoverageRowSpec[] LargeLabelRows = new LobbyHangulCoverageRowSpec[]
         {
+            new LobbyHangulCoverageRowSpec("ClassJob", 0, 43),
+            new LobbyHangulCoverageRowSpec("Race", 1, 8),
+            new LobbyHangulCoverageRowSpec("Tribe", 1, 16),
+            new LobbyHangulCoverageRowSpec("GuardianDeity", 1, 12, 0)
+        };
+
+        public static readonly LobbyHangulCoverageRowSpec[] HighScaleRows = new LobbyHangulCoverageRowSpec[]
+        {
+            new LobbyHangulCoverageRowSpec("Lobby", 1, 40),
+            new LobbyHangulCoverageRowSpec("Addon", 4000, 4200),
+            new LobbyHangulCoverageRowSpec("Addon", 8683, 8722),
             new LobbyHangulCoverageRowSpec("ClassJob", 0, 43),
             new LobbyHangulCoverageRowSpec("Race", 1, 8),
             new LobbyHangulCoverageRowSpec("Tribe", 1, 16),

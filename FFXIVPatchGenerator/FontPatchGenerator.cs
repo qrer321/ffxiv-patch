@@ -2399,7 +2399,13 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
                 else if (activeLobbyHangulAllocationCache != null &&
                     activeLobbyHangulAllocationCache.TryGet(allocationKey, out allocation))
                 {
-                    hasAllocation = LobbyTextureCandidateContains(lobbyTextureCandidates, allocation.TexturePath);
+                    hasAllocation = LobbyTextureCandidateContains(lobbyTextureCandidates, allocation.TexturePath) ||
+                        CanReuseHighScaleLobbyAllocation(
+                            normalizedPath,
+                            sourceFdtPath,
+                            allocation,
+                            patchClearWidth,
+                            patchClearHeight);
                 }
 
                 if (!hasAllocation)
@@ -2646,6 +2652,26 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
             return false;
         }
 
+        private static bool CanReuseHighScaleLobbyAllocation(
+            string targetFdtPath,
+            string sourceFdtPath,
+            LobbyHangulGlyphAllocation allocation,
+            int requiredWidth,
+            int requiredHeight)
+        {
+            return IsHighScaleLobbyFont(targetFdtPath) &&
+                   string.Equals(
+                       NormalizeGamePath(sourceFdtPath),
+                       "common/font/AXIS_36.fdt",
+                       StringComparison.OrdinalIgnoreCase) &&
+                   IsLobbyFontTexturePath(allocation.TexturePath) &&
+                   !IsRuntimeUnsafeLobbyTexturePath(allocation.TexturePath) &&
+                   allocation.Cell.ImageIndex >= 0 &&
+                   allocation.Cell.ImageIndex < 24 &&
+                   allocation.Cell.ClearWidth >= requiredWidth &&
+                   allocation.Cell.ClearHeight >= requiredHeight;
+        }
+
         private static string[] GetLobbyHangulTextureCandidates(SqPackArchive globalArchive, string fdtPath)
         {
             string normalized = NormalizeGamePath(fdtPath);
@@ -2667,7 +2693,8 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
                    string.Equals(normalized, "common/font/MiedingerMid_14_lobby.fdt", StringComparison.OrdinalIgnoreCase) ||
                    string.Equals(normalized, "common/font/MiedingerMid_18_lobby.fdt", StringComparison.OrdinalIgnoreCase) ||
                    string.Equals(normalized, "common/font/TrumpGothic_23_lobby.fdt", StringComparison.OrdinalIgnoreCase) ||
-                   string.Equals(normalized, "common/font/TrumpGothic_34_lobby.fdt", StringComparison.OrdinalIgnoreCase);
+                   string.Equals(normalized, "common/font/TrumpGothic_34_lobby.fdt", StringComparison.OrdinalIgnoreCase) ||
+                   IsHighScaleLobbyFont(normalized);
         }
 
         private static bool TryUseCleanEmptyLobbySourceCell(
@@ -5608,16 +5635,24 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
                 LobbyScaledHangulPhrases.StartScreenMainMenu,
                 "lobby start-main-menu glyph coverage");
             sets.SystemAndCharacter = UnionCodepointArrays(sets.SystemSettings, sets.CharacterSelect);
+            uint[] highScaleRaw = CreateLobbyHangulCodepoints(
+                koreaSqpack,
+                LobbyHangulCoverage.HighScaleRows,
+                CombinePhraseGroups(
+                    LobbyScaledHangulPhrases.Core,
+                    LobbyScaledHangulPhrases.StartScreenSystemSettingsResultMessages,
+                    LobbyScaledHangulPhrases.HighResolutionUiScaleOptions,
+                    LobbyScaledHangulPhrases.StartScreenSystemSettings,
+                    LobbyScaledHangulPhrases.StartScreenMainMenu,
+                    LobbyScaledHangulPhrases.CharacterSelectLargeLabels),
+                "lobby high-scale glyph coverage");
             sets.HighScale = CreatePriorityCodepointArray(
                 CombinePhraseGroups(
                     LobbyScaledHangulPhrases.StartScreenSystemSettingsResultMessages,
                     LobbyScaledHangulPhrases.HighResolutionUiScaleOptions,
                     LobbyScaledHangulPhrases.StartScreenSystemSettings,
                     LobbyScaledHangulPhrases.StartScreenMainMenu),
-                sets.SystemSettings,
-                sets.CharacterSelect,
-                sets.LargeLabels,
-                sets.StartMainMenu);
+                highScaleRaw);
             Console.WriteLine(
                 "Lobby Hangul route sets: all={0}, system={1}, character={2}, main-menu={3}, system+character={4}, high-scale={5}",
                 sets.All.Length,
@@ -5673,22 +5708,14 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
                 return sets.StartMainMenu;
             }
 
-            if (IsSystemSettingsLobbyAxisFont(normalized))
+            if (IsLobbyLargeLabelVisualScaleFont(normalized))
             {
-                if (string.Equals(normalized, "common/font/AXIS_18_lobby.fdt", StringComparison.OrdinalIgnoreCase))
+                if (string.Equals(normalized, "common/font/TrumpGothic_34_lobby.fdt", StringComparison.OrdinalIgnoreCase))
                 {
-                    return CreatePriorityCodepointArray(
-                        LobbyScaledHangulPhrases.StartScreenMainMenu,
-                        sets.StartMainMenu,
-                        sets.SystemSettings);
+                    return sets.LargeCharacterLabels;
                 }
 
-                return sets.SystemSettings;
-            }
-
-            if (string.Equals(normalized, "common/font/TrumpGothic_34_lobby.fdt", StringComparison.OrdinalIgnoreCase))
-            {
-                return sets.LargeCharacterLabels;
+                return sets.SystemAndCharacter;
             }
 
             if (IsCharacterSelectOnlyLobbyFont(normalized))
@@ -5698,22 +5725,7 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
 
             if (IsHighScaleLobbyFont(normalized))
             {
-                if (string.Equals(normalized, "common/font/AXIS_36_lobby.fdt", StringComparison.OrdinalIgnoreCase))
-                {
-                    return sets.HighScale;
-                }
-
-                return new uint[0];
-            }
-
-            if (IsLobbyLargeLabelVisualScaleFont(normalized))
-            {
-                if (string.Equals(normalized, "common/font/TrumpGothic_34_lobby.fdt", StringComparison.OrdinalIgnoreCase))
-                {
-                    return sets.LargeCharacterLabels;
-                }
-
-                return sets.LargeLabels;
+                return sets.HighScale;
             }
 
             return sets.SystemAndCharacter;

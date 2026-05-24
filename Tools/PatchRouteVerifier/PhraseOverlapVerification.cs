@@ -982,6 +982,14 @@ namespace FfxivKoreanPatch.PatchRouteVerifier
             private static string ResolveLobbyHangulSourceFontPath(string fontPath)
             {
                 string normalized = (fontPath ?? string.Empty).Replace('\\', '/');
+                for (int i = 0; i < LobbyHangulSourceFontPairs.GetLength(0); i++)
+                {
+                    if (string.Equals(normalized, LobbyHangulSourceFontPairs[i, 0], StringComparison.OrdinalIgnoreCase))
+                    {
+                        return LobbyHangulSourceFontPairs[i, 1];
+                    }
+                }
+
                 for (int i = 0; i < Derived4kLobbyFontPairs.GetLength(0); i++)
                 {
                     if (string.Equals(normalized, Derived4kLobbyFontPairs[i, 0], StringComparison.OrdinalIgnoreCase))
