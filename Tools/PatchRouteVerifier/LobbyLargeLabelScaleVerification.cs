@@ -8,19 +8,19 @@ namespace FfxivKoreanPatch.PatchRouteVerifier
         {
             private static readonly LobbyLargeLabelScaleCase[] LobbyLargeLabelScaleCases = new LobbyLargeLabelScaleCase[]
             {
-                new LobbyLargeLabelScaleCase("start-system-config-title-23", "common/font/TrumpGothic_23_lobby.fdt", "common/font/AXIS_18.fdt", "시스템 설정", "システムコンフィグ"),
-                new LobbyLargeLabelScaleCase("character-race-gender-23", "common/font/TrumpGothic_23_lobby.fdt", "common/font/AXIS_18.fdt", "로스가르 여", "ロスガル"),
-                new LobbyLargeLabelScaleCase("character-tribe-23", "common/font/TrumpGothic_23_lobby.fdt", "common/font/AXIS_18.fdt", "떠도는 별", "ロスト"),
-                new LobbyLargeLabelScaleCase("character-birthday-23", "common/font/TrumpGothic_23_lobby.fdt", "common/font/AXIS_18.fdt", "그림자 5월 11일", "霊5月11日"),
-                new LobbyLargeLabelScaleCase("character-deity-23", "common/font/TrumpGothic_23_lobby.fdt", "common/font/AXIS_18.fdt", "니메이아", "ニメーヤ"),
-                new LobbyLargeLabelScaleCase("character-class-23", "common/font/TrumpGothic_23_lobby.fdt", "common/font/AXIS_18.fdt", "레벨 100 암흑기사", "レベル100暗黒騎士"),
-                new LobbyLargeLabelScaleCase("character-location-23", "common/font/TrumpGothic_23_lobby.fdt", "common/font/AXIS_18.fdt", "지고천 거리", "ジゴテン街"),
-                new LobbyLargeLabelScaleCase("character-race-gender-34", "common/font/TrumpGothic_34_lobby.fdt", "common/font/TrumpGothic_34.fdt", "로스가르 여", "ロスガル"),
-                new LobbyLargeLabelScaleCase("character-tribe-34", "common/font/TrumpGothic_34_lobby.fdt", "common/font/TrumpGothic_34.fdt", "떠도는 별", "ロスト"),
-                new LobbyLargeLabelScaleCase("character-birthday-34", "common/font/TrumpGothic_34_lobby.fdt", "common/font/TrumpGothic_34.fdt", "그림자 5월 11일", "霊5月11日"),
-                new LobbyLargeLabelScaleCase("character-deity-34", "common/font/TrumpGothic_34_lobby.fdt", "common/font/TrumpGothic_34.fdt", "니메이아", "ニメーヤ"),
-                new LobbyLargeLabelScaleCase("character-class-34", "common/font/TrumpGothic_34_lobby.fdt", "common/font/TrumpGothic_34.fdt", "레벨 100 암흑기사", "レベル100暗黒騎士"),
-                new LobbyLargeLabelScaleCase("character-location-34", "common/font/TrumpGothic_34_lobby.fdt", "common/font/TrumpGothic_34.fdt", "지고천 거리", "ジゴテン街")
+                new LobbyLargeLabelScaleCase("start-system-config-title-23", "common/font/TrumpGothic_23_lobby.fdt", "common/font/AXIS_18.fdt", "common/font/AXIS_18.fdt", "시스템 설정", "システムコンフィグ"),
+                new LobbyLargeLabelScaleCase("character-race-gender-23", "common/font/TrumpGothic_23_lobby.fdt", "common/font/AXIS_18.fdt", "common/font/AXIS_18.fdt", "로스가르 여", "ロスガル"),
+                new LobbyLargeLabelScaleCase("character-tribe-23", "common/font/TrumpGothic_23_lobby.fdt", "common/font/AXIS_18.fdt", "common/font/AXIS_18.fdt", "떠도는 별", "ロスト"),
+                new LobbyLargeLabelScaleCase("character-birthday-23", "common/font/TrumpGothic_23_lobby.fdt", "common/font/AXIS_18.fdt", "common/font/AXIS_18.fdt", "그림자 5월 11일", "霊5月11日"),
+                new LobbyLargeLabelScaleCase("character-deity-23", "common/font/TrumpGothic_23_lobby.fdt", "common/font/AXIS_18.fdt", "common/font/AXIS_18.fdt", "니메이아", "ニメーヤ"),
+                new LobbyLargeLabelScaleCase("character-class-23", "common/font/TrumpGothic_23_lobby.fdt", "common/font/AXIS_18.fdt", "common/font/AXIS_18.fdt", "레벨 100 암흑기사", "レベル100暗黒騎士"),
+                new LobbyLargeLabelScaleCase("character-location-23", "common/font/TrumpGothic_23_lobby.fdt", "common/font/AXIS_18.fdt", "common/font/AXIS_18.fdt", "지고천 거리", "ジゴテン街"),
+                new LobbyLargeLabelScaleCase("character-race-gender-34", "common/font/TrumpGothic_34_lobby.fdt", "common/font/TrumpGothic_34.fdt", "common/font/AXIS_36.fdt", "로스가르 여", "ロスガル"),
+                new LobbyLargeLabelScaleCase("character-tribe-34", "common/font/TrumpGothic_34_lobby.fdt", "common/font/TrumpGothic_34.fdt", "common/font/AXIS_36.fdt", "떠도는 별", "ロスト"),
+                new LobbyLargeLabelScaleCase("character-birthday-34", "common/font/TrumpGothic_34_lobby.fdt", "common/font/TrumpGothic_34.fdt", "common/font/AXIS_36.fdt", "그림자 5월 11일", "霊5月11日"),
+                new LobbyLargeLabelScaleCase("character-deity-34", "common/font/TrumpGothic_34_lobby.fdt", "common/font/TrumpGothic_34.fdt", "common/font/AXIS_36.fdt", "니메이아", "ニメーヤ"),
+                new LobbyLargeLabelScaleCase("character-class-34", "common/font/TrumpGothic_34_lobby.fdt", "common/font/TrumpGothic_34.fdt", "common/font/AXIS_36.fdt", "레벨 100 암흑기사", "レベル100暗黒騎士"),
+                new LobbyLargeLabelScaleCase("character-location-34", "common/font/TrumpGothic_34_lobby.fdt", "common/font/TrumpGothic_34.fdt", "common/font/AXIS_36.fdt", "지고천 거리", "ジゴテン街")
             };
 
             private void VerifyLobbyLargeLabelScaleLayouts()
@@ -85,15 +85,11 @@ namespace FfxivKoreanPatch.PatchRouteVerifier
             {
                 PhraseVisualBounds cleanReference;
                 string error;
-                string cleanReferenceFontPath = testCase.FontPath;
+                string cleanReferenceFontPath = testCase.CleanReferenceFontPath;
                 if (!TryMeasurePhraseVisualBounds(_cleanFont, cleanReferenceFontPath, testCase.CleanReferencePhrase, false, out cleanReference, out error))
                 {
-                    cleanReferenceFontPath = testCase.ReferenceFontPath;
-                    if (!TryMeasurePhraseVisualBounds(_cleanFont, cleanReferenceFontPath, testCase.CleanReferencePhrase, false, out cleanReference, out error))
-                    {
-                        Warn("{0} lobby large-label clean reference [{1}] skipped: {2}", testCase.FontPath, Escape(testCase.CleanReferencePhrase), error);
-                        return;
-                    }
+                    Fail("{0} lobby large-label clean reference [{1}] missing in {2}: {3}", testCase.FontPath, Escape(testCase.CleanReferencePhrase), cleanReferenceFontPath, error);
+                    return;
                 }
 
                 double referenceHeight = cleanReference.MeanReferenceHeight;
@@ -125,10 +121,10 @@ namespace FfxivKoreanPatch.PatchRouteVerifier
                 string normalized = (fontPath ?? string.Empty).Replace('\\', '/');
                 if (string.Equals(normalized, "common/font/TrumpGothic_34_lobby.fdt", StringComparison.OrdinalIgnoreCase))
                 {
-                    return new LobbyLargeLabelScaleExpectation(0.90d, 1.22d, 0.90d, 24.0d, 38.0d, 0.82d, 2.70d);
+                    return new LobbyLargeLabelScaleExpectation(0.92d, 1.05d, 0.96d, 24.0d, 34.0d, 0.82d, 1.35d);
                 }
 
-                return new LobbyLargeLabelScaleExpectation(1.04d, 1.16d, 1.02d, 17.0d, 24.0d, 0.82d, 1.80d);
+                return new LobbyLargeLabelScaleExpectation(0.84d, 1.02d, 0.84d, 14.0d, 20.0d, 0.82d, 1.45d);
             }
 
             private void VerifyLobbyLargeLabelFontPixelHeight(
@@ -212,14 +208,16 @@ namespace FfxivKoreanPatch.PatchRouteVerifier
                 public readonly string Id;
                 public readonly string FontPath;
                 public readonly string ReferenceFontPath;
+                public readonly string CleanReferenceFontPath;
                 public readonly string KoreanPhrase;
                 public readonly string CleanReferencePhrase;
 
-                public LobbyLargeLabelScaleCase(string id, string fontPath, string referenceFontPath, string koreanPhrase, string cleanReferencePhrase)
+                public LobbyLargeLabelScaleCase(string id, string fontPath, string referenceFontPath, string cleanReferenceFontPath, string koreanPhrase, string cleanReferencePhrase)
                 {
                     Id = id;
                     FontPath = fontPath;
                     ReferenceFontPath = referenceFontPath;
+                    CleanReferenceFontPath = cleanReferenceFontPath;
                     KoreanPhrase = koreanPhrase;
                     CleanReferencePhrase = cleanReferencePhrase;
                 }

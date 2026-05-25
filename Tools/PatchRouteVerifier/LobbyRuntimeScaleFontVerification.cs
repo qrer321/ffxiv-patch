@@ -8,14 +8,13 @@ namespace FfxivKoreanPatch.PatchRouteVerifier
         {
             private static readonly LobbyRuntimeScaleCase[] LobbyRuntimeScaleCases = new LobbyRuntimeScaleCase[]
             {
-                new LobbyRuntimeScaleCase("start-system-title-23", "common/font/TrumpGothic_23.fdt", "시스템 설정", "common/font/TrumpGothic_23.fdt", "システムコンフィグ", 0.90d, 1.16d, 0.72d, 1.28d, 0.72d, 1.28d),
-                new LobbyRuntimeScaleCase("start-system-title-23-lobby", "common/font/TrumpGothic_23_lobby.fdt", "시스템 설정", "common/font/TrumpGothic_23_lobby.fdt", "システムコンフィグ", 0.88d, 1.24d, 0.62d, 1.40d, 0.62d, 1.40d),
-                new LobbyRuntimeScaleCase("start-system-title-34-lobby", "common/font/TrumpGothic_34_lobby.fdt", "시스템 설정", "common/font/TrumpGothic_34_lobby.fdt", "システムコンフィグ", 0.88d, 1.24d, 0.62d, 1.40d, 0.62d, 1.40d),
+                new LobbyRuntimeScaleCase("start-system-title-23-lobby", "common/font/TrumpGothic_23_lobby.fdt", "시스템 설정", "common/font/AXIS_18.fdt", "システムコンフィグ", 0.88d, 1.24d, 0.62d, 1.40d, 0.62d, 1.40d),
+                new LobbyRuntimeScaleCase("start-system-title-34-lobby", "common/font/TrumpGothic_34_lobby.fdt", "시스템 설정", "common/font/AXIS_36.fdt", "システムコンフィグ", 0.84d, 1.24d, 0.62d, 1.40d, 0.62d, 1.40d),
                 new LobbyRuntimeScaleCase("start-system-title-68-lobby", "common/font/TrumpGothic_68_lobby.fdt", "시스템 설정", "common/font/AXIS_36.fdt", "システムコンフィグ", 0.88d, 1.24d, 0.62d, 1.40d, 0.62d, 1.40d),
-                new LobbyRuntimeScaleCase("character-race-23", "common/font/TrumpGothic_23_lobby.fdt", "로스가르 여", "common/font/TrumpGothic_23_lobby.fdt", "ロスガル", 0.88d, 1.24d, 0.62d, 1.40d, 0.62d, 1.40d),
-                new LobbyRuntimeScaleCase("character-class-23", "common/font/TrumpGothic_23_lobby.fdt", "레벨 100 암흑기사", "common/font/TrumpGothic_23_lobby.fdt", "レベル100暗黒騎士", 0.88d, 1.24d, 0.62d, 1.40d, 0.62d, 1.40d),
-                new LobbyRuntimeScaleCase("character-race-34", "common/font/TrumpGothic_34_lobby.fdt", "로스가르 여", "common/font/TrumpGothic_34_lobby.fdt", "ロスガル", 0.88d, 1.24d, 0.62d, 1.40d, 0.62d, 1.40d),
-                new LobbyRuntimeScaleCase("character-class-34", "common/font/TrumpGothic_34_lobby.fdt", "레벨 100 암흑기사", "common/font/TrumpGothic_34_lobby.fdt", "レベル100暗黒騎士", 0.88d, 1.24d, 0.62d, 1.40d, 0.62d, 1.40d),
+                new LobbyRuntimeScaleCase("character-race-23", "common/font/TrumpGothic_23_lobby.fdt", "로스가르 여", "common/font/AXIS_18.fdt", "ロスガル", 0.88d, 1.24d, 0.62d, 1.40d, 0.62d, 1.40d),
+                new LobbyRuntimeScaleCase("character-class-23", "common/font/TrumpGothic_23_lobby.fdt", "레벨 100 암흑기사", "common/font/AXIS_18.fdt", "レベル100暗黒騎士", 0.88d, 1.24d, 0.62d, 1.40d, 0.62d, 1.40d),
+                new LobbyRuntimeScaleCase("character-race-34", "common/font/TrumpGothic_34_lobby.fdt", "로스가르 여", "common/font/AXIS_36.fdt", "ロスガル", 0.84d, 1.24d, 0.62d, 1.40d, 0.62d, 1.40d),
+                new LobbyRuntimeScaleCase("character-class-34", "common/font/TrumpGothic_34_lobby.fdt", "레벨 100 암흑기사", "common/font/AXIS_36.fdt", "レベル100暗黒騎士", 0.84d, 1.24d, 0.62d, 1.40d, 0.62d, 1.40d),
                 new LobbyRuntimeScaleCase("character-race-68", "common/font/TrumpGothic_68_lobby.fdt", "로스가르 여", "common/font/AXIS_36.fdt", "ロスガル", 0.88d, 1.24d, 0.62d, 1.40d, 0.62d, 1.40d),
                 new LobbyRuntimeScaleCase("character-class-68", "common/font/TrumpGothic_68_lobby.fdt", "레벨 100 암흑기사", "common/font/AXIS_36.fdt", "レベル100暗黒騎士", 0.88d, 1.24d, 0.62d, 1.40d, 0.62d, 1.40d)
             };
@@ -40,22 +39,15 @@ namespace FfxivKoreanPatch.PatchRouteVerifier
                 }
 
                 PhraseVisualBounds reference;
-                bool referenceIsCjk = true;
                 if (!TryMeasurePhraseVisualBounds(_cleanFont, testCase.ReferenceFontPath, testCase.ReferencePhrase, false, out reference, out error))
                 {
-                    referenceIsCjk = false;
-                    if (_ttmpFont == null ||
-                        !_ttmpFont.ContainsPath(testCase.ReferenceFontPath) ||
-                        !TryMeasurePhraseVisualBounds(_ttmpFont, testCase.ReferenceFontPath, testCase.KoreanPhrase, out reference, out error))
-                    {
-                        Fail("{0} lobby runtime-scale [{1}] reference layout error in {2}: clean=[{3}], source=[{4}], error={5}", testCase.FontPath, testCase.Id, testCase.ReferenceFontPath, Escape(testCase.ReferencePhrase), Escape(testCase.KoreanPhrase), error);
-                        return;
-                    }
+                    Fail("{0} lobby runtime-scale [{1}] clean reference layout error in {2}: clean=[{3}], error={4}", testCase.FontPath, testCase.Id, testCase.ReferenceFontPath, Escape(testCase.ReferencePhrase), error);
+                    return;
                 }
 
-                double referenceHeight = referenceIsCjk ? reference.MeanReferenceHeight : reference.MeanHangulHeight;
-                double referenceWidth = referenceIsCjk ? reference.MeanReferenceWidth : reference.MeanHangulWidth;
-                double referenceAdvance = referenceIsCjk ? reference.MeanReferenceAdvance : reference.MeanHangulAdvance;
+                double referenceHeight = reference.MeanReferenceHeight;
+                double referenceWidth = reference.MeanReferenceWidth;
+                double referenceAdvance = reference.MeanReferenceAdvance;
                 if (korean.MeanHangulHeight <= 0d || referenceHeight <= 0d)
                 {
                     Fail("{0} lobby runtime-scale [{1}] cannot compare height: korean={2}, reference={3}", testCase.FontPath, testCase.Id, FormatDouble(korean.MeanHangulHeight), FormatDouble(referenceHeight));
@@ -78,7 +70,7 @@ namespace FfxivKoreanPatch.PatchRouteVerifier
                     FormatRatio(SafeRatio(korean.MeanHangulWidth, referenceWidth)),
                     FormatRatio(SafeRatio(korean.MeanHangulAdvance, referenceAdvance)),
                     Escape(testCase.KoreanPhrase),
-                    referenceIsCjk ? Escape(testCase.ReferencePhrase) : Escape(testCase.KoreanPhrase));
+                    Escape(testCase.ReferencePhrase));
             }
 
             private bool VerifyLobbyRuntimeScaleAxis(

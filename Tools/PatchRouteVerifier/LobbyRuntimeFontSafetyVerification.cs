@@ -107,6 +107,7 @@ namespace FfxivKoreanPatch.PatchRouteVerifier
                 }
 
                 VerifyLobbyPatchedHangulCellOverlap(patchedHangulCells, ref failures);
+                VerifyLobbyPatchedHangulMipConsistency(patchedHangulCells, ref failures);
 
                 if (failures >= MaxLobbyRuntimeSafetyFailures)
                 {
@@ -277,6 +278,200 @@ namespace FfxivKoreanPatch.PatchRouteVerifier
                 }
             }
 
+            private void VerifyLobbyPatchedHangulMipConsistency(List<LobbyRuntimeGlyphCell> cells, ref int failures)
+            {
+                Dictionary<string, Texture> textureCache = new Dictionary<string, Texture>(StringComparer.OrdinalIgnoreCase);
+                HashSet<string> checkedCells = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+                for (int cellIndex = 0; cellIndex < cells.Count; cellIndex++)
+                {
+                    if (failures >= MaxLobbyRuntimeSafetyFailures)
+                    {
+                        return;
+                    }
+
+                    LobbyRuntimeGlyphCell cell = cells[cellIndex];
+                    string key = cell.TexturePath + "#" + cell.Channel.ToString() + "#" +
+                                 cell.X.ToString() + "," + cell.Y.ToString() + "," +
+                                 cell.Width.ToString() + "x" + cell.Height.ToString();
+                    if (checkedCells.Contains(key))
+                    {
+                        continue;
+                    }
+
+                    checkedCells.Add(key);
+                    Texture texture;
+                    if (!textureCache.TryGetValue(cell.TexturePath, out texture))
+                    {
+                        try
+                        {
+                            texture = ReadFontTexture(_patchedFont, cell.TexturePath);
+                            textureCache.Add(cell.TexturePath, texture);
+                        }
+                        catch (Exception ex)
+                        {
+                            failures = FailLobbyRuntimeSafetyOnce(
+                                failures,
+                                "{0} U+{1:X4} patched Hangul mip check cannot read {2}: {3}",
+                                cell.FontPath,
+                                cell.Codepoint,
+                                cell.TexturePath,
+                                ex.Message);
+                            continue;
+                        }
+                    }
+
+                    for (int level = 1; level < texture.MipmapCount; level++)
+                    {
+                        if (!IsTextureMipAvailable(texture, level))
+                        {
+                            failures = FailLobbyRuntimeSafetyOnce(
+                                failures,
+                                "{0} U+{1:X4} patched Hangul cell {2}:{3},{4} {5}x{6} has unavailable mip level {7}",
+                                cell.FontPath,
+                                cell.Codepoint,
+                                cell.TexturePath,
+                                cell.X,
+                                cell.Y,
+                                cell.Width,
+                                cell.Height,
+                                level);
+                            continue;
+                        }
+
+                        LobbyMipDiff diff = MeasureLobbyPatchedHangulMipDiff(texture, cell, level);
+                        if (diff.CheckedPixels == 0)
+                        {
+                            continue;
+                        }
+
+                        int allowedMismatches = Math.Max(2, diff.CheckedPixels / 8);
+                        if ((diff.ExpectedVisible > 0 && diff.ActualVisible == 0) ||
+                            diff.MismatchedPixels > allowedMismatches ||
+                            diff.MaxDiff > 85)
+                        {
+                            failures = FailLobbyRuntimeSafetyOnce(
+                                failures,
+                                "{0} U+{1:X4} patched Hangul cell {2}:{3},{4} {5}x{6} mip {7} does not match base glyph downsample: checked={8}, expectedVisible={9}, actualVisible={10}, mismatched={11}, maxDiff={12}",
+                                cell.FontPath,
+                                cell.Codepoint,
+                                cell.TexturePath,
+                                cell.X,
+                                cell.Y,
+                                cell.Width,
+                                cell.Height,
+                                level,
+                                diff.CheckedPixels,
+                                diff.ExpectedVisible,
+                                diff.ActualVisible,
+                                diff.MismatchedPixels,
+                                diff.MaxDiff);
+                        }
+                    }
+                }
+            }
+
+            private static LobbyMipDiff MeasureLobbyPatchedHangulMipDiff(Texture texture, LobbyRuntimeGlyphCell cell, int level)
+            {
+                LobbyMipDiff diff = new LobbyMipDiff();
+                int mipWidth = GetTextureMipWidth(texture, level);
+                int mipHeight = GetTextureMipHeight(texture, level);
+                int left = ClampInt(FloorDivPow2(cell.X, level), 0, mipWidth);
+                int top = ClampInt(FloorDivPow2(cell.Y, level), 0, mipHeight);
+                int right = ClampInt(CeilDivPow2(cell.X + cell.Width, level), 0, mipWidth);
+                int bottom = ClampInt(CeilDivPow2(cell.Y + cell.Height, level), 0, mipHeight);
+                int blockSize = 1 << Math.Min(level, 30);
+                for (int y = top; y < bottom; y++)
+                {
+                    int baseY0 = Math.Max(0, y * blockSize - cell.Y);
+                    int baseY1 = Math.Min(cell.Height, (y + 1) * blockSize - cell.Y);
+                    if (baseY0 >= baseY1)
+                    {
+                        continue;
+                    }
+
+                    for (int x = left; x < right; x++)
+                    {
+                        int baseX0 = Math.Max(0, x * blockSize - cell.X);
+                        int baseX1 = Math.Min(cell.Width, (x + 1) * blockSize - cell.X);
+                        if (baseX0 >= baseX1)
+                        {
+                            continue;
+                        }
+
+                        byte expected = DownsampleLobbyBaseGlyphAlpha(texture, cell, baseX0, baseX1, baseY0, baseY1);
+                        byte actual = ReadFontTextureMipAlphaOrZero(texture, x, y, cell.Channel, level);
+                        if (expected > 0)
+                        {
+                            diff.ExpectedVisible++;
+                        }
+
+                        if (actual > 0)
+                        {
+                            diff.ActualVisible++;
+                        }
+
+                        int valueDiff = Math.Abs((int)expected - actual);
+                        if (valueDiff > 34)
+                        {
+                            diff.MismatchedPixels++;
+                        }
+
+                        if (valueDiff > diff.MaxDiff)
+                        {
+                            diff.MaxDiff = valueDiff;
+                        }
+
+                        diff.CheckedPixels++;
+                    }
+                }
+
+                return diff;
+            }
+
+            private static byte DownsampleLobbyBaseGlyphAlpha(
+                Texture texture,
+                LobbyRuntimeGlyphCell cell,
+                int baseX0,
+                int baseX1,
+                int baseY0,
+                int baseY1)
+            {
+                byte maxAlpha = 0;
+                for (int y = baseY0; y < baseY1; y++)
+                {
+                    for (int x = baseX0; x < baseX1; x++)
+                    {
+                        byte alpha = ReadFontTextureAlphaOrZero(
+                            texture,
+                            0,
+                            cell.X + x,
+                            cell.Y + y,
+                            cell.Channel);
+                        if (alpha > maxAlpha)
+                        {
+                            maxAlpha = alpha;
+                        }
+                    }
+                }
+
+                return maxAlpha;
+            }
+
+            private static int ClampInt(int value, int min, int max)
+            {
+                if (value < min)
+                {
+                    return min;
+                }
+
+                if (value > max)
+                {
+                    return max;
+                }
+
+                return value;
+            }
+
             private static bool SameLobbyRuntimeCell(FdtGlyphEntry left, FdtGlyphEntry right)
             {
                 return left.ImageIndex == right.ImageIndex &&
@@ -317,6 +512,15 @@ namespace FfxivKoreanPatch.PatchRouteVerifier
                 public int Y;
                 public int Width;
                 public int Height;
+            }
+
+            private struct LobbyMipDiff
+            {
+                public int CheckedPixels;
+                public int ExpectedVisible;
+                public int ActualVisible;
+                public int MismatchedPixels;
+                public int MaxDiff;
             }
         }
     }
