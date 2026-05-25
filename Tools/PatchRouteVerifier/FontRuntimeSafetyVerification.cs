@@ -54,6 +54,8 @@ namespace FfxivKoreanPatch.PatchRouteVerifier
                         continue;
                     }
 
+                    VerifyNoRuntimeUtf8OnlyStartScreenKerning(fontPath, fdt, ref failures);
+
                     checkedFonts++;
                     for (int glyphIndex = 0; glyphIndex < glyphCount; glyphIndex++)
                     {
@@ -176,6 +178,101 @@ namespace FfxivKoreanPatch.PatchRouteVerifier
                 }
 
                 return true;
+            }
+
+            private static readonly Lazy<HashSet<string>> RuntimeUnsafeStartScreenKerningPairs =
+                new Lazy<HashSet<string>>(CreateRuntimeUnsafeStartScreenKerningPairs);
+
+            private void VerifyNoRuntimeUtf8OnlyStartScreenKerning(string fontPath, byte[] fdt, ref int failures)
+            {
+                if (IsLobbyFontPath(fontPath) || fdt == null)
+                {
+                    return;
+                }
+
+                int kerningStart;
+                uint kerningCount;
+                if (!TryGetKerningTable(fdt, out kerningStart, out kerningCount))
+                {
+                    return;
+                }
+
+                HashSet<string> unsafePairs = RuntimeUnsafeStartScreenKerningPairs.Value;
+                for (int i = 0; i < kerningCount; i++)
+                {
+                    int offset = kerningStart + i * FdtKerningEntrySize;
+                    uint leftValue = Endian.ReadUInt32LE(fdt, offset);
+                    uint rightValue = Endian.ReadUInt32LE(fdt, offset + 4);
+                    string key = BuildKerningAdjustmentKey(leftValue, rightValue);
+                    if (!unsafePairs.Contains(key))
+                    {
+                        continue;
+                    }
+
+                    ushort leftShiftJis = Endian.ReadUInt16LE(fdt, offset + 8);
+                    ushort rightShiftJis = Endian.ReadUInt16LE(fdt, offset + 10);
+                    if (leftShiftJis != 0 && rightShiftJis != 0)
+                    {
+                        continue;
+                    }
+
+                    uint leftCodepoint;
+                    uint rightCodepoint;
+                    TryDecodeFdtUtf8Value(leftValue, out leftCodepoint);
+                    TryDecodeFdtUtf8Value(rightValue, out rightCodepoint);
+                    failures = FailFontRuntimeGlyphBoundsOnce(
+                        failures,
+                        "{0} has start-screen UTF-8-only kerning U+{1:X4}:U+{2:X4} with Shift-JIS fallback {3:X4}:{4:X4}; non-lobby runtime fonts are used by HD/non-4K lobby UI and must not receive Hangul synthetic kerning",
+                        fontPath,
+                        leftCodepoint,
+                        rightCodepoint,
+                        leftShiftJis,
+                        rightShiftJis);
+                }
+            }
+
+            private static HashSet<string> CreateRuntimeUnsafeStartScreenKerningPairs()
+            {
+                HashSet<string> pairs = new HashSet<string>(StringComparer.Ordinal);
+                AddRuntimeUnsafeStartScreenKerningPairs(pairs, LobbyScaledHangulPhrases.StartScreenSystemSettingsResultMessages);
+                AddRuntimeUnsafeStartScreenKerningPairs(pairs, LobbyScaledHangulPhrases.StartScreenSystemSettings);
+                AddRuntimeUnsafeStartScreenKerningPairs(pairs, LobbyScaledHangulPhrases.HighResolutionUiScaleOptions);
+                return pairs;
+            }
+
+            private static void AddRuntimeUnsafeStartScreenKerningPairs(HashSet<string> pairs, string[] phrases)
+            {
+                if (pairs == null || phrases == null)
+                {
+                    return;
+                }
+
+                for (int phraseIndex = 0; phraseIndex < phrases.Length; phraseIndex++)
+                {
+                    string phrase = phrases[phraseIndex] ?? string.Empty;
+                    uint previous = 0;
+                    bool hasPrevious = false;
+                    for (int i = 0; i < phrase.Length; i++)
+                    {
+                        uint codepoint = ReadCodepoint(phrase, ref i);
+                        if (hasPrevious && IsRuntimeUnsafeStartScreenKerningPair(previous, codepoint))
+                        {
+                            pairs.Add(BuildKerningAdjustmentKey(PackUtf8(previous), PackUtf8(codepoint)));
+                        }
+
+                        previous = codepoint;
+                        hasPrevious = !IsPhraseLayoutSpace(codepoint);
+                    }
+                }
+            }
+
+            private static bool IsRuntimeUnsafeStartScreenKerningPair(uint left, uint right)
+            {
+                ushort ignored;
+                bool leftEncodes = TryEncodeShiftJisValue(left, out ignored);
+                bool rightEncodes = TryEncodeShiftJisValue(right, out ignored);
+                return (!leftEncodes || !rightEncodes) &&
+                       (IsHangulCodepoint(left) || IsHangulCodepoint(right));
             }
 
             private bool TryReadRuntimeTexture(Dictionary<string, Texture> cache, string texturePath, out Texture texture)

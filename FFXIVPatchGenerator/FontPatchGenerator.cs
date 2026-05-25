@@ -4544,8 +4544,24 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
 
             return UpsertKerningEntries(
                 ref targetFdt,
-                CollectStartScreenKerningPairs(route),
+                CollectRuntimeSafeStartScreenKerningPairs(route),
                 route.MinimumAdjustment);
+        }
+
+        private static List<byte[]> CollectRuntimeSafeStartScreenKerningPairs(StartScreenKerningRoute route)
+        {
+            // AtkFontAnalyzerRender can be reached from start-screen/non-4K UI paths
+            // that use non-lobby AXIS fonts. Do not add UTF-8-only Hangul kerning
+            // there; keep only Shift-JIS encodable ASCII pairs.
+            Dictionary<string, byte[]> entries = new Dictionary<string, byte[]>(StringComparer.Ordinal);
+            if (route.IncludeHighResolutionPercentPairs)
+            {
+                AddAsciiPercentKerningPairs(entries, LobbyScaledHangulPhrases.HighResolutionUiScaleOptions, route.PercentAdjustment);
+            }
+
+            List<byte[]> result = new List<byte[]>(entries.Values);
+            result.Sort(CompareKerningEntries);
+            return result;
         }
 
         private static bool TryGetStartScreenKerningRoute(string path, out StartScreenKerningRoute route)
