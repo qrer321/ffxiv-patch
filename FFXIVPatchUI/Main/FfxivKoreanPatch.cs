@@ -1617,7 +1617,36 @@ namespace FFXIVKoreanPatch.Main
                 files.Add("0a0000.win32.index2");
             }
 
+            if (IsFontOnlyPatchSelection(selected))
+            {
+                files.AddRange(GetCleanIndexFilesToRestoreBeforeApply(selected));
+            }
+
             return files.Distinct(StringComparer.OrdinalIgnoreCase).ToArray();
+        }
+
+        private bool IsFontOnlyPatchSelection(IEnumerable<string> selectedPatchFiles)
+        {
+            string[] selected = selectedPatchFiles.Distinct(StringComparer.OrdinalIgnoreCase).ToArray();
+            return HasAnyPatchFile(selected, fontPatchFiles) &&
+                   !HasAnyPatchFile(selected, textPatchFiles) &&
+                   !HasAnyPatchFile(selected, uiPatchFiles);
+        }
+
+        private string[] GetCleanIndexFilesToRestoreBeforeApply(IEnumerable<string> selectedPatchFiles)
+        {
+            if (!IsFontOnlyPatchSelection(selectedPatchFiles))
+            {
+                return new string[0];
+            }
+
+            return new string[]
+            {
+                "0a0000.win32.index",
+                "0a0000.win32.index2",
+                "060000.win32.index",
+                "060000.win32.index2"
+            };
         }
 
         private bool HasCleanIndexAtPath(string indexPath)
@@ -2841,6 +2870,82 @@ namespace FFXIVKoreanPatch.Main
                 if (!File.Exists(filePath))
                 {
                     throw new FileNotFoundException(context + " 파일이 누락되었습니다.", filePath);
+                }
+            }
+        }
+
+        private string ResolveCleanIndexSourceForApply(
+            string fileName,
+            string baselineDir,
+            string applySqpackDir)
+        {
+            string baselinePath = GetRestoreBaselineOrigPath(baselineDir, fileName);
+            if (HasCleanIndexAtPath(baselinePath))
+            {
+                return baselinePath;
+            }
+
+            string installedOrigPath = Path.Combine(applySqpackDir, "orig." + fileName);
+            if (HasCleanIndexAtPath(installedOrigPath))
+            {
+                return installedOrigPath;
+            }
+
+            string currentPath = Path.Combine(applySqpackDir, fileName);
+            if (HasCleanIndexAtPath(currentPath))
+            {
+                return currentPath;
+            }
+
+            string existingBaselinePath;
+            if (TryFindExistingRestoreBaselineIndex(fileName, out existingBaselinePath))
+            {
+                return existingBaselinePath;
+            }
+
+            return null;
+        }
+
+        private void RestoreCleanIndexFilesBeforeFontOnlyApply(
+            IEnumerable<string> fileNames,
+            string baselineDir,
+            string applySqpackDir,
+            IList<string> logLines)
+        {
+            string[] restoreIndexFiles = fileNames.Distinct(StringComparer.OrdinalIgnoreCase).ToArray();
+            if (restoreIndexFiles.Length == 0)
+            {
+                return;
+            }
+
+            foreach (string fileName in restoreIndexFiles)
+            {
+                string sourcePath = ResolveCleanIndexSourceForApply(fileName, baselineDir, applySqpackDir);
+                if (string.IsNullOrEmpty(sourcePath))
+                {
+                    throw new FileNotFoundException("font-only 적용에 필요한 clean 텍스트/UI index를 찾을 수 없습니다.", fileName);
+                }
+
+                File.Copy(sourcePath, Path.Combine(applySqpackDir, fileName), true);
+                if (logLines != null)
+                {
+                    logLines.Add("Font-only clean index restore: " + fileName + " <- " + sourcePath);
+                }
+            }
+        }
+
+        private void ValidateCleanIndexesApplied(string directory, IEnumerable<string> fileNames, string context)
+        {
+            foreach (string fileName in fileNames.Distinct(StringComparer.OrdinalIgnoreCase))
+            {
+                string filePath = Path.Combine(directory, fileName);
+                int dat1Count;
+                string error;
+                if (!IsCleanIndexFile(filePath, out dat1Count, out error))
+                {
+                    throw new InvalidDataException(
+                        context + " 검증 실패: " + fileName + "가 clean index가 아닙니다. dat1 엔트리 " +
+                        dat1Count.ToString() + (string.IsNullOrEmpty(error) ? "" : ", 오류: " + error));
                 }
             }
         }
@@ -4548,6 +4653,7 @@ namespace FFXIVKoreanPatch.Main
                 string applyGameDir = GetApplyGameDir();
                 string applySqpackDir = Path.Combine(applyGameDir, "sqpack", "ffxiv");
                 Directory.CreateDirectory(applySqpackDir);
+                string[] cleanIndexRestoreBeforeApplyFiles = GetCleanIndexFilesToRestoreBeforeApply(selectedPatchFiles);
 
                 UpdateStatusLabel(useDebugApplyPath ? "생성된 패치 테스트 경로에 적용 중..." : "생성된 패치 적용 중...");
                 UpdateDownloadLabel("");
@@ -4556,7 +4662,12 @@ namespace FFXIVKoreanPatch.Main
                 string backupDir = string.Empty;
                 if (!useDebugApplyPath)
                 {
-                    backupDir = BackupTargetFiles(selectedPatchFiles, buildTextPatch ? "auto-apply" : "font-apply");
+                    string[] backupFiles = selectedPatchFiles
+                        .Concat(cleanIndexRestoreBeforeApplyFiles)
+                        .Distinct(StringComparer.OrdinalIgnoreCase)
+                        .ToArray();
+                    backupDir = BackupTargetFiles(backupFiles, buildTextPatch ? "auto-apply" : "font-apply");
+                    RestoreCleanIndexFilesBeforeFontOnlyApply(cleanIndexRestoreBeforeApplyFiles, baselineDir, applySqpackDir, logLines);
                 }
 
                 foreach (string patchFile in selectedPatchFiles)
@@ -4571,7 +4682,9 @@ namespace FFXIVKoreanPatch.Main
                 }
 
                 ValidateFilesExist(applySqpackDir, selectedPatchFiles, "적용 대상");
+                ValidateFilesExist(applySqpackDir, cleanIndexRestoreBeforeApplyFiles, "font-only clean 복구 대상");
                 ValidateSelectedPatchReferences(applySqpackDir, selectedPatchFiles, "적용 대상");
+                ValidateCleanIndexesApplied(applySqpackDir, cleanIndexRestoreBeforeApplyFiles, "font-only clean 복구");
                 ValidateAppliedFilesMatchRelease(releaseOutputDir, applySqpackDir, selectedPatchFiles);
                 logLines.Add("Apply byte validation: OK");
                 logLines.Add("Apply validation: OK");

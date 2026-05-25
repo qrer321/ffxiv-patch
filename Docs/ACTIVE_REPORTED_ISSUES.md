@@ -439,3 +439,16 @@
 - Fresh generated output `.tmp\lobby-runtime-scale-ja-r3` passes the focused route set:
   `lobby-runtime-scale-font-routes,lobby-coverage-glyphs,lobby-multitexture-font-set,lobby-texture-cell-margin,pvp-profile-font-routes,action-detail-scale-layouts,combat-flytext-damage-glyphs,third-party-game-font-safety`.
 - The same output passes the broader `lobby-critical,ingame-critical` verifier group. This is generated-output verification only; keep the live lobby/PvP reports open until user confirmation on a release build.
+
+## 2026-05-25 font-only over full-patch mixed-state rejection
+
+- New live report after the runtime-scale work: lobby `시스템 설정` is still too large at 150% and too small at 200%+, character-select still has `=` fallback above 100%, and HD UI resolution still crashes in `component::gui::atkfontanalyzerRenderer`.
+- The latest applied/generated folder was `%LOCALAPPDATA%\FFXIVKoreanPatch\generated-release\ja\2026.05.01.0000.0000\20260525-200137`. Its manifest is a `font-apply` output containing only `000000` font files.
+- The previous full output `%LOCALAPPDATA%\FFXIVKoreanPatch\generated-release\ja\2026.05.01.0000.0000\20260525-022746` contains `0a0000`, `000000`, and `060000` files and passes `lobby-critical,ingame-critical,font-runtime-glyph-bounds`.
+- The `20260525-200137` font-only output fails the same critical verifier when checked against the still-Korean lobby/text state:
+  - `lobby coverage glyphs are present and visible: fonts=0, glyphs=0`
+  - `lobby runtime font safety passed: fonts=22, hangul_glyphs=0, patched_hangul_cells=0`
+  - representative failure: `common/font/TrumpGothic_23.fdt phrase [시스템 설정] layout error: missing U+C2DC`
+- Root cause direction: applying strict font-only after a full patch can leave full-patch Korean `0a0000/060000` text/UI installed while replacing only `000000` fonts with the minimal font-only payload. That mixed state can reproduce `=`/`-` lobby and character-select fallback even if the previous full output itself passes generated-output verification.
+- UI apply correction: when the selected patch is font-only, restore clean `0a0000.win32.index/index2` and `060000.win32.index/index2` from clean baseline/current `orig.*`/existing restore-baseline before copying the font files. Back up those index files together with `000000` and validate the restored indexes are clean.
+- Verification correction: `font-runtime-glyph-bounds` passing by itself is not enough for the HD crash report. Pair it with an applied-state/mixed-state check that proves font-only did not leave Korean text/UI patched, and keep the live HD crash issue open until the user confirms after a fresh release build.
