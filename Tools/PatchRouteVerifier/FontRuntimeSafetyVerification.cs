@@ -220,6 +220,11 @@ namespace FfxivKoreanPatch.PatchRouteVerifier
                     uint rightCodepoint;
                     TryDecodeFdtUtf8Value(leftValue, out leftCodepoint);
                     TryDecodeFdtUtf8Value(rightValue, out rightCodepoint);
+                    if (IsRuntimeSafeTerminalPunctuationKerning(leftCodepoint, rightCodepoint, leftShiftJis, rightShiftJis))
+                    {
+                        continue;
+                    }
+
                     failures = FailFontRuntimeGlyphBoundsOnce(
                         failures,
                         "{0} has start-screen UTF-8-only kerning U+{1:X4}:U+{2:X4} with Shift-JIS fallback {3:X4}:{4:X4}; non-lobby runtime fonts are used by HD/non-4K lobby UI and must not receive Hangul synthetic kerning",
@@ -273,6 +278,25 @@ namespace FfxivKoreanPatch.PatchRouteVerifier
                 bool rightEncodes = TryEncodeShiftJisValue(right, out ignored);
                 return (!leftEncodes || !rightEncodes) &&
                        (IsHangulCodepoint(left) || IsHangulCodepoint(right));
+            }
+
+            private static bool IsRuntimeSafeTerminalPunctuationKerning(
+                uint left,
+                uint right,
+                ushort leftShiftJis,
+                ushort rightShiftJis)
+            {
+                return IsHangulCodepoint(left) &&
+                       IsRuntimeSafeTerminalPunctuationCodepoint(right) &&
+                       leftShiftJis == 0 &&
+                       rightShiftJis != 0;
+            }
+
+            private static bool IsRuntimeSafeTerminalPunctuationCodepoint(uint codepoint)
+            {
+                return codepoint == 0x002Eu ||
+                       codepoint == 0x3002u ||
+                       codepoint == 0xFF0Eu;
             }
 
             private bool TryReadRuntimeTexture(Dictionary<string, Texture> cache, string texturePath, out Texture texture)

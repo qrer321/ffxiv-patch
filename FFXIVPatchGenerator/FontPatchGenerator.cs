@@ -4551,9 +4551,15 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
         private static List<byte[]> CollectRuntimeSafeStartScreenKerningPairs(StartScreenKerningRoute route)
         {
             // AtkFontAnalyzerRender can be reached from start-screen/non-4K UI paths
-            // that use non-lobby AXIS fonts. Do not add UTF-8-only Hangul kerning
-            // there; keep only Shift-JIS encodable ASCII pairs.
+            // that use non-lobby AXIS fonts. Keep glyph routes clean; only add
+            // terminal punctuation and ASCII pairs, not Hangul-Hangul kerning.
             Dictionary<string, byte[]> entries = new Dictionary<string, byte[]>(StringComparer.Ordinal);
+            if (route.IncludeTerminalPunctuationPairs && ShouldApplyRuntimeSafeTerminalPunctuationKerning(route.FontPath))
+            {
+                AddTerminalPunctuationKerningPairs(entries, LobbyScaledHangulPhrases.HighResolutionUiScaleOptions, route.MinimumAdjustment);
+                AddTerminalPunctuationKerningPairs(entries, LobbyScaledHangulPhrases.StartScreenSystemSettingsResultMessages, route.MinimumAdjustment);
+            }
+
             if (route.IncludeHighResolutionPercentPairs)
             {
                 AddAsciiPercentKerningPairs(entries, LobbyScaledHangulPhrases.HighResolutionUiScaleOptions, route.PercentAdjustment);
@@ -4562,6 +4568,14 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
             List<byte[]> result = new List<byte[]>(entries.Values);
             result.Sort(CompareKerningEntries);
             return result;
+        }
+
+        private static bool ShouldApplyRuntimeSafeTerminalPunctuationKerning(string fontPath)
+        {
+            return string.Equals(
+                NormalizeGamePath(fontPath),
+                "common/font/AXIS_18.fdt",
+                StringComparison.OrdinalIgnoreCase);
         }
 
         private static bool TryGetStartScreenKerningRoute(string path, out StartScreenKerningRoute route)
