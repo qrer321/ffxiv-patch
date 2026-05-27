@@ -3793,6 +3793,17 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
         private static string[] GetPreferredLobbyTextureCandidates(string fdtPath)
         {
             string normalizedFdtPath = NormalizeGamePath(fdtPath);
+            if (IsStartupLobbyTextureLimitedFont(normalizedFdtPath))
+            {
+                return new string[]
+                {
+                    FontLobby3TexturePath,
+                    FontLobby4TexturePath,
+                    FontLobby2TexturePath,
+                    FontLobby1TexturePath
+                };
+            }
+
             if (IsLobbyLargeLabelVisualScaleFont(normalizedFdtPath))
             {
                 return new string[]
@@ -3828,6 +3839,17 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
                 FontLobby2TexturePath,
                 FontLobby1TexturePath
             };
+        }
+
+        private static bool IsStartupLobbyTextureLimitedFont(string path)
+        {
+            string normalized = NormalizeGamePath(path);
+            return string.Equals(normalized, "common/font/AXIS_12_lobby.fdt", StringComparison.OrdinalIgnoreCase) ||
+                   string.Equals(normalized, "common/font/AXIS_14_lobby.fdt", StringComparison.OrdinalIgnoreCase) ||
+                   string.Equals(normalized, "common/font/AXIS_18_lobby.fdt", StringComparison.OrdinalIgnoreCase) ||
+                   string.Equals(normalized, "common/font/MiedingerMid_12_lobby.fdt", StringComparison.OrdinalIgnoreCase) ||
+                   string.Equals(normalized, "common/font/MiedingerMid_14_lobby.fdt", StringComparison.OrdinalIgnoreCase) ||
+                   string.Equals(normalized, "common/font/MiedingerMid_18_lobby.fdt", StringComparison.OrdinalIgnoreCase);
         }
 
         private static bool TryAllocateActionDetailHighScaleGlyphCell(

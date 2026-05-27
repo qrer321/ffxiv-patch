@@ -80,7 +80,8 @@ namespace FfxivKoreanPatch.PatchRouteVerifier
                         string texturePath = ResolveFontTexturePath(fontPath, glyph.ImageIndex);
                         if (!IsLobbyTexturePath(texturePath) ||
                             string.Equals(texturePath, "common/font/font_lobby7.tex", StringComparison.OrdinalIgnoreCase) ||
-                            glyph.ImageIndex >= 24)
+                            glyph.ImageIndex >= 24 ||
+                            (IsStartupLobbyTextureLimitedFont(fontPath) && glyph.ImageIndex >= 16))
                         {
                             failures = FailLobbyRuntimeSafetyOnce(
                                 failures,
@@ -122,6 +123,17 @@ namespace FfxivKoreanPatch.PatchRouteVerifier
                         checkedGlyphs,
                         patchedHangulCells.Count);
                 }
+            }
+
+            private static bool IsStartupLobbyTextureLimitedFont(string path)
+            {
+                string normalized = (path ?? string.Empty).Replace('\\', '/');
+                return string.Equals(normalized, "common/font/AXIS_12_lobby.fdt", StringComparison.OrdinalIgnoreCase) ||
+                       string.Equals(normalized, "common/font/AXIS_14_lobby.fdt", StringComparison.OrdinalIgnoreCase) ||
+                       string.Equals(normalized, "common/font/AXIS_18_lobby.fdt", StringComparison.OrdinalIgnoreCase) ||
+                       string.Equals(normalized, "common/font/MiedingerMid_12_lobby.fdt", StringComparison.OrdinalIgnoreCase) ||
+                       string.Equals(normalized, "common/font/MiedingerMid_14_lobby.fdt", StringComparison.OrdinalIgnoreCase) ||
+                       string.Equals(normalized, "common/font/MiedingerMid_18_lobby.fdt", StringComparison.OrdinalIgnoreCase);
             }
 
             private void VerifyLobbyUtf8OnlyKerningEntries(string fontPath, byte[] patchedFdt, byte[] cleanFdt, ref int failures)
