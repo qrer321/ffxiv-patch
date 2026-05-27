@@ -8151,24 +8151,32 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
             }
 
             const int maxBlockSize = 16000;
-            int rawPayloadSize = rawTexture.Length - textureHeaderSize;
-            int subBlockCount = Math.Max(1, (rawPayloadSize + maxBlockSize - 1) / maxBlockSize);
-            int fileHeaderSize = Align(24 + 20 + subBlockCount * 2, 128);
+            int textureDataSize = rawTexture.Length - textureHeaderSize;
+            int blockCount = Math.Max(1, (textureDataSize + maxBlockSize - 1) / maxBlockSize);
+            int fileHeaderSize = Align(24 + blockCount * 20 + blockCount * 2, 128);
 
             List<TextureSubBlockPayload> payloads = new List<TextureSubBlockPayload>();
             int sourceOffset = textureHeaderSize;
+            int blockDataOffset = 0;
             int totalStoredSize = 0;
-            for (int i = 0; i < subBlockCount; i++)
+            for (int i = 0; i < blockCount; i++)
             {
                 int length = Math.Min(maxBlockSize, rawTexture.Length - sourceOffset);
+                if (length < 0)
+                {
+                    length = 0;
+                }
+
                 byte[] compressed = Deflate(rawTexture, sourceOffset, length);
                 TextureSubBlockPayload payload = new TextureSubBlockPayload();
+                payload.PackedOffset = textureHeaderSize + blockDataOffset;
                 payload.RawOffset = sourceOffset;
                 payload.RawLength = length;
                 payload.Payload = compressed.Length < length ? compressed : null;
                 payload.StoredSize = Align(16 + (payload.Payload == null ? length : payload.Payload.Length), 128);
                 payloads.Add(payload);
                 totalStoredSize += payload.StoredSize;
+                blockDataOffset += payload.StoredSize;
                 sourceOffset += length;
             }
 
@@ -8178,17 +8186,20 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
             Endian.WriteUInt32LE(packed, 4, 4);
             Endian.WriteUInt32LE(packed, 8, checked((uint)rawTexture.Length));
             Endian.WriteUInt32LE(packed, 12, 0);
-            Endian.WriteUInt32LE(packed, 16, checked((uint)(fileLength / 128)));
-            Endian.WriteUInt32LE(packed, 20, 1);
+            Endian.WriteUInt32LE(packed, 16, checked((uint)((textureHeaderSize + totalStoredSize) / 128)));
+            Endian.WriteUInt32LE(packed, 20, checked((uint)blockCount));
 
-            Endian.WriteUInt32LE(packed, 24, checked((uint)textureHeaderSize));
-            Endian.WriteUInt32LE(packed, 28, checked((uint)(rawPayloadSize + subBlockCount * 16)));
-            Endian.WriteUInt32LE(packed, 32, checked((uint)rawPayloadSize));
-            Endian.WriteUInt32LE(packed, 36, 0);
-            Endian.WriteUInt32LE(packed, 40, checked((uint)subBlockCount));
-            int subBlockSizeOffset = 44;
+            int locatorOffset = 24;
+            int subBlockSizeOffset = locatorOffset + blockCount * 20;
             for (int i = 0; i < payloads.Count; i++)
             {
+                TextureSubBlockPayload payload = payloads[i];
+                int currentLocatorOffset = locatorOffset + i * 20;
+                Endian.WriteUInt32LE(packed, currentLocatorOffset, checked((uint)payload.PackedOffset));
+                Endian.WriteUInt32LE(packed, currentLocatorOffset + 4, checked((uint)payload.StoredSize));
+                Endian.WriteUInt32LE(packed, currentLocatorOffset + 8, checked((uint)payload.RawLength));
+                Endian.WriteUInt32LE(packed, currentLocatorOffset + 12, checked((uint)i));
+                Endian.WriteUInt32LE(packed, currentLocatorOffset + 16, 1);
                 Endian.WriteUInt16LE(packed, subBlockSizeOffset + i * 2, checked((ushort)payloads[i].StoredSize));
             }
 
@@ -9814,6 +9825,7 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
 
         private sealed class TextureSubBlockPayload
         {
+            public int PackedOffset;
             public int RawOffset;
             public int RawLength;
             public byte[] Payload;

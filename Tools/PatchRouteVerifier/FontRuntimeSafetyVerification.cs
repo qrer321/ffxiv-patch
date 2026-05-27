@@ -15,6 +15,7 @@ namespace FfxivKoreanPatch.PatchRouteVerifier
                 Console.WriteLine("[FDT] Font runtime glyph bounds");
 
                 Dictionary<string, Texture> textures = new Dictionary<string, Texture>(StringComparer.OrdinalIgnoreCase);
+                HashSet<string> checkedPackedTextures = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
                 int checkedFonts = 0;
                 int checkedGlyphs = 0;
                 int checkedTextures = 0;
@@ -100,6 +101,11 @@ namespace FfxivKoreanPatch.PatchRouteVerifier
                                 glyphIndex,
                                 texturePath);
                             continue;
+                        }
+
+                        if (checkedPackedTextures.Add(texturePath))
+                        {
+                            VerifyRuntimeTexturePackLayout(texturePath, texture, ref failures);
                         }
 
                         if (glyph.X + glyph.Width > texture.Width || glyph.Y + glyph.Height > texture.Height)
@@ -297,6 +303,173 @@ namespace FfxivKoreanPatch.PatchRouteVerifier
                 return codepoint == 0x002Eu ||
                        codepoint == 0x3002u ||
                        codepoint == 0xFF0Eu;
+            }
+
+            private void VerifyRuntimeTexturePackLayout(string texturePath, Texture texture, ref int failures)
+            {
+                if (texture.Raw == null)
+                {
+                    failures = FailFontRuntimeGlyphBoundsOnce(
+                        failures,
+                        "{0} packed texture layout cannot be checked because raw texture is missing",
+                        texturePath);
+                    return;
+                }
+
+                byte[] packed;
+                try
+                {
+                    if (!_patchedFont.TryReadPackedFile(texturePath, out packed))
+                    {
+                        failures = FailFontRuntimeGlyphBoundsOnce(
+                            failures,
+                            "{0} packed texture is missing",
+                            texturePath);
+                        return;
+                    }
+                }
+                catch (Exception ex)
+                {
+                    failures = FailFontRuntimeGlyphBoundsOnce(
+                        failures,
+                        "{0} packed texture read error: {1}",
+                        texturePath,
+                        ex.Message);
+                    return;
+                }
+
+                if (packed == null || packed.Length < 24)
+                {
+                    failures = FailFontRuntimeGlyphBoundsOnce(
+                        failures,
+                        "{0} packed texture header is too short",
+                        texturePath);
+                    return;
+                }
+
+                uint headerSize = Endian.ReadUInt32LE(packed, 0);
+                uint fileType = Endian.ReadUInt32LE(packed, 4);
+                uint rawSize = Endian.ReadUInt32LE(packed, 8);
+                uint blockCount = Endian.ReadUInt32LE(packed, 20);
+                if (fileType != 4)
+                {
+                    failures = FailFontRuntimeGlyphBoundsOnce(
+                        failures,
+                        "{0} packed texture has unexpected file type {1}",
+                        texturePath,
+                        fileType);
+                    return;
+                }
+
+                if (rawSize != texture.Raw.Length)
+                {
+                    failures = FailFontRuntimeGlyphBoundsOnce(
+                        failures,
+                        "{0} packed texture raw size {1} differs from decoded size {2}",
+                        texturePath,
+                        rawSize,
+                        texture.Raw.Length);
+                    return;
+                }
+
+                int textureHeaderSize = texture.MipmapOffsets != null && texture.MipmapOffsets.Length > 0
+                    ? texture.MipmapOffsets[0]
+                    : 0;
+                int textureDataSize = Math.Max(0, texture.Raw.Length - textureHeaderSize);
+                int expectedBlockCount = Math.Max(1, (textureDataSize + 16000 - 1) / 16000);
+                if (blockCount != expectedBlockCount)
+                {
+                    failures = FailFontRuntimeGlyphBoundsOnce(
+                        failures,
+                        "{0} packed texture block count {1} does not match runtime-safe 16KB texture blocks {2}; one-block repacking can break non-4K UI-resolution mip loads",
+                        texturePath,
+                        blockCount,
+                        expectedBlockCount);
+                    return;
+                }
+
+                long minimumHeaderSize = 24L + (long)blockCount * 20L + (long)blockCount * 2L;
+                if (headerSize < minimumHeaderSize || headerSize > packed.Length)
+                {
+                    failures = FailFontRuntimeGlyphBoundsOnce(
+                        failures,
+                        "{0} packed texture header size {1} is invalid for {2} blocks",
+                        texturePath,
+                        headerSize,
+                        blockCount);
+                    return;
+                }
+
+                int subBlockSizeOffset = checked(24 + (int)blockCount * 20);
+                int expectedRawRemaining = textureDataSize;
+                for (int i = 0; i < blockCount; i++)
+                {
+                    int locatorOffset = 24 + i * 20;
+                    uint firstBlockOffset = Endian.ReadUInt32LE(packed, locatorOffset);
+                    uint totalSize = Endian.ReadUInt32LE(packed, locatorOffset + 4);
+                    uint decompressedSize = Endian.ReadUInt32LE(packed, locatorOffset + 8);
+                    uint firstSubBlockIndex = Endian.ReadUInt32LE(packed, locatorOffset + 12);
+                    uint subBlockCount = Endian.ReadUInt32LE(packed, locatorOffset + 16);
+                    int expectedRawLength = Math.Min(16000, expectedRawRemaining);
+                    expectedRawRemaining -= expectedRawLength;
+
+                    if (subBlockCount != 1 ||
+                        firstSubBlockIndex != i ||
+                        decompressedSize != expectedRawLength ||
+                        decompressedSize > 16000)
+                    {
+                        failures = FailFontRuntimeGlyphBoundsOnce(
+                            failures,
+                            "{0} packed texture block#{1} has unsafe locator: firstSubBlock={2}, subBlocks={3}, decompressed={4}, expected={5}",
+                            texturePath,
+                            i,
+                            firstSubBlockIndex,
+                            subBlockCount,
+                            decompressedSize,
+                            expectedRawLength);
+                        continue;
+                    }
+
+                    int sizeOffset = subBlockSizeOffset + i * 2;
+                    if (sizeOffset < 0 || sizeOffset > packed.Length - 2)
+                    {
+                        failures = FailFontRuntimeGlyphBoundsOnce(
+                            failures,
+                            "{0} packed texture block#{1} sub-block size entry is out of range",
+                            texturePath,
+                            i);
+                        continue;
+                    }
+
+                    ushort paddedBlockSize = Endian.ReadUInt16LE(packed, sizeOffset);
+                    if (paddedBlockSize == 0 || totalSize != paddedBlockSize)
+                    {
+                        failures = FailFontRuntimeGlyphBoundsOnce(
+                            failures,
+                            "{0} packed texture block#{1} totalSize={2} differs from sub-block size table {3}",
+                            texturePath,
+                            i,
+                            totalSize,
+                            paddedBlockSize);
+                        continue;
+                    }
+
+                    long packedBlockOffset = (long)headerSize + firstBlockOffset;
+                    if (firstBlockOffset < textureHeaderSize ||
+                        packedBlockOffset < 0 ||
+                        packedBlockOffset + paddedBlockSize > packed.Length)
+                    {
+                        failures = FailFontRuntimeGlyphBoundsOnce(
+                            failures,
+                            "{0} packed texture block#{1} packed range is invalid: firstBlockOffset={2}, paddedSize={3}, header={4}, length={5}",
+                            texturePath,
+                            i,
+                            firstBlockOffset,
+                            paddedBlockSize,
+                            headerSize,
+                            packed.Length);
+                    }
+                }
             }
 
             private bool TryReadRuntimeTexture(Dictionary<string, Texture> cache, string texturePath, out Texture texture)
