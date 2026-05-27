@@ -3798,7 +3798,6 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
                 return new string[]
                 {
                     FontLobby3TexturePath,
-                    FontLobby4TexturePath,
                     FontLobby2TexturePath,
                     FontLobby1TexturePath
                 };
@@ -7171,6 +7170,8 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
 
             Dictionary<string, List<ReclaimableFontGlyphCell>> protectedCells =
                 CollectProtectedCleanLobbyCells(context, globalArchive);
+            List<ReclaimableFontGlyphCell> startupSharedCells =
+                CollectStartupSafeCleanLobbyReclaimCells(context, globalArchive, protectedCells);
             int total = 0;
             for (int i = 0; i < LobbyHangulCoverage.TargetFontPaths.Length; i++)
             {
@@ -7223,12 +7224,100 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
                 {
                     Console.WriteLine("  Prepared clean-page lobby CJK reclaim cells: {0} ({1})", fontTotal, fontPath);
                 }
+
+                if (IsStartupLobbyTextureLimitedFont(fontPath) && startupSharedCells.Count > 0)
+                {
+                    for (int sharedIndex = 0; sharedIndex < startupSharedCells.Count; sharedIndex++)
+                    {
+                        context.AddReclaimableLobbyCell(fontPath, startupSharedCells[sharedIndex]);
+                    }
+                }
             }
 
             if (total > 0)
             {
                 Console.WriteLine("  Prepared clean-page lobby CJK reclaim cells: {0}", total);
             }
+        }
+
+        private static List<ReclaimableFontGlyphCell> CollectStartupSafeCleanLobbyReclaimCells(
+            FontGlyphRepairContext context,
+            SqPackArchive globalArchive,
+            Dictionary<string, List<ReclaimableFontGlyphCell>> protectedCells)
+        {
+            List<ReclaimableFontGlyphCell> cells = new List<ReclaimableFontGlyphCell>();
+            HashSet<string> seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            if (context == null || globalArchive == null)
+            {
+                return cells;
+            }
+
+            for (int fontIndex = 0; fontIndex < FontPaths.Length; fontIndex++)
+            {
+                string fontPath = NormalizeGamePath(FontPaths[fontIndex]);
+                if (!IsLobbyFontPath(fontPath))
+                {
+                    continue;
+                }
+
+                byte[] fdt = TryReadArchiveStandardFile(globalArchive, fontPath);
+                if (fdt == null)
+                {
+                    continue;
+                }
+
+                string[] cleanPages = GetCleanLobbyTextureCandidates(globalArchive, fontPath);
+                int fontTableOffset;
+                uint glyphCount;
+                int glyphStart;
+                if (!TryGetFdtGlyphTable(fdt, out fontTableOffset, out glyphCount, out glyphStart))
+                {
+                    continue;
+                }
+
+                for (int glyphIndex = 0; glyphIndex < glyphCount; glyphIndex++)
+                {
+                    int offset = glyphStart + glyphIndex * FdtGlyphEntrySize;
+                    uint codepoint;
+                    if (!TryDecodeFdtUtf8Value(Endian.ReadUInt32LE(fdt, offset), out codepoint) ||
+                        !IsReclaimableCleanLobbyGlyphCodepoint(codepoint))
+                    {
+                        continue;
+                    }
+
+                    FdtGlyphEntry glyph = ReadFdtGlyphEntry(fdt, offset);
+                    ReclaimableFontGlyphCell cell;
+                    if (!TryCreateCleanLobbyReclaimableCell(
+                            context,
+                            fontPath,
+                            cleanPages,
+                            glyph,
+                            protectedCells,
+                            out cell) ||
+                        cell.ImageIndex >= 12)
+                    {
+                        continue;
+                    }
+
+                    string key = NormalizeGamePath(cell.TexturePath) + "|" +
+                                 cell.Channel.ToString() + "|" +
+                                 cell.X.ToString() + "," +
+                                 cell.Y.ToString() + "," +
+                                 cell.Width.ToString() + "x" +
+                                 cell.Height.ToString();
+                    if (seen.Add(key))
+                    {
+                        cells.Add(cell);
+                    }
+                }
+            }
+
+            if (cells.Count > 0)
+            {
+                Console.WriteLine("  Prepared startup-safe shared lobby CJK reclaim cells: {0}", cells.Count);
+            }
+
+            return cells;
         }
 
         private static Dictionary<string, List<ReclaimableFontGlyphCell>> CollectProtectedCleanLobbyCells(

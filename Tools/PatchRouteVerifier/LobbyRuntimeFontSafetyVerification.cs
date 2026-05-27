@@ -81,7 +81,7 @@ namespace FfxivKoreanPatch.PatchRouteVerifier
                         if (!IsLobbyTexturePath(texturePath) ||
                             string.Equals(texturePath, "common/font/font_lobby7.tex", StringComparison.OrdinalIgnoreCase) ||
                             glyph.ImageIndex >= 24 ||
-                            (IsStartupLobbyTextureLimitedFont(fontPath) && glyph.ImageIndex >= 16))
+                            (IsStartupLobbyTextureLimitedFont(fontPath) && glyph.ImageIndex >= 12))
                         {
                             failures = FailLobbyRuntimeSafetyOnce(
                                 failures,

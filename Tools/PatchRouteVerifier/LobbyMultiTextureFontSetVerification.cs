@@ -213,13 +213,15 @@ namespace FfxivKoreanPatch.PatchRouteVerifier
             private static bool IsAllowedExtendedLobbyHangulTextureRoute(string fontPath, string texturePath, int imageIndex)
             {
                 string normalized = (fontPath ?? string.Empty).Replace('\\', '/');
+                if (IsStartupLobbyTextureLimitedFontForMultiTexture(normalized))
+                {
+                    return imageIndex >= 0 &&
+                           imageIndex < 12 &&
+                           IsLobbyTexturePath(texturePath) &&
+                           !IsClientUnsafeLobbyTexturePath(texturePath);
+                }
+
                 bool extendedLobbyHangul =
-                    string.Equals(normalized, "common/font/AXIS_12_lobby.fdt", StringComparison.OrdinalIgnoreCase) ||
-                    string.Equals(normalized, "common/font/AXIS_14_lobby.fdt", StringComparison.OrdinalIgnoreCase) ||
-                    string.Equals(normalized, "common/font/AXIS_18_lobby.fdt", StringComparison.OrdinalIgnoreCase) ||
-                    string.Equals(normalized, "common/font/MiedingerMid_12_lobby.fdt", StringComparison.OrdinalIgnoreCase) ||
-                    string.Equals(normalized, "common/font/MiedingerMid_14_lobby.fdt", StringComparison.OrdinalIgnoreCase) ||
-                    string.Equals(normalized, "common/font/MiedingerMid_18_lobby.fdt", StringComparison.OrdinalIgnoreCase) ||
                     string.Equals(normalized, "common/font/TrumpGothic_23_lobby.fdt", StringComparison.OrdinalIgnoreCase) ||
                     string.Equals(normalized, "common/font/TrumpGothic_34_lobby.fdt", StringComparison.OrdinalIgnoreCase) ||
                     LobbyHangulCoverage.IsHighScaleTargetFontPath(normalized);
@@ -228,6 +230,17 @@ namespace FfxivKoreanPatch.PatchRouteVerifier
                        imageIndex < 24 &&
                        IsLobbyTexturePath(texturePath) &&
                        !IsClientUnsafeLobbyTexturePath(texturePath);
+            }
+
+            private static bool IsStartupLobbyTextureLimitedFontForMultiTexture(string path)
+            {
+                string normalized = (path ?? string.Empty).Replace('\\', '/');
+                return string.Equals(normalized, "common/font/AXIS_12_lobby.fdt", StringComparison.OrdinalIgnoreCase) ||
+                       string.Equals(normalized, "common/font/AXIS_14_lobby.fdt", StringComparison.OrdinalIgnoreCase) ||
+                       string.Equals(normalized, "common/font/AXIS_18_lobby.fdt", StringComparison.OrdinalIgnoreCase) ||
+                       string.Equals(normalized, "common/font/MiedingerMid_12_lobby.fdt", StringComparison.OrdinalIgnoreCase) ||
+                       string.Equals(normalized, "common/font/MiedingerMid_14_lobby.fdt", StringComparison.OrdinalIgnoreCase) ||
+                       string.Equals(normalized, "common/font/MiedingerMid_18_lobby.fdt", StringComparison.OrdinalIgnoreCase);
             }
 
             private static string FormatLobbyTexturePageSet(HashSet<string> pages)
