@@ -15,6 +15,8 @@ param(
 
     [string]$FailedOutput,
 
+    [string[]]$AdditionalFailedOutput,
+
     [string]$ReleasePath,
 
     [string]$Configuration = "Release",
@@ -93,6 +95,27 @@ function Resolve-KnownFailedOutput {
     return $candidate.FullName
 }
 
+function Add-KnownFailedOutput {
+    param(
+        [System.Collections.Generic.List[string]]$Outputs,
+
+        [string]$Path
+    )
+
+    if ($Outputs -eq $null -or [string]::IsNullOrWhiteSpace($Path) -or !(Test-Path -LiteralPath $Path)) {
+        return
+    }
+
+    $resolved = (Resolve-Path -LiteralPath $Path).Path
+    for ($i = 0; $i -lt $Outputs.Count; $i++) {
+        if ([string]::Equals($Outputs[$i], $resolved, [System.StringComparison]::OrdinalIgnoreCase)) {
+            return
+        }
+    }
+
+    $Outputs.Add($resolved)
+}
+
 function Invoke-Checked {
     param(
         [Parameter(Mandatory = $true)]
@@ -139,8 +162,24 @@ if ([string]::IsNullOrWhiteSpace($BaseIndexDirectory)) {
     $BaseIndexDirectory = Resolve-LatestBaseIndexDirectory -Language $TargetLanguage
 }
 
+$failedOutputs = New-Object 'System.Collections.Generic.List[string]'
+$resolvedOutputPath = [System.IO.Path]::GetFullPath($Output)
 if ([string]::IsNullOrWhiteSpace($FailedOutput)) {
-    $FailedOutput = Resolve-KnownFailedOutput -Language $TargetLanguage
+    Add-KnownFailedOutput -Outputs $failedOutputs -Path (Resolve-KnownFailedOutput -Language $TargetLanguage)
+}
+else {
+    Add-KnownFailedOutput -Outputs $failedOutputs -Path $FailedOutput
+}
+
+$postReleaseR33Output = Join-Path $repoRoot ".tmp\release-hd-crash-head-$TargetLanguage"
+if (![string]::Equals([System.IO.Path]::GetFullPath($postReleaseR33Output), $resolvedOutputPath, [System.StringComparison]::OrdinalIgnoreCase)) {
+    Add-KnownFailedOutput -Outputs $failedOutputs -Path $postReleaseR33Output
+}
+
+if ($AdditionalFailedOutput -ne $null) {
+    for ($i = 0; $i -lt $AdditionalFailedOutput.Length; $i++) {
+        Add-KnownFailedOutput -Outputs $failedOutputs -Path $AdditionalFailedOutput[$i]
+    }
 }
 
 $focusedChecks = "lobby-coverage-glyphs,lobby-runtime-font-safety,lobby-multitexture-font-set,lobby-runtime-scale-font-routes,lobby-hangul-visibility,font-runtime-glyph-bounds"
@@ -231,34 +270,37 @@ if ($RunInGameCritical) {
 }
 
 if (!$SkipKnownFailureCheck) {
-    if ([string]::IsNullOrWhiteSpace($FailedOutput) -or !(Test-Path -LiteralPath $FailedOutput)) {
+    if ($failedOutputs.Count -eq 0) {
         throw "Known failed output was not found. Pass -SkipKnownFailureCheck or -FailedOutput explicitly."
     }
 
     $verifierExe = Join-Path $repoRoot "Tools\PatchRouteVerifier\bin\$Configuration\PatchRouteVerifier.exe"
-    $knownFailureResult = Invoke-CapturedNative `
-        -File $verifierExe `
-        -Arguments @(
-            "--output", $FailedOutput,
-            "--global", $Global,
-            "--korea", $Korea,
-            "--target-language", $TargetLanguage,
-            "--font-pack-dir", $FontPackDir,
-            "--checks", "lobby-runtime-font-safety",
-            "--no-glyph-dump"
-        )
+    for ($failedIndex = 0; $failedIndex -lt $failedOutputs.Count; $failedIndex++) {
+        $failedOutputPath = $failedOutputs[$failedIndex]
+        $knownFailureResult = Invoke-CapturedNative `
+            -File $verifierExe `
+            -Arguments @(
+                "--output", $failedOutputPath,
+                "--global", $Global,
+                "--korea", $Korea,
+                "--target-language", $TargetLanguage,
+                "--font-pack-dir", $FontPackDir,
+                "--checks", "lobby-runtime-font-safety",
+                "--no-glyph-dump"
+            )
 
-    if ($knownFailureResult.ExitCode -eq 0) {
-        throw "Known failed output unexpectedly passed: $FailedOutput"
+        if ($knownFailureResult.ExitCode -eq 0) {
+            throw "Known failed output unexpectedly passed: $failedOutputPath"
+        }
+
+        $expectedFailure = @($knownFailureResult.Lines | Select-String -Pattern "unsafe lobby texture route.*font_lobby3\.tex")
+        if ($expectedFailure.Count -eq 0) {
+            $sample = ($knownFailureResult.Lines | Select-Object -First 20) -join "`n"
+            throw "Known failed output failed for an unexpected reason. First lines:`n$sample"
+        }
+
+        Write-Host "Known failed output rejected as expected: $failedOutputPath"
     }
-
-    $expectedFailure = @($knownFailureResult.Lines | Select-String -Pattern "unsafe lobby texture route.*font_lobby3\.tex")
-    if ($expectedFailure.Count -eq 0) {
-        $sample = ($knownFailureResult.Lines | Select-Object -First 20) -join "`n"
-        throw "Known failed output failed for an unexpected reason. First lines:`n$sample"
-    }
-
-    Write-Host "Known failed output rejected as expected: $FailedOutput"
 }
 
 if (!$SkipCrashLogCheck) {
