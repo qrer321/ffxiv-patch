@@ -36,6 +36,84 @@ function Get-RegisterValue {
     return ""
 }
 
+function Get-CrashHandlerEventsAfterRelease {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$Path,
+
+        [Parameter(Mandatory = $true)]
+        [datetime]$ReleaseTime
+    )
+
+    $events = New-Object 'System.Collections.Generic.List[object]'
+    if (!(Test-Path -LiteralPath $Path)) {
+        return $events
+    }
+
+    $item = Get-Item -LiteralPath $Path
+    if ($item.LastWriteTime -le $ReleaseTime) {
+        return $events
+    }
+
+    $lines = @(Get-Content -LiteralPath $Path)
+    $latestSessionStart = -1
+    $latestSessionTime = [datetime]::MinValue
+
+    for ($i = 0; $i -lt $lines.Count; $i++) {
+        $line = $lines[$i]
+        if ($line -notmatch "^\[(\d{2}):(\d{2}):(\d{2})\s+[^\]]+\]\s+Logging to file:") {
+            continue
+        }
+
+        $hour = [int]$Matches[1]
+        $minute = [int]$Matches[2]
+        $second = [int]$Matches[3]
+        $eventTime = $ReleaseTime.Date.AddHours($hour).AddMinutes($minute).AddSeconds($second)
+        if ($eventTime.TimeOfDay -lt $ReleaseTime.TimeOfDay) {
+            $eventTime = $eventTime.AddDays(1)
+        }
+
+        $latestSessionStart = $i
+        $latestSessionTime = $eventTime
+    }
+
+    if ($latestSessionStart -lt 0 -or $latestSessionTime -le $ReleaseTime) {
+        return $events
+    }
+
+    for ($i = $latestSessionStart; $i -lt $lines.Count; $i++) {
+        $line = $lines[$i]
+        if ($line -notmatch "^\[(\d{2}):(\d{2}):(\d{2})\s+[^\]]+\]\s+(.*)$") {
+            continue
+        }
+
+        $hour = [int]$Matches[1]
+        $minute = [int]$Matches[2]
+        $second = [int]$Matches[3]
+        $message = $Matches[4]
+        if ($message -notmatch "Failed to read exception information|Terminating target process|Process exited with exit code 3221225477|0xc0000005") {
+            continue
+        }
+
+        $eventTime = $ReleaseTime.Date.AddHours($hour).AddMinutes($minute).AddSeconds($second)
+        if ($eventTime.TimeOfDay -lt $ReleaseTime.TimeOfDay) {
+            $eventTime = $eventTime.AddDays(1)
+        }
+
+        if ($eventTime -le $ReleaseTime) {
+            continue
+        }
+
+        $events.Add([pscustomobject]@{
+            Time = $eventTime
+            Message = $message
+            Line = $line
+        })
+    }
+
+    return $events
+}
+
 $releaseItem = Get-Item -LiteralPath $ReleasePath
 $releaseHash = (Get-FileHash -LiteralPath $releaseItem.FullName -Algorithm SHA256).Hash
 
@@ -51,8 +129,20 @@ if (!(Test-Path -LiteralPath $LogDir)) {
     exit 0
 }
 
+$crashHandlerPath = Join-Path $LogDir "dalamud.crashhandler.log"
+$crashHandlerEvents = Get-CrashHandlerEventsAfterRelease -Path $crashHandlerPath -ReleaseTime $releaseItem.LastWriteTime
+
 $logs = @(Get-ChildItem -LiteralPath $LogDir -Filter "dalamud_appcrash_*.log" | Sort-Object LastWriteTime -Descending)
 if ($logs.Count -eq 0) {
+    if ($crashHandlerEvents.Count -gt 0) {
+        Write-Host "RESULT: FAIL"
+        Write-Host "Dalamud crashhandler reported post-release target termination without an appcrash log:"
+        foreach ($event in $crashHandlerEvents) {
+            Write-Host ("  {0} {1}" -f $event.Time.ToString('yyyy-MM-dd HH:mm:ss'), $event.Message)
+        }
+        exit 1
+    }
+
     Write-Host "RESULT: PASS"
     Write-Host "No Dalamud appcrash logs found."
     exit 0
@@ -108,6 +198,15 @@ if ($FailOnAnyNewCrash -and $newLogs.Count -gt 0) {
     Write-Host "New appcrash logs exist after the release:"
     foreach ($log in $newLogs) {
         Write-Host "  $($log.LastWriteTime.ToString('yyyy-MM-dd HH:mm:ss')) $($log.FullName)"
+    }
+    exit 1
+}
+
+if ($crashHandlerEvents.Count -gt 0) {
+    Write-Host "RESULT: FAIL"
+    Write-Host "Dalamud crashhandler reported post-release target termination without an appcrash log:"
+    foreach ($event in $crashHandlerEvents) {
+        Write-Host ("  {0} {1}" -f $event.Time.ToString('yyyy-MM-dd HH:mm:ss'), $event.Message)
     }
     exit 1
 }

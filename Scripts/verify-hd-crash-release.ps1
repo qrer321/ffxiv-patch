@@ -19,6 +19,8 @@ param(
 
     [string]$ReleasePath,
 
+    [string]$AppliedGame,
+
     [string]$Configuration = "Release",
 
     [switch]$BuildRelease,
@@ -199,6 +201,9 @@ Write-Host "  release: $($releaseItem.FullName)"
 Write-Host "  release time: $($releaseItem.LastWriteTime.ToString('yyyy-MM-dd HH:mm:ss'))"
 Write-Host "  release SHA256: $releaseHash"
 Write-Host "  output: $Output"
+if (![string]::IsNullOrWhiteSpace($AppliedGame)) {
+    Write-Host "  applied game: $AppliedGame"
+}
 Write-Host "  base index: $BaseIndexDirectory"
 Write-Host "  focused checks: $focusedChecks"
 
@@ -249,6 +254,35 @@ else {
             "-Checks", $focusedChecks,
             "-NoGlyphDump"
         )
+}
+
+if (![string]::IsNullOrWhiteSpace($AppliedGame)) {
+    $appliedChecks = "applied-output-files,applied-lobby-routes,lobby-runtime-font-safety,font-runtime-glyph-bounds"
+    $appliedArgs = @(
+        "-ExecutionPolicy", "Bypass",
+        "-File", (Join-Path $repoRoot "Scripts\verify-patch-routes.ps1"),
+        "-Output", $Output,
+        "-Global", $Global,
+        "-Korea", $Korea,
+        "-TargetLanguage", $TargetLanguage,
+        "-FontPackDir", $FontPackDir,
+        "-Configuration", $Configuration,
+        "-AppliedGame", $AppliedGame,
+        "-Checks", $appliedChecks,
+        "-NoGlyphDump"
+    )
+
+    $cleanFontIndex = Join-Path $Output "orig.000000.win32.index"
+    if (Test-Path -LiteralPath $cleanFontIndex) {
+        $appliedArgs += @("-CleanFontIndex", $cleanFontIndex)
+    }
+
+    $cleanUiIndex = Join-Path $Output "orig.060000.win32.index"
+    if (Test-Path -LiteralPath $cleanUiIndex) {
+        $appliedArgs += @("-CleanUiIndex", $cleanUiIndex)
+    }
+
+    Invoke-Checked -Label "verify-applied-output" -File "powershell" -Arguments $appliedArgs
 }
 
 if ($RunInGameCritical) {
