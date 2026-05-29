@@ -3806,20 +3806,10 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
         private static string[] GetPreferredLobbyTextureCandidates(string fdtPath)
         {
             string normalizedFdtPath = NormalizeGamePath(fdtPath);
-            if (IsObservedHdAnalyzerPage2UnsafeLobbyFont(normalizedFdtPath))
-            {
-                return new string[]
-                {
-                    FontLobby2TexturePath,
-                    FontLobby1TexturePath
-                };
-            }
-
             if (IsStartupLobbyTextureLimitedFont(normalizedFdtPath))
             {
                 return new string[]
                 {
-                    FontLobby3TexturePath,
                     FontLobby2TexturePath,
                     FontLobby1TexturePath
                 };
@@ -3831,7 +3821,6 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
                 {
                     FontLobby2TexturePath,
                     FontLobby1TexturePath,
-                    FontLobby3TexturePath,
                     FontLobby4TexturePath,
                     FontLobby5TexturePath,
                     FontLobby6TexturePath
@@ -3845,7 +3834,18 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
                     FontLobby6TexturePath,
                     FontLobby5TexturePath,
                     FontLobby4TexturePath,
-                    FontLobby3TexturePath,
+                    FontLobby2TexturePath,
+                    FontLobby1TexturePath
+                };
+            }
+
+            if (IsObservedHdAnalyzerPage2UnsafeLobbyFont(normalizedFdtPath))
+            {
+                return new string[]
+                {
+                    FontLobby4TexturePath,
+                    FontLobby5TexturePath,
+                    FontLobby6TexturePath,
                     FontLobby2TexturePath,
                     FontLobby1TexturePath
                 };
@@ -3853,7 +3853,6 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
 
             return new string[]
             {
-                FontLobby3TexturePath,
                 FontLobby4TexturePath,
                 FontLobby5TexturePath,
                 FontLobby6TexturePath,
@@ -3864,7 +3863,8 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
 
         private static bool IsObservedHdAnalyzerPage2UnsafeLobbyFont(string path)
         {
-            return IsStartupLobbyTextureLimitedFont(path);
+            string normalized = NormalizeGamePath(path);
+            return normalized.IndexOf("_lobby.fdt", StringComparison.OrdinalIgnoreCase) >= 0;
         }
 
         private static bool IsStartupLobbyTextureLimitedFont(string path)

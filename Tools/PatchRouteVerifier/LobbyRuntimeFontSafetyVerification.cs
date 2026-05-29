@@ -82,7 +82,7 @@ namespace FfxivKoreanPatch.PatchRouteVerifier
                             string.Equals(texturePath, "common/font/font_lobby7.tex", StringComparison.OrdinalIgnoreCase) ||
                             glyph.ImageIndex >= 24 ||
                             (IsStartupLobbyTextureLimitedFont(fontPath) && glyph.ImageIndex >= 12) ||
-                            (IsObservedHdAnalyzerPage2UnsafeLobbyFont(fontPath) && glyph.ImageIndex >= 8))
+                            (IsObservedHdAnalyzerPage2UnsafeLobbyFont(fontPath) && glyph.ImageIndex >= 8 && glyph.ImageIndex < 12))
                         {
                             failures = FailLobbyRuntimeSafetyOnce(
                                 failures,
@@ -139,7 +139,8 @@ namespace FfxivKoreanPatch.PatchRouteVerifier
 
             private static bool IsObservedHdAnalyzerPage2UnsafeLobbyFont(string path)
             {
-                return IsStartupLobbyTextureLimitedFont(path);
+                string normalized = (path ?? string.Empty).Replace('\\', '/');
+                return normalized.IndexOf("_lobby.fdt", StringComparison.OrdinalIgnoreCase) >= 0;
             }
 
             private void VerifyLobbyUtf8OnlyKerningEntries(string fontPath, byte[] patchedFdt, byte[] cleanFdt, ref int failures)

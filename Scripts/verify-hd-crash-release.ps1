@@ -178,6 +178,11 @@ if (![string]::Equals([System.IO.Path]::GetFullPath($postReleaseR33Output), $res
     Add-KnownFailedOutput -Outputs $failedOutputs -Path $postReleaseR33Output
 }
 
+$postReleaseR34GeneratedOutput = Join-Path $env:LOCALAPPDATA "FFXIVKoreanPatch\generated-release\$TargetLanguage\2026.05.01.0000.0000\20260530-002104"
+if (![string]::Equals([System.IO.Path]::GetFullPath($postReleaseR34GeneratedOutput), $resolvedOutputPath, [System.StringComparison]::OrdinalIgnoreCase)) {
+    Add-KnownFailedOutput -Outputs $failedOutputs -Path $postReleaseR34GeneratedOutput
+}
+
 if ($AdditionalFailedOutput -ne $null) {
     for ($i = 0; $i -lt $AdditionalFailedOutput.Length; $i++) {
         Add-KnownFailedOutput -Outputs $failedOutputs -Path $AdditionalFailedOutput[$i]
