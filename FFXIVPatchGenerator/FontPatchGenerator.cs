@@ -3864,8 +3864,7 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
 
         private static bool IsObservedHdAnalyzerPage2UnsafeLobbyFont(string path)
         {
-            string normalized = NormalizeGamePath(path);
-            return string.Equals(normalized, "common/font/AXIS_12_lobby.fdt", StringComparison.OrdinalIgnoreCase);
+            return IsStartupLobbyTextureLimitedFont(path);
         }
 
         private static bool IsStartupLobbyTextureLimitedFont(string path)

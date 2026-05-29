@@ -252,7 +252,7 @@ if (!$SkipKnownFailureCheck) {
         throw "Known failed output unexpectedly passed: $FailedOutput"
     }
 
-    $expectedFailure = @($knownFailureResult.Lines | Select-String -Pattern "AXIS_12_lobby.*font_lobby3\.tex")
+    $expectedFailure = @($knownFailureResult.Lines | Select-String -Pattern "unsafe lobby texture route.*font_lobby3\.tex")
     if ($expectedFailure.Count -eq 0) {
         $sample = ($knownFailureResult.Lines | Select-Object -First 20) -join "`n"
         throw "Known failed output failed for an unexpected reason. First lines:`n$sample"
