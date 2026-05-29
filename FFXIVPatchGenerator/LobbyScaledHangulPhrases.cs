@@ -32,7 +32,8 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
             "\uD655\uC778",
             "\uC989\uC2DC \uBC1C\uB3D9",
             "\uCD08\uC2B9\uB2EC \uB808\uBCA8",
-            "\uD0D0\uC0AC\uB300 \uD638\uC704\uB300\uC6D0"
+            "\uD0D0\uC0AC\uB300 \uD638\uC704\uB300\uC6D0",
+            "\uC544"
         };
 
         public static readonly string[] StartScreenSystemSettings = new string[]

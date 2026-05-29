@@ -338,6 +338,13 @@ namespace FfxivKoreanPatch.PatchRouteVerifier
                     return;
                 }
 
+                byte[] cleanPacked;
+                if (_cleanFont.TryReadPackedFile(texturePath, out cleanPacked) &&
+                    BytesEqual(packed, cleanPacked))
+                {
+                    return;
+                }
+
                 if (packed == null || packed.Length < 24)
                 {
                     failures = FailFontRuntimeGlyphBoundsOnce(
@@ -372,9 +379,15 @@ namespace FfxivKoreanPatch.PatchRouteVerifier
                     return;
                 }
 
-                int textureHeaderSize = texture.MipmapOffsets != null && texture.MipmapOffsets.Length > 0
-                    ? texture.MipmapOffsets[0]
+                int textureHeaderSize = texture.Raw.Length >= 32
+                    ? checked((int)Endian.ReadUInt32LE(texture.Raw, 0x1C))
                     : 0;
+                if (textureHeaderSize <= 0 || textureHeaderSize > texture.Raw.Length)
+                {
+                    textureHeaderSize = texture.MipmapOffsets != null && texture.MipmapOffsets.Length > 0
+                        ? texture.MipmapOffsets[0]
+                        : 0;
+                }
                 int textureDataSize = Math.Max(0, texture.Raw.Length - textureHeaderSize);
                 int expectedBlockCount = Math.Max(1, (textureDataSize + 16000 - 1) / 16000);
                 if (blockCount != expectedBlockCount)

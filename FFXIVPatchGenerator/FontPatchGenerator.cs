@@ -1063,11 +1063,24 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
             normalized = 0;
             if (!path.EndsWith(".fdt", StringComparison.OrdinalIgnoreCase))
             {
-                return datWriter.WritePackedFile(packedFile);
+                return datWriter.WritePackedFile(RepackFontTexturePayload(path, packedFile));
             }
 
             byte[] fdt = SqPackArchive.UnpackStandardFile(packedFile);
             return WritePreparedFontFdtPayload(datWriter, path, fdt, packedFile, 0, mpdStream, payloadsByPath, dialogueGlyphRepair, glyphRepair, globalArchive, texturePatches, lobbyHangulAllocationCache, actionDetailHighScaleHangulCodepoints, pvpProfileVisualScaleCodepoints, lobbyHangulCodepoints, out normalized);
+        }
+
+        private static byte[] RepackFontTexturePayload(string path, byte[] packedFile)
+        {
+            if (packedFile == null ||
+                !path.EndsWith(".tex", StringComparison.OrdinalIgnoreCase))
+            {
+                return packedFile;
+            }
+
+            List<TextureSubBlock> ignored;
+            byte[] rawTexture = UnpackTextureFile(packedFile, out ignored);
+            return PackTextureFile(rawTexture);
         }
 
         private long WritePreparedFontFdtPayload(
@@ -3793,6 +3806,15 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
         private static string[] GetPreferredLobbyTextureCandidates(string fdtPath)
         {
             string normalizedFdtPath = NormalizeGamePath(fdtPath);
+            if (IsObservedHdAnalyzerPage2UnsafeLobbyFont(normalizedFdtPath))
+            {
+                return new string[]
+                {
+                    FontLobby2TexturePath,
+                    FontLobby1TexturePath
+                };
+            }
+
             if (IsStartupLobbyTextureLimitedFont(normalizedFdtPath))
             {
                 return new string[]
@@ -3838,6 +3860,12 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
                 FontLobby2TexturePath,
                 FontLobby1TexturePath
             };
+        }
+
+        private static bool IsObservedHdAnalyzerPage2UnsafeLobbyFont(string path)
+        {
+            string normalized = NormalizeGamePath(path);
+            return string.Equals(normalized, "common/font/AXIS_12_lobby.fdt", StringComparison.OrdinalIgnoreCase);
         }
 
         private static bool IsStartupLobbyTextureLimitedFont(string path)
@@ -5826,6 +5854,7 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
                 "lobby system-settings glyph coverage");
             sets.SystemSettings = CreatePriorityCodepointArray(
                 CombinePhraseGroups(
+                    LobbyScaledHangulPhrases.Core,
                     LobbyScaledHangulPhrases.StartScreenSystemSettingsResultMessages,
                     LobbyScaledHangulPhrases.HighResolutionUiScaleOptions,
                     LobbyScaledHangulPhrases.StartScreenSystemSettings),
@@ -6103,7 +6132,8 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
 
         private static uint[] UnionCodepointArrays(params uint[][] groups)
         {
-            HashSet<uint> values = new HashSet<uint>();
+            List<uint> values = new List<uint>();
+            HashSet<uint> seen = new HashSet<uint>();
             for (int groupIndex = 0; groupIndex < groups.Length; groupIndex++)
             {
                 uint[] group = groups[groupIndex];
@@ -6114,14 +6144,14 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
 
                 for (int i = 0; i < group.Length; i++)
                 {
-                    values.Add(group[i]);
+                    if (seen.Add(group[i]))
+                    {
+                        values.Add(group[i]);
+                    }
                 }
             }
 
-            uint[] array = new uint[values.Count];
-            values.CopyTo(array);
-            Array.Sort(array);
-            return array;
+            return values.ToArray();
         }
 
         private int AddLobbySheetHangulCodepoints(
