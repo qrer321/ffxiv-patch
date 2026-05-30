@@ -122,6 +122,7 @@
     <Compile Include="ProtectedGlyphVerification.cs" />
     <Compile Include="PvpProfileFontVerification.cs" />
     <Compile Include="ReportedInGamePhraseVerification.cs" />
+    <Compile Include="StartScreenGlyphVariantVerification.cs" />
     <Compile Include="ThirdPartyGameFontSafetyVerification.cs" />
     <Compile Include="TtmpFontPackage.cs" />
     <Compile Include="TtmpGlyphRendering.cs" />
@@ -146,6 +147,9 @@
     </Compile>
     <Compile Include="..\..\FFXIVPatchGenerator\LobbyScaledHangulPhrases.cs">
       <Link>Generator\LobbyScaledHangulPhrases.cs</Link>
+    </Compile>
+    <Compile Include="..\..\FFXIVPatchGenerator\StartScreenGlyphVariants.cs">
+      <Link>Generator\StartScreenGlyphVariants.cs</Link>
     </Compile>
     <Compile Include="..\..\FFXIVPatchGenerator\LobbyHangulCoverage.cs">
       <Link>Generator\LobbyHangulCoverage.cs</Link>

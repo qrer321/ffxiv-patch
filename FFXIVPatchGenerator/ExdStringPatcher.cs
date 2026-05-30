@@ -517,6 +517,16 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
                     }
                 }
 
+                if (ShouldApplyStartScreenGlyphVariants(patchPolicy, targetRow.RowId))
+                {
+                    byte[] variantSelected = StartScreenGlyphVariants.ApplyToAddonBytes(selected);
+                    if (!BytesEqual(selected, variantSelected))
+                    {
+                        selected = variantSelected;
+                        touched = true;
+                    }
+                }
+
                 if (ContainsRsvToken(selected))
                 {
                     rsvStrings++;
@@ -556,6 +566,13 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
             }
 
             return new RowPatchResult(rowOutput.ToArray(), true, protectedUiStrings, rowHasRsv ? 1 : 0, rsvStrings);
+        }
+
+        private static bool ShouldApplyStartScreenGlyphVariants(StringPatchPolicy patchPolicy, uint rowId)
+        {
+            return patchPolicy != null &&
+                   string.Equals(patchPolicy.SheetName, "Addon", StringComparison.OrdinalIgnoreCase) &&
+                   StartScreenGlyphVariants.ShouldApplyToAddonRow(rowId);
         }
 
         private static bool ShouldKeepOriginalForUiStructure(StringPatchPolicy patchPolicy, byte[] original, byte[] replacement)

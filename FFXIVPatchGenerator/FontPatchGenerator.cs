@@ -1129,6 +1129,7 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
             int cleanAsciiFixes = ApplyCleanAsciiGlyphShapes(path, fdt, glyphRepair, globalArchive, texturePatches);
             int cleanAsciiKerningFixes = ApplyCleanAsciiKerning(path, ref fdt, globalArchive);
             int startScreenKerningFixes = _options.FontOnly ? 0 : ApplyStartScreenSystemSettingsKerning(path, ref fdt);
+            int startScreenVariantAliases = _options.FontOnly ? 0 : ApplyStartScreenGlyphVariantAliases(path, ref fdt);
             // FDT edits are written as standard files when key normalization,
             // targeted Hangul repair, party marker allocation, or ASCII/numeric
             // glyph repair changed the render contract for the file.
@@ -1146,6 +1147,7 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
                 cleanAsciiFixes == 0 &&
                 cleanAsciiKerningFixes == 0 &&
                 startScreenKerningFixes == 0 &&
+                startScreenVariantAliases == 0 &&
                 originalPackedFile != null)
             {
                 return datWriter.WritePackedFile(originalPackedFile);
@@ -1209,6 +1211,11 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
             if (startScreenKerningFixes > 0)
             {
                 Console.WriteLine("  Added start-screen system-settings kerning pairs: {0} ({1})", startScreenKerningFixes, path);
+            }
+
+            if (startScreenVariantAliases > 0)
+            {
+                Console.WriteLine("  Added start-screen glyph variants: {0} ({1})", startScreenVariantAliases, path);
             }
 
             return datWriter.WriteStandardFile(fdt);
@@ -4576,6 +4583,116 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
             new StartScreenKerningRoute("common/font/AXIS_14_lobby.fdt", true, true, false, 1, 1, true),
             new StartScreenKerningRoute("common/font/AXIS_18_lobby.fdt", true, true, false, 1, 1, true)
         };
+
+        private static int ApplyStartScreenGlyphVariantAliases(string path, ref byte[] targetFdt)
+        {
+            if (targetFdt == null || !ShouldAddStartScreenGlyphVariantAliases(path))
+            {
+                return 0;
+            }
+
+            int fontTableOffset;
+            uint glyphCount;
+            int glyphStart;
+            if (!TryGetFdtGlyphTable(targetFdt, out fontTableOffset, out glyphCount, out glyphStart))
+            {
+                return 0;
+            }
+
+            int glyphEnd = checked(glyphStart + checked((int)glyphCount) * FdtGlyphEntrySize);
+            List<byte[]> entries = new List<byte[]>(checked((int)glyphCount + StartScreenGlyphVariants.Aliases.Length));
+            Dictionary<uint, int> entryIndexes = new Dictionary<uint, int>();
+            for (int glyphIndex = 0; glyphIndex < glyphCount; glyphIndex++)
+            {
+                byte[] entry = new byte[FdtGlyphEntrySize];
+                Buffer.BlockCopy(targetFdt, glyphStart + glyphIndex * FdtGlyphEntrySize, entry, 0, FdtGlyphEntrySize);
+                uint utf8Value = Endian.ReadUInt32LE(entry, 0);
+                if (!entryIndexes.ContainsKey(utf8Value))
+                {
+                    entryIndexes.Add(utf8Value, entries.Count);
+                }
+
+                entries.Add(entry);
+            }
+
+            string normalizedPath = NormalizeGamePath(path);
+            int changed = 0;
+            for (int i = 0; i < StartScreenGlyphVariants.Aliases.Length; i++)
+            {
+                StartScreenGlyphVariant alias = StartScreenGlyphVariants.Aliases[i];
+                uint sourceValue = PackFdtUtf8Value(alias.SourceCodepoint);
+                uint aliasValue = PackFdtUtf8Value(alias.AliasCodepoint);
+                if (entryIndexes.ContainsKey(aliasValue))
+                {
+                    continue;
+                }
+
+                int sourceIndex;
+                if (!entryIndexes.TryGetValue(sourceValue, out sourceIndex))
+                {
+                    continue;
+                }
+
+                byte[] aliasEntry = new byte[FdtGlyphEntrySize];
+                Buffer.BlockCopy(entries[sourceIndex], 0, aliasEntry, 0, FdtGlyphEntrySize);
+                Endian.WriteUInt32LE(aliasEntry, 0, aliasValue);
+                Endian.WriteUInt16LE(aliasEntry, 4, 0);
+
+                int adjustment = GetRuntimeStartScreenGlyphVariantAdvanceCompensation(normalizedPath, alias.SourceCodepoint);
+                if (adjustment > 0)
+                {
+                    int offsetX = unchecked((sbyte)aliasEntry[14]);
+                    int adjustedOffsetX = ClampInt(offsetX + adjustment, sbyte.MinValue, sbyte.MaxValue);
+                    if (adjustedOffsetX > offsetX)
+                    {
+                        aliasEntry[14] = unchecked((byte)(sbyte)adjustedOffsetX);
+                    }
+                }
+
+                entryIndexes.Add(aliasValue, entries.Count);
+                entries.Add(aliasEntry);
+                changed++;
+            }
+
+            if (changed > 0)
+            {
+                targetFdt = RewriteFdtGlyphTable(targetFdt, fontTableOffset, glyphStart, glyphEnd, entries);
+            }
+
+            return changed;
+        }
+
+        private static bool ShouldAddStartScreenGlyphVariantAliases(string path)
+        {
+            string normalized = NormalizeGamePath(path);
+            return normalized.StartsWith("common/font/", StringComparison.OrdinalIgnoreCase) &&
+                   normalized.EndsWith(".fdt", StringComparison.OrdinalIgnoreCase);
+        }
+
+        private static int GetRuntimeStartScreenGlyphVariantAdvanceCompensation(string path, uint codepoint)
+        {
+            string normalized = NormalizeGamePath(path);
+            if (!string.Equals(normalized, "common/font/AXIS_12.fdt", StringComparison.OrdinalIgnoreCase) &&
+                !string.Equals(normalized, "common/font/AXIS_14.fdt", StringComparison.OrdinalIgnoreCase) &&
+                !string.Equals(normalized, "common/font/AXIS_18.fdt", StringComparison.OrdinalIgnoreCase) &&
+                !string.Equals(normalized, "common/font/KrnAXIS_180.fdt", StringComparison.OrdinalIgnoreCase))
+            {
+                return 0;
+            }
+
+            if (!StartScreenGlyphVariants.IsAliasSourceCodepoint(codepoint))
+            {
+                return 0;
+            }
+
+            if (string.Equals(normalized, "common/font/AXIS_18.fdt", StringComparison.OrdinalIgnoreCase) ||
+                string.Equals(normalized, "common/font/KrnAXIS_180.fdt", StringComparison.OrdinalIgnoreCase))
+            {
+                return 1;
+            }
+
+            return 2;
+        }
 
         private static int ApplyStartScreenSystemSettingsKerning(string path, ref byte[] targetFdt)
         {

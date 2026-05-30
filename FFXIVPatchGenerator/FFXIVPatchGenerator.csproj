@@ -42,6 +42,7 @@
     <Compile Include="ActionDetailHighScaleHangulGlyphs.cs" />
     <Compile Include="PvpProfileVisualScaleGlyphs.cs" />
     <Compile Include="LobbyScaledHangulPhrases.cs" />
+    <Compile Include="StartScreenGlyphVariants.cs" />
     <Compile Include="LobbyHangulCoverage.cs" />
     <Compile Include="UiPatchGenerator.cs" />
     <Compile Include="SqPack.cs" />

@@ -18,6 +18,7 @@ $sources = @(
     "ActionDetailHighScaleHangulGlyphs.cs",
     "PvpProfileVisualScaleGlyphs.cs",
     "LobbyScaledHangulPhrases.cs",
+    "StartScreenGlyphVariants.cs",
     "LobbyHangulCoverage.cs",
     "UiPatchGenerator.cs",
     "SqPack.cs",

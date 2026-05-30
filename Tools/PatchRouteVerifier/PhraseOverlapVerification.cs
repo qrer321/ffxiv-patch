@@ -15,7 +15,9 @@ namespace FfxivKoreanPatch.PatchRouteVerifier
                 {
                     for (int phraseIndex = 0; phraseIndex < SystemSettingsScaledPhrases.Length; phraseIndex++)
                     {
-                        VerifyNoPhraseOverlap(SystemSettingsScaledFonts[fontIndex], SystemSettingsScaledPhrases[phraseIndex]);
+                        VerifyNoPhraseOverlap(
+                            SystemSettingsScaledFonts[fontIndex],
+                            StartScreenGlyphVariants.ApplyToKnownPhrases(SystemSettingsScaledPhrases[phraseIndex]));
                     }
                 }
             }
@@ -30,7 +32,11 @@ namespace FfxivKoreanPatch.PatchRouteVerifier
                     string asciiFallbackSourceFontPath = ResolveDerived4kLobbyFallbackAsciiReferenceFontPath(fontPath);
                     for (int phraseIndex = 0; phraseIndex < SystemSettingsMixedScalePhrases.Length; phraseIndex++)
                     {
-                        VerifyMixedScalePhraseLayout(fontPath, asciiSourceFontPath, asciiFallbackSourceFontPath, SystemSettingsMixedScalePhrases[phraseIndex]);
+                        VerifyMixedScalePhraseLayout(
+                            fontPath,
+                            asciiSourceFontPath,
+                            asciiFallbackSourceFontPath,
+                            StartScreenGlyphVariants.ApplyToKnownPhrases(SystemSettingsMixedScalePhrases[phraseIndex]));
                     }
                 }
             }
@@ -472,22 +478,24 @@ namespace FfxivKoreanPatch.PatchRouteVerifier
 
             private void VerifySystemSettingsScaledRoutePhraseLayout(string fontPath, string phrase, bool strictVisualGap)
             {
+                string displayPhrase = StartScreenGlyphVariants.ApplyToKnownPhrases(phrase);
+                string sourcePhrase = StartScreenGlyphVariants.NormalizeAliases(displayPhrase);
                 if (!IsScaledLobbySystemSettingsFont(fontPath))
                 {
                     if ((strictVisualGap || IsStartScreenHighRiskSystemSettingsPhrase(phrase)) &&
                         IsSystemSettingsStrictVisualFont(fontPath) &&
-                        !VerifySystemSettingsStrictScaledRoutePhraseLayout(fontPath, phrase))
+                        !VerifySystemSettingsStrictScaledRoutePhraseLayout(fontPath, displayPhrase))
                     {
                         return;
                     }
 
-                    VerifyNoPhraseOverlap(fontPath, phrase);
+                    VerifyNoPhraseOverlap(fontPath, displayPhrase);
                     return;
                 }
 
                 PhraseLayoutResult layout;
                 string error;
-                if (!TryMeasurePhraseLayout(_patchedFont, fontPath, phrase, true, out layout, out error))
+                if (!TryMeasurePhraseLayout(_patchedFont, fontPath, displayPhrase, true, out layout, out error))
                 {
                     Fail("{0} system-settings phrase [{1}] layout error: {2}", fontPath, Escape(phrase), error);
                     return;
@@ -498,7 +506,7 @@ namespace FfxivKoreanPatch.PatchRouteVerifier
                 string sourceFontPath = ResolveLobbyHangulSourceFontPath(fontPath);
                 if (_ttmpFont == null ||
                     !_ttmpFont.ContainsPath(sourceFontPath) ||
-                    !TryMeasurePhraseLayout(_ttmpFont, sourceFontPath, phrase, out sourceLayout, out sourceError))
+                    !TryMeasurePhraseLayout(_ttmpFont, sourceFontPath, sourcePhrase, out sourceLayout, out sourceError))
                 {
                     Fail(
                         "{0} system-settings phrase [{1}] source layout error from {2}: {3}",
@@ -527,7 +535,7 @@ namespace FfxivKoreanPatch.PatchRouteVerifier
                     TryComputeLobbyAxisAdvanceNormalizedWidth(
                         fontPath,
                         sourceFontPath,
-                        phrase,
+                        sourcePhrase,
                         sourceLayout,
                         out normalizedSourceWidth,
                         out sourceError);
@@ -561,7 +569,7 @@ namespace FfxivKoreanPatch.PatchRouteVerifier
                 }
 
                 if (strictVisualGap &&
-                    !VerifySystemSettingsStrictVisualGap(fontPath, phrase, layout))
+                    !VerifySystemSettingsStrictVisualGap(fontPath, displayPhrase, layout))
                 {
                     return;
                 }

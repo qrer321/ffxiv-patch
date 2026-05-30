@@ -17,6 +17,8 @@ namespace FfxivKoreanPatch.PatchRouteVerifier
             private const double LowScaleSimilarityFailThreshold = 0.035;
             private static readonly string SettingsChangedPhrase = LobbyScaledHangulPhrases.StartScreenSystemSettingsResultMessages[0];
             private static readonly string HighResolutionFhdPhrase = LobbyScaledHangulPhrases.HighResolutionUiScaleOptions[2];
+            private static readonly string SettingsChangedDisplayPhrase = StartScreenGlyphVariants.ApplyToKnownPhrases(SettingsChangedPhrase);
+            private static readonly string HighResolutionFhdDisplayPhrase = StartScreenGlyphVariants.ApplyToKnownPhrases(HighResolutionFhdPhrase);
 
             private static readonly LobbyRenderCase[] LobbyRenderCases = new LobbyRenderCase[]
             {
@@ -24,34 +26,34 @@ namespace FfxivKoreanPatch.PatchRouteVerifier
                 new LobbyRenderCase("dc-axis14-pandaemonium", "common/font/AXIS_14_lobby.fdt", "Pandaemonium", 1.0, false, 0, true),
                 new LobbyRenderCase("dc-jupiter20-worlds", "common/font/Jupiter_20_lobby.fdt", "Aegis  Atomos  Carbuncle", 1.0, false, 0, true),
                 new LobbyRenderCase("dc-trump23-title", "common/font/TrumpGothic_23_lobby.fdt", "JAPAN DATA CENTER", 1.0, false, 0, true),
-                new LobbyRenderCase("settings-axis12-result", "common/font/AXIS_12_lobby.fdt", SettingsChangedPhrase, 1.0),
-                new LobbyRenderCase("settings-axis14-fhd", "common/font/AXIS_14_lobby.fdt", HighResolutionFhdPhrase, 1.0),
-                new LobbyRenderCase("settings-axis18-result", "common/font/AXIS_18_lobby.fdt", SettingsChangedPhrase, 1.0),
-                new LobbyRenderCase("settings-axis36-result", "common/font/AXIS_36_lobby.fdt", SettingsChangedPhrase, 1.0),
+                new LobbyRenderCase("settings-axis12-result", "common/font/AXIS_12_lobby.fdt", SettingsChangedDisplayPhrase, 1.0),
+                new LobbyRenderCase("settings-axis14-fhd", "common/font/AXIS_14_lobby.fdt", HighResolutionFhdDisplayPhrase, 1.0),
+                new LobbyRenderCase("settings-axis18-result", "common/font/AXIS_18_lobby.fdt", SettingsChangedDisplayPhrase, 1.0),
+                new LobbyRenderCase("settings-axis36-result", "common/font/AXIS_36_lobby.fdt", SettingsChangedDisplayPhrase, 1.0),
                 new LobbyRenderCase("settings-trump23-title", "common/font/TrumpGothic_23_lobby.fdt", LobbyScaledHangulPhrases.StartScreenSystemSettings[0], 1.0),
                 new LobbyRenderCase("character-trump23-race", "common/font/TrumpGothic_23_lobby.fdt", LobbyScaledHangulPhrases.CharacterSelectLargeLabels[0], 1.0),
                 new LobbyRenderCase("character-trump34-race", "common/font/TrumpGothic_34_lobby.fdt", LobbyScaledHangulPhrases.CharacterSelectLargeLabels[0], 1.0),
-                new LobbyRenderCase("settings-global-axis18-result", "common/font/AXIS_18.fdt", SettingsChangedPhrase, 1.0, true),
-                new LobbyRenderCase("settings-global-axis36-result", "common/font/AXIS_36.fdt", SettingsChangedPhrase, 1.0, true),
-                new LobbyRenderCase("settings-global-krnaxis180-result", "common/font/KrnAXIS_180.fdt", SettingsChangedPhrase, 1.0, true),
-                new LobbyRenderCase("settings-global-krnaxis360-result", "common/font/KrnAXIS_360.fdt", SettingsChangedPhrase, 1.0, true),
-                new LobbyRenderCase("settings-axis12-ui150-result", "common/font/AXIS_12.fdt", SettingsChangedPhrase, 1.5, false, 1),
-                new LobbyRenderCase("settings-axis14-ui150-fhd", "common/font/AXIS_14.fdt", HighResolutionFhdPhrase, 1.5, false, 1),
-                new LobbyRenderCase("settings-axis14-ui200-result", "common/font/AXIS_14.fdt", SettingsChangedPhrase, 2.0, false, 1),
-                new LobbyRenderCase("settings-axis14-ui300-result", "common/font/AXIS_14.fdt", SettingsChangedPhrase, 3.0, false, 1)
+                new LobbyRenderCase("settings-global-axis18-result", "common/font/AXIS_18.fdt", SettingsChangedDisplayPhrase, 1.0, true),
+                new LobbyRenderCase("settings-global-axis36-result", "common/font/AXIS_36.fdt", SettingsChangedDisplayPhrase, 1.0, true),
+                new LobbyRenderCase("settings-global-krnaxis180-result", "common/font/KrnAXIS_180.fdt", SettingsChangedDisplayPhrase, 1.0, true),
+                new LobbyRenderCase("settings-global-krnaxis360-result", "common/font/KrnAXIS_360.fdt", SettingsChangedDisplayPhrase, 1.0, true),
+                new LobbyRenderCase("settings-axis12-ui150-result", "common/font/AXIS_12.fdt", SettingsChangedDisplayPhrase, 1.5, false, 1),
+                new LobbyRenderCase("settings-axis14-ui150-fhd", "common/font/AXIS_14.fdt", HighResolutionFhdDisplayPhrase, 1.5, false, 1),
+                new LobbyRenderCase("settings-axis14-ui200-result", "common/font/AXIS_14.fdt", SettingsChangedDisplayPhrase, 2.0, false, 1),
+                new LobbyRenderCase("settings-axis14-ui300-result", "common/font/AXIS_14.fdt", SettingsChangedDisplayPhrase, 3.0, false, 1)
             };
 
             private static readonly LobbyScaleComparisonCase[] LobbyScaleComparisonCases = new LobbyScaleComparisonCase[]
             {
-                new LobbyScaleComparisonCase("axis18-vs-axis12-150-result", "common/font/AXIS_18_lobby.fdt", "common/font/AXIS_12_lobby.fdt", SettingsChangedPhrase, 1.5),
-                new LobbyScaleComparisonCase("axis18-vs-axis12-150-fhd", "common/font/AXIS_18_lobby.fdt", "common/font/AXIS_12_lobby.fdt", HighResolutionFhdPhrase, 1.5),
-                new LobbyScaleComparisonCase("axis36-vs-axis18-200-result", "common/font/AXIS_36_lobby.fdt", "common/font/AXIS_18_lobby.fdt", SettingsChangedPhrase, 2.0),
-                new LobbyScaleComparisonCase("axis36-vs-axis12-300-result", "common/font/AXIS_36_lobby.fdt", "common/font/AXIS_12_lobby.fdt", SettingsChangedPhrase, 3.0),
-                new LobbyScaleComparisonCase("global-axis18-vs-axis12-150-result", "common/font/AXIS_18.fdt", "common/font/AXIS_12.fdt", SettingsChangedPhrase, 1.5, true),
-                new LobbyScaleComparisonCase("global-axis36-vs-axis18-200-result", "common/font/AXIS_36.fdt", "common/font/AXIS_18.fdt", SettingsChangedPhrase, 2.0, true),
-                new LobbyScaleComparisonCase("global-axis36-vs-axis12-300-result", "common/font/AXIS_36.fdt", "common/font/AXIS_12.fdt", SettingsChangedPhrase, 3.0, true),
-                new LobbyScaleComparisonCase("krnaxis180-vs-krnaxis120-150-result", "common/font/KrnAXIS_180.fdt", "common/font/KrnAXIS_120.fdt", SettingsChangedPhrase, 1.5, true),
-                new LobbyScaleComparisonCase("krnaxis360-vs-krnaxis180-200-result", "common/font/KrnAXIS_360.fdt", "common/font/KrnAXIS_180.fdt", SettingsChangedPhrase, 2.0, true)
+                new LobbyScaleComparisonCase("axis18-vs-axis12-150-result", "common/font/AXIS_18_lobby.fdt", "common/font/AXIS_12_lobby.fdt", SettingsChangedDisplayPhrase, 1.5),
+                new LobbyScaleComparisonCase("axis18-vs-axis12-150-fhd", "common/font/AXIS_18_lobby.fdt", "common/font/AXIS_12_lobby.fdt", HighResolutionFhdDisplayPhrase, 1.5),
+                new LobbyScaleComparisonCase("axis36-vs-axis18-200-result", "common/font/AXIS_36_lobby.fdt", "common/font/AXIS_18_lobby.fdt", SettingsChangedDisplayPhrase, 2.0),
+                new LobbyScaleComparisonCase("axis36-vs-axis12-300-result", "common/font/AXIS_36_lobby.fdt", "common/font/AXIS_12_lobby.fdt", SettingsChangedDisplayPhrase, 3.0),
+                new LobbyScaleComparisonCase("global-axis18-vs-axis12-150-result", "common/font/AXIS_18.fdt", "common/font/AXIS_12.fdt", SettingsChangedDisplayPhrase, 1.5, true),
+                new LobbyScaleComparisonCase("global-axis36-vs-axis18-200-result", "common/font/AXIS_36.fdt", "common/font/AXIS_18.fdt", SettingsChangedDisplayPhrase, 2.0, true),
+                new LobbyScaleComparisonCase("global-axis36-vs-axis12-300-result", "common/font/AXIS_36.fdt", "common/font/AXIS_12.fdt", SettingsChangedDisplayPhrase, 3.0, true),
+                new LobbyScaleComparisonCase("krnaxis180-vs-krnaxis120-150-result", "common/font/KrnAXIS_180.fdt", "common/font/KrnAXIS_120.fdt", SettingsChangedDisplayPhrase, 1.5, true),
+                new LobbyScaleComparisonCase("krnaxis360-vs-krnaxis180-200-result", "common/font/KrnAXIS_360.fdt", "common/font/KrnAXIS_180.fdt", SettingsChangedDisplayPhrase, 2.0, true)
             };
 
             private void VerifyLobbyRenderSnapshots()
