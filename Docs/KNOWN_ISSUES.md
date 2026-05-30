@@ -454,4 +454,5 @@
 - The previous PUA alias path copied the same small `AXIS_12/14/18` glyph entry, so `=` fallback was fixed but 150%+ lobby/system-settings text could still look like a low-scale glyph enlarged by the client.
 - The generator now creates route-scoped PUA alias cells from high-scale source fonts (`AXIS_12/14 -> AXIS_18`, `AXIS_18 -> AXIS_36`) and applies the same runtime advance compensation to the generated alias entries.
 - Fresh output `.tmp\start-variant-visual-alias-ja-r3` passes the focused lobby critical set and the full `verify-hd-crash-release.ps1 -SkipGenerate -RunFullFontObjective -SkipKnownFailureCheck -SkipCrashLogCheck` gate.
+- Release build `Release\Public\FFXIVKoreanPatch.exe` rebuilt at `2026-05-31 01:08:12` with SHA256 `3E55E468D929C95DC5C361C1D39AB17698F19C53BEA0AC9B60AE8E96BE560503`; `Scripts\check-hd-crash-logs.ps1 -FailOnAnyNewCrash` passed against that timestamp. Visual snapshots for the final r3 output are under `.tmp\start-variant-visual-alias-ja-r3-snapshots`.
 - This is code-level evidence only. Do not mark the live lobby high-scale issue fixed until the user confirms the client.
