@@ -83,11 +83,15 @@ namespace FfxivKoreanPatch.PatchRouteVerifier
                         "system-settings-mixed-scale-layouts",
                         "system-settings-scaled-phrase-layouts",
                         "high-scale-ascii-phrase-layouts",
+                        "start-screen-glyph-variants",
                         "lobby-scale-font-sources",
                         "lobby-render-snapshots",
                         "lobby-large-label-scale-layouts",
                         "lobby-runtime-scale-font-routes",
                         "lobby-coverage-glyphs",
+                        "lobby-hangul-visibility",
+                        "4k-lobby-phrase-layouts",
+                        "start-main-menu-phrase-layouts",
                         "lobby-runtime-font-safety",
                         "lobby-multitexture-font-set",
                         "lobby-texture-cell-margin"
@@ -104,8 +108,11 @@ namespace FfxivKoreanPatch.PatchRouteVerifier
                         "party-list-self-marker",
                         "combat-flytext-damage-glyphs",
                         "third-party-game-font-safety",
+                        "reported-ingame-hangul-phrases",
                         "action-detail-scale-layouts",
-                        "pvp-profile-font-routes"
+                        "pvp-profile-font-routes",
+                        "hangul-source-preservation",
+                        "ingame-ttmp-texture-neighborhoods"
                     };
                 }
 

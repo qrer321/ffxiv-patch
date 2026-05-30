@@ -269,7 +269,7 @@ if (![string]::Equals([System.IO.Path]::GetFullPath($pvpOversizedStartVariantOut
     Add-KnownFailedOutput -Outputs $pvpProfileFailedOutputs -Path $pvpOversizedStartVariantOutput
 }
 
-$focusedChecks = "lobby-coverage-glyphs,lobby-runtime-font-safety,lobby-multitexture-font-set,lobby-runtime-scale-font-routes,lobby-hangul-visibility,font-runtime-glyph-bounds"
+$focusedChecks = "lobby-coverage-glyphs,lobby-runtime-font-safety,lobby-multitexture-font-set,lobby-runtime-scale-font-routes,lobby-hangul-visibility,font-runtime-glyph-bounds,start-screen-glyph-variants,lobby-render-snapshots,action-detail-scale-layouts,pvp-profile-font-routes,combat-flytext-damage-glyphs,third-party-game-font-safety,party-list-self-marker"
 
 if ($BuildRelease) {
     Invoke-Checked `
