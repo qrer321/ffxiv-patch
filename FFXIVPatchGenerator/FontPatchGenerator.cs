@@ -1129,7 +1129,7 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
             int cleanAsciiFixes = ApplyCleanAsciiGlyphShapes(path, fdt, glyphRepair, globalArchive, texturePatches);
             int cleanAsciiKerningFixes = ApplyCleanAsciiKerning(path, ref fdt, globalArchive);
             int startScreenKerningFixes = _options.FontOnly ? 0 : ApplyStartScreenSystemSettingsKerning(path, ref fdt);
-            int startScreenVariantAliases = _options.FontOnly ? 0 : ApplyStartScreenGlyphVariantAliases(path, ref fdt);
+            int startScreenVariantAliases = _options.FontOnly ? 0 : ApplyStartScreenGlyphVariantAliases(path, ref fdt, mpdStream, payloadsByPath, glyphRepair, texturePatches);
             // FDT edits are written as standard files when key normalization,
             // targeted Hangul repair, party marker allocation, or ASCII/numeric
             // glyph repair changed the render contract for the file.
@@ -4583,7 +4583,13 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
             new StartScreenKerningRoute("common/font/AXIS_18_lobby.fdt", true, true, false, 1, 1, true)
         };
 
-        private static int ApplyStartScreenGlyphVariantAliases(string path, ref byte[] targetFdt)
+        private int ApplyStartScreenGlyphVariantAliases(
+            string path,
+            ref byte[] targetFdt,
+            FileStream mpdStream,
+            Dictionary<string, FontPayload> payloadsByPath,
+            FontGlyphRepairContext glyphRepair,
+            Dictionary<string, List<FontTexturePatch>> texturePatches)
         {
             if (targetFdt == null || !ShouldAddStartScreenGlyphVariantAliases(path))
             {
@@ -4621,31 +4627,53 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
                 StartScreenGlyphVariant alias = StartScreenGlyphVariants.Aliases[i];
                 uint sourceValue = PackFdtUtf8Value(alias.SourceCodepoint);
                 uint aliasValue = PackFdtUtf8Value(alias.AliasCodepoint);
-                if (entryIndexes.ContainsKey(aliasValue))
-                {
-                    continue;
-                }
+                int aliasIndex;
+                bool hasAlias = entryIndexes.TryGetValue(aliasValue, out aliasIndex);
 
-                int sourceIndex;
-                if (!entryIndexes.TryGetValue(sourceValue, out sourceIndex))
+                byte[] aliasEntry;
+                if (!TryCreateStartScreenGlyphVariantVisualAliasEntry(
+                    normalizedPath,
+                    alias,
+                    aliasValue,
+                    mpdStream,
+                    payloadsByPath,
+                    glyphRepair,
+                    texturePatches,
+                    out aliasEntry))
                 {
-                    continue;
-                }
-
-                byte[] aliasEntry = new byte[FdtGlyphEntrySize];
-                Buffer.BlockCopy(entries[sourceIndex], 0, aliasEntry, 0, FdtGlyphEntrySize);
-                Endian.WriteUInt32LE(aliasEntry, 0, aliasValue);
-                Endian.WriteUInt16LE(aliasEntry, 4, 0);
-
-                int adjustment = GetRuntimeStartScreenGlyphVariantAdvanceCompensation(normalizedPath, alias.SourceCodepoint);
-                if (adjustment > 0)
-                {
-                    int offsetX = unchecked((sbyte)aliasEntry[14]);
-                    int adjustedOffsetX = ClampInt(offsetX + adjustment, sbyte.MinValue, sbyte.MaxValue);
-                    if (adjustedOffsetX > offsetX)
+                    if (hasAlias)
                     {
-                        aliasEntry[14] = unchecked((byte)(sbyte)adjustedOffsetX);
+                        continue;
                     }
+
+                    int sourceIndex;
+                    if (!entryIndexes.TryGetValue(sourceValue, out sourceIndex))
+                    {
+                        continue;
+                    }
+
+                    aliasEntry = new byte[FdtGlyphEntrySize];
+                    Buffer.BlockCopy(entries[sourceIndex], 0, aliasEntry, 0, FdtGlyphEntrySize);
+                    Endian.WriteUInt32LE(aliasEntry, 0, aliasValue);
+                    Endian.WriteUInt16LE(aliasEntry, 4, 0);
+
+                    int adjustment = GetRuntimeStartScreenGlyphVariantAdvanceCompensation(normalizedPath, alias.SourceCodepoint);
+                    if (adjustment > 0)
+                    {
+                        int offsetX = unchecked((sbyte)aliasEntry[14]);
+                        int adjustedOffsetX = ClampInt(offsetX + adjustment, sbyte.MinValue, sbyte.MaxValue);
+                        if (adjustedOffsetX > offsetX)
+                        {
+                            aliasEntry[14] = unchecked((byte)(sbyte)adjustedOffsetX);
+                        }
+                    }
+                }
+
+                if (hasAlias)
+                {
+                    entries[aliasIndex] = aliasEntry;
+                    changed++;
+                    continue;
                 }
 
                 entryIndexes.Add(aliasValue, entries.Count);
@@ -4659,6 +4687,143 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
             }
 
             return changed;
+        }
+
+        private bool TryCreateStartScreenGlyphVariantVisualAliasEntry(
+            string targetFontPath,
+            StartScreenGlyphVariant alias,
+            uint aliasValue,
+            FileStream mpdStream,
+            Dictionary<string, FontPayload> payloadsByPath,
+            FontGlyphRepairContext glyphRepair,
+            Dictionary<string, List<FontTexturePatch>> texturePatches,
+            out byte[] aliasEntry)
+        {
+            aliasEntry = null;
+            string sourceFontPath;
+            if (!TryGetStartScreenGlyphVariantVisualSourceFontPath(targetFontPath, out sourceFontPath) ||
+                mpdStream == null ||
+                payloadsByPath == null ||
+                glyphRepair == null ||
+                texturePatches == null)
+            {
+                return false;
+            }
+
+            byte[] sourceFdt = TryLoadTtmpStandardPayload(payloadsByPath, mpdStream, sourceFontPath);
+            if (sourceFdt == null)
+            {
+                return false;
+            }
+
+            Dictionary<uint, byte[]> sourceEntries = ReadGlyphEntriesByUtf8Value(sourceFdt);
+            byte[] sourceEntryBytes;
+            uint sourceValue = PackFdtUtf8Value(alias.SourceCodepoint);
+            if (!sourceEntries.TryGetValue(sourceValue, out sourceEntryBytes))
+            {
+                return false;
+            }
+
+            FdtGlyphEntry sourceEntry = ReadFdtGlyphEntry(sourceEntryBytes, 0);
+            if (sourceEntry.Width == 0 || sourceEntry.Height == 0)
+            {
+                return false;
+            }
+
+            string sourceTexturePath = ResolveFontTexturePath(sourceFontPath, sourceEntry.ImageIndex);
+            string targetTexturePath = ResolveFontTexturePath(targetFontPath, sourceEntry.ImageIndex);
+            if (sourceTexturePath == null || targetTexturePath == null)
+            {
+                return false;
+            }
+
+            byte[] sourceTexture = TryLoadTtmpTexturePayload(payloadsByPath, mpdStream, sourceTexturePath);
+            if (sourceTexture == null)
+            {
+                return false;
+            }
+
+            byte[] sourceAlpha;
+            try
+            {
+                sourceAlpha = ExtractFontTextureAlpha(sourceTexture, sourceEntry);
+            }
+            catch (ArgumentOutOfRangeException)
+            {
+                return false;
+            }
+            catch (IndexOutOfRangeException)
+            {
+                return false;
+            }
+
+            AllocatedFontGlyphCell allocatedCell;
+            string allocatedTexturePath;
+            int paddedWidth = checked(sourceEntry.Width + ActionDetailHighScaleGlyphTexturePadding * 2);
+            int paddedHeight = checked(sourceEntry.Height + ActionDetailHighScaleGlyphTexturePadding * 2);
+            if (!TryAllocateActionDetailHighScaleGlyphCell(
+                glyphRepair,
+                targetTexturePath,
+                paddedWidth,
+                paddedHeight,
+                out allocatedTexturePath,
+                out allocatedCell))
+            {
+                AddLimitedWarning("Start-screen variant alias atlas allocation failed for " + targetFontPath);
+                return false;
+            }
+
+            FontTexturePatch patch = new FontTexturePatch();
+            patch.TargetX = allocatedCell.X;
+            patch.TargetY = allocatedCell.Y;
+            patch.TargetChannel = allocatedCell.Channel;
+            patch.ClearWidth = paddedWidth;
+            patch.ClearHeight = paddedHeight;
+            patch.SourceWidth = paddedWidth;
+            patch.SourceHeight = paddedHeight;
+            patch.SourceAlpha = PadGlyphAlpha(
+                sourceAlpha,
+                sourceEntry.Width,
+                sourceEntry.Height,
+                ActionDetailHighScaleGlyphTexturePadding);
+            patch.SourceFdtPath = sourceFontPath;
+            patch.SourceCodepoint = alias.SourceCodepoint;
+            AddTexturePatch(texturePatches, allocatedTexturePath, patch);
+
+            aliasEntry = new byte[FdtGlyphEntrySize];
+            Buffer.BlockCopy(sourceEntryBytes, 0, aliasEntry, 0, FdtGlyphEntrySize);
+            Endian.WriteUInt32LE(aliasEntry, 0, aliasValue);
+            Endian.WriteUInt16LE(aliasEntry, 4, 0);
+            Endian.WriteUInt16LE(aliasEntry, 6, checked((ushort)allocatedCell.ImageIndex));
+            Endian.WriteUInt16LE(aliasEntry, 8, checked((ushort)(allocatedCell.X + ActionDetailHighScaleGlyphTexturePadding)));
+            Endian.WriteUInt16LE(aliasEntry, 10, checked((ushort)(allocatedCell.Y + ActionDetailHighScaleGlyphTexturePadding)));
+            aliasEntry[12] = checked((byte)sourceEntry.Width);
+            aliasEntry[13] = checked((byte)sourceEntry.Height);
+            int adjustment = GetRuntimeStartScreenGlyphVariantAdvanceCompensation(targetFontPath, alias.SourceCodepoint);
+            int adjustedOffsetX = ClampInt(sourceEntry.OffsetX + adjustment, sbyte.MinValue, sbyte.MaxValue);
+            aliasEntry[14] = unchecked((byte)(sbyte)adjustedOffsetX);
+            aliasEntry[15] = unchecked((byte)sourceEntry.OffsetY);
+            return true;
+        }
+
+        private static bool TryGetStartScreenGlyphVariantVisualSourceFontPath(string targetFontPath, out string sourceFontPath)
+        {
+            string normalized = NormalizeGamePath(targetFontPath);
+            if (string.Equals(normalized, "common/font/AXIS_12.fdt", StringComparison.OrdinalIgnoreCase) ||
+                string.Equals(normalized, "common/font/AXIS_14.fdt", StringComparison.OrdinalIgnoreCase))
+            {
+                sourceFontPath = "common/font/AXIS_18.fdt";
+                return true;
+            }
+
+            if (string.Equals(normalized, "common/font/AXIS_18.fdt", StringComparison.OrdinalIgnoreCase))
+            {
+                sourceFontPath = "common/font/AXIS_36.fdt";
+                return true;
+            }
+
+            sourceFontPath = null;
+            return false;
         }
 
         private static bool ShouldAddStartScreenGlyphVariantAliases(string path)
@@ -4684,8 +4849,12 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
                 return 0;
             }
 
-            if (string.Equals(normalized, "common/font/AXIS_18.fdt", StringComparison.OrdinalIgnoreCase) ||
-                string.Equals(normalized, "common/font/KrnAXIS_180.fdt", StringComparison.OrdinalIgnoreCase))
+            if (string.Equals(normalized, "common/font/AXIS_18.fdt", StringComparison.OrdinalIgnoreCase))
+            {
+                return 2;
+            }
+
+            if (string.Equals(normalized, "common/font/KrnAXIS_180.fdt", StringComparison.OrdinalIgnoreCase))
             {
                 return 1;
             }

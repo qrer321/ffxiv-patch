@@ -108,6 +108,64 @@ namespace FfxivKoreanPatch.PatchRouteVerifier
                         requiredRows,
                         requiredStrings);
                 }
+
+                VerifyStartScreenGlyphVariantVisualScale();
+            }
+
+            private void VerifyStartScreenGlyphVariantVisualScale()
+            {
+                VerifyStartScreenGlyphVariantVisualScaleCase("axis12-to-axis18", "common/font/AXIS_12.fdt", "common/font/AXIS_18.fdt");
+                VerifyStartScreenGlyphVariantVisualScaleCase("axis14-to-axis18", "common/font/AXIS_14.fdt", "common/font/AXIS_18.fdt");
+                VerifyStartScreenGlyphVariantVisualScaleCase("axis18-to-axis36", "common/font/AXIS_18.fdt", "common/font/AXIS_36.fdt");
+            }
+
+            private void VerifyStartScreenGlyphVariantVisualScaleCase(string id, string targetFontPath, string referenceFontPath)
+            {
+                const double minHeightRatio = 0.86d;
+                const double maxHeightRatio = 1.20d;
+
+                PhraseVisualBounds target;
+                string error;
+                string targetPhrase = StartScreenGlyphVariants.ApplyToKnownPhrases(LobbyScaledHangulPhrases.StartScreenSystemSettingsResultMessages[0]);
+                if (!TryMeasurePhraseVisualBounds(_patchedFont, targetFontPath, targetPhrase, true, out target, out error))
+                {
+                    Fail("{0} start-screen variant target render failed in {1}: {2}", id, targetFontPath, error);
+                    return;
+                }
+
+                PhraseVisualBounds reference;
+                string referencePhrase = LobbyScaledHangulPhrases.StartScreenSystemSettingsResultMessages[0];
+                if (!TryMeasurePhraseVisualBounds(_patchedFont, referenceFontPath, referencePhrase, true, out reference, out error))
+                {
+                    Fail("{0} start-screen variant reference render failed in {1}: {2}", id, referenceFontPath, error);
+                    return;
+                }
+
+                double ratio = SafeRatio(target.Height, reference.Height);
+                if (ratio < minHeightRatio || ratio > maxHeightRatio)
+                {
+                    Fail(
+                        "{0} start-screen variant height ratio {1} outside {2}..{3}: target={4} {5}, reference={6} {7}, targetBounds={8}, referenceBounds={9}",
+                        id,
+                        FormatRatio(ratio),
+                        FormatRatio(minHeightRatio),
+                        FormatRatio(maxHeightRatio),
+                        targetFontPath,
+                        target.Height.ToString(System.Globalization.CultureInfo.InvariantCulture),
+                        referenceFontPath,
+                        reference.Height.ToString(System.Globalization.CultureInfo.InvariantCulture),
+                        FormatPhraseBounds(target),
+                        FormatPhraseBounds(reference));
+                    return;
+                }
+
+                Pass(
+                    "{0} start-screen variant visual scale matches {1}: ratio={2}, target={3}, reference={4}",
+                    id,
+                    referenceFontPath,
+                    FormatRatio(ratio),
+                    target.Height.ToString(System.Globalization.CultureInfo.InvariantCulture),
+                    reference.Height.ToString(System.Globalization.CultureInfo.InvariantCulture));
             }
 
             private static bool RequiresStartScreenGlyphVariant(string text)

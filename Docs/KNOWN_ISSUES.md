@@ -448,3 +448,10 @@
 - Use `Scripts\apply-generated-output.ps1` when the exact verified `.tmp` output must be applied to the game folder. Do not regenerate in that path unless the task is explicitly to create a new output; otherwise the applied-state comparison no longer proves that the already-verified output is installed.
 - A release rebuild that produces the same SHA256 still needs the release timestamp recorded if crash-log gating is part of the evidence. The crash-log check compares logs against `Release\Public\FFXIVKoreanPatch.exe` last-write time, not just commit hash.
 - 2026-05-30 visual snapshot gate update: `Scripts\verify-hd-crash-release.ps1 -DumpVisualSnapshots` now has to dump lobby render PNGs plus `action-detail-scale-layouts` and `pvp-profile-font-routes` PNGs in the same evidence directory. A focused PASS without these PNGs is not enough evidence for the repeated `시스템 설정`, `즉시 발동`/`초`, or `크리스탈라인 컨플릭트` visual-size reports.
+
+### 2026-05-31 start-screen high-scale alias update
+
+- The previous PUA alias path copied the same small `AXIS_12/14/18` glyph entry, so `=` fallback was fixed but 150%+ lobby/system-settings text could still look like a low-scale glyph enlarged by the client.
+- The generator now creates route-scoped PUA alias cells from high-scale source fonts (`AXIS_12/14 -> AXIS_18`, `AXIS_18 -> AXIS_36`) and applies the same runtime advance compensation to the generated alias entries.
+- Fresh output `.tmp\start-variant-visual-alias-ja-r3` passes the focused lobby critical set and the full `verify-hd-crash-release.ps1 -SkipGenerate -RunFullFontObjective -SkipKnownFailureCheck -SkipCrashLogCheck` gate.
+- This is code-level evidence only. Do not mark the live lobby high-scale issue fixed until the user confirms the client.
