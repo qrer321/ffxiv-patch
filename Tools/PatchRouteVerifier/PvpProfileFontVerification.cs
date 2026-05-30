@@ -119,16 +119,12 @@ namespace FfxivKoreanPatch.PatchRouteVerifier
                     if (PvpProfileVisualScaleGlyphs.IsTargetFontPath(fontPath))
                     {
                         VerifyPvpNumericScale(fontPath, phrase, phraseBounds, numeric, true);
-                        if (IsPvpProfile100PercentFontPath(fontPath))
-                        {
-                            VerifyPvpProfile100PercentSourceScale(fontPath, phrase, phraseBounds);
-                        }
                     }
                     else
                     {
                         if (IsPvpVisualScaleCandidateFontPath(fontPath))
                         {
-                            VerifyPvpNumericScale(fontPath, phrase, phraseBounds, numeric, false);
+                            VerifyPvpNumericScale(fontPath, phrase, phraseBounds, numeric, IsPvpProfile100PercentFontPath(fontPath));
                             VerifyPvpTtmpSourceScale(fontPath, phrase, phraseBounds);
                         }
 
@@ -364,71 +360,6 @@ namespace FfxivKoreanPatch.PatchRouteVerifier
                     (fontPath ?? string.Empty).Replace('\\', '/'),
                     "common/font/Jupiter_16.fdt",
                     StringComparison.OrdinalIgnoreCase);
-            }
-
-            private void VerifyPvpProfile100PercentSourceScale(string fontPath, PvpProfileRoutePhrase phrase, PhraseVisualBounds korean)
-            {
-                if (_ttmpFont == null || !_ttmpFont.ContainsPath(fontPath))
-                {
-                    Fail("{0} PvP 100% source-scale check requires TTMP source for [{1}]", fontPath, Escape(phrase.Korean));
-                    return;
-                }
-
-                PhraseVisualBounds source;
-                string error;
-                if (!TryMeasurePhraseVisualBounds(_ttmpFont, fontPath, phrase.Korean, out source, out error))
-                {
-                    Fail("{0} PvP 100% source phrase [{1}] skipped: {2}", fontPath, Escape(phrase.Korean), error);
-                    return;
-                }
-
-                bool heightOk = VerifyPvp100SourceAxis(fontPath, phrase, "height", korean.MeanHangulHeight, source.MeanHangulHeight, korean, source);
-                bool widthOk = VerifyPvp100SourceAxis(fontPath, phrase, "width", korean.MeanHangulWidth, source.MeanHangulWidth, korean, source);
-                bool advanceOk = VerifyPvp100SourceAxis(fontPath, phrase, "advance", korean.MeanHangulAdvance, source.MeanHangulAdvance, korean, source);
-                if (!heightOk || !widthOk || !advanceOk)
-                {
-                    return;
-                }
-
-                Pass(
-                    "{0} PvP 100% phrase [{1}] matches source scale: height={2}, width={3}, advance={4}",
-                    fontPath,
-                    Escape(phrase.Korean),
-                    FormatRatio(SafeRatio(korean.MeanHangulHeight, source.MeanHangulHeight)),
-                    FormatRatio(SafeRatio(korean.MeanHangulWidth, source.MeanHangulWidth)),
-                    FormatRatio(SafeRatio(korean.MeanHangulAdvance, source.MeanHangulAdvance)));
-            }
-
-            private bool VerifyPvp100SourceAxis(
-                string fontPath,
-                PvpProfileRoutePhrase phrase,
-                string axis,
-                double koreanValue,
-                double sourceValue,
-                PhraseVisualBounds korean,
-                PhraseVisualBounds source)
-            {
-                const double minRatio = 0.94d;
-                const double maxRatio = 1.06d;
-                double ratio = SafeRatio(koreanValue, sourceValue);
-                if (ratio >= minRatio && ratio <= maxRatio)
-                {
-                    return true;
-                }
-
-                Fail(
-                    "{0} PvP 100% phrase [{1}] source {2} ratio {3} outside {4}..{5}: patched={6}, source={7}, patchedBounds={8}, sourceBounds={9}",
-                    fontPath,
-                    Escape(phrase.Korean),
-                    axis,
-                    FormatRatio(ratio),
-                    FormatRatio(minRatio),
-                    FormatRatio(maxRatio),
-                    FormatDouble(koreanValue),
-                    FormatDouble(sourceValue),
-                    FormatPhraseBounds(korean),
-                    FormatPhraseBounds(source));
-                return false;
             }
 
             private struct PvpProfileRoutePhrase

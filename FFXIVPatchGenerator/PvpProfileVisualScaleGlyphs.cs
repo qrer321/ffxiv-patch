@@ -8,9 +8,11 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
         public static readonly string[] TargetFontPaths = new string[]
         {
             // Source-preserving these routes makes Korean PvP labels overflow
-            // their ULD areas. The generator crops visible source pixels before
-            // scaling, so this target renders around the verifier's 1.16..1.42
-            // digit-height window rather than the raw source ratio.
+            // or look oversized in their ULD areas. The generator crops visible
+            // source pixels before scaling, so these targets render around the
+            // verifier's 1.16..1.42 digit-height window rather than the raw
+            // source ratio.
+            "common/font/Jupiter_16.fdt",
             "common/font/Jupiter_20.fdt"
         };
 
