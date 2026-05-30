@@ -18,6 +18,8 @@
 - Added `Scripts\apply-generated-output.ps1` to apply an already-generated output without regenerating it. The script refuses to run while game/launcher processes are active, backs up the selected sqpack files, copies text/font/ui files, and verifies SHA1 after copy.
 - 2026-05-30 applied-state repair: `.tmp\lobby-highscale-ascii-all-ja-r1` was applied to `D:\SquareEnix\FINAL FANTASY XIV - A Realm Reborn\game`; backup is `.tmp\applied-route-backups\20260530-203608`.
 - Post-apply gate result: `Scripts\verify-hd-crash-release.ps1 -AppliedGame ... -SkipGenerate -RunFullFontObjective -FailOnAnyNewCrash` passes. Evidence includes `applied-output-files`, `applied-lobby-routes`, `lobby-runtime-font-safety`, `font-runtime-glyph-bounds`, the split full-font objective chunks, known-bad output rejection, and no newer `AtkFontAnalyzerRenderer` crash log after release time.
+- 2026-05-30 current-HEAD release rebuild: after commit `064f59e`, `Scripts\build-release.ps1` rebuilt `Release\Public\FFXIVKoreanPatch.exe` at `2026-05-30 20:55:56`; SHA256 stayed `0BDACB430788E580E937BEDD2433D468AC5C97EA4405C2D1A1E8B51D5EA21770`, embedded generator SHA256 `BA68085A5FA66B1775986BA01215FCF0B9ACB966DE77071D5F3F29B8203042E4`.
+- Post-rebuild gate result: the same `-AppliedGame ... -SkipGenerate -RunFullFontObjective -FailOnAnyNewCrash` gate passes against the rebuilt release timestamp and the already-applied game folder. `applied-output-files` and `applied-lobby-routes` both pass, full objective chunks pass, known-bad outputs are rejected, and no `AtkFontAnalyzerRenderer` crash log is newer than the rebuilt release.
 
 ## 2026-05-24 Lobby/Character High-Scale Coverage Rework
 
