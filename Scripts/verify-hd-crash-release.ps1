@@ -172,7 +172,9 @@ function New-VerifierArguments {
         [string]$OutputPath,
 
         [Parameter(Mandatory = $true)]
-        [string]$Checks
+        [string]$Checks,
+
+        [switch]$UseAppliedGame
     )
 
     $arguments = @(
@@ -184,6 +186,20 @@ function New-VerifierArguments {
         "--checks", $Checks,
         "--no-glyph-dump"
     )
+
+    if ($UseAppliedGame -and ![string]::IsNullOrWhiteSpace($AppliedGame)) {
+        $arguments += @("--applied-game", $AppliedGame)
+
+        $cleanFontIndex = Join-Path $OutputPath "orig.000000.win32.index"
+        if (Test-Path -LiteralPath $cleanFontIndex) {
+            $arguments += @("--clean-font-index", $cleanFontIndex)
+        }
+
+        $cleanUiIndex = Join-Path $OutputPath "orig.060000.win32.index"
+        if (Test-Path -LiteralPath $cleanUiIndex) {
+            $arguments += @("--clean-ui-index", $cleanUiIndex)
+        }
+    }
 
     return $arguments
 }
@@ -197,20 +213,23 @@ function Invoke-CapturedVerifierCheck {
         [string]$OutputPath,
 
         [Parameter(Mandatory = $true)]
-        [string]$Checks
+        [string]$Checks,
+
+        [switch]$UseAppliedGame
     )
 
     $verifierExe = Join-Path $repoRoot "Tools\PatchRouteVerifier\bin\$Configuration\PatchRouteVerifier.exe"
     $safeLabel = $Label -replace "[^A-Za-z0-9_.-]", "_"
     $logPath = Join-Path $gateLogDir ("{0}-{1}.log" -f (Get-Date -Format "yyyyMMdd-HHmmss"), $safeLabel)
     $stopwatch = [System.Diagnostics.Stopwatch]::StartNew()
-    Write-Host "[$Label] $verifierExe --checks $Checks"
+    $appliedSuffix = if ($UseAppliedGame -and ![string]::IsNullOrWhiteSpace($AppliedGame)) { " --applied-game $AppliedGame" } else { "" }
+    Write-Host "[$Label] $verifierExe --checks $Checks$appliedSuffix"
     Write-Host "[$Label] log: $logPath"
 
     $oldPreference = $ErrorActionPreference
     $ErrorActionPreference = "Continue"
     try {
-        $verifierArguments = New-VerifierArguments -OutputPath $OutputPath -Checks $Checks
+        $verifierArguments = New-VerifierArguments -OutputPath $OutputPath -Checks $Checks -UseAppliedGame:$UseAppliedGame
         & $verifierExe @verifierArguments *> $logPath
         $exitCode = $LASTEXITCODE
     }
@@ -463,7 +482,8 @@ if ($RunFullFontObjective) {
         Invoke-CapturedVerifierCheck `
             -Label $objectiveChecks[$objectiveIndex].Label `
             -OutputPath $Output `
-            -Checks $objectiveChecks[$objectiveIndex].Checks
+            -Checks $objectiveChecks[$objectiveIndex].Checks `
+            -UseAppliedGame:(![string]::IsNullOrWhiteSpace($AppliedGame))
     }
 }
 
