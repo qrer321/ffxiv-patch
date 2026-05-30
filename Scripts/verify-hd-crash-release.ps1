@@ -381,10 +381,14 @@ if (![string]::IsNullOrWhiteSpace($AppliedGame)) {
 if ($DumpVisualSnapshots) {
     $snapshotDir = Join-Path $gateLogDir ("{0}-visual-snapshots" -f (Get-Date -Format "yyyyMMdd-HHmmss"))
     Write-Host "  visual snapshots: $snapshotDir"
-    Invoke-Checked `
-        -Label "verify-visual-snapshots" `
-        -File "powershell" `
-        -Arguments @(
+    if (![string]::IsNullOrWhiteSpace($AppliedGame)) {
+        $snapshotArgs = @($appliedBaseArgs | Where-Object { $_ -ne "-NoGlyphDump" }) + @(
+            "-Checks", "lobby-render-snapshots",
+            "-GlyphDumpDir", $snapshotDir
+        )
+    }
+    else {
+        $snapshotArgs = @(
             "-ExecutionPolicy", "Bypass",
             "-File", (Join-Path $repoRoot "Scripts\verify-patch-routes.ps1"),
             "-Output", $Output,
@@ -396,6 +400,12 @@ if ($DumpVisualSnapshots) {
             "-Checks", "lobby-render-snapshots",
             "-GlyphDumpDir", $snapshotDir
         )
+    }
+
+    Invoke-Checked `
+        -Label "verify-visual-snapshots" `
+        -File "powershell" `
+        -Arguments $snapshotArgs
 }
 
 if ($RunInGameCritical) {
