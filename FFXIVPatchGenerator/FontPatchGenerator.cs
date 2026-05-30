@@ -2879,8 +2879,7 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
         private static uint[] CreateHighScaleLobbyCleanAsciiCodepoints()
         {
             HashSet<uint> codepoints = new HashSet<uint>();
-            AddAsciiPhraseCodepoints(codepoints, LobbyScaledHangulPhrases.HighResolutionUiScaleOptions);
-            AddAsciiPhraseCodepoints(codepoints, LobbyScaledHangulPhrases.StartScreenSystemSettingsResultMessages);
+            AddAsciiPhraseCodepoints(codepoints, LobbyScaledHangulPhrases.All);
             uint[] result = new uint[codepoints.Count];
             codepoints.CopyTo(result);
             Array.Sort(result);

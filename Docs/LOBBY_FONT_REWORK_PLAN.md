@@ -101,6 +101,7 @@
 - 2026-05-15 로비 ASCII spacing 정규화는 끈다. clean lobby ASCII metric/kerning이 기준이며, 100% 로비 글자 간격을 넓히는 방식은 회귀로 본다.
 - 2026-05-15 `.tmp\lobby-axis12-full-ja-r2` 검증부터 output에 UI index가 없으면 verifier가 split baseline의 UI index를 읽는다. `--skip-ui-texture-fix` 산출물도 text/font/ui 기준을 분리해 검증할 수 있어야 한다.
 - 2026-05-15 `4k-lobby-font-derivations`는 로비 Latin/숫자를 non-lobby source와 비교하지 않는다. 로비 Latin/숫자는 clean lobby 보존이 기준이고 `clean-ascii-font-routes,numeric-glyphs`가 검증한다. 4K derivation check는 한글 glyph가 대응되는 큰 source glyph를 쓰는지만 검증한다.
+- 2026-05-30 follow-up: high-scale lobby clean ASCII injection must be phrase-derived from `LobbyScaledHangulPhrases.All`, matching `4k-lobby-phrase-layouts`. A narrower high-resolution/result-message-only ASCII set missed `M` in `데이터 센터 Mana에 접속 중입니다.` for `Jupiter_90_lobby.fdt` and `Meidinger_40_lobby.fdt`.
 - 인게임 폰트 관련 verifier가 회귀하지 않아야 한다.
 
 ## 다음 작업 순서
