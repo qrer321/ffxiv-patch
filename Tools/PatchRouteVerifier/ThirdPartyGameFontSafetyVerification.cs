@@ -43,6 +43,7 @@ namespace FfxivKoreanPatch.PatchRouteVerifier
                 int fonts = 0;
                 int compared = 0;
                 HashSet<uint> actionDetailHighScaleCodepoints = CollectActionDetailHighScaleHangulCodepointSet();
+                HashSet<uint> pvpProfileVisualScaleCodepoints = CollectPvpProfileVisualScaleHangulCodepointSet();
                 for (int i = 0; i < ThirdPartyGameFontSafetyFonts.Length; i++)
                 {
                     string fontPath = ThirdPartyGameFontSafetyFonts[i];
@@ -51,7 +52,7 @@ namespace FfxivKoreanPatch.PatchRouteVerifier
                         continue;
                     }
 
-                    int comparedForFont = VerifyThirdPartyGameFont(fontPath, actionDetailHighScaleCodepoints, ref ok);
+                    int comparedForFont = VerifyThirdPartyGameFont(fontPath, actionDetailHighScaleCodepoints, pvpProfileVisualScaleCodepoints, ref ok);
                     if (comparedForFont > 0)
                     {
                         fonts++;
@@ -78,6 +79,7 @@ namespace FfxivKoreanPatch.PatchRouteVerifier
             private int VerifyThirdPartyGameFont(
                 string fontPath,
                 HashSet<uint> actionDetailHighScaleCodepoints,
+                HashSet<uint> pvpProfileVisualScaleCodepoints,
                 ref bool ok)
             {
                 byte[] sourceFdt;
@@ -106,7 +108,7 @@ namespace FfxivKoreanPatch.PatchRouteVerifier
                     FdtGlyphEntry sourceGlyph = pair.Value;
                     if (sourceGlyph.Width <= 0 ||
                         sourceGlyph.Height <= 0 ||
-                        IsIntentionalHangulSourceChange(fontPath, codepoint, actionDetailHighScaleCodepoints))
+                        IsIntentionalHangulSourceChange(fontPath, codepoint, actionDetailHighScaleCodepoints, pvpProfileVisualScaleCodepoints))
                     {
                         continue;
                     }

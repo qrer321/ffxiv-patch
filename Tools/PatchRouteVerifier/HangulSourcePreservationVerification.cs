@@ -28,6 +28,7 @@ namespace FfxivKoreanPatch.PatchRouteVerifier
                 int lobbyAxisAdvanceEntriesChecked = 0;
                 int lobbyAxisAdvanceEntriesMatched = 0;
                 HashSet<uint> actionDetailHighScaleCodepoints = CollectActionDetailHighScaleHangulCodepointSet();
+                HashSet<uint> pvpProfileVisualScaleCodepoints = CollectPvpProfileVisualScaleHangulCodepointSet();
 
                 foreach (string fontPath in fontPaths)
                 {
@@ -73,7 +74,7 @@ namespace FfxivKoreanPatch.PatchRouteVerifier
                             continue;
                         }
 
-                        if (IsIntentionalHangulSourceChange(fontPath, codepoint, actionDetailHighScaleCodepoints))
+                        if (IsIntentionalHangulSourceChange(fontPath, codepoint, actionDetailHighScaleCodepoints, pvpProfileVisualScaleCodepoints))
                         {
                             skippedIntentional++;
                             continue;
@@ -193,12 +194,39 @@ namespace FfxivKoreanPatch.PatchRouteVerifier
                 return result;
             }
 
-            private static bool IsIntentionalHangulSourceChange(string fontPath, uint codepoint, HashSet<uint> actionDetailHighScaleCodepoints)
+            private HashSet<uint> CollectPvpProfileVisualScaleHangulCodepointSet()
+            {
+                HashSet<uint> codepoints = new HashSet<uint>();
+                AddHangulCodepoints(codepoints, PvpProfileVisualScaleGlyphs.FallbackPhrases);
+                AddPatchedSheetHangulCodepoints(
+                    codepoints,
+                    PvpProfileVisualScaleGlyphs.SheetNames,
+                    "PvP profile visual-scale source-preservation exception");
+                AddPatchedAddonRangeHangulCodepoints(
+                    codepoints,
+                    PvpProfileVisualScaleGlyphs.AddonRowRanges,
+                    "PvP profile visual-scale source-preservation exception");
+                RemoveDynamicHangulCodepoints(codepoints, ActionDetailHighScaleHangulGlyphs.CombatFlyTextPreservePhrases);
+                return codepoints;
+            }
+
+            private static bool IsIntentionalHangulSourceChange(
+                string fontPath,
+                uint codepoint,
+                HashSet<uint> actionDetailHighScaleCodepoints,
+                HashSet<uint> pvpProfileVisualScaleCodepoints = null)
             {
                 string normalized = fontPath.Replace('\\', '/');
                 if (actionDetailHighScaleCodepoints != null &&
                     actionDetailHighScaleCodepoints.Contains(codepoint) &&
                     ActionDetailHighScaleHangulGlyphs.IsVisualScaleTargetFontPath(normalized))
+                {
+                    return true;
+                }
+
+                if (pvpProfileVisualScaleCodepoints != null &&
+                    pvpProfileVisualScaleCodepoints.Contains(codepoint) &&
+                    PvpProfileVisualScaleGlyphs.IsTargetFontPath(normalized))
                 {
                     return true;
                 }

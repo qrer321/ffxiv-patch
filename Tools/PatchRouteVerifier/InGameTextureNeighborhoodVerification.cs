@@ -81,6 +81,7 @@ namespace FfxivKoreanPatch.PatchRouteVerifier
                 HashSet<string> fontPaths = CollectHangulSourcePreservationFontPaths();
                 uint[] codepoints = CollectHangulSourcePreservationCodepoints();
                 HashSet<uint> actionDetailHighScaleCodepoints = CollectActionDetailHighScaleHangulCodepointSet();
+                HashSet<uint> pvpProfileVisualScaleCodepoints = CollectPvpProfileVisualScaleHangulCodepointSet();
                 int compared = 0;
                 int skippedIntentional = 0;
 
@@ -95,7 +96,7 @@ namespace FfxivKoreanPatch.PatchRouteVerifier
                     for (int i = 0; i < codepoints.Length; i++)
                     {
                         uint codepoint = codepoints[i];
-                        if (IsIntentionalHangulSourceChange(fontPath, codepoint, actionDetailHighScaleCodepoints))
+                        if (IsIntentionalHangulSourceChange(fontPath, codepoint, actionDetailHighScaleCodepoints, pvpProfileVisualScaleCodepoints))
                         {
                             skippedIntentional++;
                             continue;
@@ -156,7 +157,7 @@ namespace FfxivKoreanPatch.PatchRouteVerifier
 
                 if (skippedIntentional > 0)
                 {
-                    Pass("Skipped intentional action-detail high-scale neighborhood changes: {0}", skippedIntentional);
+                    Pass("Skipped intentional route-scoped visual-scale neighborhood changes: {0}", skippedIntentional);
                 }
             }
         }
