@@ -263,6 +263,12 @@ if ($AdditionalFailedOutput -ne $null) {
     }
 }
 
+$pvpProfileFailedOutputs = New-Object 'System.Collections.Generic.List[string]'
+$pvpOversizedStartVariantOutput = Join-Path $repoRoot ".tmp\start-variant-$TargetLanguage-r3"
+if (![string]::Equals([System.IO.Path]::GetFullPath($pvpOversizedStartVariantOutput), $resolvedOutputPath, [System.StringComparison]::OrdinalIgnoreCase)) {
+    Add-KnownFailedOutput -Outputs $pvpProfileFailedOutputs -Path $pvpOversizedStartVariantOutput
+}
+
 $focusedChecks = "lobby-coverage-glyphs,lobby-runtime-font-safety,lobby-multitexture-font-set,lobby-runtime-scale-font-routes,lobby-hangul-visibility,font-runtime-glyph-bounds"
 
 if ($BuildRelease) {
@@ -459,6 +465,33 @@ if (!$SkipKnownFailureCheck) {
         }
 
         Write-Host "Known failed output rejected as expected: $failedOutputPath"
+    }
+
+    for ($pvpFailedIndex = 0; $pvpFailedIndex -lt $pvpProfileFailedOutputs.Count; $pvpFailedIndex++) {
+        $pvpFailedOutputPath = $pvpProfileFailedOutputs[$pvpFailedIndex]
+        $pvpKnownFailureResult = Invoke-CapturedNative `
+            -File $verifierExe `
+            -Arguments @(
+                "--output", $pvpFailedOutputPath,
+                "--global", $Global,
+                "--korea", $Korea,
+                "--target-language", $TargetLanguage,
+                "--font-pack-dir", $FontPackDir,
+                "--checks", "pvp-profile-font-routes",
+                "--no-glyph-dump"
+            )
+
+        if ($pvpKnownFailureResult.ExitCode -eq 0) {
+            throw "Known PvP profile failed output unexpectedly passed: $pvpFailedOutputPath"
+        }
+
+        $expectedPvpFailure = @($pvpKnownFailureResult.Lines | Select-String -Pattern "Jupiter_16\.fdt PvP phrase .*outside")
+        if ($expectedPvpFailure.Count -eq 0) {
+            $sample = ($pvpKnownFailureResult.Lines | Select-Object -First 20) -join "`n"
+            throw "Known PvP profile failed output failed for an unexpected reason. First lines:`n$sample"
+        }
+
+        Write-Host "Known PvP profile failed output rejected as expected: $pvpFailedOutputPath"
     }
 }
 
