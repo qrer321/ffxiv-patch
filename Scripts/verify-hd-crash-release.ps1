@@ -39,7 +39,9 @@ param(
 
     [switch]$AllowVersionMismatch,
 
-    [switch]$FailOnAnyNewCrash
+    [switch]$FailOnAnyNewCrash,
+
+    [switch]$DumpVisualSnapshots
 )
 
 $ErrorActionPreference = "Stop"
@@ -374,6 +376,26 @@ if (![string]::IsNullOrWhiteSpace($AppliedGame)) {
         -Label "verify-applied-routes" `
         -File "powershell" `
         -Arguments ($appliedBaseArgs + @("-Checks", "applied-lobby-routes,lobby-runtime-font-safety,font-runtime-glyph-bounds"))
+}
+
+if ($DumpVisualSnapshots) {
+    $snapshotDir = Join-Path $gateLogDir ("{0}-visual-snapshots" -f (Get-Date -Format "yyyyMMdd-HHmmss"))
+    Write-Host "  visual snapshots: $snapshotDir"
+    Invoke-Checked `
+        -Label "verify-visual-snapshots" `
+        -File "powershell" `
+        -Arguments @(
+            "-ExecutionPolicy", "Bypass",
+            "-File", (Join-Path $repoRoot "Scripts\verify-patch-routes.ps1"),
+            "-Output", $Output,
+            "-Global", $Global,
+            "-Korea", $Korea,
+            "-TargetLanguage", $TargetLanguage,
+            "-FontPackDir", $FontPackDir,
+            "-Configuration", $Configuration,
+            "-Checks", "lobby-render-snapshots",
+            "-GlyphDumpDir", $snapshotDir
+        )
 }
 
 if ($RunInGameCritical) {
