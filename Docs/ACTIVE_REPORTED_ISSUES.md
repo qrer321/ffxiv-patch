@@ -449,7 +449,7 @@
 - In-game boss/nameplate risk survey passes:
   `NamePlate.uld` routes to `common/font/AXIS_18.fdt`, `EnemyList.uld` routes to `common/font/AXIS_12.fdt`, and `BNpcName` contributes `14312` candidate rows with `1050` unique Hangul codepoints. The survey reports `0` clean-visible PUA regressions.
 - Fix applied while checking this: non-lobby `MiedingerMid_10/12/14/18/36.fdt` now keeps Korean-capable glyphs from the font pack but restores clean global ASCII/number/symbol glyphs. The previous current output failed `numeric-glyphs` because those fonts had TTMP-sized digits and symbols instead of clean global shapes.
-- Open, separate from the crash-class bounds result: broad `4k-lobby-font-derivations` still reports missing Hangul in some 4K lobby candidate fonts such as `Jupiter_46_lobby.fdt`. Runtime bounds/mip checks still pass, so treat this as a 4K lobby visual/coverage follow-up, not proof of the reported in-game boss-spawn crash.
+- Superseded current check: broad `4k-lobby-font-derivations` now passes on `.tmp\lobby-highscale-ascii-all-ja-r1` with `static=144`, `addon-derived=136`, `total=280`, including high-scale lobby candidates such as `Jupiter_46_lobby.fdt`. Keep the crash-class runtime checks separate, but this specific 4K lobby coverage caveat is no longer an active current-output failure.
 - Do not mark the live 4K crash report fixed until the user confirms on a release built from this code.
 
 ## 2026-05-24 lobby-critical verifier correction and high-scale lobby fix
