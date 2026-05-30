@@ -432,6 +432,27 @@ namespace FfxivKoreanPatch.PatchRouteVerifier
                         return;
                     }
 
+                    if (IsAsciiCodepoint(layout.MinimumGapLeftCodepoint) &&
+                        IsAsciiCodepoint(layout.MinimumGapRightCodepoint))
+                    {
+                        int cleanAsciiOverlap;
+                        if (TryMeasureCleanAsciiPhraseOverlap(fontPath, null, phrase, out cleanAsciiOverlap, out error) &&
+                            layout.OverlapPixels <= cleanAsciiOverlap)
+                        {
+                            Pass(
+                                "{0} phrase [{1}] layout glyphs={2}, width={3}, ASCII-pair overlap={4} matches clean baseline={5}, pair=U+{6:X4}/U+{7:X4}",
+                                fontPath,
+                                Escape(phrase),
+                                layout.Glyphs,
+                                layout.Width,
+                                layout.OverlapPixels,
+                                cleanAsciiOverlap,
+                                layout.MinimumGapLeftCodepoint,
+                                layout.MinimumGapRightCodepoint);
+                            return;
+                        }
+                    }
+
                     if (layout.OverlapPixels <= 1)
                     {
                         Pass(
@@ -463,7 +484,14 @@ namespace FfxivKoreanPatch.PatchRouteVerifier
                         return;
                     }
 
-                    Fail("{0} phrase [{1}] has overlap pixels={2}", fontPath, Escape(phrase), layout.OverlapPixels);
+                    Fail(
+                        "{0} phrase [{1}] has overlap pixels={2}, minGap={3}, pair=U+{4:X4}/U+{5:X4}",
+                        fontPath,
+                        Escape(phrase),
+                        layout.OverlapPixels,
+                        layout.MinimumGapPixels,
+                        layout.MinimumGapLeftCodepoint,
+                        layout.MinimumGapRightCodepoint);
                     return;
                 }
 
@@ -1020,6 +1048,11 @@ namespace FfxivKoreanPatch.PatchRouteVerifier
                 }
 
                 return true;
+            }
+
+            private static bool IsAsciiCodepoint(uint codepoint)
+            {
+                return codepoint >= 0x21u && codepoint <= 0x7Eu;
             }
         }
     }

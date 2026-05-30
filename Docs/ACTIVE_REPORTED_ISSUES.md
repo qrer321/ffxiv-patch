@@ -1,5 +1,19 @@
 # Active Reported Issues
 
+## 2026-05-30 full font objective release gate
+
+- `Scripts\verify-hd-crash-release.ps1` now supports `-RunFullFontObjective`.
+- This mode keeps the existing HD crash focused gate, then runs the broader objective in small logged verifier chunks so a partial/focused PASS cannot be mistaken for the whole font objective:
+  - `lobby-critical,4k-lobby-phrase-layouts,start-main-menu-phrase-layouts`
+  - `font-runtime-glyph-bounds,ingame-clean-ascii-glyphs,numeric-glyphs`
+  - `party-list-self-marker,combat-flytext-damage-glyphs`
+  - `third-party-game-font-safety,reported-ingame-hangul-phrases`
+  - `action-detail-scale-layouts,pvp-profile-font-routes`
+  - `hangul-source-preservation`
+  - `ingame-ttmp-texture-neighborhoods`
+- Use this before reporting a release as code-level ready for the current HD/4K lobby plus in-game font objective. This still does not close the live issue without user confirmation.
+- The first trial of this mode caught a verifier false positive: `Jupiter_23/46` mixed system-settings phrases were failing on clean ASCII pairs such as `(4` and `6x`. `PhraseOverlapVerification` now accepts those only when the mixed-phrase ASCII overlap is no worse than the clean ASCII baseline, while still failing Hangul or patched-metric overlap.
+
 ## 2026-05-24 Lobby/Character High-Scale Coverage Rework
 
 - User report: lobby and character-select still have `-`/`=` fallback glyphs, and 150%+ lobby scale can render Korean with overlap. In-game fonts are mostly acceptable; PvP profile `Crystalline Conflict` remains lower priority.

@@ -29,6 +29,8 @@ param(
 
     [switch]$RunInGameCritical,
 
+    [switch]$RunFullFontObjective,
+
     [switch]$SkipKnownFailureCheck,
 
     [switch]$SkipCrashLogCheck,
@@ -42,6 +44,8 @@ param(
 
 $ErrorActionPreference = "Stop"
 $repoRoot = Resolve-Path (Join-Path $PSScriptRoot "..")
+$gateLogDir = Join-Path $repoRoot ".tmp\hd-crash-release-gate-logs"
+New-Item -ItemType Directory -Force -Path $gateLogDir | Out-Null
 
 if ([string]::IsNullOrWhiteSpace($Output)) {
     $Output = Join-Path $repoRoot ".tmp\release-hd-crash-focus-$TargetLanguage"
@@ -157,6 +161,76 @@ function Invoke-CapturedNative {
     return @{
         ExitCode = $code
         Lines = @($lines | ForEach-Object { $_.ToString() })
+    }
+}
+
+function New-VerifierArguments {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$OutputPath,
+
+        [Parameter(Mandatory = $true)]
+        [string]$Checks
+    )
+
+    $arguments = @(
+        "--output", $OutputPath,
+        "--global", $Global,
+        "--korea", $Korea,
+        "--target-language", $TargetLanguage,
+        "--font-pack-dir", $FontPackDir,
+        "--checks", $Checks,
+        "--no-glyph-dump"
+    )
+
+    return $arguments
+}
+
+function Invoke-CapturedVerifierCheck {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$Label,
+
+        [Parameter(Mandatory = $true)]
+        [string]$OutputPath,
+
+        [Parameter(Mandatory = $true)]
+        [string]$Checks
+    )
+
+    $verifierExe = Join-Path $repoRoot "Tools\PatchRouteVerifier\bin\$Configuration\PatchRouteVerifier.exe"
+    $safeLabel = $Label -replace "[^A-Za-z0-9_.-]", "_"
+    $logPath = Join-Path $gateLogDir ("{0}-{1}.log" -f (Get-Date -Format "yyyyMMdd-HHmmss"), $safeLabel)
+    $stopwatch = [System.Diagnostics.Stopwatch]::StartNew()
+    Write-Host "[$Label] $verifierExe --checks $Checks"
+    Write-Host "[$Label] log: $logPath"
+
+    $oldPreference = $ErrorActionPreference
+    $ErrorActionPreference = "Continue"
+    try {
+        $verifierArguments = New-VerifierArguments -OutputPath $OutputPath -Checks $Checks
+        & $verifierExe @verifierArguments *> $logPath
+        $exitCode = $LASTEXITCODE
+    }
+    finally {
+        $ErrorActionPreference = $oldPreference
+        $stopwatch.Stop()
+    }
+
+    $important = @(Select-String -LiteralPath $logPath -Pattern "^\s+(FAIL|WARN) ","^Checks:","^RESULT:" | ForEach-Object { $_.Line })
+
+    if ($important.Count -gt 0) {
+        $important | Select-Object -First 80 | ForEach-Object { Write-Host $_ }
+        if ($important.Count -gt 80) {
+            Write-Host "... verifier summary truncated"
+        }
+    }
+
+    Write-Host ("[$Label] elapsed: {0:n1}s" -f $stopwatch.Elapsed.TotalSeconds)
+
+    if ($exitCode -ne 0) {
+        $sample = (Get-Content -LiteralPath $logPath -First 120) -join "`n"
+        throw "$Label failed with exit code $exitCode. Log: $logPath`nFirst lines:`n$sample"
     }
 }
 
@@ -306,6 +380,46 @@ if ($RunInGameCritical) {
             "-Checks", "ingame-critical",
             "-NoGlyphDump"
         )
+}
+
+if ($RunFullFontObjective) {
+    $objectiveChecks = @(
+        @{
+            Label = "objective-lobby-critical"
+            Checks = "lobby-critical,4k-lobby-phrase-layouts,start-main-menu-phrase-layouts"
+        },
+        @{
+            Label = "objective-ingame-bounds"
+            Checks = "font-runtime-glyph-bounds,ingame-clean-ascii-glyphs,numeric-glyphs"
+        },
+        @{
+            Label = "objective-ingame-markers"
+            Checks = "party-list-self-marker,combat-flytext-damage-glyphs"
+        },
+        @{
+            Label = "objective-shared-font-safety"
+            Checks = "third-party-game-font-safety,reported-ingame-hangul-phrases"
+        },
+        @{
+            Label = "objective-large-ui"
+            Checks = "action-detail-scale-layouts,pvp-profile-font-routes"
+        },
+        @{
+            Label = "objective-source-preservation"
+            Checks = "hangul-source-preservation"
+        },
+        @{
+            Label = "objective-texture-neighborhoods"
+            Checks = "ingame-ttmp-texture-neighborhoods"
+        }
+    )
+
+    for ($objectiveIndex = 0; $objectiveIndex -lt $objectiveChecks.Count; $objectiveIndex++) {
+        Invoke-CapturedVerifierCheck `
+            -Label $objectiveChecks[$objectiveIndex].Label `
+            -OutputPath $Output `
+            -Checks $objectiveChecks[$objectiveIndex].Checks
+    }
 }
 
 if (!$SkipKnownFailureCheck) {
