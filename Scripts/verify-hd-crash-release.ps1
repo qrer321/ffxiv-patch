@@ -336,8 +336,7 @@ else {
 }
 
 if (![string]::IsNullOrWhiteSpace($AppliedGame)) {
-    $appliedChecks = "applied-output-files,applied-lobby-routes,lobby-runtime-font-safety,font-runtime-glyph-bounds"
-    $appliedArgs = @(
+    $appliedBaseArgs = @(
         "-ExecutionPolicy", "Bypass",
         "-File", (Join-Path $repoRoot "Scripts\verify-patch-routes.ps1"),
         "-Output", $Output,
@@ -347,21 +346,28 @@ if (![string]::IsNullOrWhiteSpace($AppliedGame)) {
         "-FontPackDir", $FontPackDir,
         "-Configuration", $Configuration,
         "-AppliedGame", $AppliedGame,
-        "-Checks", $appliedChecks,
         "-NoGlyphDump"
     )
 
     $cleanFontIndex = Join-Path $Output "orig.000000.win32.index"
     if (Test-Path -LiteralPath $cleanFontIndex) {
-        $appliedArgs += @("-CleanFontIndex", $cleanFontIndex)
+        $appliedBaseArgs += @("-CleanFontIndex", $cleanFontIndex)
     }
 
     $cleanUiIndex = Join-Path $Output "orig.060000.win32.index"
     if (Test-Path -LiteralPath $cleanUiIndex) {
-        $appliedArgs += @("-CleanUiIndex", $cleanUiIndex)
+        $appliedBaseArgs += @("-CleanUiIndex", $cleanUiIndex)
     }
 
-    Invoke-Checked -Label "verify-applied-output" -File "powershell" -Arguments $appliedArgs
+    Invoke-Checked `
+        -Label "verify-applied-files" `
+        -File "powershell" `
+        -Arguments ($appliedBaseArgs + @("-Checks", "applied-output-files"))
+
+    Invoke-Checked `
+        -Label "verify-applied-routes" `
+        -File "powershell" `
+        -Arguments ($appliedBaseArgs + @("-Checks", "applied-lobby-routes,lobby-runtime-font-safety,font-runtime-glyph-bounds"))
 }
 
 if ($RunInGameCritical) {

@@ -437,3 +437,4 @@
 - Run `Scripts\verify-hd-crash-release.ps1` with `-RunFullFontObjective` before treating a release as code-level ready.
 - The new mode deliberately splits heavy checks into logged chunks to avoid timeout/noise hiding failures while still covering lobby scale routes, 4K lobby phrases, in-game critical fonts, reported in-game phrases, source preservation, and TTMP texture neighborhoods.
 - Mixed Korean/ASCII phrase overlap checks must not fail solely on ASCII pairs that already overlap in clean fonts. They may pass only when the patched mixed phrase is no worse than the clean ASCII-only baseline for the same font.
+- When `-AppliedGame` is used, `applied-output-files` must pass before running applied route/runtime checks. If the installed game folder differs from the generated output, later route failures are stale/mixed-state evidence only and must not be used to reject the current generator.

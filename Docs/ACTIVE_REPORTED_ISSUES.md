@@ -13,6 +13,8 @@
   - `ingame-ttmp-texture-neighborhoods`
 - Use this before reporting a release as code-level ready for the current HD/4K lobby plus in-game font objective. This still does not close the live issue without user confirmation.
 - The first trial of this mode caught a verifier false positive: `Jupiter_23/46` mixed system-settings phrases were failing on clean ASCII pairs such as `(4` and `6x`. `PhraseOverlapVerification` now accepts those only when the mixed-phrase ASCII overlap is no worse than the clean ASCII baseline, while still failing Hangul or patched-metric overlap.
+- Applied-state check result after commit `b6a2755`: `-AppliedGame D:\SquareEnix\FINAL FANTASY XIV - A Realm Reborn\game` fails `applied-output-files`. The installed font files do not match `.tmp\lobby-highscale-ascii-all-ja-r1`; UI files match, but many font FDT/TEX files differ and the installed state still has old unsafe `font_lobby3.tex` Hangul routes. Treat this as a stale/mixed installed state, not evidence against the current generated output.
+- `verify-hd-crash-release.ps1 -AppliedGame` now runs `applied-output-files` first and stops before route/runtime checks if the installed files differ from the generated output. This prevents stale installed sqpack failures from being reported as current-code font regressions.
 
 ## 2026-05-24 Lobby/Character High-Scale Coverage Rework
 
