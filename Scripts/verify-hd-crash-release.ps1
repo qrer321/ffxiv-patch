@@ -272,6 +272,7 @@ if (![string]::Equals([System.IO.Path]::GetFullPath($pvpOversizedStartVariantOut
 }
 
 $focusedChecks = "lobby-coverage-glyphs,lobby-runtime-font-safety,lobby-multitexture-font-set,lobby-runtime-scale-font-routes,lobby-hangul-visibility,font-runtime-glyph-bounds,start-screen-glyph-variants,lobby-render-snapshots,action-detail-scale-layouts,pvp-profile-font-routes,combat-flytext-damage-glyphs,third-party-game-font-safety,party-list-self-marker"
+$visualSnapshotChecks = "lobby-render-snapshots,action-detail-scale-layouts,pvp-profile-font-routes"
 
 if ($BuildRelease) {
     Invoke-Checked `
@@ -383,7 +384,7 @@ if ($DumpVisualSnapshots) {
     Write-Host "  visual snapshots: $snapshotDir"
     if (![string]::IsNullOrWhiteSpace($AppliedGame)) {
         $snapshotArgs = @($appliedBaseArgs | Where-Object { $_ -ne "-NoGlyphDump" }) + @(
-            "-Checks", "lobby-render-snapshots",
+            "-Checks", $visualSnapshotChecks,
             "-GlyphDumpDir", $snapshotDir
         )
     }
@@ -397,7 +398,7 @@ if ($DumpVisualSnapshots) {
             "-TargetLanguage", $TargetLanguage,
             "-FontPackDir", $FontPackDir,
             "-Configuration", $Configuration,
-            "-Checks", "lobby-render-snapshots",
+            "-Checks", $visualSnapshotChecks,
             "-GlyphDumpDir", $snapshotDir
         )
     }

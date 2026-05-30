@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Globalization;
+using System.IO;
 using System.Text;
 using FfxivKoreanPatch.FFXIVPatchGenerator;
 
@@ -129,6 +130,8 @@ namespace FfxivKoreanPatch.PatchRouteVerifier
                 {
                     Fail("No large UI font route could render the reported phrases");
                 }
+
+                DumpLargeUiVisualSnapshots(fonts);
             }
 
             private void VerifyLargeUiLabelSourcePreservation()
@@ -290,6 +293,107 @@ namespace FfxivKoreanPatch.PatchRouteVerifier
                 VerifyActionDetailTimerMix(fontPath, ActionDetailLongTimerPhrase, longTimer);
                 VerifyActionDetailTimerMix(fontPath, ActionDetailShortTimerPhrase, shortTimer);
                 return measuredPhrases > 0 ? 1 : 0;
+            }
+
+            private void DumpLargeUiVisualSnapshots(HashSet<string> fonts)
+            {
+                if (string.IsNullOrWhiteSpace(_glyphDumpDir) || fonts == null || fonts.Count == 0)
+                {
+                    return;
+                }
+
+                EnsureLargeUiVisualReport();
+
+                string[] phrases = new string[]
+                {
+                    ActionDetailHighScaleHangulGlyphs.InstantCastPhrase,
+                    ActionDetailHighScaleHangulGlyphs.SecondUnitPhrase,
+                    ActionDetailLongTimerPhrase,
+                    ActionDetailShortTimerPhrase,
+                    ActionDetailHighScaleHangulGlyphs.DutyFinderPhrase,
+                    ActionDetailHighScaleHangulGlyphs.QuestPhrase,
+                    ActionDetailHighScaleHangulGlyphs.SystemConfigurationPhrase,
+                    ActionDetailHighScaleHangulGlyphs.CrystallineConflictPhrase
+                };
+
+                int written = 0;
+                foreach (string fontPath in fonts)
+                {
+                    for (int phraseIndex = 0; phraseIndex < phrases.Length; phraseIndex++)
+                    {
+                        string phrase = phrases[phraseIndex];
+                        PhraseRenderSnapshot snapshot;
+                        string error;
+                        if (!TryRenderPhrasePixels(_patchedFont, fontPath, phrase, true, out snapshot, out error))
+                        {
+                            continue;
+                        }
+
+                        PhraseLayoutResult layout;
+                        if (!TryMeasurePhraseLayout(_patchedFont, fontPath, phrase, true, out layout, out error))
+                        {
+                            continue;
+                        }
+
+                        string id = "large-ui-" + PhraseSnapshotId(phraseIndex, phrase);
+                        string pngPath = DumpLargeUiVisualSnapshot(id, fontPath, phrase, snapshot);
+                        WriteLargeUiVisualReport(id, fontPath, phrase, AnalyzeLobbyRender(snapshot), layout, pngPath);
+                        written++;
+                    }
+                }
+
+                if (written > 0)
+                {
+                    Pass("large UI visual snapshots wrote {0} PNGs", written);
+                }
+            }
+
+            private void EnsureLargeUiVisualReport()
+            {
+                if (string.IsNullOrWhiteSpace(_glyphDumpDir))
+                {
+                    return;
+                }
+
+                File.WriteAllText(
+                    Path.Combine(_glyphDumpDir, "large-ui-render-report.tsv"),
+                    "id\tfont\tphrase\twidth\theight\tvisible\tfringe_ratio\tlayout_width\tmin_gap\tmin_pair\toverlap\tpng" + Environment.NewLine,
+                    Encoding.UTF8);
+            }
+
+            private string DumpLargeUiVisualSnapshot(string id, string fontPath, string phrase, PhraseRenderSnapshot snapshot)
+            {
+                string fileName = "large-ui-render_" + SanitizeFileName(id) + "_" + SanitizeFileName(fontPath) + ".png";
+                string pngPath = Path.Combine(_glyphDumpDir, fileName);
+                WritePhraseSnapshotPng(snapshot, 1.0d, pngPath);
+                return pngPath;
+            }
+
+            private void WriteLargeUiVisualReport(string id, string fontPath, string phrase, LobbyRenderStats stats, PhraseLayoutResult layout, string pngPath)
+            {
+                string line = string.Join(
+                    "\t",
+                    new string[]
+                    {
+                        EscapeTsv(id),
+                        EscapeTsv(fontPath),
+                        EscapeTsv(phrase),
+                        stats.Width.ToString(CultureInfo.InvariantCulture),
+                        stats.Height.ToString(CultureInfo.InvariantCulture),
+                        stats.VisiblePixels.ToString(CultureInfo.InvariantCulture),
+                        stats.FringeRatio.ToString("0.####", CultureInfo.InvariantCulture),
+                        layout.Width.ToString(CultureInfo.InvariantCulture),
+                        layout.MinimumGapPixels.ToString(CultureInfo.InvariantCulture),
+                        EscapeTsv(FormatCodepointPair(layout.MinimumGapLeftCodepoint, layout.MinimumGapRightCodepoint)),
+                        layout.OverlapPixels.ToString(CultureInfo.InvariantCulture),
+                        EscapeTsv(pngPath)
+                    });
+                File.AppendAllText(Path.Combine(_glyphDumpDir, "large-ui-render-report.tsv"), line + Environment.NewLine, Encoding.UTF8);
+            }
+
+            private static string PhraseSnapshotId(int phraseIndex, string phrase)
+            {
+                return phraseIndex.ToString("00", CultureInfo.InvariantCulture) + "-" + phrase;
             }
 
             private static bool IsKnownLargeUiSourcePreservationException(string fontPath, string phrase)

@@ -1,5 +1,8 @@
 using System;
 using System.Collections.Generic;
+using System.Globalization;
+using System.IO;
+using System.Text;
 using FfxivKoreanPatch.FFXIVPatchGenerator;
 
 namespace FfxivKoreanPatch.PatchRouteVerifier
@@ -88,6 +91,8 @@ namespace FfxivKoreanPatch.PatchRouteVerifier
                 {
                     Pass("PvP profile routed phrases checked: ulds={0}, fonts={1}, phrases={2}", foundUlds, routedFonts.Count, measured);
                 }
+
+                DumpPvpProfileVisualSnapshots(routedFonts);
             }
 
             private int VerifyPvpProfileFont(string fontPath)
@@ -360,6 +365,90 @@ namespace FfxivKoreanPatch.PatchRouteVerifier
                     (fontPath ?? string.Empty).Replace('\\', '/'),
                     "common/font/Jupiter_16.fdt",
                     StringComparison.OrdinalIgnoreCase);
+            }
+
+            private void DumpPvpProfileVisualSnapshots(HashSet<string> routedFonts)
+            {
+                if (string.IsNullOrWhiteSpace(_glyphDumpDir) || routedFonts == null || routedFonts.Count == 0)
+                {
+                    return;
+                }
+
+                EnsurePvpProfileVisualReport();
+
+                int written = 0;
+                foreach (string fontPath in routedFonts)
+                {
+                    for (int phraseIndex = 0; phraseIndex < PvpProfileRoutePhrases.Length; phraseIndex++)
+                    {
+                        PvpProfileRoutePhrase phrase = PvpProfileRoutePhrases[phraseIndex];
+                        PhraseRenderSnapshot snapshot;
+                        string error;
+                        if (!TryRenderPhrasePixels(_patchedFont, fontPath, phrase.Korean, true, out snapshot, out error))
+                        {
+                            continue;
+                        }
+
+                        PhraseLayoutResult layout;
+                        if (!TryMeasurePhraseLayout(_patchedFont, fontPath, phrase.Korean, true, out layout, out error))
+                        {
+                            continue;
+                        }
+
+                        string id = "pvp-profile-" + PhraseSnapshotId(phraseIndex, phrase.Korean);
+                        string pngPath = DumpPvpProfileVisualSnapshot(id, fontPath, phrase.Korean, snapshot);
+                        WritePvpProfileVisualReport(id, fontPath, phrase.Korean, AnalyzeLobbyRender(snapshot), layout, pngPath);
+                        written++;
+                    }
+                }
+
+                if (written > 0)
+                {
+                    Pass("PvP profile visual snapshots wrote {0} PNGs", written);
+                }
+            }
+
+            private void EnsurePvpProfileVisualReport()
+            {
+                if (string.IsNullOrWhiteSpace(_glyphDumpDir))
+                {
+                    return;
+                }
+
+                File.WriteAllText(
+                    Path.Combine(_glyphDumpDir, "pvp-profile-render-report.tsv"),
+                    "id\tfont\tphrase\twidth\theight\tvisible\tfringe_ratio\tlayout_width\tmin_gap\tmin_pair\toverlap\tpng" + Environment.NewLine,
+                    Encoding.UTF8);
+            }
+
+            private string DumpPvpProfileVisualSnapshot(string id, string fontPath, string phrase, PhraseRenderSnapshot snapshot)
+            {
+                string fileName = "pvp-profile-render_" + SanitizeFileName(id) + "_" + SanitizeFileName(fontPath) + ".png";
+                string pngPath = Path.Combine(_glyphDumpDir, fileName);
+                WritePhraseSnapshotPng(snapshot, 1.0d, pngPath);
+                return pngPath;
+            }
+
+            private void WritePvpProfileVisualReport(string id, string fontPath, string phrase, LobbyRenderStats stats, PhraseLayoutResult layout, string pngPath)
+            {
+                string line = string.Join(
+                    "\t",
+                    new string[]
+                    {
+                        EscapeTsv(id),
+                        EscapeTsv(fontPath),
+                        EscapeTsv(phrase),
+                        stats.Width.ToString(CultureInfo.InvariantCulture),
+                        stats.Height.ToString(CultureInfo.InvariantCulture),
+                        stats.VisiblePixels.ToString(CultureInfo.InvariantCulture),
+                        stats.FringeRatio.ToString("0.####", CultureInfo.InvariantCulture),
+                        layout.Width.ToString(CultureInfo.InvariantCulture),
+                        layout.MinimumGapPixels.ToString(CultureInfo.InvariantCulture),
+                        EscapeTsv(FormatCodepointPair(layout.MinimumGapLeftCodepoint, layout.MinimumGapRightCodepoint)),
+                        layout.OverlapPixels.ToString(CultureInfo.InvariantCulture),
+                        EscapeTsv(pngPath)
+                    });
+                File.AppendAllText(Path.Combine(_glyphDumpDir, "pvp-profile-render-report.tsv"), line + Environment.NewLine, Encoding.UTF8);
             }
 
             private struct PvpProfileRoutePhrase
