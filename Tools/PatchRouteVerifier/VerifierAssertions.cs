@@ -77,6 +77,11 @@ namespace FfxivKoreanPatch.PatchRouteVerifier
                 Console.WriteLine("  WARN " + string.Format(format, args));
             }
 
+            private static void Info(string format, params object[] args)
+            {
+                Console.WriteLine("  INFO " + string.Format(format, args));
+            }
+
             private void Fail(string format, params object[] args)
             {
                 Failed = true;

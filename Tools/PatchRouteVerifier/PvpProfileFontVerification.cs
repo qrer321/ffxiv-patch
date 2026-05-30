@@ -250,7 +250,7 @@ namespace FfxivKoreanPatch.PatchRouteVerifier
                     }
                     else
                     {
-                        Warn("{0} PvP reference phrase [{1}] skipped: {2}", fontPath, Escape(phrase.Reference), error);
+                        Info("{0} PvP reference phrase [{1}] skipped outside strict target scope: {2}", fontPath, Escape(phrase.Reference), error);
                     }
 
                     return;
@@ -274,7 +274,7 @@ namespace FfxivKoreanPatch.PatchRouteVerifier
                     }
                     else
                     {
-                        Warn(message);
+                        Info("{0} outside strict target scope", message);
                     }
 
                     return;
@@ -334,7 +334,7 @@ namespace FfxivKoreanPatch.PatchRouteVerifier
                 }
                 else
                 {
-                    Warn(message);
+                    Info("{0} outside strict target scope", message);
                 }
 
                 return false;
