@@ -27,6 +27,8 @@ param(
 
     [switch]$SkipGenerate,
 
+    [switch]$SkipFocusedChecks,
+
     [switch]$RunInGameCritical,
 
     [switch]$RunFullFontObjective,
@@ -292,6 +294,12 @@ if (![string]::Equals([System.IO.Path]::GetFullPath($pvpOversizedStartVariantOut
 
 $focusedChecks = "lobby-coverage-glyphs,lobby-runtime-font-safety,lobby-multitexture-font-set,lobby-runtime-scale-font-routes,lobby-hangul-visibility,font-runtime-glyph-bounds,start-screen-glyph-variants,lobby-render-snapshots,action-detail-scale-layouts,pvp-profile-font-routes,combat-flytext-damage-glyphs,third-party-game-font-safety,party-list-self-marker"
 $visualSnapshotChecks = "lobby-render-snapshots,action-detail-scale-layouts,pvp-profile-font-routes"
+$verifyFocusedAgainstAppliedGame = ![string]::IsNullOrWhiteSpace($AppliedGame)
+$runAppliedFocusedChecks = $verifyFocusedAgainstAppliedGame -and !$RunFullFontObjective -and !$SkipFocusedChecks
+
+if ($SkipFocusedChecks -and !$SkipGenerate) {
+    throw "-SkipFocusedChecks is only valid with -SkipGenerate; generation still needs a verification check set."
+}
 
 if ($BuildRelease) {
     Invoke-Checked `
@@ -346,21 +354,23 @@ else {
         throw "Output does not exist for -SkipGenerate: $Output"
     }
 
-    Invoke-Checked `
-        -Label "verify-focused-output" `
-        -File "powershell" `
-        -Arguments @(
-            "-ExecutionPolicy", "Bypass",
-            "-File", (Join-Path $repoRoot "Scripts\verify-patch-routes.ps1"),
-            "-Output", $Output,
-            "-Global", $Global,
-            "-Korea", $Korea,
-            "-TargetLanguage", $TargetLanguage,
-            "-FontPackDir", $FontPackDir,
-            "-Configuration", $Configuration,
-            "-Checks", $focusedChecks,
-            "-NoGlyphDump"
-        )
+    if (!$verifyFocusedAgainstAppliedGame -and !$SkipFocusedChecks) {
+        Invoke-Checked `
+            -Label "verify-focused-output" `
+            -File "powershell" `
+            -Arguments @(
+                "-ExecutionPolicy", "Bypass",
+                "-File", (Join-Path $repoRoot "Scripts\verify-patch-routes.ps1"),
+                "-Output", $Output,
+                "-Global", $Global,
+                "-Korea", $Korea,
+                "-TargetLanguage", $TargetLanguage,
+                "-FontPackDir", $FontPackDir,
+                "-Configuration", $Configuration,
+                "-Checks", $focusedChecks,
+                "-NoGlyphDump"
+            )
+    }
 }
 
 if (![string]::IsNullOrWhiteSpace($AppliedGame)) {
@@ -391,6 +401,13 @@ if (![string]::IsNullOrWhiteSpace($AppliedGame)) {
         -Label "verify-applied-files" `
         -File "powershell" `
         -Arguments ($appliedBaseArgs + @("-Checks", "applied-output-files"))
+
+    if ($runAppliedFocusedChecks) {
+        Invoke-Checked `
+            -Label "verify-applied-focused" `
+            -File "powershell" `
+            -Arguments ($appliedBaseArgs + @("-Checks", $focusedChecks))
+    }
 
     Invoke-Checked `
         -Label "verify-applied-routes" `
@@ -429,21 +446,29 @@ if ($DumpVisualSnapshots) {
 }
 
 if ($RunInGameCritical) {
-    Invoke-Checked `
-        -Label "verify-ingame-critical" `
-        -File "powershell" `
-        -Arguments @(
-            "-ExecutionPolicy", "Bypass",
-            "-File", (Join-Path $repoRoot "Scripts\verify-patch-routes.ps1"),
-            "-Output", $Output,
-            "-Global", $Global,
-            "-Korea", $Korea,
-            "-TargetLanguage", $TargetLanguage,
-            "-FontPackDir", $FontPackDir,
-            "-Configuration", $Configuration,
-            "-Checks", "ingame-critical",
-            "-NoGlyphDump"
-        )
+    if (![string]::IsNullOrWhiteSpace($AppliedGame)) {
+        Invoke-Checked `
+            -Label "verify-applied-ingame-critical" `
+            -File "powershell" `
+            -Arguments ($appliedBaseArgs + @("-Checks", "ingame-critical"))
+    }
+    else {
+        Invoke-Checked `
+            -Label "verify-ingame-critical" `
+            -File "powershell" `
+            -Arguments @(
+                "-ExecutionPolicy", "Bypass",
+                "-File", (Join-Path $repoRoot "Scripts\verify-patch-routes.ps1"),
+                "-Output", $Output,
+                "-Global", $Global,
+                "-Korea", $Korea,
+                "-TargetLanguage", $TargetLanguage,
+                "-FontPackDir", $FontPackDir,
+                "-Configuration", $Configuration,
+                "-Checks", "ingame-critical",
+                "-NoGlyphDump"
+            )
+    }
 }
 
 if ($RunFullFontObjective) {
