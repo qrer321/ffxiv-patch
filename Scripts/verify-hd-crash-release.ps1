@@ -445,6 +445,14 @@ if ($DumpVisualSnapshots) {
         -Arguments $snapshotArgs
 
     Invoke-Checked `
+        -Label "test-visual-snapshot-report-audit" `
+        -File "powershell" `
+        -Arguments @(
+            "-ExecutionPolicy", "Bypass",
+            "-File", (Join-Path $repoRoot "Scripts\test-visual-snapshot-report-audit.ps1")
+        )
+
+    Invoke-Checked `
         -Label "check-visual-snapshot-reports" `
         -File "powershell" `
         -Arguments @(
