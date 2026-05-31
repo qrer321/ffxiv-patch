@@ -12,6 +12,11 @@ namespace FfxivKoreanPatch.PatchRouteVerifier
             private void VerifyStartScreenGlyphVariantRows()
             {
                 Console.WriteLine("[EXD] start-screen glyph variant rows");
+                if (StartScreenGlyphVariants.Aliases.Length == 0)
+                {
+                    Pass("start-screen glyph variants are disabled; verifier will use normal Hangul phrase rendering");
+                    return;
+                }
 
                 ExcelHeader header = ExcelHeader.Parse(_patchedText.ReadFile("exd/Addon.exh"));
                 if (header.Variant != ExcelVariant.Default)

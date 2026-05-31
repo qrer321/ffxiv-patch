@@ -139,8 +139,7 @@ namespace FfxivKoreanPatch.PatchRouteVerifier
 
             private static bool IsObservedHdAnalyzerPage2UnsafeLobbyFont(string path)
             {
-                string normalized = (path ?? string.Empty).Replace('\\', '/');
-                return normalized.IndexOf("_lobby.fdt", StringComparison.OrdinalIgnoreCase) >= 0;
+                return IsStartupLobbyTextureLimitedFont(path);
             }
 
             private void VerifyLobbyUtf8OnlyKerningEntries(string fontPath, byte[] patchedFdt, byte[] cleanFdt, ref int failures)

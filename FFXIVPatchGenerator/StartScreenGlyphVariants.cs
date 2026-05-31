@@ -19,7 +19,7 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
 
     internal static class StartScreenGlyphVariants
     {
-        private static readonly bool Enabled = false;
+        private static readonly bool Enabled = IsEnabled();
         private const uint AliasBaseCodepoint = 0xF700u;
         private static readonly Encoding Utf8 = new UTF8Encoding(false, true);
 
@@ -220,6 +220,11 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
             }
 
             return aliases;
+        }
+
+        private static bool IsEnabled()
+        {
+            return false;
         }
 
         private static string[] CreateVariantPhraseReplacements()
