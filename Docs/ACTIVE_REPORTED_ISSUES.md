@@ -1,5 +1,13 @@
 # Active Reported Issues
 
+## 2026-05-31 generated-output PASS but live lobby still broken
+
+- Live report after generated-release `20260531-214231`: the lobby still rendered broken glyphs. The user then restored the game folder to clean, so a later `applied-output-files` mismatch only proved the user had reverted. Do not cite that clean installed state as the root cause.
+- Operator correction: the accidental re-apply to `D:\SquareEnix\FINAL FANTASY XIV - A Realm Reborn\game` was reverted from backup `.tmp\applied-route-backups\20260531-215548`, and SHA1 was checked after restore.
+- Current conclusion: the current verifier can still pass a generated output that the real client rejects in the lobby. The next fix must make the verifier fail on generated-release `20260531-214231` or an equivalent broken output before changing atlas/font logic.
+- UI hardening kept: release payload extraction now byte-compares an existing embedded `FFXIVPatchGenerator.exe`/TTMP payload before reusing it. File size equality alone is not trusted, so stale extracted tools cannot survive when the release exe timestamp directory is reused.
+- Next analysis direction: stop treating PNG render snapshots as client-equivalent. Investigate runtime-only lobby lookup/loading conditions such as FDT font-table invariants, Shift-JIS fallback fields, texture-page availability by scene, packed texture block layout, and ULD font/render byte combinations.
+
 ## 2026-05-30 full font objective release gate
 
 - `Scripts\verify-hd-crash-release.ps1` now supports `-RunFullFontObjective`.

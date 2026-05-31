@@ -1435,7 +1435,15 @@ namespace FFXIVKoreanPatch.Main
                 FileInfo destinationInfo = new FileInfo(destinationPath);
                 if (destinationInfo.Exists && destinationInfo.Length == resourceStream.Length)
                 {
-                    return true;
+                    using (FileStream existingStream = new FileStream(destinationPath, FileMode.Open, FileAccess.Read, FileShare.Read))
+                    {
+                        if (StreamsHaveSameContent(existingStream, resourceStream))
+                        {
+                            return true;
+                        }
+                    }
+
+                    resourceStream.Position = 0;
                 }
 
                 string tempPath = destinationPath + ".tmp";
@@ -1451,6 +1459,54 @@ namespace FFXIVKoreanPatch.Main
 
                 File.Move(tempPath, destinationPath);
                 return true;
+            }
+        }
+
+        private static bool StreamsHaveSameContent(Stream left, Stream right)
+        {
+            if (left == null || right == null || !left.CanRead || !right.CanRead)
+            {
+                return false;
+            }
+
+            if (left.Length != right.Length)
+            {
+                return false;
+            }
+
+            if (left.CanSeek)
+            {
+                left.Position = 0;
+            }
+
+            if (right.CanSeek)
+            {
+                right.Position = 0;
+            }
+
+            byte[] leftBuffer = new byte[8192];
+            byte[] rightBuffer = new byte[8192];
+            while (true)
+            {
+                int leftRead = left.Read(leftBuffer, 0, leftBuffer.Length);
+                int rightRead = right.Read(rightBuffer, 0, rightBuffer.Length);
+                if (leftRead != rightRead)
+                {
+                    return false;
+                }
+
+                if (leftRead == 0)
+                {
+                    return true;
+                }
+
+                for (int i = 0; i < leftRead; i++)
+                {
+                    if (leftBuffer[i] != rightBuffer[i])
+                    {
+                        return false;
+                    }
+                }
             }
         }
 
