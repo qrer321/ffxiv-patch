@@ -8,7 +8,9 @@ param(
 
     [double]$MaxFringeRatio = 1.05,
 
-    [int]$MinInkPixels = 8
+    [int]$MinInkPixels = 8,
+
+    [switch]$FailOnAnyRawOverlap
 )
 
 $ErrorActionPreference = "Stop"
@@ -209,6 +211,15 @@ function Test-ReportRows {
     $maxOverlap = ($Rows | ForEach-Object { To-Int $_.overlap } | Measure-Object -Maximum).Maximum
     $minGap = ($Rows | ForEach-Object { To-Int $_.min_gap 999 } | Measure-Object -Minimum).Minimum
 
+    $rawAnomalies = @($Rows | Where-Object { (To-Int $_.overlap) -gt 0 -or (To-Int $_.min_gap 999) -lt 0 })
+    if ($FailOnAnyRawOverlap -and $rawAnomalies.Count -gt 0) {
+        $details = $rawAnomalies |
+            Select-Object -First 10 id, font, phrase, min_gap, min_pair, overlap, png |
+            Format-List |
+            Out-String
+        throw "$Name has raw visual overlap/gap anomalies under strict mode:`n$details"
+    }
+
     if ($pngCount -lt $Rows.Count) {
         throw "$Name has fewer PNG references than rows: pngs=$pngCount rows=$($Rows.Count)"
     }
@@ -221,6 +232,15 @@ function Test-ReportRows {
         $negativeGapRows.Count,
         $maxOverlap,
         $minGap)
+
+    if ($rawAnomalies.Count -gt 0) {
+        $summary = $rawAnomalies |
+            Select-Object -First 5 id, font, phrase, min_gap, min_pair, overlap |
+            Format-Table -AutoSize |
+            Out-String
+        Write-Host "  INFO $Name bounded raw visual anomalies:"
+        $summary.TrimEnd() -split "`r?`n" | ForEach-Object { Write-Host "       $_" }
+    }
 }
 
 $lobby = Import-Report "lobby-render-report.tsv"

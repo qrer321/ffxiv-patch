@@ -110,7 +110,9 @@ function New-VisualReportSet {
 
         [switch]$BlankLargeUiPng,
 
-        [switch]$SeverePvpOverlap
+        [switch]$SeverePvpOverlap,
+
+        [switch]$MildPvpOverlap
     )
 
     New-Item -ItemType Directory -Force -Path $Directory | Out-Null
@@ -177,6 +179,9 @@ function New-VisualReportSet {
         if ($SeverePvpOverlap -and $id -eq "pvp-profile-02-crystalline") {
             $overlap = 4
         }
+        elseif ($MildPvpOverlap -and $id -eq "pvp-profile-02-crystalline") {
+            $overlap = 1
+        }
 
         $row = New-Row -Id $id -Png $png -Overlap $overlap
         $pvpRows += [pscustomobject]@{
@@ -215,11 +220,18 @@ function Invoke-AuditExpectFail {
         [string]$Directory,
 
         [Parameter(Mandatory = $true)]
-        [string]$Label
+        [string]$Label,
+
+        [switch]$FailOnAnyRawOverlap
     )
 
     try {
-        & $checkScript -SnapshotDir $Directory | Out-Host
+        if ($FailOnAnyRawOverlap) {
+            & $checkScript -SnapshotDir $Directory -FailOnAnyRawOverlap | Out-Host
+        }
+        else {
+            & $checkScript -SnapshotDir $Directory | Out-Host
+        }
     }
     catch {
         Write-Host "  OK   expected failure for ${Label}: $($_.Exception.Message)"
@@ -244,6 +256,11 @@ Invoke-AuditExpectFail $blankPngDir "blank PNG"
 $severeOverlapDir = Join-Path $OutputRoot "severe-overlap"
 New-VisualReportSet $severeOverlapDir -SeverePvpOverlap
 Invoke-AuditExpectFail $severeOverlapDir "severe overlap"
+
+$strictOverlapDir = Join-Path $OutputRoot "strict-raw-overlap"
+New-VisualReportSet $strictOverlapDir -MildPvpOverlap
+Invoke-AuditExpectPass $strictOverlapDir
+Invoke-AuditExpectFail $strictOverlapDir "strict raw overlap" -FailOnAnyRawOverlap
 
 Write-Host "RESULT: PASS"
 Write-Host "  artifacts: $OutputRoot"
