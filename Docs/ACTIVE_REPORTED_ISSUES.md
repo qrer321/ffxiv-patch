@@ -111,6 +111,7 @@
   - 2026-05-31 applied objective gate hardening: `verify-hd-crash-release.ps1` now forwards `-AppliedGame` into every `-RunFullFontObjective` chunk and includes output `orig.000000/060000` indexes as clean baselines. Re-run with `-SkipGenerate -AppliedGame ... -RunFullFontObjective -SkipKnownFailureCheck -SkipCrashLogCheck` passed all applied objective chunks: lobby critical, in-game bounds, markers/flytext, shared font safety, large UI/PvP, source preservation, and TTMP texture neighborhoods.
   - 2026-05-31 weak applied-state gate: `verify-hd-crash-release.ps1` now supports `-SkipFocusedChecks` for short post-apply drift checks. The quick applied command passed generated-vs-installed file matching plus applied lobby/runtime/font-bounds checks in 3.3s, while leaving full visual/objective checks as the required final evidence.
   - 2026-05-31 completion-audit evidence: the accepted applied objective logs are `20260531-022850` through `20260531-024229`; each reports `patched sqpack: D:\SquareEnix\FINAL FANTASY XIV - A Realm Reborn\game\sqpack\ffxiv` and `RESULT: PASS`, with no `FAIL`/`WARN` lines. The later `20260531-171804-objective-lobby-critical.log` was from an interrupted run and must not be used as completion evidence. Completion remains pending live client confirmation.
+  - 2026-05-31 supersession note: older open notes below about lobby high-scale glyphs, ActionDetail size, combat flytext, and in-game blur/halo are preserved for history. Current generated/applied-state evidence is the 2026-05-31 visual snapshot set and accepted applied objective logs above; treat a fresh verifier failure or user client rejection as the only reason to reopen the implementation direction.
   - Remaining: do not mark the live boot crash fixed until the user confirms the client result. Also do not reintroduce `font_lobby7.tex`, lobby `image_index >= 24`, or clean-unused page reuse to regain coverage.
 
 - [ ] Lobby high-UI-scale font coverage under clean-page safety
@@ -310,6 +311,7 @@
 
 - [ ] In-game combat flytext: critical/direct-hit font regression
   - Reported: critical or direct-hit combat text can render with broken font glyphs after recent font work.
+  - 2026-05-31 current applied evidence: the accepted applied objective run includes `combat-flytext-damage-glyphs` with clean font/UI indexes and the applied game as patched sqpack, and it passed with no `FAIL`/`WARN`. Keep the item open only for live-client confirmation; do not change damage-number routes without a new failing verifier or fresh user rejection.
   - Investigation: in-game `font1.tex` through `font7.tex` already exist and can be referenced by FDT image indexes, but regular in-game clean ASCII repair was still mostly writing to `font1/font2`. More importantly, non-lobby `TrumpGothic_23/34/68/184.fdt` combat candidates were receiving clean global ASCII/symbol replacement, which changed TTMP combat phrases such as direct-hit/critical punctuation routes.
   - Current code direction: preserve TTMP source glyphs for non-lobby `TrumpGothic_23/34/68/184.fdt`; keep lobby `*_lobby.fdt` clean ASCII behavior separate.
   - Superseded verification note: direct-hit/critical fly text must not be modeled as Korean phrases with `!`. `reported-ingame-hangul-phrases` remains for Korean TTMP phrases, while `combat-flytext-damage-glyphs` covers clean damage digits and `!`/`!!` routes.
@@ -322,6 +324,7 @@
 
 - [ ] In-game font blur/halo after font patching
   - Reported: in-game Korean text looks slightly blurred, like a faint 1px larger alpha layer is present behind the intended glyph.
+  - 2026-05-31 current applied evidence: the accepted applied objective run includes `ingame-ttmp-texture-neighborhoods`, `font-runtime-glyph-bounds`, and source-preservation checks against the applied game, all passing with no `FAIL`/`WARN`. Keep live confirmation pending, but do not keep broad atlas reshaping in scope unless a new verifier failure points to a specific route.
   - Found cause candidate: previous font repair could let in-game textures such as `font1.tex` through `font7.tex` and `font_krn_1.tex` grow from `4096x4096` to `4096x8192` when a patch wrote past the existing atlas. This is rejected for both lobby and in-game fonts.
   - Code direction: font texture resize is now a hard failure for every font texture. Patches must fit an existing atlas page or allocate another existing page (`font1.tex` through `font7.tex`, or `font_krn_1.tex` for KrnAXIS); they must not expand an atlas.
   - Party-list PUA clean-shape repair now reuses the existing clean-sized cell when it fits, allocates to an existing page only when needed, and writes only the source glyph dimensions so boundary cells do not force texture growth.
