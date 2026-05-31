@@ -6,10 +6,13 @@ param(
 
     [int]$MinSevereGap = -2,
 
-    [double]$MaxFringeRatio = 1.05
+    [double]$MaxFringeRatio = 1.05,
+
+    [int]$MinInkPixels = 8
 )
 
 $ErrorActionPreference = "Stop"
+Add-Type -AssemblyName System.Drawing
 
 if (!(Test-Path -LiteralPath $SnapshotDir)) {
     throw "Snapshot directory was not found: $SnapshotDir"
@@ -86,6 +89,9 @@ function Test-SnapshotPath {
         [Parameter(Mandatory = $true)]
         [string]$Column,
 
+        [Parameter(Mandatory = $true)]
+        [object]$Row,
+
         [string]$Path
     )
 
@@ -100,6 +106,56 @@ function Test-SnapshotPath {
     $item = Get-Item -LiteralPath $Path
     if ($item.Length -le 0) {
         throw "$Name row '$Id' references empty ${Column}: $Path"
+    }
+
+    $bitmap = $null
+    try {
+        $bitmap = [System.Drawing.Bitmap]::FromFile($item.FullName)
+        if ($bitmap.Width -le 0 -or $bitmap.Height -le 0) {
+            throw "$Name row '$Id' references invalid ${Column} dimensions: $Path"
+        }
+
+        $expectedWidth = To-Int $Row.width
+        $expectedHeight = To-Int $Row.height
+        if ($expectedWidth -gt 0 -and $bitmap.Width -lt $expectedWidth) {
+            throw "$Name row '$Id' ${Column} width is smaller than report width: image=$($bitmap.Width), report=$expectedWidth, path=$Path"
+        }
+
+        if ($expectedHeight -gt 0 -and $bitmap.Height -lt $expectedHeight) {
+            throw "$Name row '$Id' ${Column} height is smaller than report height: image=$($bitmap.Height), report=$expectedHeight, path=$Path"
+        }
+
+        $background = $bitmap.GetPixel(0, 0)
+        $inkPixels = 0
+        for ($y = 0; $y -lt $bitmap.Height; $y++) {
+            for ($x = 0; $x -lt $bitmap.Width; $x++) {
+                $pixel = $bitmap.GetPixel($x, $y)
+                $delta =
+                    [Math]::Abs([int]$pixel.A - [int]$background.A) +
+                    [Math]::Abs([int]$pixel.R - [int]$background.R) +
+                    [Math]::Abs([int]$pixel.G - [int]$background.G) +
+                    [Math]::Abs([int]$pixel.B - [int]$background.B)
+                if ($delta -gt 2) {
+                    $inkPixels++
+                    if ($inkPixels -ge $MinInkPixels) {
+                        break
+                    }
+                }
+            }
+
+            if ($inkPixels -ge $MinInkPixels) {
+                break
+            }
+        }
+
+        if ($inkPixels -lt $MinInkPixels) {
+            throw "$Name row '$Id' ${Column} has too few non-background pixels: ink=$inkPixels, required=$MinInkPixels, path=$Path"
+        }
+    }
+    finally {
+        if ($bitmap -ne $null) {
+            $bitmap.Dispose()
+        }
     }
 
     return $true
@@ -129,12 +185,12 @@ function Test-ReportRows {
             $severe += $row
         }
 
-        if (Test-SnapshotPath $Name $row.id "png" $row.png) {
+        if (Test-SnapshotPath $Name $row.id "png" $row $row.png) {
             $pngCount++
         }
 
         if (Get-Member -InputObject $row -Name "png2" -MemberType NoteProperty -ErrorAction SilentlyContinue) {
-            if (Test-SnapshotPath $Name $row.id "png2" $row.png2) {
+            if (Test-SnapshotPath $Name $row.id "png2" $row $row.png2) {
                 $pngCount++
             }
         }
