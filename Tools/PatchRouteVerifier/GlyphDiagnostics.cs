@@ -5,6 +5,12 @@ namespace FfxivKoreanPatch.PatchRouteVerifier
     internal static partial class PatchRouteVerifier
     {
         private const int GlyphDumpScale = 4;
+        private static readonly uint[] MissingGlyphFallbackCodepoints = new uint[]
+        {
+            '-',
+            '=',
+            '|'
+        };
 
         private sealed partial class Verifier
         {
@@ -24,6 +30,22 @@ namespace FfxivKoreanPatch.PatchRouteVerifier
                 {
                     return false;
                 }
+            }
+
+            private bool GlyphMatchesAnyMissingGlyphFallback(string fontPath, GlyphCanvas target, uint codepoint, out uint fallbackCodepoint)
+            {
+                for (int i = 0; i < MissingGlyphFallbackCodepoints.Length; i++)
+                {
+                    uint candidate = MissingGlyphFallbackCodepoints[i];
+                    if (GlyphMatchesFallback(fontPath, target, codepoint, candidate))
+                    {
+                        fallbackCodepoint = candidate;
+                        return true;
+                    }
+                }
+
+                fallbackCodepoint = 0;
+                return false;
             }
 
             private static uint[] CollectCodepoints(string[] phrases)

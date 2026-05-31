@@ -4911,6 +4911,12 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
 
             if (route.IncludeHighResolutionPercentPairs)
             {
+                if (useRuntimeBackedFallback)
+                {
+                    AddRuntimeBackedAdjacentHangulKerningPairs(entries, LobbyScaledHangulPhrases.HighResolutionUiScaleOptions, route.MinimumAdjustment);
+                }
+
+                AddAsciiAdjacentKerningPairs(entries, LobbyScaledHangulPhrases.HighResolutionUiScaleOptions, route.PercentAdjustment);
                 AddAsciiPercentKerningPairs(entries, LobbyScaledHangulPhrases.HighResolutionUiScaleOptions, route.PercentAdjustment);
             }
 
@@ -5046,6 +5052,19 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
                 });
         }
 
+        private static void AddAsciiAdjacentKerningPairs(Dictionary<string, byte[]> entries, string[] phrases, int adjustment)
+        {
+            AddStartScreenKerningPairs(
+                entries,
+                phrases,
+                adjustment,
+                false,
+                delegate(uint left, uint right)
+                {
+                    return left > 0x20u && left <= 0x7Eu && right > 0x20u && right <= 0x7Eu;
+                });
+        }
+
         private static void AddStartScreenKerningPairs(
             Dictionary<string, byte[]> entries,
             string[] phrases,
@@ -5159,7 +5178,11 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
         private static bool IsTerminalPunctuationCodepoint(uint codepoint)
         {
             return codepoint == 0x002Eu ||
+                   codepoint == 0x0029u ||
+                   codepoint == 0x003Au ||
                    codepoint == 0x3002u ||
+                   codepoint == 0xFF09u ||
+                   codepoint == 0xFF1Au ||
                    codepoint == 0xFF0Eu;
         }
 

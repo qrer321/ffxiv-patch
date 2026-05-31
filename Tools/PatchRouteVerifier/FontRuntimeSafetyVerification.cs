@@ -301,7 +301,11 @@ namespace FfxivKoreanPatch.PatchRouteVerifier
             private static bool IsRuntimeSafeTerminalPunctuationCodepoint(uint codepoint)
             {
                 return codepoint == 0x002Eu ||
+                       codepoint == 0x0029u ||
+                       codepoint == 0x003Au ||
                        codepoint == 0x3002u ||
+                       codepoint == 0xFF09u ||
+                       codepoint == 0xFF1Au ||
                        codepoint == 0xFF0Eu;
             }
 

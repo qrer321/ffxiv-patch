@@ -66,9 +66,53 @@ namespace FfxivKoreanPatch.PatchRouteVerifier
                     VerifyLobbyRenderCase(LobbyRenderCases[i]);
                 }
 
+                VerifyExtendedLobbyRenderCases();
+
                 for (int i = 0; i < LobbyScaleComparisonCases.Length; i++)
                 {
                     VerifyLobbyScaleComparisonCase(LobbyScaleComparisonCases[i]);
+                }
+            }
+
+            private void VerifyExtendedLobbyRenderCases()
+            {
+                VerifyLobbyRenderPhraseSet("start-menu-trump23", "common/font/TrumpGothic_23_lobby.fdt", LobbyScaledHangulPhrases.StartScreenMainMenu, 1.0, 0);
+                VerifyLobbyRenderPhraseSet("start-menu-trump34", "common/font/TrumpGothic_34_lobby.fdt", LobbyScaledHangulPhrases.StartScreenMainMenu, 1.0, 0);
+                VerifyLobbyRenderPhraseSet("start-menu-trump68", "common/font/TrumpGothic_68_lobby.fdt", LobbyScaledHangulPhrases.StartScreenMainMenu, 1.0, 0);
+
+                VerifyLobbyRenderPhraseSet("character-trump23", "common/font/TrumpGothic_23_lobby.fdt", LobbyScaledHangulPhrases.CharacterSelectLargeLabels, 1.0, 0);
+                VerifyLobbyRenderPhraseSet("character-trump34", "common/font/TrumpGothic_34_lobby.fdt", LobbyScaledHangulPhrases.CharacterSelectLargeLabels, 1.0, 0);
+                VerifyLobbyRenderPhraseSet("character-trump68", "common/font/TrumpGothic_68_lobby.fdt", LobbyScaledHangulPhrases.CharacterSelectLargeLabels, 1.0, 0);
+
+                VerifyLobbyRenderPhraseSet("settings-title-trump23", "common/font/TrumpGothic_23_lobby.fdt", LobbyScaledHangulPhrases.StartScreenSystemSettings, 1.0, -1);
+                VerifyLobbyRenderPhraseSet("settings-title-trump34", "common/font/TrumpGothic_34_lobby.fdt", LobbyScaledHangulPhrases.StartScreenSystemSettings, 1.0, -1);
+                VerifyLobbyRenderPhraseSet("settings-title-trump68", "common/font/TrumpGothic_68_lobby.fdt", LobbyScaledHangulPhrases.StartScreenSystemSettings, 1.0, -1);
+
+                VerifyLobbyRenderPhraseSet("settings-axis12-lobby", "common/font/AXIS_12_lobby.fdt", LobbyScaledHangulPhrases.HighResolutionUiScaleOptions, 1.0, 0);
+                VerifyLobbyRenderPhraseSet("settings-axis14-lobby", "common/font/AXIS_14_lobby.fdt", LobbyScaledHangulPhrases.HighResolutionUiScaleOptions, 1.0, 0);
+                VerifyLobbyRenderPhraseSet("settings-axis18-lobby", "common/font/AXIS_18_lobby.fdt", LobbyScaledHangulPhrases.StartScreenSystemSettingsResultMessages, 1.0, 0);
+                VerifyLobbyRenderPhraseSet("settings-axis36-lobby", "common/font/AXIS_36_lobby.fdt", LobbyScaledHangulPhrases.StartScreenSystemSettingsResultMessages, 1.0, 0);
+
+                VerifyLobbyRenderPhraseSet("settings-axis12-ui150", "common/font/AXIS_12.fdt", LobbyScaledHangulPhrases.StartScreenSystemSettingsResultMessages, 1.5, 1);
+                VerifyLobbyRenderPhraseSet("settings-axis14-ui150", "common/font/AXIS_14.fdt", LobbyScaledHangulPhrases.HighResolutionUiScaleOptions, 1.5, 1);
+                VerifyLobbyRenderPhraseSet("settings-axis14-ui200", "common/font/AXIS_14.fdt", LobbyScaledHangulPhrases.StartScreenSystemSettingsResultMessages, 2.0, 1);
+                VerifyLobbyRenderPhraseSet("settings-axis14-ui300", "common/font/AXIS_14.fdt", LobbyScaledHangulPhrases.StartScreenSystemSettingsResultMessages, 3.0, 1);
+                VerifyLobbyRenderPhraseSet("settings-axis18-ui150", "common/font/AXIS_18.fdt", LobbyScaledHangulPhrases.StartScreenSystemSettingsResultMessages, 1.5, 1);
+                VerifyLobbyRenderPhraseSet("settings-axis36-ui200", "common/font/AXIS_36.fdt", LobbyScaledHangulPhrases.StartScreenSystemSettingsResultMessages, 2.0, 1);
+            }
+
+            private void VerifyLobbyRenderPhraseSet(string idPrefix, string fontPath, string[] phrases, double outputScale, int minimumGapFloor)
+            {
+                for (int i = 0; i < phrases.Length; i++)
+                {
+                    VerifyLobbyRenderCase(new LobbyRenderCase(
+                        idPrefix + "-" + i.ToString("00", CultureInfo.InvariantCulture),
+                        fontPath,
+                        StartScreenGlyphVariants.ApplyToKnownPhrases(phrases[i]),
+                        outputScale,
+                        false,
+                        minimumGapFloor,
+                        false));
                 }
             }
 

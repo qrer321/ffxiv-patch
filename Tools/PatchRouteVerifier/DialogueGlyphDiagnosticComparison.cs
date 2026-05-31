@@ -40,15 +40,10 @@ namespace FfxivKoreanPatch.PatchRouteVerifier
                     return true;
                 }
 
-                if (GlyphMatchesFallback(fontPath, glyph, codepoint, '-'))
+                uint fallbackCodepoint;
+                if (GlyphMatchesAnyMissingGlyphFallback(fontPath, glyph, codepoint, out fallbackCodepoint))
                 {
-                    ReportDialogueGlyphIssue(fontPath, codepoint, "{0} U+{1:X4} matches fallback U+002D");
-                    return true;
-                }
-
-                if (GlyphMatchesFallback(fontPath, glyph, codepoint, '='))
-                {
-                    ReportDialogueGlyphIssue(fontPath, codepoint, "{0} U+{1:X4} matches fallback U+003D");
+                    ReportDialogueGlyphIssue(fontPath, codepoint, "{0} U+{1:X4} matches fallback U+" + fallbackCodepoint.ToString("X4"));
                     return true;
                 }
 

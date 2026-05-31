@@ -80,7 +80,31 @@ namespace FfxivKoreanPatch.PatchRouteVerifier
                 int targetAdjustment = targetEntry != null && targetEntry.Length >= FdtKerningEntrySize
                     ? unchecked((int)Endian.ReadUInt32LE(targetEntry, 12))
                     : 0;
+                if (IsAllowedHighScaleLobbyAsciiKerningAdjustment(targetFontPath, left, right, 0, targetAdjustment))
+                {
+                    return true;
+                }
+
                 return IsAllowedStartScreenAsciiKerningAdjustment(targetFontPath, left, right, 0, targetAdjustment);
+            }
+
+            private static bool IsAllowedHighScaleLobbyAsciiKerningAdjustment(
+                string targetFontPath,
+                uint leftPackedUtf8,
+                uint rightPackedUtf8,
+                int sourceAdjustment,
+                int targetAdjustment)
+            {
+                if (!LobbyHangulCoverage.IsHighScaleTargetFontPath(targetFontPath) ||
+                    sourceAdjustment != 0 ||
+                    targetAdjustment != 8)
+                {
+                    return false;
+                }
+
+                return leftPackedUtf8 >= '0' &&
+                       leftPackedUtf8 <= '9' &&
+                       (rightPackedUtf8 == '%' || rightPackedUtf8 == 'x');
             }
 
             private static bool IsAllowedStartScreenAsciiKerningAdjustment(
@@ -160,7 +184,11 @@ namespace FfxivKoreanPatch.PatchRouteVerifier
                     for (int i = 0; i < phrase.Length; i++)
                     {
                         uint codepoint = ReadCodepoint(phrase, ref i);
-                        if (hasPrevious && previous >= '0' && previous <= '9' && codepoint == '%')
+                        if (hasPrevious &&
+                            previous > 0x20u &&
+                            previous <= 0x7Eu &&
+                            codepoint > 0x20u &&
+                            codepoint <= 0x7Eu)
                         {
                             pairs.Add(PackUtf8(previous).ToString("X2") + ":" + PackUtf8(codepoint).ToString("X2"));
                         }
@@ -237,7 +265,11 @@ namespace FfxivKoreanPatch.PatchRouteVerifier
             private static bool IsVerifierTerminalPunctuationCodepoint(uint codepoint)
             {
                 return codepoint == 0x002Eu ||
+                       codepoint == 0x0029u ||
+                       codepoint == 0x003Au ||
                        codepoint == 0x3002u ||
+                       codepoint == 0xFF09u ||
+                       codepoint == 0xFF1Au ||
                        codepoint == 0xFF0Eu;
             }
         }

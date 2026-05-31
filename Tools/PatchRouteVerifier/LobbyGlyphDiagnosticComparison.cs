@@ -47,15 +47,10 @@ namespace FfxivKoreanPatch.PatchRouteVerifier
                     return true;
                 }
 
-                if (GlyphMatchesFallback(fontPath, target, codepoint, '-'))
+                uint fallbackCodepoint;
+                if (GlyphMatchesAnyMissingGlyphFallback(fontPath, target, codepoint, out fallbackCodepoint))
                 {
-                    Fail("{0} U+{1:X4} matches fallback U+002D", fontPath, codepoint);
-                    return true;
-                }
-
-                if (GlyphMatchesFallback(fontPath, target, codepoint, '='))
-                {
-                    Fail("{0} U+{1:X4} matches fallback U+003D", fontPath, codepoint);
+                    Fail("{0} U+{1:X4} matches fallback U+{2:X4}", fontPath, codepoint, fallbackCodepoint);
                     return true;
                 }
 

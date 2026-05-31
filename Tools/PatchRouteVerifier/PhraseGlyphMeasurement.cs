@@ -85,11 +85,11 @@ namespace FfxivKoreanPatch.PatchRouteVerifier
                     return false;
                 }
 
+                uint fallbackCodepoint;
                 if (IsHangulCodepoint(codepoint) &&
-                    (GlyphMatchesFallback(fontPath, canvas, codepoint, '-') ||
-                     GlyphMatchesFallback(fontPath, canvas, codepoint, '=')))
+                    GlyphMatchesAnyMissingGlyphFallback(fontPath, canvas, codepoint, out fallbackCodepoint))
                 {
-                    error = "U+" + codepoint.ToString("X4") + " matches fallback glyph";
+                    error = "U+" + codepoint.ToString("X4") + " matches fallback U+" + fallbackCodepoint.ToString("X4");
                     return false;
                 }
 
