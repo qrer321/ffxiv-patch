@@ -75,6 +75,36 @@ function Require-ReportIdLike {
     }
 }
 
+function Test-SnapshotPath {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$Name,
+
+        [Parameter(Mandatory = $true)]
+        [string]$Id,
+
+        [Parameter(Mandatory = $true)]
+        [string]$Column,
+
+        [string]$Path
+    )
+
+    if ([string]::IsNullOrWhiteSpace($Path)) {
+        return $false
+    }
+
+    if (!(Test-Path -LiteralPath $Path)) {
+        throw "$Name row '$Id' references missing ${Column}: $Path"
+    }
+
+    $item = Get-Item -LiteralPath $Path
+    if ($item.Length -le 0) {
+        throw "$Name row '$Id' references empty ${Column}: $Path"
+    }
+
+    return $true
+}
+
 function Test-ReportRows {
     param(
         [Parameter(Mandatory = $true)]
@@ -89,6 +119,7 @@ function Test-ReportRows {
     }
 
     $severe = @()
+    $pngCount = 0
     foreach ($row in $Rows) {
         $overlap = To-Int $row.overlap
         $minGap = To-Int $row.min_gap 999
@@ -96,6 +127,16 @@ function Test-ReportRows {
 
         if ($overlap -gt $MaxSevereOverlap -or $minGap -lt $MinSevereGap -or $fringe -gt $MaxFringeRatio) {
             $severe += $row
+        }
+
+        if (Test-SnapshotPath $Name $row.id "png" $row.png) {
+            $pngCount++
+        }
+
+        if (Get-Member -InputObject $row -Name "png2" -MemberType NoteProperty -ErrorAction SilentlyContinue) {
+            if (Test-SnapshotPath $Name $row.id "png2" $row.png2) {
+                $pngCount++
+            }
         }
     }
 
@@ -112,9 +153,14 @@ function Test-ReportRows {
     $maxOverlap = ($Rows | ForEach-Object { To-Int $_.overlap } | Measure-Object -Maximum).Maximum
     $minGap = ($Rows | ForEach-Object { To-Int $_.min_gap 999 } | Measure-Object -Minimum).Minimum
 
-    Write-Host ("  OK   {0}: rows={1}, overlapRows={2}, negativeGapRows={3}, maxOverlap={4}, minGap={5}" -f `
+    if ($pngCount -lt $Rows.Count) {
+        throw "$Name has fewer PNG references than rows: pngs=$pngCount rows=$($Rows.Count)"
+    }
+
+    Write-Host ("  OK   {0}: rows={1}, pngs={2}, overlapRows={3}, negativeGapRows={4}, maxOverlap={5}, minGap={6}" -f `
         $Name,
         $Rows.Count,
+        $pngCount,
         $overlapRows.Count,
         $negativeGapRows.Count,
         $maxOverlap,
