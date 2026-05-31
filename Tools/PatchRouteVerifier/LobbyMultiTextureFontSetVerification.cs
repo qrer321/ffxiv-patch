@@ -49,7 +49,13 @@ namespace FfxivKoreanPatch.PatchRouteVerifier
                         continue;
                     }
 
-                    HashSet<string> cleanTexturePages = CollectCleanLobbyFontTexturePages(fontPath, ref failures);
+                    byte[] cleanFdt = ReadCleanLobbyFdtForMultiTexture(fontPath, ref failures);
+                    Dictionary<uint, FdtGlyphEntry> cleanGlyphs = cleanFdt == null
+                        ? new Dictionary<uint, FdtGlyphEntry>()
+                        : ReadGlyphEntriesByUtf8(cleanFdt);
+                    HashSet<string> cleanTexturePages = cleanFdt == null
+                        ? null
+                        : CollectCleanLobbyFontTexturePages(fontPath, cleanFdt, ref failures);
                     checkedFonts++;
                     for (int glyphIndex = 0; glyphIndex < glyphCount; glyphIndex++)
                     {
@@ -72,7 +78,8 @@ namespace FfxivKoreanPatch.PatchRouteVerifier
                             continue;
                         }
 
-                        if (IsClientUnsafeLobbyTexturePath(texturePath))
+                        if (IsClientUnsafeLobbyTexturePath(texturePath) &&
+                            IsPatchedLobbyHangulGlyphRoute(fdt, glyphOffset, glyph, cleanGlyphs))
                         {
                             failures = FailLobbyMultiTextureOnce(
                                 failures,
@@ -161,12 +168,11 @@ namespace FfxivKoreanPatch.PatchRouteVerifier
                 }
             }
 
-            private HashSet<string> CollectCleanLobbyFontTexturePages(string fontPath, ref int failures)
+            private byte[] ReadCleanLobbyFdtForMultiTexture(string fontPath, ref int failures)
             {
-                byte[] cleanFdt;
                 try
                 {
-                    cleanFdt = _cleanFont.ReadFile(fontPath);
+                    return _cleanFont.ReadFile(fontPath);
                 }
                 catch (Exception ex)
                 {
@@ -177,7 +183,10 @@ namespace FfxivKoreanPatch.PatchRouteVerifier
                         ex.Message);
                     return null;
                 }
+            }
 
+            private HashSet<string> CollectCleanLobbyFontTexturePages(string fontPath, byte[] cleanFdt, ref int failures)
+            {
                 int fontTableOffset;
                 uint glyphCount;
                 int glyphStart;
@@ -208,6 +217,35 @@ namespace FfxivKoreanPatch.PatchRouteVerifier
                 }
 
                 return pages;
+            }
+
+            private static bool IsPatchedLobbyHangulGlyphRoute(
+                byte[] fdt,
+                int glyphOffset,
+                FdtGlyphEntry glyph,
+                Dictionary<uint, FdtGlyphEntry> cleanGlyphs)
+            {
+                uint utf8Value = Endian.ReadUInt32LE(fdt, glyphOffset);
+                uint codepoint;
+                if (!TryDecodeFdtUtf8Value(utf8Value, out codepoint) ||
+                    !IsHangulCodepoint(codepoint))
+                {
+                    return false;
+                }
+
+                FdtGlyphEntry cleanGlyph;
+                return cleanGlyphs == null ||
+                       !cleanGlyphs.TryGetValue(utf8Value, out cleanGlyph) ||
+                       !SameLobbyMultiTextureCell(glyph, cleanGlyph);
+            }
+
+            private static bool SameLobbyMultiTextureCell(FdtGlyphEntry left, FdtGlyphEntry right)
+            {
+                return left.ImageIndex == right.ImageIndex &&
+                       left.X == right.X &&
+                       left.Y == right.Y &&
+                       left.Width == right.Width &&
+                       left.Height == right.Height;
             }
 
             private static bool IsAllowedExtendedLobbyHangulTextureRoute(string fontPath, string texturePath, int imageIndex)
@@ -342,7 +380,8 @@ namespace FfxivKoreanPatch.PatchRouteVerifier
 
             private static bool IsClientUnsafeLobbyTexturePath(string texturePath)
             {
-                return string.Equals(texturePath, FontLobby7TexturePath, StringComparison.OrdinalIgnoreCase);
+                return string.Equals(texturePath, FontLobby3TexturePath, StringComparison.OrdinalIgnoreCase) ||
+                       string.Equals(texturePath, FontLobby7TexturePath, StringComparison.OrdinalIgnoreCase);
             }
 
             private int FailLobbyMultiTextureOnce(int failures, string format, params object[] args)

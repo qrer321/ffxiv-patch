@@ -139,7 +139,7 @@ namespace FfxivKoreanPatch.PatchRouteVerifier
 
             private static bool IsObservedHdAnalyzerPage2UnsafeLobbyFont(string path)
             {
-                return IsStartupLobbyTextureLimitedFont(path);
+                return IsLobbyFontPath(path);
             }
 
             private void VerifyLobbyUtf8OnlyKerningEntries(string fontPath, byte[] patchedFdt, byte[] cleanFdt, ref int failures)

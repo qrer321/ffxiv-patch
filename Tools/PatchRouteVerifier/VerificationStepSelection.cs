@@ -93,6 +93,7 @@ namespace FfxivKoreanPatch.PatchRouteVerifier
                         "4k-lobby-phrase-layouts",
                         "start-main-menu-phrase-layouts",
                         "lobby-runtime-font-safety",
+                        "fdt-table-invariants",
                         "lobby-multitexture-font-set",
                         "lobby-texture-cell-margin"
                     };
@@ -103,6 +104,7 @@ namespace FfxivKoreanPatch.PatchRouteVerifier
                     return new string[]
                     {
                         "font-runtime-glyph-bounds",
+                        "fdt-table-invariants",
                         "ingame-clean-ascii-glyphs",
                         "numeric-glyphs",
                         "party-list-self-marker",

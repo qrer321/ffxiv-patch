@@ -60,6 +60,7 @@
     <Compile Include="ExdScenarioVerification.cs" />
     <Compile Include="FdtGlyphParsing.cs" />
     <Compile Include="FdtKerningParsing.cs" />
+    <Compile Include="FdtTableInvariantVerification.cs" />
     <Compile Include="FontGuardVerificationData.cs" />
     <Compile Include="FontGuardVerification.cs" />
     <Compile Include="FontOnlyOutputScopeVerification.cs" />
