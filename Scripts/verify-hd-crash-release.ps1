@@ -443,6 +443,15 @@ if ($DumpVisualSnapshots) {
         -Label "verify-visual-snapshots" `
         -File "powershell" `
         -Arguments $snapshotArgs
+
+    Invoke-Checked `
+        -Label "check-visual-snapshot-reports" `
+        -File "powershell" `
+        -Arguments @(
+            "-ExecutionPolicy", "Bypass",
+            "-File", (Join-Path $repoRoot "Scripts\check-visual-snapshot-reports.ps1"),
+            "-SnapshotDir", $snapshotDir
+        )
 }
 
 if ($RunInGameCritical) {
