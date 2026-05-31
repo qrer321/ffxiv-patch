@@ -19,6 +19,7 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
 
     internal static class StartScreenGlyphVariants
     {
+        private static readonly bool Enabled = false;
         private const uint AliasBaseCodepoint = 0xF700u;
         private static readonly Encoding Utf8 = new UTF8Encoding(false, true);
 
@@ -26,12 +27,14 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
             LobbyScaledHangulPhrases.HighResolutionUiScaleOptions,
             LobbyScaledHangulPhrases.StartScreenSystemSettingsResultMessages);
 
-        public static readonly StartScreenGlyphVariant[] Aliases = CreateAliases();
+        public static readonly StartScreenGlyphVariant[] Aliases = Enabled
+            ? CreateAliases()
+            : new StartScreenGlyphVariant[0];
         private static readonly string[] VariantPhraseReplacements = CreateVariantPhraseReplacements();
 
         public static byte[] ApplyToAddonBytes(byte[] bytes)
         {
-            if (bytes == null || bytes.Length == 0 || Aliases.Length == 0)
+            if (!Enabled || bytes == null || bytes.Length == 0 || Aliases.Length == 0)
             {
                 return bytes;
             }
@@ -54,7 +57,7 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
 
         public static string ApplyToKnownPhrases(string text)
         {
-            if (string.IsNullOrEmpty(text) || Aliases.Length == 0)
+            if (!Enabled || string.IsNullOrEmpty(text) || Aliases.Length == 0)
             {
                 return text;
             }
@@ -77,7 +80,7 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
 
         public static string NormalizeAliases(string text)
         {
-            if (string.IsNullOrEmpty(text) || Aliases.Length == 0)
+            if (!Enabled || string.IsNullOrEmpty(text) || Aliases.Length == 0)
             {
                 return text;
             }
@@ -102,6 +105,11 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
 
         public static bool ShouldApplyToAddonRow(uint rowId)
         {
+            if (!Enabled)
+            {
+                return false;
+            }
+
             AddonRowRange[] ranges = LobbyScaledHangulPhrases.StartScreenSystemSettingsAddonRowRanges;
             for (int i = 0; i < ranges.Length; i++)
             {
@@ -116,7 +124,7 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
 
         public static bool ContainsAlias(string text)
         {
-            if (string.IsNullOrEmpty(text) || Aliases.Length == 0)
+            if (!Enabled || string.IsNullOrEmpty(text) || Aliases.Length == 0)
             {
                 return false;
             }
@@ -136,12 +144,23 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
 
         public static bool IsAliasSourceCodepoint(uint codepoint)
         {
+            if (!Enabled)
+            {
+                return false;
+            }
+
             uint ignored;
             return TryGetAliasCodepoint(codepoint, out ignored);
         }
 
         public static bool TryGetAliasCodepoint(uint sourceCodepoint, out uint aliasCodepoint)
         {
+            if (!Enabled)
+            {
+                aliasCodepoint = 0;
+                return false;
+            }
+
             for (int i = 0; i < Aliases.Length; i++)
             {
                 if (Aliases[i].SourceCodepoint == sourceCodepoint)
@@ -157,6 +176,12 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
 
         public static bool TryGetSourceCodepoint(uint aliasCodepoint, out uint sourceCodepoint)
         {
+            if (!Enabled)
+            {
+                sourceCodepoint = 0;
+                return false;
+            }
+
             for (int i = 0; i < Aliases.Length; i++)
             {
                 if (Aliases[i].AliasCodepoint == aliasCodepoint)
