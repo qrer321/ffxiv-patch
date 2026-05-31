@@ -2968,6 +2968,7 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
                 entries,
                 LobbyScaledHangulPhrases.HighResolutionUiScaleOptions,
                 numericBoundaryAdjustment,
+                false,
                 delegate(uint left, uint right)
                 {
                     return left >= '0' &&
@@ -4885,14 +4886,27 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
 
         private static List<byte[]> CollectRuntimeSafeStartScreenKerningPairs(StartScreenKerningRoute route)
         {
-            // AtkFontAnalyzerRender can be reached from start-screen/non-4K UI paths
-            // that use non-lobby AXIS fonts. Keep glyph routes clean; only add
-            // terminal punctuation and ASCII pairs, not Hangul-Hangul kerning.
+            // AtkFontAnalyzerRender can be reached from start-screen/non-4K UI paths.
+            // Keep glyph routes clean and avoid UTF-8-only Hangul kerning entries.
             Dictionary<string, byte[]> entries = new Dictionary<string, byte[]>(StringComparer.Ordinal);
+            bool useRuntimeBackedFallback = ShouldApplyRuntimeBackedHangulKerning(route.FontPath);
             if (route.IncludeTerminalPunctuationPairs && ShouldApplyRuntimeSafeTerminalPunctuationKerning(route.FontPath))
             {
-                AddTerminalPunctuationKerningPairs(entries, LobbyScaledHangulPhrases.HighResolutionUiScaleOptions, route.MinimumAdjustment);
-                AddTerminalPunctuationKerningPairs(entries, LobbyScaledHangulPhrases.StartScreenSystemSettingsResultMessages, route.MinimumAdjustment);
+                AddTerminalPunctuationKerningPairs(
+                    entries,
+                    LobbyScaledHangulPhrases.HighResolutionUiScaleOptions,
+                    route.MinimumAdjustment,
+                    useRuntimeBackedFallback);
+                AddTerminalPunctuationKerningPairs(
+                    entries,
+                    LobbyScaledHangulPhrases.StartScreenSystemSettingsResultMessages,
+                    route.MinimumAdjustment,
+                    useRuntimeBackedFallback);
+            }
+
+            if (route.IncludeResultMessageHangulPairs && useRuntimeBackedFallback)
+            {
+                AddRuntimeBackedAdjacentHangulKerningPairs(entries, LobbyScaledHangulPhrases.StartScreenSystemSettingsResultMessages, route.MinimumAdjustment);
             }
 
             if (route.IncludeHighResolutionPercentPairs)
@@ -4907,10 +4921,18 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
 
         private static bool ShouldApplyRuntimeSafeTerminalPunctuationKerning(string fontPath)
         {
-            return string.Equals(
-                NormalizeGamePath(fontPath),
-                "common/font/AXIS_18.fdt",
-                StringComparison.OrdinalIgnoreCase);
+            string normalized = NormalizeGamePath(fontPath);
+            return string.Equals(normalized, "common/font/AXIS_12.fdt", StringComparison.OrdinalIgnoreCase) ||
+                   string.Equals(normalized, "common/font/AXIS_14.fdt", StringComparison.OrdinalIgnoreCase) ||
+                   string.Equals(normalized, "common/font/KrnAXIS_140.fdt", StringComparison.OrdinalIgnoreCase) ||
+                   string.Equals(normalized, "common/font/AXIS_18.fdt", StringComparison.OrdinalIgnoreCase);
+        }
+
+        private static bool ShouldApplyRuntimeBackedHangulKerning(string fontPath)
+        {
+            string normalized = NormalizeGamePath(fontPath);
+            return string.Equals(normalized, "common/font/AXIS_12.fdt", StringComparison.OrdinalIgnoreCase) ||
+                   string.Equals(normalized, "common/font/AXIS_14.fdt", StringComparison.OrdinalIgnoreCase);
         }
 
         private static bool TryGetStartScreenKerningRoute(string path, out StartScreenKerningRoute route)
@@ -4969,6 +4991,20 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
                 entries,
                 phrases,
                 adjustment,
+                false,
+                delegate(uint left, uint right)
+                {
+                    return IsHangulCodepoint(left) && IsHangulCodepoint(right);
+                });
+        }
+
+        private static void AddRuntimeBackedAdjacentHangulKerningPairs(Dictionary<string, byte[]> entries, string[] phrases, int adjustment)
+        {
+            AddStartScreenKerningPairs(
+                entries,
+                phrases,
+                adjustment,
+                true,
                 delegate(uint left, uint right)
                 {
                     return IsHangulCodepoint(left) && IsHangulCodepoint(right);
@@ -4977,10 +5013,20 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
 
         private static void AddTerminalPunctuationKerningPairs(Dictionary<string, byte[]> entries, string[] phrases, int adjustment)
         {
+            AddTerminalPunctuationKerningPairs(entries, phrases, adjustment, false);
+        }
+
+        private static void AddTerminalPunctuationKerningPairs(
+            Dictionary<string, byte[]> entries,
+            string[] phrases,
+            int adjustment,
+            bool useRuntimeBackedFallback)
+        {
             AddStartScreenKerningPairs(
                 entries,
                 phrases,
                 adjustment,
+                useRuntimeBackedFallback,
                 delegate(uint left, uint right)
                 {
                     return IsHangulCodepoint(left) && IsTerminalPunctuationCodepoint(right);
@@ -4993,6 +5039,7 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
                 entries,
                 phrases,
                 adjustment,
+                false,
                 delegate(uint left, uint right)
                 {
                     return left >= '0' && left <= '9' && right == '%';
@@ -5003,6 +5050,7 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
             Dictionary<string, byte[]> entries,
             string[] phrases,
             int adjustment,
+            bool useRuntimeBackedFallback,
             KerningPairPredicate predicate)
         {
             if (phrases == null)
@@ -5020,7 +5068,9 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
                     uint codepoint = ReadCodepoint(phrase, ref i);
                     if (hasPrevious && predicate(previous, codepoint))
                     {
-                        byte[] entry = CreateKerningEntry(previous, codepoint, adjustment);
+                        byte[] entry = useRuntimeBackedFallback
+                            ? CreateRuntimeBackedKerningEntry(previous, codepoint, adjustment)
+                            : CreateKerningEntry(previous, codepoint, adjustment);
                         entries[BuildKerningKey(Endian.ReadUInt32LE(entry, 0), Endian.ReadUInt32LE(entry, 4))] = entry;
                     }
 
@@ -5116,6 +5166,42 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
         private static bool IsPhraseSeparatorCodepoint(uint codepoint)
         {
             return codepoint == 0 || codepoint == 0x20u || codepoint == 0x3000u;
+        }
+
+        private static readonly ushort[] RuntimeBackedHangulKerningFallbackShiftJisValues = new ushort[]
+        {
+            0x82A0,
+            0x82A2,
+            0x82A4,
+            0x82A6,
+            0x82A8,
+            0x82A9,
+            0x82AB,
+            0x82AD
+        };
+
+        private static byte[] CreateRuntimeBackedKerningEntry(uint leftCodepoint, uint rightCodepoint, int adjustment)
+        {
+            byte[] entry = CreateKerningEntry(leftCodepoint, rightCodepoint, adjustment);
+            EnsureRuntimeBackedKerningShiftJis(entry, 8, leftCodepoint);
+            EnsureRuntimeBackedKerningShiftJis(entry, 10, rightCodepoint);
+            return entry;
+        }
+
+        private static void EnsureRuntimeBackedKerningShiftJis(byte[] entry, int offset, uint codepoint)
+        {
+            if (Endian.ReadUInt16LE(entry, offset) != 0 || !IsHangulCodepoint(codepoint))
+            {
+                return;
+            }
+
+            Endian.WriteUInt16LE(entry, offset, SelectRuntimeBackedHangulKerningFallback(codepoint));
+        }
+
+        private static ushort SelectRuntimeBackedHangulKerningFallback(uint codepoint)
+        {
+            return RuntimeBackedHangulKerningFallbackShiftJisValues[
+                checked((int)(codepoint % (uint)RuntimeBackedHangulKerningFallbackShiftJisValues.Length))];
         }
 
         private static byte[] CreateKerningEntry(uint leftCodepoint, uint rightCodepoint, int adjustment)
