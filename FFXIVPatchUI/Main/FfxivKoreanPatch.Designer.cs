@@ -329,40 +329,58 @@
             //
             // preserveBaseBnpcNamesCheckBox
             //
-            this.preserveBaseBnpcNamesCheckBox.AutoSize = true;
-            this.preserveBaseBnpcNamesCheckBox.BackColor = System.Drawing.Color.Transparent;
+            this.preserveBaseBnpcNamesCheckBox.Appearance = System.Windows.Forms.Appearance.Button;
+            this.preserveBaseBnpcNamesCheckBox.BackColor = System.Drawing.Color.FromArgb(((int)(((byte)(38)))), ((int)(((byte)(47)))), ((int)(((byte)(58)))));
+            this.preserveBaseBnpcNamesCheckBox.FlatAppearance.BorderColor = System.Drawing.Color.FromArgb(((int)(((byte)(86)))), ((int)(((byte)(104)))), ((int)(((byte)(122)))));
+            this.preserveBaseBnpcNamesCheckBox.FlatAppearance.CheckedBackColor = System.Drawing.Color.FromArgb(((int)(((byte)(34)))), ((int)(((byte)(126)))), ((int)(((byte)(188)))));
+            this.preserveBaseBnpcNamesCheckBox.FlatAppearance.MouseDownBackColor = System.Drawing.Color.FromArgb(((int)(((byte)(29)))), ((int)(((byte)(122)))), ((int)(((byte)(184)))));
+            this.preserveBaseBnpcNamesCheckBox.FlatAppearance.MouseOverBackColor = System.Drawing.Color.FromArgb(((int)(((byte)(50)))), ((int)(((byte)(61)))), ((int)(((byte)(74)))));
+            this.preserveBaseBnpcNamesCheckBox.FlatStyle = System.Windows.Forms.FlatStyle.Flat;
             this.preserveBaseBnpcNamesCheckBox.Location = new System.Drawing.Point(16, 354);
             this.preserveBaseBnpcNamesCheckBox.Name = "preserveBaseBnpcNamesCheckBox";
-            this.preserveBaseBnpcNamesCheckBox.Size = new System.Drawing.Size(206, 19);
+            this.preserveBaseBnpcNamesCheckBox.Size = new System.Drawing.Size(128, 30);
             this.preserveBaseBnpcNamesCheckBox.TabIndex = 0;
             this.preserveBaseBnpcNamesCheckBox.TabStop = false;
-            this.preserveBaseBnpcNamesCheckBox.Text = "\uBCF4\uC2A4\uBA85(BNpcName) \uC6D0\uBB38 \uC720\uC9C0";
+            this.preserveBaseBnpcNamesCheckBox.Text = "\uBCF4\uC2A4\uBA85";
+            this.preserveBaseBnpcNamesCheckBox.TextAlign = System.Drawing.ContentAlignment.MiddleCenter;
             this.preserveBaseBnpcNamesCheckBox.UseVisualStyleBackColor = false;
             this.preserveBaseBnpcNamesCheckBox.CheckedChanged += new System.EventHandler(this.preserveBaseLanguageOptionCheckBox_CheckedChanged);
             //
             // preserveBaseActionNamesCheckBox
             //
-            this.preserveBaseActionNamesCheckBox.AutoSize = true;
-            this.preserveBaseActionNamesCheckBox.BackColor = System.Drawing.Color.Transparent;
+            this.preserveBaseActionNamesCheckBox.Appearance = System.Windows.Forms.Appearance.Button;
+            this.preserveBaseActionNamesCheckBox.BackColor = System.Drawing.Color.FromArgb(((int)(((byte)(38)))), ((int)(((byte)(47)))), ((int)(((byte)(58)))));
+            this.preserveBaseActionNamesCheckBox.FlatAppearance.BorderColor = System.Drawing.Color.FromArgb(((int)(((byte)(86)))), ((int)(((byte)(104)))), ((int)(((byte)(122)))));
+            this.preserveBaseActionNamesCheckBox.FlatAppearance.CheckedBackColor = System.Drawing.Color.FromArgb(((int)(((byte)(34)))), ((int)(((byte)(126)))), ((int)(((byte)(188)))));
+            this.preserveBaseActionNamesCheckBox.FlatAppearance.MouseDownBackColor = System.Drawing.Color.FromArgb(((int)(((byte)(29)))), ((int)(((byte)(122)))), ((int)(((byte)(184)))));
+            this.preserveBaseActionNamesCheckBox.FlatAppearance.MouseOverBackColor = System.Drawing.Color.FromArgb(((int)(((byte)(50)))), ((int)(((byte)(61)))), ((int)(((byte)(74)))));
+            this.preserveBaseActionNamesCheckBox.FlatStyle = System.Windows.Forms.FlatStyle.Flat;
             this.preserveBaseActionNamesCheckBox.Location = new System.Drawing.Point(240, 354);
             this.preserveBaseActionNamesCheckBox.Name = "preserveBaseActionNamesCheckBox";
-            this.preserveBaseActionNamesCheckBox.Size = new System.Drawing.Size(150, 19);
+            this.preserveBaseActionNamesCheckBox.Size = new System.Drawing.Size(128, 30);
             this.preserveBaseActionNamesCheckBox.TabIndex = 0;
             this.preserveBaseActionNamesCheckBox.TabStop = false;
-            this.preserveBaseActionNamesCheckBox.Text = "\uAE30\uC220\uBA85 \uC6D0\uBB38 \uC720\uC9C0";
+            this.preserveBaseActionNamesCheckBox.Text = "\uAE30\uC220\uBA85";
+            this.preserveBaseActionNamesCheckBox.TextAlign = System.Drawing.ContentAlignment.MiddleCenter;
             this.preserveBaseActionNamesCheckBox.UseVisualStyleBackColor = false;
             this.preserveBaseActionNamesCheckBox.CheckedChanged += new System.EventHandler(this.preserveBaseLanguageOptionCheckBox_CheckedChanged);
             //
             // preserveBaseCommonPhrasesCheckBox
             //
-            this.preserveBaseCommonPhrasesCheckBox.AutoSize = true;
-            this.preserveBaseCommonPhrasesCheckBox.BackColor = System.Drawing.Color.Transparent;
+            this.preserveBaseCommonPhrasesCheckBox.Appearance = System.Windows.Forms.Appearance.Button;
+            this.preserveBaseCommonPhrasesCheckBox.BackColor = System.Drawing.Color.FromArgb(((int)(((byte)(38)))), ((int)(((byte)(47)))), ((int)(((byte)(58)))));
+            this.preserveBaseCommonPhrasesCheckBox.FlatAppearance.BorderColor = System.Drawing.Color.FromArgb(((int)(((byte)(86)))), ((int)(((byte)(104)))), ((int)(((byte)(122)))));
+            this.preserveBaseCommonPhrasesCheckBox.FlatAppearance.CheckedBackColor = System.Drawing.Color.FromArgb(((int)(((byte)(34)))), ((int)(((byte)(126)))), ((int)(((byte)(188)))));
+            this.preserveBaseCommonPhrasesCheckBox.FlatAppearance.MouseDownBackColor = System.Drawing.Color.FromArgb(((int)(((byte)(29)))), ((int)(((byte)(122)))), ((int)(((byte)(184)))));
+            this.preserveBaseCommonPhrasesCheckBox.FlatAppearance.MouseOverBackColor = System.Drawing.Color.FromArgb(((int)(((byte)(50)))), ((int)(((byte)(61)))), ((int)(((byte)(74)))));
+            this.preserveBaseCommonPhrasesCheckBox.FlatStyle = System.Windows.Forms.FlatStyle.Flat;
             this.preserveBaseCommonPhrasesCheckBox.Location = new System.Drawing.Point(408, 354);
             this.preserveBaseCommonPhrasesCheckBox.Name = "preserveBaseCommonPhrasesCheckBox";
-            this.preserveBaseCommonPhrasesCheckBox.Size = new System.Drawing.Size(150, 19);
+            this.preserveBaseCommonPhrasesCheckBox.Size = new System.Drawing.Size(128, 30);
             this.preserveBaseCommonPhrasesCheckBox.TabIndex = 0;
             this.preserveBaseCommonPhrasesCheckBox.TabStop = false;
-            this.preserveBaseCommonPhrasesCheckBox.Text = "\uC0C1\uC6A9\uAD6C \uC6D0\uBB38 \uC720\uC9C0";
+            this.preserveBaseCommonPhrasesCheckBox.Text = "\uC0C1\uC6A9\uAD6C";
+            this.preserveBaseCommonPhrasesCheckBox.TextAlign = System.Drawing.ContentAlignment.MiddleCenter;
             this.preserveBaseCommonPhrasesCheckBox.UseVisualStyleBackColor = false;
             this.preserveBaseCommonPhrasesCheckBox.CheckedChanged += new System.EventHandler(this.preserveBaseLanguageOptionCheckBox_CheckedChanged);
             // 

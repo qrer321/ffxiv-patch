@@ -326,6 +326,7 @@ namespace FFXIVKoreanPatch.Main
             DrawSurface(e.Graphics, new Rectangle(24, 240, 852, 330));
             DrawSurface(e.Graphics, new Rectangle(24, 586, 852, 104));
             DrawSurface(e.Graphics, new Rectangle(24, 706, 852, 112));
+            DrawOptionStrip(e.Graphics, new Rectangle(42, 476, 816, 44));
 
             using (SolidBrush accent = new SolidBrush(Color.FromArgb(76, 169, 232)))
             {
@@ -335,6 +336,17 @@ namespace FFXIVKoreanPatch.Main
             }
 
             DrawModeBadge(e.Graphics);
+        }
+
+        private void DrawOptionStrip(Graphics graphics, Rectangle bounds)
+        {
+            using (SolidBrush fill = new SolidBrush(Color.FromArgb(104, 31, 37, 45)))
+            using (Pen line = new Pen(Color.FromArgb(54, 84, 100, 118)))
+            {
+                graphics.FillRectangle(fill, bounds);
+                graphics.DrawLine(line, bounds.Left, bounds.Top, bounds.Right, bounds.Top);
+                graphics.DrawLine(line, bounds.Left, bounds.Bottom, bounds.Right, bounds.Bottom);
+            }
         }
 
         private void DrawSurface(Graphics graphics, Rectangle bounds)
@@ -425,11 +437,19 @@ namespace FFXIVKoreanPatch.Main
 
         private void StyleCheckBox(CheckBox checkBox)
         {
-            checkBox.BackColor = Color.Transparent;
-            checkBox.ForeColor = Color.FromArgb(220, 227, 236);
+            checkBox.Appearance = Appearance.Button;
+            checkBox.AutoSize = false;
+            checkBox.BackColor = Color.FromArgb(38, 47, 58);
+            checkBox.ForeColor = Color.FromArgb(230, 236, 244);
             checkBox.Font = new Font("맑은 고딕", 8.5F, FontStyle.Bold, GraphicsUnit.Point, 129);
             checkBox.Cursor = Cursors.Hand;
             checkBox.FlatStyle = FlatStyle.Flat;
+            checkBox.TextAlign = ContentAlignment.MiddleCenter;
+            checkBox.FlatAppearance.BorderSize = 1;
+            checkBox.FlatAppearance.BorderColor = Color.FromArgb(86, 104, 122);
+            checkBox.FlatAppearance.MouseOverBackColor = Color.FromArgb(50, 61, 74);
+            checkBox.FlatAppearance.MouseDownBackColor = Color.FromArgb(29, 122, 184);
+            checkBox.FlatAppearance.CheckedBackColor = Color.FromArgb(34, 126, 188);
         }
 
         private void StyleButton(Button button, Color backColor, Color borderColor, Color hoverColor)
@@ -496,6 +516,7 @@ namespace FFXIVKoreanPatch.Main
             CreateLayoutLabel("pathsSectionLabel", "클라이언트", 54, 254, 180, 24, sectionFont, Color.FromArgb(236, 241, 247));
             CreateLayoutLabel("actionsSectionLabel", "패치 작업", 54, 596, 180, 24, sectionFont, Color.FromArgb(236, 241, 247));
             CreateLayoutLabel("statusSectionLabel", "상태", 54, 716, 180, 24, sectionFont, Color.FromArgb(236, 241, 247));
+            CreateLayoutLabel("baseLanguageOptionsLabel", "원문 유지", 58, 486, 92, 20, smallFont, Color.FromArgb(198, 205, 214));
 
             StyleFieldLabel(globalPathLabel);
             StyleFieldLabel(koreaPathLabel);
@@ -561,9 +582,9 @@ namespace FFXIVKoreanPatch.Main
             PlaceControl(resetPathsButton, 500, 441, 132, 32);
             PlaceControl(debugFontProfileLabel, 646, 418, 212, 20);
             PlaceControl(debugFontProfileComboBox, 646, 442, 212, 30);
-            PlaceControl(preserveBaseBnpcNamesCheckBox, 42, 478, 250, 28);
-            PlaceControl(preserveBaseActionNamesCheckBox, 318, 478, 230, 28);
-            PlaceControl(preserveBaseCommonPhrasesCheckBox, 594, 478, 264, 28);
+            PlaceControl(preserveBaseBnpcNamesCheckBox, 166, 483, 128, 30);
+            PlaceControl(preserveBaseActionNamesCheckBox, 306, 483, 128, 30);
+            PlaceControl(preserveBaseCommonPhrasesCheckBox, 446, 483, 128, 30);
 
             PlaceControl(openReleaseButton, 42, 526, 194, 32);
             PlaceControl(openLogsButton, 248, 526, 184, 32);
