@@ -1003,10 +1003,45 @@ namespace FFXIVKoreanPatch.Main
         // Return the directory back if valid, else return null.
         private string CheckTargetDir(string targetDir)
         {
-            if (!Directory.Exists(targetDir)) return null;
-            if (!requiredFiles.All(requiredFile => File.Exists(Path.Combine(targetDir, requiredFile)))) return null;
+            string checkedDir;
+            string failureReason;
+            return TryCheckTargetDir(targetDir, out checkedDir, out failureReason) ? checkedDir : null;
+        }
 
-            return targetDir;
+        private bool TryCheckTargetDir(string targetDir, out string checkedDir, out string failureReason)
+        {
+            checkedDir = null;
+            failureReason = null;
+
+            if (string.IsNullOrWhiteSpace(targetDir))
+            {
+                failureReason = "empty path";
+                return false;
+            }
+
+            if (!Directory.Exists(targetDir))
+            {
+                failureReason = "directory not found";
+                return false;
+            }
+
+            string[] missingFiles = requiredFiles
+                .Where(requiredFile => !File.Exists(Path.Combine(targetDir, requiredFile)))
+                .ToArray();
+            if (missingFiles.Length > 0)
+            {
+                string shownFiles = string.Join(", ", missingFiles.Take(6));
+                if (missingFiles.Length > 6)
+                {
+                    shownFiles += ", ...";
+                }
+
+                failureReason = "missing required files: " + shownFiles;
+                return false;
+            }
+
+            checkedDir = targetDir;
+            return true;
         }
 
         private bool HasValidGlobalClient()
@@ -1073,8 +1108,9 @@ namespace FFXIVKoreanPatch.Main
         {
             foreach (string candidateDir in GetCandidateTargetDirs(rawPath))
             {
-                string checkedDir = CheckTargetDir(candidateDir);
-                if (!string.IsNullOrEmpty(checkedDir))
+                string checkedDir;
+                string failureReason;
+                if (TryCheckTargetDir(candidateDir, out checkedDir, out failureReason))
                 {
                     targetDir = checkedDir;
                     return true;
@@ -1088,8 +1124,9 @@ namespace FFXIVKoreanPatch.Main
         {
             foreach (string candidateDir in GetCandidateTargetDirs(rawPath))
             {
-                string checkedDir = CheckTargetDir(candidateDir);
-                if (!string.IsNullOrEmpty(checkedDir))
+                string checkedDir;
+                string failureReason;
+                if (TryCheckTargetDir(candidateDir, out checkedDir, out failureReason))
                 {
                     koreaSourceDir = checkedDir;
                     return true;
@@ -4119,8 +4156,10 @@ namespace FFXIVKoreanPatch.Main
             }
         }
 
-        private string SelectGameDirectory(string title)
+        private string SelectGameDirectory(string title, out string failureReason)
         {
+            failureReason = null;
+
             using (OpenFileDialog dialog = new OpenFileDialog())
             {
                 dialog.CheckFileExists = true;
@@ -4135,16 +4174,54 @@ namespace FFXIVKoreanPatch.Main
                     return null;
                 }
 
-                return CheckTargetDir(Path.GetFullPath(Path.GetDirectoryName(dialog.FileName)));
+                List<string> failedCandidates = new List<string>();
+                foreach (string candidateDir in GetCandidateTargetDirs(dialog.FileName).Distinct(StringComparer.OrdinalIgnoreCase))
+                {
+                    string checkedDir;
+                    string candidateFailureReason;
+                    if (TryCheckTargetDir(candidateDir, out checkedDir, out candidateFailureReason))
+                    {
+                        return checkedDir;
+                    }
+
+                    failedCandidates.Add(candidateDir + " - " + candidateFailureReason);
+                }
+
+                failureReason =
+                    "Selected file: " + dialog.FileName + Environment.NewLine +
+                    "Checked candidates:" + Environment.NewLine +
+                    string.Join(Environment.NewLine, failedCandidates.Take(6));
+                return null;
             }
+        }
+
+        private string WriteManualPathSelectionFailureLog(string operation, string failureReason)
+        {
+            List<string> lines = new List<string>();
+            lines.Add("Manual client path selection failed.");
+            if (!string.IsNullOrEmpty(failureReason))
+            {
+                lines.Add(failureReason);
+            }
+
+            return WriteOperationLog(operation, lines);
         }
 
         private void globalPathBrowseButton_Click(object sender, EventArgs e)
         {
-            string selectedDir = SelectGameDirectory("글로벌 서버 클라이언트 ffxiv_dx11.exe 파일을 선택해주세요...");
+            string failureReason;
+            string selectedDir = SelectGameDirectory("글로벌 서버 클라이언트 ffxiv_dx11.exe 파일을 선택해주세요...", out failureReason);
             if (string.IsNullOrEmpty(selectedDir))
             {
-                MessageBox.Show("선택된 글로벌 서버 클라이언트 경로가 올바르지 않아요.", Text, MessageBoxButtons.OK, MessageBoxIcon.Error);
+                string logPath = WriteManualPathSelectionFailureLog("manual-global-path-select-error", failureReason);
+                string message = "선택된 글로벌 서버 클라이언트 경로가 올바르지 않아요.";
+                if (!string.IsNullOrEmpty(failureReason))
+                {
+                    message += Environment.NewLine + Environment.NewLine + failureReason;
+                }
+
+                message += Environment.NewLine + Environment.NewLine + "로그: " + logPath;
+                MessageBox.Show(message, Text, MessageBoxButtons.OK, MessageBoxIcon.Error);
                 return;
             }
 
@@ -4160,10 +4237,19 @@ namespace FFXIVKoreanPatch.Main
 
         private void koreaPathBrowseButton_Click(object sender, EventArgs e)
         {
-            string selectedDir = SelectGameDirectory("한국 서버 클라이언트 ffxiv_dx11.exe 파일을 선택해주세요...");
+            string failureReason;
+            string selectedDir = SelectGameDirectory("한국 서버 클라이언트 ffxiv_dx11.exe 파일을 선택해주세요...", out failureReason);
             if (string.IsNullOrEmpty(selectedDir))
             {
-                MessageBox.Show("선택된 한국 서버 클라이언트 경로가 올바르지 않아요.", Text, MessageBoxButtons.OK, MessageBoxIcon.Error);
+                string logPath = WriteManualPathSelectionFailureLog("manual-korea-path-select-error", failureReason);
+                string message = "선택된 한국 서버 클라이언트 경로가 올바르지 않아요.";
+                if (!string.IsNullOrEmpty(failureReason))
+                {
+                    message += Environment.NewLine + Environment.NewLine + failureReason;
+                }
+
+                message += Environment.NewLine + Environment.NewLine + "로그: " + logPath;
+                MessageBox.Show(message, Text, MessageBoxButtons.OK, MessageBoxIcon.Error);
                 return;
             }
 
