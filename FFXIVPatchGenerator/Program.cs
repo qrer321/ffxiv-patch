@@ -110,6 +110,12 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
             Console.WriteLine("  --policy           Optional JSON patch policy file.");
             Console.WriteLine("  --anonymize-quest-chat-phrases");
             Console.WriteLine("                     Disabled/no-op until quest say sheet coverage is complete.");
+            Console.WriteLine("  --preserve-base-bnpc-names");
+            Console.WriteLine("                     Keep BNpcName name columns in the base client language.");
+            Console.WriteLine("  --preserve-base-action-names");
+            Console.WriteLine("                     Keep action/skill name columns in the base client language.");
+            Console.WriteLine("  --preserve-base-language-groups <csv>");
+            Console.WriteLine("                     Keep named text groups in the base client language. Example: battle-npc,actions");
             Console.WriteLine("  --diagnostic-csv   Export row/column comparison CSV for a sheet.");
             Console.WriteLine("  --base-index       Clean global 0a0000.win32.index to use instead of installed index.");
             Console.WriteLine("  --base-index2      Clean global 0a0000.win32.index2 to use instead of installed index2.");
@@ -232,6 +238,7 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
         public bool AllowVersionMismatch;
         public bool SkipUiTextureFix;
         public bool IncludeCommandSheets = true;
+        public readonly HashSet<string> PreserveBaseLanguageGroups = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         public bool AnonymizeQuestChatPhrasesRequested;
         public bool AnonymizeQuestChatPhrases
         {
@@ -283,6 +290,33 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
                 if (string.Equals(arg, "--anonymize-quest-chat-phrases", StringComparison.OrdinalIgnoreCase))
                 {
                     options.AnonymizeQuestChatPhrasesRequested = true;
+                    continue;
+                }
+
+                if (string.Equals(arg, "--preserve-base-language-names", StringComparison.OrdinalIgnoreCase))
+                {
+                    options.AddBaseLanguageGroup("bnpcname");
+                    options.AddBaseLanguageGroup("actions");
+                    continue;
+                }
+
+                if (string.Equals(arg, "--translate-boss-action-names", StringComparison.OrdinalIgnoreCase) ||
+                    string.Equals(arg, "--no-preserve-base-language-names", StringComparison.OrdinalIgnoreCase))
+                {
+                    options.PreserveBaseLanguageGroups.Clear();
+                    continue;
+                }
+
+                if (string.Equals(arg, "--preserve-base-bnpc-names", StringComparison.OrdinalIgnoreCase) ||
+                    string.Equals(arg, "--preserve-base-boss-names", StringComparison.OrdinalIgnoreCase))
+                {
+                    options.AddBaseLanguageGroup("bnpcname");
+                    continue;
+                }
+
+                if (string.Equals(arg, "--preserve-base-action-names", StringComparison.OrdinalIgnoreCase))
+                {
+                    options.AddBaseLanguageGroup("actions");
                     continue;
                 }
 
@@ -378,6 +412,11 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
                 options.FontPatchProfile = FontPatchProfiles.Normalize(value.Trim('"'));
             }
 
+            if (values.TryGetValue("--preserve-base-language-groups", out value))
+            {
+                options.AddBaseLanguageGroups(value);
+            }
+
             if (LanguageCodes.ToId(options.TargetLanguage) == 0)
             {
                 throw new ArgumentException("Unsupported target language: " + options.TargetLanguage);
@@ -389,6 +428,31 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
             }
 
             return options;
+        }
+
+        private void AddBaseLanguageGroups(string value)
+        {
+            if (string.IsNullOrWhiteSpace(value))
+            {
+                return;
+            }
+
+            string[] parts = value.Split(new char[] { ',', ';' }, StringSplitOptions.RemoveEmptyEntries);
+            for (int i = 0; i < parts.Length; i++)
+            {
+                AddBaseLanguageGroup(parts[i]);
+            }
+        }
+
+        private void AddBaseLanguageGroup(string value)
+        {
+            string normalized = PatchPolicy.NormalizeBaseLanguageGroupId(value);
+            if (string.IsNullOrEmpty(normalized))
+            {
+                throw new ArgumentException("Unsupported base language group: " + value);
+            }
+
+            PreserveBaseLanguageGroups.Add(normalized);
         }
 
         private static string GetRequired(Dictionary<string, string> values, string key)

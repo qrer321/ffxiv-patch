@@ -141,6 +141,9 @@ namespace FFXIVKoreanPatch.Main
         // Global EXD language suffix to rewrite. Default is ja because the primary target is Japanese client.
         private string targetLanguageCode = "ja";
         private string targetLanguageDisplayName = "일본어";
+        private bool preserveBaseBnpcNames;
+        private bool preserveBaseActionNames;
+        private bool suppressBaseLanguageOptionSave;
 
         // Output directory used when generating release files locally.
         private string releaseOutputDir = string.Empty;
@@ -178,6 +181,7 @@ namespace FFXIVKoreanPatch.Main
             targetLanguageComboBox.Items.Add("일본어 클라이언트 (ja)");
             targetLanguageComboBox.Items.Add("영어 클라이언트 (en)");
             targetLanguageComboBox.SelectedIndex = 0;
+            LoadBaseLanguageNameOptionSettings();
             InitializeDebugFontProfileControls();
 
 #if TEST_BUILD
@@ -318,15 +322,15 @@ namespace FFXIVKoreanPatch.Main
                 e.Graphics.FillRectangle(brush, 0, 0, ClientSize.Width, 280);
             }
 
-            DrawSurface(e.Graphics, new Rectangle(24, 240, 852, 285));
-            DrawSurface(e.Graphics, new Rectangle(24, 542, 852, 104));
-            DrawSurface(e.Graphics, new Rectangle(24, 662, 852, 112));
+            DrawSurface(e.Graphics, new Rectangle(24, 240, 852, 330));
+            DrawSurface(e.Graphics, new Rectangle(24, 586, 852, 104));
+            DrawSurface(e.Graphics, new Rectangle(24, 706, 852, 112));
 
             using (SolidBrush accent = new SolidBrush(Color.FromArgb(76, 169, 232)))
             {
                 e.Graphics.FillRectangle(accent, 42, 255, 4, 22);
-                e.Graphics.FillRectangle(accent, 42, 557, 4, 22);
-                e.Graphics.FillRectangle(accent, 42, 677, 4, 22);
+                e.Graphics.FillRectangle(accent, 42, 597, 4, 22);
+                e.Graphics.FillRectangle(accent, 42, 717, 4, 22);
             }
 
             DrawModeBadge(e.Graphics);
@@ -457,7 +461,7 @@ namespace FFXIVKoreanPatch.Main
         {
             SuspendLayout();
 
-            ClientSize = new Size(900, 790);
+            ClientSize = new Size(900, 830);
             BackColor = Color.FromArgb(18, 21, 26);
             ForeColor = Color.FromArgb(240, 243, 247);
             Font = new Font("맑은 고딕", 9F, FontStyle.Regular, GraphicsUnit.Point, 129);
@@ -489,8 +493,8 @@ namespace FFXIVKoreanPatch.Main
 #endif
                 );
             CreateLayoutLabel("pathsSectionLabel", "클라이언트", 54, 254, 180, 24, sectionFont, Color.FromArgb(236, 241, 247));
-            CreateLayoutLabel("actionsSectionLabel", "패치 작업", 54, 556, 180, 24, sectionFont, Color.FromArgb(236, 241, 247));
-            CreateLayoutLabel("statusSectionLabel", "상태", 54, 676, 180, 24, sectionFont, Color.FromArgb(236, 241, 247));
+            CreateLayoutLabel("actionsSectionLabel", "패치 작업", 54, 596, 180, 24, sectionFont, Color.FromArgb(236, 241, 247));
+            CreateLayoutLabel("statusSectionLabel", "상태", 54, 716, 180, 24, sectionFont, Color.FromArgb(236, 241, 247));
 
             StyleFieldLabel(globalPathLabel);
             StyleFieldLabel(koreaPathLabel);
@@ -500,6 +504,8 @@ namespace FFXIVKoreanPatch.Main
             StyleTextBox(koreaPathTextBox);
             StyleComboBox(targetLanguageComboBox);
             StyleComboBox(debugFontProfileComboBox);
+            StyleCheckBox(preserveBaseBnpcNamesCheckBox);
+            StyleCheckBox(preserveBaseActionNamesCheckBox);
 
             Color neutral = Color.FromArgb(42, 50, 61);
             Color neutralBorder = Color.FromArgb(82, 96, 112);
@@ -553,20 +559,22 @@ namespace FFXIVKoreanPatch.Main
             PlaceControl(resetPathsButton, 500, 441, 132, 32);
             PlaceControl(debugFontProfileLabel, 646, 418, 212, 20);
             PlaceControl(debugFontProfileComboBox, 646, 442, 212, 30);
+            PlaceControl(preserveBaseBnpcNamesCheckBox, 42, 478, 270, 28);
+            PlaceControl(preserveBaseActionNamesCheckBox, 318, 478, 270, 28);
 
-            PlaceControl(openReleaseButton, 42, 484, 194, 32);
-            PlaceControl(openLogsButton, 248, 484, 184, 32);
-            PlaceControl(cleanupButton, 444, 484, 190, 32);
-            PlaceControl(restoreBackupButton, 646, 484, 212, 32);
+            PlaceControl(openReleaseButton, 42, 526, 194, 32);
+            PlaceControl(openLogsButton, 248, 526, 184, 32);
+            PlaceControl(cleanupButton, 444, 526, 190, 32);
+            PlaceControl(restoreBackupButton, 646, 526, 212, 32);
 
 #if TEST_BUILD
-            PlaceControl(preflightCheckButton, 42, 590, 404, 42);
-            PlaceControl(debugBuildReleaseButton, 458, 590, 400, 42);
+            PlaceControl(preflightCheckButton, 42, 630, 404, 42);
+            PlaceControl(debugBuildReleaseButton, 458, 630, 400, 42);
 #else
-            PlaceControl(preflightCheckButton, 42, 590, 238, 42);
-            PlaceControl(installButton, 294, 590, 178, 42);
-            PlaceControl(chatOnlyInstallButton, 486, 590, 178, 42);
-            PlaceControl(removeButton, 678, 590, 180, 42);
+            PlaceControl(preflightCheckButton, 42, 630, 238, 42);
+            PlaceControl(installButton, 294, 630, 178, 42);
+            PlaceControl(chatOnlyInstallButton, 486, 630, 178, 42);
+            PlaceControl(removeButton, 678, 630, 180, 42);
 #endif
 
             statusLabel.AutoSize = false;
@@ -576,7 +584,7 @@ namespace FFXIVKoreanPatch.Main
             statusLabel.ForeColor = Color.White;
             statusLabel.Padding = new Padding(12, 0, 12, 0);
             statusLabel.TextAlign = ContentAlignment.MiddleLeft;
-            PlaceControl(statusLabel, 42, 706, 816, 34);
+            PlaceControl(statusLabel, 42, 746, 816, 34);
 
             downloadLabel.AutoSize = false;
             downloadLabel.Dock = DockStyle.None;
@@ -584,10 +592,10 @@ namespace FFXIVKoreanPatch.Main
             downloadLabel.ForeColor = Color.FromArgb(198, 205, 214);
             downloadLabel.Padding = new Padding(0);
             downloadLabel.TextAlign = ContentAlignment.MiddleLeft;
-            PlaceControl(downloadLabel, 42, 741, 816, 18);
+            PlaceControl(downloadLabel, 42, 781, 816, 18);
 
             progressBar.Dock = DockStyle.None;
-            PlaceControl(progressBar, 42, 764, 816, 8);
+            PlaceControl(progressBar, 42, 804, 816, 8);
 
             ResumeLayout(false);
         }
@@ -938,6 +946,8 @@ namespace FFXIVKoreanPatch.Main
                 globalPathBrowseButton.Enabled = enabled;
                 koreaPathBrowseButton.Enabled = enabled;
                 targetLanguageComboBox.Enabled = enabled;
+                preserveBaseBnpcNamesCheckBox.Enabled = enabled;
+                preserveBaseActionNamesCheckBox.Enabled = enabled;
                 debugFontProfileComboBox.Enabled = enabled;
                 detectPathsButton.Enabled = enabled;
                 resetPathsButton.Enabled = enabled;
@@ -1277,6 +1287,8 @@ namespace FFXIVKoreanPatch.Main
                 globalPathBrowseButton.Enabled = enabled;
                 koreaPathBrowseButton.Enabled = enabled;
                 targetLanguageComboBox.Enabled = enabled;
+                preserveBaseBnpcNamesCheckBox.Enabled = enabled;
+                preserveBaseActionNamesCheckBox.Enabled = enabled;
                 detectPathsButton.Enabled = enabled;
                 resetPathsButton.Enabled = enabled;
                 openReleaseButton.Enabled = enabled;
@@ -1389,6 +1401,78 @@ namespace FFXIVKoreanPatch.Main
             string childDir = Path.Combine(GetRuntimeDataRootDir(), childName);
             Directory.CreateDirectory(childDir);
             return childDir;
+        }
+
+        private string GetPatchOptionSettingsPath()
+        {
+            return Path.Combine(GetRuntimeDataRootDir(), "patch-options.txt");
+        }
+
+        private void LoadBaseLanguageNameOptionSettings()
+        {
+            bool bnpc = false;
+            bool actions = false;
+            string path = GetPatchOptionSettingsPath();
+            if (File.Exists(path))
+            {
+                foreach (string line in File.ReadAllLines(path))
+                {
+                    string trimmed = (line ?? string.Empty).Trim();
+                    if (trimmed.Length == 0 || trimmed.StartsWith("#", StringComparison.Ordinal))
+                    {
+                        continue;
+                    }
+
+                    int equals = trimmed.IndexOf('=');
+                    if (equals <= 0)
+                    {
+                        continue;
+                    }
+
+                    string key = trimmed.Substring(0, equals).Trim();
+                    string value = trimmed.Substring(equals + 1).Trim();
+                    bool enabled = string.Equals(value, "true", StringComparison.OrdinalIgnoreCase) ||
+                                   string.Equals(value, "1", StringComparison.OrdinalIgnoreCase) ||
+                                   string.Equals(value, "yes", StringComparison.OrdinalIgnoreCase);
+                    if (string.Equals(key, "preserveBaseBnpcNames", StringComparison.OrdinalIgnoreCase))
+                    {
+                        bnpc = enabled;
+                    }
+                    else if (string.Equals(key, "preserveBaseActionNames", StringComparison.OrdinalIgnoreCase))
+                    {
+                        actions = enabled;
+                    }
+                }
+            }
+
+            suppressBaseLanguageOptionSave = true;
+            preserveBaseBnpcNamesCheckBox.Checked = bnpc;
+            preserveBaseActionNamesCheckBox.Checked = actions;
+            suppressBaseLanguageOptionSave = false;
+            SyncBaseLanguageNameOptionsFromUi();
+        }
+
+        private void SaveBaseLanguageNameOptionSettings()
+        {
+            string path = GetPatchOptionSettingsPath();
+            string[] lines = new string[]
+            {
+                "preserveBaseBnpcNames=" + (preserveBaseBnpcNames ? "true" : "false"),
+                "preserveBaseActionNames=" + (preserveBaseActionNames ? "true" : "false")
+            };
+            File.WriteAllLines(path, lines, Encoding.UTF8);
+        }
+
+        private void SyncBaseLanguageNameOptionsFromUi()
+        {
+            preserveBaseBnpcNames = preserveBaseBnpcNamesCheckBox != null && preserveBaseBnpcNamesCheckBox.Checked;
+            preserveBaseActionNames = preserveBaseActionNamesCheckBox != null && preserveBaseActionNamesCheckBox.Checked;
+        }
+
+        private string FormatBaseLanguageNameOptionSummary()
+        {
+            return "BNpcName=" + (preserveBaseBnpcNames ? "preserve" : "korean") +
+                   ", Actions=" + (preserveBaseActionNames ? "preserve" : "korean");
         }
 
         private string GetEmbeddedToolDir()
@@ -2595,6 +2679,7 @@ namespace FFXIVKoreanPatch.Main
                 );
             output.Add("Time Local: " + DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss"));
             output.Add("Target Language: " + targetLanguageDisplayName + " (" + targetLanguageCode + ")");
+            output.Add("Base Language Name Options: " + FormatBaseLanguageNameOptionSummary());
             output.Add("Global Game: " + (string.IsNullOrEmpty(targetDir) ? "(unset)" : targetDir));
             output.Add("Korean Game: " + (string.IsNullOrEmpty(koreaSourceDir) ? "(unset)" : koreaSourceDir));
             output.Add("Global Version: " + (string.IsNullOrEmpty(targetVersion) ? "(unknown)" : targetVersion));
@@ -2697,6 +2782,8 @@ namespace FFXIVKoreanPatch.Main
             AppendJsonString(sb, "releaseOutputDir", outputDir);
             AppendJsonString(sb, "applyGameDir", applyGameDir);
             AppendJsonString(sb, "backupDir", backupDir);
+            sb.AppendLine("  \"preserveBaseBnpcNames\": " + (preserveBaseBnpcNames ? "true" : "false") + ",");
+            sb.AppendLine("  \"preserveBaseActionNames\": " + (preserveBaseActionNames ? "true" : "false") + ",");
             sb.AppendLine("  \"debugApply\": " + (debugApply ? "true" : "false") + ",");
             sb.AppendLine("  \"files\": [");
 
@@ -3534,6 +3621,7 @@ namespace FFXIVKoreanPatch.Main
                 lines.Add("[OK] 현재 실행 파일은 릴리즈 빌드입니다. 실제 적용 버튼은 글로벌 서버 클라이언트 폴더를 변경합니다.");
 #endif
                 lines.Add("[OK] 베이스 클라이언트 언어: " + targetLanguageDisplayName + " (" + targetLanguageCode + ")");
+                lines.Add("[OK] Base language name options: " + FormatBaseLanguageNameOptionSummary());
 
                 string globalVersion = string.Empty;
                 string koreaVersion = string.Empty;
@@ -4075,6 +4163,20 @@ namespace FFXIVKoreanPatch.Main
             }
         }
 
+        private void preserveBaseLanguageOptionCheckBox_CheckedChanged(object sender, EventArgs e)
+        {
+            SyncBaseLanguageNameOptionsFromUi();
+            if (!suppressBaseLanguageOptionSave)
+            {
+                SaveBaseLanguageNameOptionSettings();
+            }
+
+            if (!suppressBaseLanguageOptionSave && statusLabel != null && statusLabel.IsHandleCreated)
+            {
+                UpdateStatusLabel("원문 유지 옵션: " + FormatBaseLanguageNameOptionSummary());
+            }
+        }
+
         private void detectPathsButton_Click(object sender, EventArgs e)
         {
             targetDir = string.Empty;
@@ -4450,6 +4552,16 @@ namespace FFXIVKoreanPatch.Main
                     arguments += " --include-font";
                 }
 
+                if (buildTextPatch && preserveBaseBnpcNames)
+                {
+                    arguments += " --preserve-base-bnpc-names";
+                }
+
+                if (buildTextPatch && preserveBaseActionNames)
+                {
+                    arguments += " --preserve-base-action-names";
+                }
+
                 if (!buildTextPatch && buildFontPatch)
                 {
                     arguments += " --font-only";
@@ -4458,6 +4570,8 @@ namespace FFXIVKoreanPatch.Main
                 {
                     logLines.Add("Say quest chat phrase anonymization: disabled (sheet coverage incomplete)");
                 }
+
+                logLines.Add("Base language name options: " + FormatBaseLanguageNameOptionSummary());
 
                 string patchPolicyPath = FindPatchPolicyPath(patchGeneratorPath);
                 if (!string.IsNullOrEmpty(patchPolicyPath))
@@ -4604,6 +4718,7 @@ namespace FFXIVKoreanPatch.Main
                 List<KeyValuePair<string, string>> resultDetails = new List<KeyValuePair<string, string>>();
                 resultDetails.Add(new KeyValuePair<string, string>("작업", operationName));
                 resultDetails.Add(new KeyValuePair<string, string>("베이스 언어", targetLanguageDisplayName + " (" + targetLanguageCode + ")"));
+                resultDetails.Add(new KeyValuePair<string, string>("원문 유지 옵션", FormatBaseLanguageNameOptionSummary()));
                 resultDetails.Add(new KeyValuePair<string, string>("생성 폴더", releaseOutputDir));
                 resultDetails.Add(new KeyValuePair<string, string>("적용 위치", applyGameDir));
                 resultDetails.Add(new KeyValuePair<string, string>("Manifest", manifestPath));

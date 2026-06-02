@@ -55,16 +55,21 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
         private const uint LobbyDataCenterConnectingRow = 808;
         private static readonly uint[] GlobalDataCenterTravelAddonRows = new uint[] { 12514, 12525 };
         private const ushort NameColumnOffset = 0;
-        private static readonly string[] BaseLanguageNameColumnSheets = new string[]
+        private static readonly string[] BaseLanguageBossNameColumnSheets = new string[]
+        {
+            "BNpcName"
+        };
+        private static readonly string[] BaseLanguageActionNameColumnSheets = new string[]
         {
             "Action",
             "BuddyAction",
             "CraftAction",
             "EventAction",
             "GeneralAction",
-            "PetAction",
-            "BNpcName"
+            "PetAction"
         };
+        private const string BaseLanguageGroupBnpcName = "bnpcname";
+        private const string BaseLanguageGroupActions = "actions";
 
         private readonly HashSet<string> _deleteFiles = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         private readonly Dictionary<string, PatchSheetPolicy> _sheets = new Dictionary<string, PatchSheetPolicy>(StringComparer.OrdinalIgnoreCase);
@@ -72,7 +77,12 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
 
         public static PatchPolicy Load(string policyPath)
         {
-            PatchPolicy policy = CreateBuiltInDefault();
+            return Load(policyPath, null);
+        }
+
+        public static PatchPolicy Load(string policyPath, IEnumerable<string> preserveBaseLanguageGroups)
+        {
+            PatchPolicy policy = CreateBuiltInDefault(preserveBaseLanguageGroups);
             if (string.IsNullOrWhiteSpace(policyPath))
             {
                 return policy;
@@ -107,7 +117,7 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
             return policy;
         }
 
-        private static PatchPolicy CreateBuiltInDefault()
+        private static PatchPolicy CreateBuiltInDefault(IEnumerable<string> preserveBaseLanguageGroups)
         {
             PatchPolicy policy = new PatchPolicy();
             PatchSheetPolicy addonPolicy = policy.GetOrCreateSheetPolicy("Addon");
@@ -118,7 +128,15 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
             PatchSheetPolicy worldPhysicalDcPolicy = policy.GetOrCreateSheetPolicy("WorldPhysicalDC");
             PatchSheetPolicy worldRegionGroupPolicy = policy.GetOrCreateSheetPolicy("WorldRegionGroup");
 
-            ApplyBaseLanguageNameColumns(policy);
+            if (HasBaseLanguageGroup(preserveBaseLanguageGroups, BaseLanguageGroupBnpcName))
+            {
+                ApplyBaseLanguageNameColumns(policy, BaseLanguageBossNameColumnSheets);
+            }
+
+            if (HasBaseLanguageGroup(preserveBaseLanguageGroups, BaseLanguageGroupActions))
+            {
+                ApplyBaseLanguageNameColumns(policy, BaseLanguageActionNameColumnSheets);
+            }
 
             // Global Addon rows 44/45/49 are compact h/m/s time-unit labels.
             // Korean "시간/분/초" overflows narrow global UI slots such as icon timers.
@@ -230,11 +248,60 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
             return policy;
         }
 
-        private static void ApplyBaseLanguageNameColumns(PatchPolicy policy)
+        public static string NormalizeBaseLanguageGroupId(string value)
         {
-            for (int i = 0; i < BaseLanguageNameColumnSheets.Length; i++)
+            string normalized = (value ?? string.Empty).Trim().ToLowerInvariant();
+            switch (normalized)
             {
-                policy.GetOrCreateSheetPolicy(BaseLanguageNameColumnSheets[i]).PreserveGlobalColumn(NameColumnOffset);
+                case "bnpc":
+                case "bnpcname":
+                case "battle-npc":
+                case "battle-npc-name":
+                case "battle-npc-names":
+                case "boss":
+                case "bosses":
+                case "boss-name":
+                case "boss-names":
+                    return BaseLanguageGroupBnpcName;
+
+                case "action":
+                case "actions":
+                case "action-name":
+                case "action-names":
+                case "skill":
+                case "skills":
+                case "skill-name":
+                case "skill-names":
+                    return BaseLanguageGroupActions;
+
+                default:
+                    return null;
+            }
+        }
+
+        private static bool HasBaseLanguageGroup(IEnumerable<string> groupIds, string expected)
+        {
+            if (groupIds == null)
+            {
+                return false;
+            }
+
+            foreach (string groupId in groupIds)
+            {
+                if (string.Equals(NormalizeBaseLanguageGroupId(groupId), expected, StringComparison.OrdinalIgnoreCase))
+                {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
+        private static void ApplyBaseLanguageNameColumns(PatchPolicy policy, string[] sheetNames)
+        {
+            for (int i = 0; i < sheetNames.Length; i++)
+            {
+                policy.GetOrCreateSheetPolicy(sheetNames[i]).PreserveGlobalColumn(NameColumnOffset);
             }
         }
 

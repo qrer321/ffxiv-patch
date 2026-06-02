@@ -248,7 +248,9 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
             EnsureOutputIsOutsideInputs(outputDir, globalGame, koreaGame);
             Directory.CreateDirectory(outputDir);
             ProgressReporter.Report(2, "입력 파일 확인 완료");
-            PatchPolicy patchPolicyRoot = PatchPolicy.Load(_options.PolicyPath);
+            PatchPolicy patchPolicyRoot = PatchPolicy.Load(
+                _options.PolicyPath,
+                _options.PreserveBaseLanguageGroups);
 
             string currentGlobalIndex = Path.Combine(globalSqpack, IndexFileName);
             string originalGlobalIndex = Path.Combine(globalSqpack, OrigIndexFileName);

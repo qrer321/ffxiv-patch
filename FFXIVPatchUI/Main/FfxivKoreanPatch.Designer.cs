@@ -46,6 +46,8 @@
             this.koreaPathBrowseButton = new System.Windows.Forms.Button();
             this.targetLanguageLabel = new System.Windows.Forms.Label();
             this.targetLanguageComboBox = new System.Windows.Forms.ComboBox();
+            this.preserveBaseBnpcNamesCheckBox = new System.Windows.Forms.CheckBox();
+            this.preserveBaseActionNamesCheckBox = new System.Windows.Forms.CheckBox();
             this.detectPathsButton = new System.Windows.Forms.Button();
             this.resetPathsButton = new System.Windows.Forms.Button();
             this.openReleaseButton = new System.Windows.Forms.Button();
@@ -323,6 +325,32 @@
             this.targetLanguageComboBox.TabIndex = 0;
             this.targetLanguageComboBox.TabStop = false;
             this.targetLanguageComboBox.SelectedIndexChanged += new System.EventHandler(this.targetLanguageComboBox_SelectedIndexChanged);
+            //
+            // preserveBaseBnpcNamesCheckBox
+            //
+            this.preserveBaseBnpcNamesCheckBox.AutoSize = true;
+            this.preserveBaseBnpcNamesCheckBox.BackColor = System.Drawing.Color.Transparent;
+            this.preserveBaseBnpcNamesCheckBox.Location = new System.Drawing.Point(16, 354);
+            this.preserveBaseBnpcNamesCheckBox.Name = "preserveBaseBnpcNamesCheckBox";
+            this.preserveBaseBnpcNamesCheckBox.Size = new System.Drawing.Size(206, 19);
+            this.preserveBaseBnpcNamesCheckBox.TabIndex = 0;
+            this.preserveBaseBnpcNamesCheckBox.TabStop = false;
+            this.preserveBaseBnpcNamesCheckBox.Text = "\uBCF4\uC2A4\uBA85(BNpcName) \uC6D0\uBB38 \uC720\uC9C0";
+            this.preserveBaseBnpcNamesCheckBox.UseVisualStyleBackColor = false;
+            this.preserveBaseBnpcNamesCheckBox.CheckedChanged += new System.EventHandler(this.preserveBaseLanguageOptionCheckBox_CheckedChanged);
+            //
+            // preserveBaseActionNamesCheckBox
+            //
+            this.preserveBaseActionNamesCheckBox.AutoSize = true;
+            this.preserveBaseActionNamesCheckBox.BackColor = System.Drawing.Color.Transparent;
+            this.preserveBaseActionNamesCheckBox.Location = new System.Drawing.Point(240, 354);
+            this.preserveBaseActionNamesCheckBox.Name = "preserveBaseActionNamesCheckBox";
+            this.preserveBaseActionNamesCheckBox.Size = new System.Drawing.Size(150, 19);
+            this.preserveBaseActionNamesCheckBox.TabIndex = 0;
+            this.preserveBaseActionNamesCheckBox.TabStop = false;
+            this.preserveBaseActionNamesCheckBox.Text = "\uAE30\uC220\uBA85 \uC6D0\uBB38 \uC720\uC9C0";
+            this.preserveBaseActionNamesCheckBox.UseVisualStyleBackColor = false;
+            this.preserveBaseActionNamesCheckBox.CheckedChanged += new System.EventHandler(this.preserveBaseLanguageOptionCheckBox_CheckedChanged);
             // 
             // detectPathsButton
             // 
@@ -466,6 +494,8 @@
             this.Controls.Add(this.openReleaseButton);
             this.Controls.Add(this.resetPathsButton);
             this.Controls.Add(this.detectPathsButton);
+            this.Controls.Add(this.preserveBaseActionNamesCheckBox);
+            this.Controls.Add(this.preserveBaseBnpcNamesCheckBox);
             this.Controls.Add(this.targetLanguageComboBox);
             this.Controls.Add(this.targetLanguageLabel);
             this.Controls.Add(this.koreaPathBrowseButton);
@@ -518,6 +548,8 @@
         private System.Windows.Forms.Button koreaPathBrowseButton;
         private System.Windows.Forms.Label targetLanguageLabel;
         private System.Windows.Forms.ComboBox targetLanguageComboBox;
+        private System.Windows.Forms.CheckBox preserveBaseBnpcNamesCheckBox;
+        private System.Windows.Forms.CheckBox preserveBaseActionNamesCheckBox;
         private System.Windows.Forms.Button detectPathsButton;
         private System.Windows.Forms.Button resetPathsButton;
         private System.Windows.Forms.Button openReleaseButton;
