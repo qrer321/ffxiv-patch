@@ -28,19 +28,30 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
                 return false;
             }
 
-            data = ReadFile(entry);
-            return true;
+            try
+            {
+                data = ReadFile(entry);
+                return true;
+            }
+            catch (InvalidDataException)
+            {
+                // Some language-specific EXD paths can exist in the index as
+                // placeholders that point at non-standard/empty dat records.
+                // Optional reads should treat those like missing pages.
+                data = null;
+                return false;
+            }
         }
 
         public byte[] ReadFile(string gamePath)
         {
-            byte[] data;
-            if (!TryReadFile(gamePath, out data))
+            SqPackIndexEntry entry;
+            if (!_index.TryGetEntry(SqPackHash.GetIndexHash(gamePath), out entry))
             {
                 throw new FileNotFoundException("SqPack file was not found: " + gamePath);
             }
 
-            return data;
+            return ReadFile(entry);
         }
 
         public List<SqPackIndexEntry> GetEntries()
