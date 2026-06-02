@@ -48,6 +48,7 @@
             this.targetLanguageComboBox = new System.Windows.Forms.ComboBox();
             this.preserveBaseBnpcNamesCheckBox = new System.Windows.Forms.CheckBox();
             this.preserveBaseActionNamesCheckBox = new System.Windows.Forms.CheckBox();
+            this.preserveBaseCommonPhrasesCheckBox = new System.Windows.Forms.CheckBox();
             this.detectPathsButton = new System.Windows.Forms.Button();
             this.resetPathsButton = new System.Windows.Forms.Button();
             this.openReleaseButton = new System.Windows.Forms.Button();
@@ -351,6 +352,19 @@
             this.preserveBaseActionNamesCheckBox.Text = "\uAE30\uC220\uBA85 \uC6D0\uBB38 \uC720\uC9C0";
             this.preserveBaseActionNamesCheckBox.UseVisualStyleBackColor = false;
             this.preserveBaseActionNamesCheckBox.CheckedChanged += new System.EventHandler(this.preserveBaseLanguageOptionCheckBox_CheckedChanged);
+            //
+            // preserveBaseCommonPhrasesCheckBox
+            //
+            this.preserveBaseCommonPhrasesCheckBox.AutoSize = true;
+            this.preserveBaseCommonPhrasesCheckBox.BackColor = System.Drawing.Color.Transparent;
+            this.preserveBaseCommonPhrasesCheckBox.Location = new System.Drawing.Point(408, 354);
+            this.preserveBaseCommonPhrasesCheckBox.Name = "preserveBaseCommonPhrasesCheckBox";
+            this.preserveBaseCommonPhrasesCheckBox.Size = new System.Drawing.Size(150, 19);
+            this.preserveBaseCommonPhrasesCheckBox.TabIndex = 0;
+            this.preserveBaseCommonPhrasesCheckBox.TabStop = false;
+            this.preserveBaseCommonPhrasesCheckBox.Text = "\uC0C1\uC6A9\uAD6C \uC6D0\uBB38 \uC720\uC9C0";
+            this.preserveBaseCommonPhrasesCheckBox.UseVisualStyleBackColor = false;
+            this.preserveBaseCommonPhrasesCheckBox.CheckedChanged += new System.EventHandler(this.preserveBaseLanguageOptionCheckBox_CheckedChanged);
             // 
             // detectPathsButton
             // 
@@ -496,6 +510,7 @@
             this.Controls.Add(this.detectPathsButton);
             this.Controls.Add(this.preserveBaseActionNamesCheckBox);
             this.Controls.Add(this.preserveBaseBnpcNamesCheckBox);
+            this.Controls.Add(this.preserveBaseCommonPhrasesCheckBox);
             this.Controls.Add(this.targetLanguageComboBox);
             this.Controls.Add(this.targetLanguageLabel);
             this.Controls.Add(this.koreaPathBrowseButton);
@@ -550,6 +565,7 @@
         private System.Windows.Forms.ComboBox targetLanguageComboBox;
         private System.Windows.Forms.CheckBox preserveBaseBnpcNamesCheckBox;
         private System.Windows.Forms.CheckBox preserveBaseActionNamesCheckBox;
+        private System.Windows.Forms.CheckBox preserveBaseCommonPhrasesCheckBox;
         private System.Windows.Forms.Button detectPathsButton;
         private System.Windows.Forms.Button resetPathsButton;
         private System.Windows.Forms.Button openReleaseButton;

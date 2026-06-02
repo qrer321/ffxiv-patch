@@ -143,6 +143,7 @@ namespace FFXIVKoreanPatch.Main
         private string targetLanguageDisplayName = "일본어";
         private bool preserveBaseBnpcNames;
         private bool preserveBaseActionNames;
+        private bool preserveBaseCommonPhrases;
         private bool suppressBaseLanguageOptionSave;
 
         // Output directory used when generating release files locally.
@@ -506,6 +507,7 @@ namespace FFXIVKoreanPatch.Main
             StyleComboBox(debugFontProfileComboBox);
             StyleCheckBox(preserveBaseBnpcNamesCheckBox);
             StyleCheckBox(preserveBaseActionNamesCheckBox);
+            StyleCheckBox(preserveBaseCommonPhrasesCheckBox);
 
             Color neutral = Color.FromArgb(42, 50, 61);
             Color neutralBorder = Color.FromArgb(82, 96, 112);
@@ -559,8 +561,9 @@ namespace FFXIVKoreanPatch.Main
             PlaceControl(resetPathsButton, 500, 441, 132, 32);
             PlaceControl(debugFontProfileLabel, 646, 418, 212, 20);
             PlaceControl(debugFontProfileComboBox, 646, 442, 212, 30);
-            PlaceControl(preserveBaseBnpcNamesCheckBox, 42, 478, 270, 28);
-            PlaceControl(preserveBaseActionNamesCheckBox, 318, 478, 270, 28);
+            PlaceControl(preserveBaseBnpcNamesCheckBox, 42, 478, 250, 28);
+            PlaceControl(preserveBaseActionNamesCheckBox, 318, 478, 230, 28);
+            PlaceControl(preserveBaseCommonPhrasesCheckBox, 594, 478, 264, 28);
 
             PlaceControl(openReleaseButton, 42, 526, 194, 32);
             PlaceControl(openLogsButton, 248, 526, 184, 32);
@@ -948,6 +951,7 @@ namespace FFXIVKoreanPatch.Main
                 targetLanguageComboBox.Enabled = enabled;
                 preserveBaseBnpcNamesCheckBox.Enabled = enabled;
                 preserveBaseActionNamesCheckBox.Enabled = enabled;
+                preserveBaseCommonPhrasesCheckBox.Enabled = enabled;
                 debugFontProfileComboBox.Enabled = enabled;
                 detectPathsButton.Enabled = enabled;
                 resetPathsButton.Enabled = enabled;
@@ -1289,6 +1293,7 @@ namespace FFXIVKoreanPatch.Main
                 targetLanguageComboBox.Enabled = enabled;
                 preserveBaseBnpcNamesCheckBox.Enabled = enabled;
                 preserveBaseActionNamesCheckBox.Enabled = enabled;
+                preserveBaseCommonPhrasesCheckBox.Enabled = enabled;
                 detectPathsButton.Enabled = enabled;
                 resetPathsButton.Enabled = enabled;
                 openReleaseButton.Enabled = enabled;
@@ -1412,6 +1417,7 @@ namespace FFXIVKoreanPatch.Main
         {
             bool bnpc = false;
             bool actions = false;
+            bool commonPhrases = false;
             string path = GetPatchOptionSettingsPath();
             if (File.Exists(path))
             {
@@ -1442,12 +1448,17 @@ namespace FFXIVKoreanPatch.Main
                     {
                         actions = enabled;
                     }
+                    else if (string.Equals(key, "preserveBaseCommonPhrases", StringComparison.OrdinalIgnoreCase))
+                    {
+                        commonPhrases = enabled;
+                    }
                 }
             }
 
             suppressBaseLanguageOptionSave = true;
             preserveBaseBnpcNamesCheckBox.Checked = bnpc;
             preserveBaseActionNamesCheckBox.Checked = actions;
+            preserveBaseCommonPhrasesCheckBox.Checked = commonPhrases;
             suppressBaseLanguageOptionSave = false;
             SyncBaseLanguageNameOptionsFromUi();
         }
@@ -1458,7 +1469,8 @@ namespace FFXIVKoreanPatch.Main
             string[] lines = new string[]
             {
                 "preserveBaseBnpcNames=" + (preserveBaseBnpcNames ? "true" : "false"),
-                "preserveBaseActionNames=" + (preserveBaseActionNames ? "true" : "false")
+                "preserveBaseActionNames=" + (preserveBaseActionNames ? "true" : "false"),
+                "preserveBaseCommonPhrases=" + (preserveBaseCommonPhrases ? "true" : "false")
             };
             File.WriteAllLines(path, lines, Encoding.UTF8);
         }
@@ -1467,12 +1479,14 @@ namespace FFXIVKoreanPatch.Main
         {
             preserveBaseBnpcNames = preserveBaseBnpcNamesCheckBox != null && preserveBaseBnpcNamesCheckBox.Checked;
             preserveBaseActionNames = preserveBaseActionNamesCheckBox != null && preserveBaseActionNamesCheckBox.Checked;
+            preserveBaseCommonPhrases = preserveBaseCommonPhrasesCheckBox != null && preserveBaseCommonPhrasesCheckBox.Checked;
         }
 
         private string FormatBaseLanguageNameOptionSummary()
         {
             return "BNpcName=" + (preserveBaseBnpcNames ? "preserve" : "korean") +
-                   ", Actions=" + (preserveBaseActionNames ? "preserve" : "korean");
+                   ", Actions=" + (preserveBaseActionNames ? "preserve" : "korean") +
+                   ", CommonPhrases=" + (preserveBaseCommonPhrases ? "preserve" : "korean");
         }
 
         private string GetEmbeddedToolDir()
@@ -2784,6 +2798,7 @@ namespace FFXIVKoreanPatch.Main
             AppendJsonString(sb, "backupDir", backupDir);
             sb.AppendLine("  \"preserveBaseBnpcNames\": " + (preserveBaseBnpcNames ? "true" : "false") + ",");
             sb.AppendLine("  \"preserveBaseActionNames\": " + (preserveBaseActionNames ? "true" : "false") + ",");
+            sb.AppendLine("  \"preserveBaseCommonPhrases\": " + (preserveBaseCommonPhrases ? "true" : "false") + ",");
             sb.AppendLine("  \"debugApply\": " + (debugApply ? "true" : "false") + ",");
             sb.AppendLine("  \"files\": [");
 
@@ -4560,6 +4575,11 @@ namespace FFXIVKoreanPatch.Main
                 if (buildTextPatch && preserveBaseActionNames)
                 {
                     arguments += " --preserve-base-action-names";
+                }
+
+                if (buildTextPatch && preserveBaseCommonPhrases)
+                {
+                    arguments += " --preserve-base-common-phrases";
                 }
 
                 if (!buildTextPatch && buildFontPatch)

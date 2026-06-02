@@ -114,8 +114,10 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
             Console.WriteLine("                     Keep BNpcName name columns in the base client language.");
             Console.WriteLine("  --preserve-base-action-names");
             Console.WriteLine("                     Keep action/skill name columns in the base client language.");
+            Console.WriteLine("  --preserve-base-common-phrases");
+            Console.WriteLine("                     Keep Completion/common phrase columns in the base client language.");
             Console.WriteLine("  --preserve-base-language-groups <csv>");
-            Console.WriteLine("                     Keep named text groups in the base client language. Example: battle-npc,actions");
+            Console.WriteLine("                     Keep named text groups in the base client language. Example: battle-npc,actions,common-phrases");
             Console.WriteLine("  --diagnostic-csv   Export row/column comparison CSV for a sheet.");
             Console.WriteLine("  --base-index       Clean global 0a0000.win32.index to use instead of installed index.");
             Console.WriteLine("  --base-index2      Clean global 0a0000.win32.index2 to use instead of installed index2.");
@@ -317,6 +319,13 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
                 if (string.Equals(arg, "--preserve-base-action-names", StringComparison.OrdinalIgnoreCase))
                 {
                     options.AddBaseLanguageGroup("actions");
+                    continue;
+                }
+
+                if (string.Equals(arg, "--preserve-base-common-phrases", StringComparison.OrdinalIgnoreCase) ||
+                    string.Equals(arg, "--preserve-base-completion", StringComparison.OrdinalIgnoreCase))
+                {
+                    options.AddBaseLanguageGroup("commonphrases");
                     continue;
                 }
 

@@ -55,6 +55,16 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
         private const uint LobbyDataCenterConnectingRow = 808;
         private static readonly uint[] GlobalDataCenterTravelAddonRows = new uint[] { 12514, 12525 };
         private const ushort NameColumnOffset = 0;
+        private static readonly ushort[] BaseLanguageNameColumnOffsets = new ushort[]
+        {
+            NameColumnOffset
+        };
+        private static readonly ushort[] BaseLanguageCommonPhraseColumnOffsets = new ushort[]
+        {
+            0,
+            4,
+            8
+        };
         private static readonly string[] BaseLanguageBossNameColumnSheets = new string[]
         {
             "BNpcName"
@@ -68,8 +78,13 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
             "GeneralAction",
             "PetAction"
         };
+        private static readonly string[] BaseLanguageCommonPhraseColumnSheets = new string[]
+        {
+            "Completion"
+        };
         private const string BaseLanguageGroupBnpcName = "bnpcname";
         private const string BaseLanguageGroupActions = "actions";
+        private const string BaseLanguageGroupCommonPhrases = "commonphrases";
 
         private readonly HashSet<string> _deleteFiles = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         private readonly Dictionary<string, PatchSheetPolicy> _sheets = new Dictionary<string, PatchSheetPolicy>(StringComparer.OrdinalIgnoreCase);
@@ -130,12 +145,17 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
 
             if (HasBaseLanguageGroup(preserveBaseLanguageGroups, BaseLanguageGroupBnpcName))
             {
-                ApplyBaseLanguageNameColumns(policy, BaseLanguageBossNameColumnSheets);
+                ApplyBaseLanguageColumns(policy, BaseLanguageBossNameColumnSheets, BaseLanguageNameColumnOffsets);
             }
 
             if (HasBaseLanguageGroup(preserveBaseLanguageGroups, BaseLanguageGroupActions))
             {
-                ApplyBaseLanguageNameColumns(policy, BaseLanguageActionNameColumnSheets);
+                ApplyBaseLanguageColumns(policy, BaseLanguageActionNameColumnSheets, BaseLanguageNameColumnOffsets);
+            }
+
+            if (HasBaseLanguageGroup(preserveBaseLanguageGroups, BaseLanguageGroupCommonPhrases))
+            {
+                ApplyBaseLanguageColumns(policy, BaseLanguageCommonPhraseColumnSheets, BaseLanguageCommonPhraseColumnOffsets);
             }
 
             // Global Addon rows 44/45/49 are compact h/m/s time-unit labels.
@@ -274,6 +294,19 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
                 case "skill-names":
                     return BaseLanguageGroupActions;
 
+                case "common":
+                case "commonphrase":
+                case "commonphrases":
+                case "common-phrase":
+                case "common-phrases":
+                case "fixed-phrase":
+                case "fixed-phrases":
+                case "auto-translate":
+                case "autotranslate":
+                case "completion":
+                case "completions":
+                    return BaseLanguageGroupCommonPhrases;
+
                 default:
                     return null;
             }
@@ -297,11 +330,15 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
             return false;
         }
 
-        private static void ApplyBaseLanguageNameColumns(PatchPolicy policy, string[] sheetNames)
+        private static void ApplyBaseLanguageColumns(PatchPolicy policy, string[] sheetNames, ushort[] columnOffsets)
         {
             for (int i = 0; i < sheetNames.Length; i++)
             {
-                policy.GetOrCreateSheetPolicy(sheetNames[i]).PreserveGlobalColumn(NameColumnOffset);
+                PatchSheetPolicy sheetPolicy = policy.GetOrCreateSheetPolicy(sheetNames[i]);
+                for (int columnIndex = 0; columnIndex < columnOffsets.Length; columnIndex++)
+                {
+                    sheetPolicy.PreserveGlobalColumn(columnOffsets[columnIndex]);
+                }
             }
         }
 
