@@ -54,6 +54,17 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
         };
         private const uint LobbyDataCenterConnectingRow = 808;
         private static readonly uint[] GlobalDataCenterTravelAddonRows = new uint[] { 12514, 12525 };
+        private const ushort NameColumnOffset = 0;
+        private static readonly string[] BaseLanguageNameColumnSheets = new string[]
+        {
+            "Action",
+            "BuddyAction",
+            "CraftAction",
+            "EventAction",
+            "GeneralAction",
+            "PetAction",
+            "BNpcName"
+        };
 
         private readonly HashSet<string> _deleteFiles = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         private readonly Dictionary<string, PatchSheetPolicy> _sheets = new Dictionary<string, PatchSheetPolicy>(StringComparer.OrdinalIgnoreCase);
@@ -106,6 +117,8 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
             PatchSheetPolicy worldDcGroupTypePolicy = policy.GetOrCreateSheetPolicy("WorldDCGroupType");
             PatchSheetPolicy worldPhysicalDcPolicy = policy.GetOrCreateSheetPolicy("WorldPhysicalDC");
             PatchSheetPolicy worldRegionGroupPolicy = policy.GetOrCreateSheetPolicy("WorldRegionGroup");
+
+            ApplyBaseLanguageNameColumns(policy);
 
             // Global Addon rows 44/45/49 are compact h/m/s time-unit labels.
             // Korean "시간/분/초" overflows narrow global UI slots such as icon timers.
@@ -215,6 +228,14 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
             }
 
             return policy;
+        }
+
+        private static void ApplyBaseLanguageNameColumns(PatchPolicy policy)
+        {
+            for (int i = 0; i < BaseLanguageNameColumnSheets.Length; i++)
+            {
+                policy.GetOrCreateSheetPolicy(BaseLanguageNameColumnSheets[i]).PreserveGlobalColumn(NameColumnOffset);
+            }
         }
 
         private static void AddGlobalTargetRows(PatchSheetPolicy sheetPolicy, RowRange[] ranges)
