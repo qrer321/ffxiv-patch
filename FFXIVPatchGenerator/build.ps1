@@ -23,6 +23,7 @@ $sources = @(
     "SqPack.cs",
     "Excel.cs",
     "ExdStringPatcher.cs",
+    "RsvStringResolver.cs",
     "QuestChatPhraseAnonymizer.cs",
     "HashAndEndian.cs",
     "PatchPolicy.cs"

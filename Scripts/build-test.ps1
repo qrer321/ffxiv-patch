@@ -7,6 +7,7 @@ $repoRoot = Resolve-Path (Join-Path $PSScriptRoot "..")
 $solutionPath = Join-Path $repoRoot "FfxivKoreanPatch.sln"
 $testDir = Join-Path $repoRoot "Release\Test"
 $patchGeneratorBuild = Join-Path $repoRoot "FFXIVPatchGenerator\build.ps1"
+$rsvMapSync = Join-Path $repoRoot "Scripts\sync-rsv-map.ps1"
 $msbuild = "${env:ProgramFiles(x86)}\Microsoft Visual Studio\18\BuildTools\MSBuild\Current\Bin\MSBuild.exe"
 
 if (!(Test-Path $msbuild)) {
@@ -14,6 +15,19 @@ if (!(Test-Path $msbuild)) {
 }
 
 & powershell -ExecutionPolicy Bypass -File $patchGeneratorBuild -Configuration Release
+if ($LASTEXITCODE -ne 0) {
+    exit $LASTEXITCODE
+}
+
+$generatorBin = Join-Path $repoRoot "FFXIVPatchGenerator\bin\Release"
+$rsvSourcePath = $env:FFXIV_RSV_MAP_PATH
+if ([string]::IsNullOrWhiteSpace($rsvSourcePath)) {
+    & powershell -ExecutionPolicy Bypass -File $rsvMapSync -Destination (Join-Path $generatorBin "rsv.json")
+}
+else {
+    & powershell -ExecutionPolicy Bypass -File $rsvMapSync -Destination (Join-Path $generatorBin "rsv.json") -SourcePath $rsvSourcePath
+}
+
 if ($LASTEXITCODE -ne 0) {
     exit $LASTEXITCODE
 }

@@ -101,6 +101,10 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
                     result.ProtectedUiStrings += rowResult.ProtectedUiStrings;
                     result.RsvRows += rowResult.RsvRows;
                     result.RsvStrings += rowResult.RsvStrings;
+                    result.RsvResolvedRows += rowResult.RsvResolvedRows;
+                    result.RsvResolvedStrings += rowResult.RsvResolvedStrings;
+                    result.RsvTokensResolved += rowResult.RsvTokensResolved;
+                    result.RsvTokensUnresolved += rowResult.RsvTokensUnresolved;
                 }
 
                 if (rowResult != null && rowResult.Touched)
@@ -421,7 +425,11 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
             bool touched = false;
             int protectedUiStrings = 0;
             int rsvStrings = 0;
+            int rsvResolvedStrings = 0;
+            int rsvTokensResolved = 0;
+            int rsvTokensUnresolved = 0;
             bool rowHasRsv = false;
+            bool rowHasResolvedRsv = false;
             MemoryStream stringData = new MemoryStream();
             for (int i = 0; i < stringColumns.Count; i++)
             {
@@ -441,6 +449,7 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
                 ExcelHeader rowSourceHeader = sourceRow.Header ?? sourceHeader;
                 byte[] replacement = sourceRow.File.GetStringBytesByColumnOffset(sourceRow.Row, rowSourceHeader, targetColumn.Offset);
                 byte[] selected = original;
+                bool allowRsvResolution = false;
                 if (sheetPolicy.ShouldKeepColumn(targetRow.RowId, targetColumn.Offset))
                 {
                     selected = original;
@@ -480,6 +489,7 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
                             if (TryBuildHybridUiReplacement(original, replacement, out hybrid))
                             {
                                 selected = hybrid;
+                                allowRsvResolution = !sheetPolicy.ShouldUseGlobalFallbackRow(targetRow.RowId);
                                 protectedUiStrings++;
                                 if (!BytesEqual(original, hybrid))
                                 {
@@ -499,6 +509,7 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
                         else
                         {
                             selected = replacement;
+                            allowRsvResolution = !sheetPolicy.ShouldUseGlobalFallbackRow(targetRow.RowId);
                             if (!BytesEqual(original, replacement))
                             {
                                 touched = true;
@@ -509,12 +520,28 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
 
                 if (sheetPolicy.GlobalEnglishRows.Contains(targetRow.RowId))
                 {
+                    allowRsvResolution = false;
                     byte[] normalizedEnglish = NormalizeGlobalEnglishFallbackBytes(selected);
                     if (!BytesEqual(selected, normalizedEnglish))
                     {
                         selected = normalizedEnglish;
                         touched = true;
                     }
+                }
+
+                if (allowRsvResolution && patchPolicy != null && patchPolicy.RsvResolver != null && patchPolicy.RsvResolver.IsEnabled)
+                {
+                    RsvResolutionResult rsvResolution = patchPolicy.RsvResolver.Resolve(selected);
+                    if (rsvResolution.Changed)
+                    {
+                        selected = rsvResolution.Bytes;
+                        touched = true;
+                        rsvResolvedStrings++;
+                        rowHasResolvedRsv = true;
+                        rsvTokensResolved += rsvResolution.ResolvedTokens;
+                    }
+
+                    rsvTokensUnresolved += rsvResolution.UnresolvedTokens;
                 }
 
                 if (ContainsRsvToken(selected))
@@ -531,7 +558,16 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
 
             if (!touched)
             {
-                return new RowPatchResult(CopyOriginalRowRecord(target, targetRow), false, protectedUiStrings, rowHasRsv ? 1 : 0, rsvStrings);
+                return new RowPatchResult(
+                    CopyOriginalRowRecord(target, targetRow),
+                    false,
+                    protectedUiStrings,
+                    rowHasRsv ? 1 : 0,
+                    rsvStrings,
+                    rowHasResolvedRsv ? 1 : 0,
+                    rsvResolvedStrings,
+                    rsvTokensResolved,
+                    rsvTokensUnresolved);
             }
 
             byte[] strings = stringData.ToArray();
@@ -555,7 +591,16 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
                 throw new InvalidDataException("Unexpected empty EXD row.");
             }
 
-            return new RowPatchResult(rowOutput.ToArray(), true, protectedUiStrings, rowHasRsv ? 1 : 0, rsvStrings);
+            return new RowPatchResult(
+                rowOutput.ToArray(),
+                true,
+                protectedUiStrings,
+                rowHasRsv ? 1 : 0,
+                rsvStrings,
+                rowHasResolvedRsv ? 1 : 0,
+                rsvResolvedStrings,
+                rsvTokensResolved,
+                rsvTokensUnresolved);
         }
 
         private static bool ShouldKeepOriginalForUiStructure(StringPatchPolicy patchPolicy, byte[] original, byte[] replacement)
@@ -1236,24 +1281,7 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
 
         private static bool ContainsRsvToken(byte[] bytes)
         {
-            if (bytes == null || bytes.Length < 5)
-            {
-                return false;
-            }
-
-            for (int i = 0; i <= bytes.Length - 5; i++)
-            {
-                if (bytes[i] == (byte)'_' &&
-                    (bytes[i + 1] == (byte)'r' || bytes[i + 1] == (byte)'R') &&
-                    (bytes[i + 2] == (byte)'s' || bytes[i + 2] == (byte)'S') &&
-                    (bytes[i + 3] == (byte)'v' || bytes[i + 3] == (byte)'V') &&
-                    bytes[i + 4] == (byte)'_')
-                {
-                    return true;
-                }
-            }
-
-            return false;
+            return RsvStringResolver.ContainsRsvToken(bytes);
         }
 
         private static bool IsAsciiDigitOrSymbolOnly(string value)
@@ -1428,14 +1456,31 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
             public readonly int ProtectedUiStrings;
             public readonly int RsvRows;
             public readonly int RsvStrings;
+            public readonly int RsvResolvedRows;
+            public readonly int RsvResolvedStrings;
+            public readonly int RsvTokensResolved;
+            public readonly int RsvTokensUnresolved;
 
-            public RowPatchResult(byte[] data, bool touched, int protectedUiStrings, int rsvRows, int rsvStrings)
+            public RowPatchResult(
+                byte[] data,
+                bool touched,
+                int protectedUiStrings,
+                int rsvRows,
+                int rsvStrings,
+                int rsvResolvedRows,
+                int rsvResolvedStrings,
+                int rsvTokensResolved,
+                int rsvTokensUnresolved)
             {
                 Data = data;
                 Touched = touched;
                 ProtectedUiStrings = protectedUiStrings;
                 RsvRows = rsvRows;
                 RsvStrings = rsvStrings;
+                RsvResolvedRows = rsvResolvedRows;
+                RsvResolvedStrings = rsvResolvedStrings;
+                RsvTokensResolved = rsvTokensResolved;
+                RsvTokensUnresolved = rsvTokensUnresolved;
             }
         }
 
@@ -1476,6 +1521,10 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
         public int ProtectedUiStrings;
         public int RsvRows;
         public int RsvStrings;
+        public int RsvResolvedRows;
+        public int RsvResolvedStrings;
+        public int RsvTokensResolved;
+        public int RsvTokensUnresolved;
     }
 
     internal sealed class StringPatchPolicy
@@ -1487,6 +1536,7 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
         public readonly bool ProtectShortNonKoreanUiTokens;
         public readonly bool ProtectUiSeStringStructure;
         public readonly PatchSheetPolicy SheetPolicy;
+        public readonly RsvStringResolver RsvResolver;
 
         public StringPatchPolicy(bool protectShortNonKoreanUiTokens, PatchSheetPolicy sheetPolicy)
             : this(protectShortNonKoreanUiTokens, protectShortNonKoreanUiTokens, sheetPolicy)
@@ -1504,11 +1554,17 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
         }
 
         public StringPatchPolicy(string sheetName, bool protectShortNonKoreanUiTokens, bool protectUiSeStringStructure, PatchSheetPolicy sheetPolicy)
+            : this(sheetName, protectShortNonKoreanUiTokens, protectUiSeStringStructure, sheetPolicy, RsvStringResolver.Empty)
+        {
+        }
+
+        public StringPatchPolicy(string sheetName, bool protectShortNonKoreanUiTokens, bool protectUiSeStringStructure, PatchSheetPolicy sheetPolicy, RsvStringResolver rsvResolver)
         {
             SheetName = sheetName;
             ProtectShortNonKoreanUiTokens = protectShortNonKoreanUiTokens;
             ProtectUiSeStringStructure = protectUiSeStringStructure;
             SheetPolicy = sheetPolicy ?? PatchSheetPolicy.Empty;
+            RsvResolver = rsvResolver ?? RsvStringResolver.Empty;
         }
     }
 

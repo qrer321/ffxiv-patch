@@ -7,6 +7,7 @@ $repoRoot = Resolve-Path (Join-Path $PSScriptRoot "..")
 $solutionPath = Join-Path $repoRoot "FfxivKoreanPatch.sln"
 $releaseDir = Join-Path $repoRoot "Release\Public"
 $patchGeneratorBuild = Join-Path $repoRoot "FFXIVPatchGenerator\build.ps1"
+$rsvMapSync = Join-Path $repoRoot "Scripts\sync-rsv-map.ps1"
 $msbuild = "${env:ProgramFiles(x86)}\Microsoft Visual Studio\18\BuildTools\MSBuild\Current\Bin\MSBuild.exe"
 
 if (!(Test-Path $msbuild)) {
@@ -14,6 +15,19 @@ if (!(Test-Path $msbuild)) {
 }
 
 & powershell -ExecutionPolicy Bypass -File $patchGeneratorBuild -Configuration $Configuration
+if ($LASTEXITCODE -ne 0) {
+    exit $LASTEXITCODE
+}
+
+$generatorBin = Join-Path $repoRoot "FFXIVPatchGenerator\bin\$Configuration"
+$rsvSourcePath = $env:FFXIV_RSV_MAP_PATH
+if ([string]::IsNullOrWhiteSpace($rsvSourcePath)) {
+    & powershell -ExecutionPolicy Bypass -File $rsvMapSync -Destination (Join-Path $generatorBin "rsv.json")
+}
+else {
+    & powershell -ExecutionPolicy Bypass -File $rsvMapSync -Destination (Join-Path $generatorBin "rsv.json") -SourcePath $rsvSourcePath
+}
+
 if ($LASTEXITCODE -ne 0) {
     exit $LASTEXITCODE
 }
@@ -116,12 +130,17 @@ function Get-EmbeddedResourceSha256 {
 
 $releaseExe = Join-Path $releaseDir "FFXIVKoreanPatch.exe"
 $generatorExe = Join-Path $repoRoot "FFXIVPatchGenerator\bin\$Configuration\FFXIVPatchGenerator.exe"
+$rsvMap = Join-Path $repoRoot "FFXIVPatchGenerator\bin\$Configuration\rsv.json"
 if (!(Test-Path $releaseExe)) {
     throw "Release executable was not written: $releaseExe"
 }
 
 if (!(Test-Path $generatorExe)) {
     throw "Generator executable was not built: $generatorExe"
+}
+
+if (!(Test-Path $rsvMap)) {
+    throw "RSV map was not prepared: $rsvMap"
 }
 
 $generatorHash = (Get-FileHash -LiteralPath $generatorExe -Algorithm SHA256).Hash
@@ -133,5 +152,15 @@ if ($embeddedGeneratorHash -ne $generatorHash) {
     throw "Release executable embedded an outdated FFXIVPatchGenerator.exe. Embedded=$embeddedGeneratorHash Built=$generatorHash"
 }
 
+$rsvHash = (Get-FileHash -LiteralPath $rsvMap -Algorithm SHA256).Hash
+$embeddedRsvHash = Get-EmbeddedResourceSha256 `
+    -AssemblyPath $releaseExe `
+    -ResourceName "EmbeddedPayloads.rsv.json"
+
+if ($embeddedRsvHash -ne $rsvHash) {
+    throw "Release executable embedded an outdated rsv.json. Embedded=$embeddedRsvHash Built=$rsvHash"
+}
+
 Write-Host "Release files written to $releaseDir"
 Write-Host "Embedded FFXIVPatchGenerator verified: $generatorHash"
+Write-Host "Embedded RSV map verified: $rsvHash"

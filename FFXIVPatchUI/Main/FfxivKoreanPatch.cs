@@ -31,6 +31,7 @@ namespace FFXIVKoreanPatch.Main
         private const string embeddedGeneratorResourceName = "EmbeddedPayloads.FFXIVPatchGenerator.exe";
         private const string embeddedTtmpMpdResourceName = "EmbeddedPayloads.TTMPD.mpd";
         private const string embeddedTtmpMplResourceName = "EmbeddedPayloads.TTMPL.mpl";
+        private const string embeddedRsvMapResourceName = "EmbeddedPayloads.rsv.json";
 
         // Local backup folder kept outside release output so users can manually restore sqpack files.
         private const string manualRollbackDirName = "manual-sqpack-rollback";
@@ -1574,6 +1575,7 @@ namespace FFXIVKoreanPatch.Main
 
             ExtractEmbeddedPayload(embeddedTtmpMpdResourceName, Path.Combine(toolDir, "TTMPD.mpd"));
             ExtractEmbeddedPayload(embeddedTtmpMplResourceName, Path.Combine(toolDir, "TTMPL.mpl"));
+            ExtractEmbeddedPayload(embeddedRsvMapResourceName, Path.Combine(toolDir, "rsv.json"));
             return generatorPath;
         }
 

@@ -104,6 +104,9 @@
     <EmbeddedResource Include="..\..\FFXIVPatchGenerator\bin\Release\TTMPL.mpl" Condition="Exists('..\..\FFXIVPatchGenerator\bin\Release\TTMPL.mpl')">
       <LogicalName>EmbeddedPayloads.TTMPL.mpl</LogicalName>
     </EmbeddedResource>
+    <EmbeddedResource Include="..\..\FFXIVPatchGenerator\bin\Release\rsv.json" Condition="Exists('..\..\FFXIVPatchGenerator\bin\Release\rsv.json')">
+      <LogicalName>EmbeddedPayloads.rsv.json</LogicalName>
+    </EmbeddedResource>
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
 </Project>

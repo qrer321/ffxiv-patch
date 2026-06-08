@@ -47,6 +47,7 @@
     <Compile Include="SqPack.cs" />
     <Compile Include="Excel.cs" />
     <Compile Include="ExdStringPatcher.cs" />
+    <Compile Include="RsvStringResolver.cs" />
     <Compile Include="QuestChatPhraseAnonymizer.cs" />
     <Compile Include="HashAndEndian.cs" />
     <Compile Include="PatchPolicy.cs" />

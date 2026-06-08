@@ -184,6 +184,7 @@
 - `patch-policy.json` 기반 sheet/row/column 보존과 row/column remap
 - `patch-diagnostics.tsv` 생성
 - `--diagnostic-csv` 지정 sheet의 row/column 비교 CSV 생성
+- `--rsv-map`으로 RSV token JSON map을 읽어 한국어 source row의 `_rsv_...` 토큰을 실제 문자열로 치환
 - `_rsv_` 토큰이 남은 row/string 수 집계
 - `Scripts\verify-patch-routes.ps1`로 release 폴더 후검증
   - 데이터센터 row, 좁은 시간 단위, 숫자 glyph, 파티 리스트 본인 번호 glyph 확인
@@ -273,6 +274,7 @@
 - `--allow-patched-global`: 이미 패치된 index 사용 허용, 실험용
 - `--allow-korean-font-fallback`: TTMP 없이 한국 서버 폰트 직접 복사, 실험용
 - `--policy`: JSON 패치 정책 파일
+- `--rsv-map`: RSV token map JSON 파일. 지정하지 않으면 실행 파일 옆 `rsv.json`, 현재 작업 디렉터리 `rsv.json` 순서로 자동 탐색
 - `--diagnostic-csv`: 지정 sheet의 row/column 비교 CSV 출력
 - `--allow-version-mismatch`: 글로벌/한국 서버 버전 불일치 허용, 진단용
 

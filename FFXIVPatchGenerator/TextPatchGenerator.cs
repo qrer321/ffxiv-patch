@@ -225,6 +225,7 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
 
         private readonly BuildOptions _options;
         private readonly BuildReport _report = new BuildReport();
+        private RsvStringResolver _rsvResolver = RsvStringResolver.Empty;
 
         public TextPatchGenerator(BuildOptions options)
         {
@@ -280,6 +281,12 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
 
             byte targetLanguageId = LanguageCodes.ToId(_options.TargetLanguage);
             byte sourceLanguageId = LanguageCodes.ToId(_options.SourceLanguage);
+            _rsvResolver = LoadRsvResolver();
+            if (_rsvResolver.IsEnabled)
+            {
+                Console.WriteLine("Using RSV map:          {0} ({1} entries)", _rsvResolver.SourcePath, _rsvResolver.Count);
+            }
+
             using (SqPackArchive globalArchive = new SqPackArchive(baseIndex, globalSqpack, "0a0000.win32"))
             using (SqPackArchive koreaArchive = new SqPackArchive(Path.Combine(koreaSqpack, IndexFileName), koreaSqpack, "0a0000.win32"))
             using (SqPackIndexFile mutableIndex = new SqPackIndexFile(outputIndex))
@@ -333,6 +340,40 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
             }
 
             return _report;
+        }
+
+        private RsvStringResolver LoadRsvResolver()
+        {
+            string rsvMapPath = ResolveRsvMapPath();
+            if (string.IsNullOrEmpty(rsvMapPath))
+            {
+                return RsvStringResolver.Empty;
+            }
+
+            return RsvStringResolver.Load(rsvMapPath, _options.SourceLanguage);
+        }
+
+        private string ResolveRsvMapPath()
+        {
+            if (!string.IsNullOrWhiteSpace(_options.RsvMapPath))
+            {
+                return _options.RsvMapPath;
+            }
+
+            string exeSidePath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "rsv.json");
+            if (File.Exists(exeSidePath))
+            {
+                return exeSidePath;
+            }
+
+            string workingDirectoryPath = Path.Combine(Environment.CurrentDirectory, "rsv.json");
+            if (File.Exists(workingDirectoryPath) &&
+                !string.Equals(Path.GetFullPath(workingDirectoryPath), Path.GetFullPath(exeSidePath), StringComparison.OrdinalIgnoreCase))
+            {
+                return workingDirectoryPath;
+            }
+
+            return null;
         }
 
         private int CountTargetSheets(List<string> sheetNames)
@@ -594,7 +635,9 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
             StringPatchPolicy stringPatchPolicy = new StringPatchPolicy(
                 sheetName,
                 IsAddonSheet(sheetName),
-                sheetPolicy);
+                IsAddonSheet(sheetName),
+                sheetPolicy,
+                _rsvResolver);
 
             for (int i = 0; i < globalHeader.Pages.Count; i++)
             {
@@ -610,7 +653,7 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
                 }
 
                 ExcelDataFile targetExd = ExcelDataFile.Parse(targetExdBytes);
-                WriteDiagnosticCsvIfRequested(sheetName, page.StartId, diagnosticCsvDir, targetExd, sourceMaps, globalHeader, sourceHeader, stringColumns, allowRowKeyFallback, sheetPolicy);
+                WriteDiagnosticCsvIfRequested(sheetName, page.StartId, diagnosticCsvDir, targetExd, sourceMaps, globalHeader, sourceHeader, stringColumns, allowRowKeyFallback, sheetPolicy, _rsvResolver);
                 ExdPatchResult patchResult = ExdStringPatcher.PatchDefaultVariant(
                     targetExd,
                     globalHeader,
@@ -623,6 +666,10 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
                 _report.ProtectedUiStrings += patchResult.ProtectedUiStrings;
                 _report.RsvRows += patchResult.RsvRows;
                 _report.RsvStrings += patchResult.RsvStrings;
+                _report.RsvResolvedRows += patchResult.RsvResolvedRows;
+                _report.RsvResolvedStrings += patchResult.RsvResolvedStrings;
+                _report.RsvTokensResolved += patchResult.RsvTokensResolved;
+                _report.RsvTokensUnresolved += patchResult.RsvTokensUnresolved;
 
                 if (!patchResult.Changed)
                 {
@@ -637,7 +684,11 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
                         0,
                         patchResult.RsvRows,
                         patchResult.RsvStrings,
-                        BuildPatchNote(JoinPatchNotes(allowRowKeyFallback ? "row-key fallback allowed" : "row-key fallback not allowed", anonymizeNote), patchResult.ProtectedUiStrings));
+                        BuildPatchNote(
+                            JoinPatchNotes(
+                                JoinPatchNotes(allowRowKeyFallback ? "row-key fallback allowed" : "row-key fallback not allowed", anonymizeNote),
+                                BuildRsvResolutionNote(patchResult)),
+                            patchResult.ProtectedUiStrings));
                     continue;
                 }
 
@@ -658,7 +709,9 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
                     patchResult.RowKeyRows,
                     patchResult.RsvRows,
                     patchResult.RsvStrings,
-                    BuildPatchNote(anonymizeNote, patchResult.ProtectedUiStrings));
+                    BuildPatchNote(
+                        JoinPatchNotes(anonymizeNote, BuildRsvResolutionNote(patchResult)),
+                        patchResult.ProtectedUiStrings));
 
                 if (_report.PagesPatched % 100 == 0)
                 {
@@ -766,6 +819,10 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
                     _report.ProtectedUiStrings += patchResult.ProtectedUiStrings;
                     _report.RsvRows += patchResult.RsvRows;
                     _report.RsvStrings += patchResult.RsvStrings;
+                    _report.RsvResolvedRows += patchResult.RsvResolvedRows;
+                    _report.RsvResolvedStrings += patchResult.RsvResolvedStrings;
+                    _report.RsvTokensResolved += patchResult.RsvTokensResolved;
+                    _report.RsvTokensUnresolved += patchResult.RsvTokensUnresolved;
                     WriteDiagnostic(
                         diagnostics,
                         sheetName,
@@ -1045,7 +1102,8 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
             ExcelHeader sourceHeader,
             List<int> stringColumns,
             bool allowRowKeyFallback,
-            PatchSheetPolicy sheetPolicy)
+            PatchSheetPolicy sheetPolicy,
+            RsvStringResolver rsvResolver)
         {
             if (string.IsNullOrEmpty(_options.DiagnosticCsvSheet) ||
                 !string.Equals(NormalizeSheetName(_options.DiagnosticCsvSheet), NormalizeSheetName(sheetName), StringComparison.OrdinalIgnoreCase))
@@ -1097,6 +1155,23 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
                             {
                                 selectedBytes = remap.LiteralBytes;
                                 note = "literal";
+                            }
+                        }
+
+                        if (rsvResolver != null &&
+                            rsvResolver.IsEnabled &&
+                            string.Equals(action, "replace", StringComparison.Ordinal) &&
+                            !sheetPolicy.ShouldUseGlobalFallbackRow(targetRow.RowId))
+                        {
+                            RsvResolutionResult rsvResolution = rsvResolver.Resolve(selectedBytes);
+                            if (rsvResolution.Changed)
+                            {
+                                selectedBytes = rsvResolution.Bytes;
+                                note = string.IsNullOrEmpty(note) ? "rsv-resolved=" + rsvResolution.ResolvedTokens.ToString() : note + "; rsv-resolved=" + rsvResolution.ResolvedTokens.ToString();
+                            }
+                            else if (rsvResolution.UnresolvedTokens > 0)
+                            {
+                                note = string.IsNullOrEmpty(note) ? "rsv-unresolved=" + rsvResolution.UnresolvedTokens.ToString() : note + "; rsv-unresolved=" + rsvResolution.UnresolvedTokens.ToString();
                             }
                         }
 
@@ -1252,24 +1327,7 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
 
         private static bool ContainsRsvToken(byte[] bytes)
         {
-            if (bytes == null || bytes.Length < 5)
-            {
-                return false;
-            }
-
-            for (int i = 0; i <= bytes.Length - 5; i++)
-            {
-                if (bytes[i] == (byte)'_' &&
-                    (bytes[i + 1] == (byte)'r' || bytes[i + 1] == (byte)'R') &&
-                    (bytes[i + 2] == (byte)'s' || bytes[i + 2] == (byte)'S') &&
-                    (bytes[i + 3] == (byte)'v' || bytes[i + 3] == (byte)'V') &&
-                    bytes[i + 4] == (byte)'_')
-                {
-                    return true;
-                }
-            }
-
-            return false;
+            return RsvStringResolver.ContainsRsvToken(bytes);
         }
 
         private static string NormalizeSheetName(string sheetName)
@@ -1354,6 +1412,22 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
             }
 
             return baseNote + "; " + protectedNote;
+        }
+
+        private static string BuildRsvResolutionNote(ExdPatchResult patchResult)
+        {
+            if (patchResult == null || patchResult.RsvTokensResolved <= 0)
+            {
+                return string.Empty;
+            }
+
+            string note = "rsv-resolved tokens=" + patchResult.RsvTokensResolved.ToString();
+            if (patchResult.RsvTokensUnresolved > 0)
+            {
+                note += ", unresolved=" + patchResult.RsvTokensUnresolved.ToString();
+            }
+
+            return note;
         }
 
         private static string JoinPatchNotes(string first, string second)
