@@ -52,18 +52,28 @@
     <Reference Include="System.Drawing" />
     <Reference Include="System.Windows.Forms" />
     <Reference Include="System.Xml" />
+    <Reference Include="System.Xaml" />
+    <Reference Include="WindowsBase" />
+    <Reference Include="PresentationCore" />
+    <Reference Include="PresentationFramework" />
   </ItemGroup>
   <ItemGroup>
-    <Compile Include="FFXIVKoreanPatch.cs">
-      <SubType>Form</SubType>
-    </Compile>
-    <Compile Include="FFXIVKoreanPatch.Designer.cs">
-      <DependentUpon>FFXIVKoreanPatch.cs</DependentUpon>
-    </Compile>
+    <Compile Include="PatchController.cs" />
+    <Compile Include="Ui\MainWindow.cs" />
+    <Compile Include="Ui\Dialogs.cs" />
     <Compile Include="Program.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
-    <EmbeddedResource Include="FFXIVKoreanPatch.resx">
-      <DependentUpon>FFXIVKoreanPatch.cs</DependentUpon>
+    <EmbeddedResource Include="Ui\MainWindow.xaml">
+      <LogicalName>FFXIVKoreanPatch.Ui.MainWindow.xaml</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="Ui\DialogWindow.xaml">
+      <LogicalName>FFXIVKoreanPatch.Ui.DialogWindow.xaml</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="ffxiv.jpg">
+      <LogicalName>FFXIVKoreanPatch.Ui.Banner.jpg</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="FFXIV.ico">
+      <LogicalName>FFXIVKoreanPatch.Ui.App.ico</LogicalName>
     </EmbeddedResource>
     <EmbeddedResource Include="Properties\Resources.resx">
       <Generator>ResXFileCodeGenerator</Generator>
@@ -92,7 +102,6 @@
   </ItemGroup>
   <ItemGroup>
     <Content Include="FFXIV.ico" />
-    <Content Include="ffxiv.jpg" />
   </ItemGroup>
   <ItemGroup>
     <EmbeddedResource Include="..\..\FFXIVPatchGenerator\bin\Release\FFXIVPatchGenerator.exe" Condition="Exists('..\..\FFXIVPatchGenerator\bin\Release\FFXIVPatchGenerator.exe')">

@@ -2,7 +2,6 @@
 // 한글 패치의 기반과 구현 흐름을 만들어주신 원작자에게 감사드립니다.
 
 using System;
-using System.Windows.Forms;
 
 namespace FFXIVKoreanPatch.Main
 {
@@ -14,9 +13,14 @@ namespace FFXIVKoreanPatch.Main
         [STAThread]
         static void Main()
         {
-            Application.EnableVisualStyles();
-            Application.SetCompatibleTextRenderingDefault(false);
-            Application.Run(new FFXIVKoreanPatch());
+            System.Windows.Application app = new System.Windows.Application();
+            app.ShutdownMode = System.Windows.ShutdownMode.OnMainWindowClose;
+
+            MainWindow view = new MainWindow();
+            PatchController controller = new PatchController(view);
+            view.AttachController(controller);
+
+            app.Run(view.Window);
         }
     }
 }

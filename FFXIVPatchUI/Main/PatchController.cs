@@ -1,24 +1,23 @@
-// 이 프로젝트는 FFXIV 한글 패치 원작자 https://github.com/korean-patch 의 작업을 참고했습니다.
+﻿// 이 프로젝트는 FFXIV 한글 패치 원작자 https://github.com/korean-patch 의 작업을 참고했습니다.
 // 한글 패치의 기반과 구현 흐름을 만들어주신 원작자에게 감사드립니다.
 
 using Microsoft.Win32;
 using System;
 using System.Collections.Generic;
-using System.ComponentModel;
 using System.Diagnostics;
-using System.Drawing;
-using System.Drawing.Drawing2D;
-using System.Drawing.Imaging;
 using System.IO;
 using System.Linq;
 using System.Reflection;
 using System.Security.Cryptography;
 using System.Text;
-using System.Windows.Forms;
+using System.Threading;
 
 namespace FFXIVKoreanPatch.Main
 {
-    public partial class FFXIVKoreanPatch : Form
+    // UI-agnostic patch controller: all game/patch logic lives here while the
+    // WPF MainWindow renders state and forwards user actions. Converted from
+    // the former WinForms form class; the file/patch logic is unchanged.
+    public sealed class PatchController
     {
         #region Variables
 
@@ -145,7 +144,6 @@ namespace FFXIVKoreanPatch.Main
         private bool preserveBaseBnpcNames;
         private bool preserveBaseActionNames;
         private bool preserveBaseCommonPhrases;
-        private bool suppressBaseLanguageOptionSave;
 
         // Output directory used when generating release files locally.
         private string releaseOutputDir = string.Empty;
@@ -159,846 +157,97 @@ namespace FFXIVKoreanPatch.Main
         private bool buildFontPatch = true;
         private bool initialPreflightStarted;
         private bool lastPreflightPassed;
-        private Label debugFontProfileLabel;
-        private ComboBox debugFontProfileComboBox;
+        private string fontPatchProfile = "full";
+        private bool preflightHasRun;
+        private bool preflightBusy;
+        private bool buildBusy;
+        private bool removeBusy;
 
         // Target client version.
         private string targetVersion = string.Empty;
 
         #endregion
 
-        public FFXIVKoreanPatch()
+        private readonly MainWindow view;
+
+        public PatchController(MainWindow view)
         {
-            InitializeComponent();
-            SetStyle(ControlStyles.AllPaintingInWmPaint | ControlStyles.OptimizedDoubleBuffer | ControlStyles.ResizeRedraw, true);
-
-            Text = patchDisplayName;
-            debugBuildReleaseButton.Text = "테스트 자동 패치 (원본 변경 없음)";
-            buildReleaseButton.Text = "한국 서버 클라이언트로 자동 패치";
-            preflightCheckButton.Text = "사전 점검";
-            installButton.Text = "전체 한글 패치";
-            chatOnlyInstallButton.Text = "한글 폰트 패치";
-            removeButton.Text = "한글 패치 제거";
-            targetLanguageComboBox.Items.Clear();
-            targetLanguageComboBox.Items.Add("일본어 클라이언트 (ja)");
-            targetLanguageComboBox.Items.Add("영어 클라이언트 (en)");
-            targetLanguageComboBox.SelectedIndex = 0;
+            this.view = view;
             LoadBaseLanguageNameOptionSettings();
-            InitializeDebugFontProfileControls();
+        }
 
-#if TEST_BUILD
-            Text = patchDisplayName + " - 테스트 빌드";
-            buildReleaseButton.Visible = false;
-            installButton.Visible = false;
-            chatOnlyInstallButton.Visible = false;
-            removeButton.Visible = false;
-#else
-            debugBuildReleaseButton.Visible = false;
-            buildReleaseButton.Visible = false;
-            detectPathsButton.Visible = false;
-            resetPathsButton.Visible = false;
-#endif
+        public int TargetLanguageIndex
+        {
+            get { return targetLanguageCode == "en" ? 1 : 0; }
+        }
 
-            ApplyModernLayout();
+        public bool PreserveBaseBnpcNames
+        {
+            get { return preserveBaseBnpcNames; }
+        }
 
-            // Adjust the background to apply gradient effect.
-            AdjustBackground();
+        public bool PreserveBaseActionNames
+        {
+            get { return preserveBaseActionNames; }
+        }
 
-            // Empty the labels.
-            statusLabel.Text = "";
-            downloadLabel.Text = "";
+        public bool PreserveBaseCommonPhrases
+        {
+            get { return preserveBaseCommonPhrases; }
+        }
 
-            // Run the initial checker to verify and set up environment.
-            initialChecker.RunWorkerAsync();
+        // Called once by the view after the main window is loaded.
+        public void Start()
+        {
+            RunBackground(InitialCheckWork);
+        }
+
+        private static void RunBackground(Action work)
+        {
+            ThreadPool.QueueUserWorkItem(state => work());
         }
 
         #region Functions
 
-        private void InitializeDebugFontProfileControls()
+        #region View bridge
+
+        // Thin bridges keep call sites identical to the WinForms-era helpers.
+        private void ShowMessage(ViewMessageKind kind, params string[] lines)
         {
-            debugFontProfileLabel = new Label();
-            debugFontProfileLabel.Name = "debugFontProfileLabel";
-            debugFontProfileLabel.Text = "테스트 폰트 프로필";
-            debugFontProfileLabel.AutoSize = false;
-            debugFontProfileLabel.BackColor = Color.Transparent;
-
-            debugFontProfileComboBox = new ComboBox();
-            debugFontProfileComboBox.Name = "debugFontProfileComboBox";
-            debugFontProfileComboBox.DropDownStyle = ComboBoxStyle.DropDownList;
-            debugFontProfileComboBox.Items.Add(new FontProfileItem("기본", "full"));
-            debugFontProfileComboBox.Items.Add(new FontProfileItem("TrumpGothic 제외", "no-trumpgothic"));
-            debugFontProfileComboBox.Items.Add(new FontProfileItem("UI 숫자 보호", "ui-numeric-safe"));
-            debugFontProfileComboBox.Items.Add(new FontProfileItem("MiedingerMid 제외", "no-miedingermid"));
-            debugFontProfileComboBox.Items.Add(new FontProfileItem("Jupiter 제외", "no-jupiter"));
-            debugFontProfileComboBox.Items.Add(new FontProfileItem("AXIS 제외", "no-axis"));
-            debugFontProfileComboBox.Items.Add(new FontProfileItem("FDT만 적용", "fdt-only"));
-            debugFontProfileComboBox.Items.Add(new FontProfileItem("텍스처만 적용", "textures-only"));
-            debugFontProfileComboBox.SelectedIndex = 0;
-
-#if !TEST_BUILD
-            debugFontProfileLabel.Visible = false;
-            debugFontProfileComboBox.Visible = false;
-#endif
-
-            Controls.Add(debugFontProfileLabel);
-            Controls.Add(debugFontProfileComboBox);
-        }
-
-        private sealed class FontProfileItem
-        {
-            public readonly string DisplayName;
-            public readonly string Value;
-
-            public FontProfileItem(string displayName, string value)
-            {
-                DisplayName = displayName;
-                Value = value;
-            }
-
-            public override string ToString()
-            {
-                return DisplayName;
-            }
-        }
-
-        // Grab the background from the form and apply gradient effect.
-        private void AdjustBackground()
-        {
-            // Get the background image as Bitmap first.
-            Bitmap origImage = (Bitmap)BackgroundImage;
-
-            // Create a new image that will be used as a new background.
-            // This should have the same width as the form, and the same width-height ratio.
-            Bitmap newImage = new Bitmap(ClientSize.Width, ClientSize.Width * origImage.Height / origImage.Width);
-            newImage.SetResolution(origImage.HorizontalResolution, origImage.VerticalResolution);
-
-            // Starting drawing in the new image...
-            using (Graphics g = Graphics.FromImage(newImage))
-            {
-                // Prepare a rectangle to copy over the original image.
-                Rectangle rect = new Rectangle(0, 0, newImage.Width, newImage.Height);
-
-                // Set Graphics parameters...
-                g.CompositingMode = CompositingMode.SourceOver;
-                g.CompositingQuality = CompositingQuality.HighQuality;
-                g.InterpolationMode = InterpolationMode.HighQualityBicubic;
-                g.SmoothingMode = SmoothingMode.HighQuality;
-                g.PixelOffsetMode = PixelOffsetMode.HighQuality;
-
-                // Copy over the original image.
-                using (ImageAttributes wrapMode = new ImageAttributes())
-                {
-                    wrapMode.SetWrapMode(WrapMode.TileFlipXY);
-                    g.DrawImage(origImage, rect, 0, 0, origImage.Width, origImage.Height, GraphicsUnit.Pixel, wrapMode);
-                }
-
-                // Prepare a linear gradient brush that is transparent on top and form back color at the bottom.
-                LinearGradientBrush brush = new LinearGradientBrush(rect, Color.Transparent, BackColor, 90f);
-
-                // Draw on top of the original image.
-                g.FillRectangle(brush, rect);
-            }
-
-            // Set the new image as background.
-            BackgroundImage = newImage;
-        }
-
-        protected override void OnPaint(PaintEventArgs e)
-        {
-            base.OnPaint(e);
-
-            e.Graphics.SmoothingMode = SmoothingMode.AntiAlias;
-            e.Graphics.PixelOffsetMode = PixelOffsetMode.HighQuality;
-
-            using (SolidBrush veil = new SolidBrush(Color.FromArgb(76, 7, 10, 14)))
-            {
-                e.Graphics.FillRectangle(veil, 0, 0, ClientSize.Width, 210);
-            }
-
-            using (LinearGradientBrush brush = new LinearGradientBrush(
-                new Rectangle(0, 0, ClientSize.Width, 280),
-                Color.FromArgb(120, 18, 33, 44),
-                Color.FromArgb(8, 18, 21, 26),
-                90f))
-            {
-                e.Graphics.FillRectangle(brush, 0, 0, ClientSize.Width, 280);
-            }
-
-            DrawSurface(e.Graphics, new Rectangle(24, 240, 852, 330));
-            DrawSurface(e.Graphics, new Rectangle(24, 586, 852, 104));
-            DrawSurface(e.Graphics, new Rectangle(24, 706, 852, 112));
-            DrawOptionStrip(e.Graphics, new Rectangle(42, 476, 816, 44));
-
-            using (SolidBrush accent = new SolidBrush(Color.FromArgb(76, 169, 232)))
-            {
-                e.Graphics.FillRectangle(accent, 42, 255, 4, 22);
-                e.Graphics.FillRectangle(accent, 42, 597, 4, 22);
-                e.Graphics.FillRectangle(accent, 42, 717, 4, 22);
-            }
-
-            DrawModeBadge(e.Graphics);
-        }
-
-        private void DrawOptionStrip(Graphics graphics, Rectangle bounds)
-        {
-            using (SolidBrush fill = new SolidBrush(Color.FromArgb(104, 31, 37, 45)))
-            using (Pen line = new Pen(Color.FromArgb(54, 84, 100, 118)))
-            {
-                graphics.FillRectangle(fill, bounds);
-                graphics.DrawLine(line, bounds.Left, bounds.Top, bounds.Right, bounds.Top);
-                graphics.DrawLine(line, bounds.Left, bounds.Bottom, bounds.Right, bounds.Bottom);
-            }
-        }
-
-        private void DrawSurface(Graphics graphics, Rectangle bounds)
-        {
-            using (GraphicsPath path = CreateRoundedRectangle(bounds, 8))
-            using (SolidBrush fill = new SolidBrush(Color.FromArgb(232, 24, 28, 34)))
-            using (Pen border = new Pen(Color.FromArgb(72, 102, 118, 138)))
-            {
-                graphics.FillPath(fill, path);
-                graphics.DrawPath(border, path);
-            }
-        }
-
-        private void DrawModeBadge(Graphics graphics)
-        {
-            Rectangle bounds = new Rectangle(758, 38, 118, 32);
-            Color fillColor;
-            Color borderColor;
-#if TEST_BUILD
-            fillColor = Color.FromArgb(82, 64, 39, 18);
-            borderColor = Color.FromArgb(230, 174, 83);
-#else
-            fillColor = Color.FromArgb(74, 24, 64, 45);
-            borderColor = Color.FromArgb(86, 190, 128);
-#endif
-
-            using (GraphicsPath path = CreateRoundedRectangle(bounds, 8))
-            using (SolidBrush fill = new SolidBrush(fillColor))
-            using (Pen border = new Pen(borderColor))
-            {
-                graphics.FillPath(fill, path);
-                graphics.DrawPath(border, path);
-            }
-        }
-
-        private static GraphicsPath CreateRoundedRectangle(Rectangle bounds, int radius)
-        {
-            int diameter = radius * 2;
-            GraphicsPath path = new GraphicsPath();
-            path.AddArc(bounds.Left, bounds.Top, diameter, diameter, 180, 90);
-            path.AddArc(bounds.Right - diameter, bounds.Top, diameter, diameter, 270, 90);
-            path.AddArc(bounds.Right - diameter, bounds.Bottom - diameter, diameter, diameter, 0, 90);
-            path.AddArc(bounds.Left, bounds.Bottom - diameter, diameter, diameter, 90, 90);
-            path.CloseFigure();
-            return path;
-        }
-
-        private Label CreateLayoutLabel(string name, string text, int x, int y, int width, int height, Font font, Color color)
-        {
-            Label label = new Label();
-            label.Name = name;
-            label.AutoSize = false;
-            label.BackColor = Color.Transparent;
-            label.ForeColor = color;
-            label.Font = font;
-            label.Location = new Point(x, y);
-            label.Size = new Size(width, height);
-            label.Text = text;
-            label.TextAlign = ContentAlignment.MiddleLeft;
-            label.TabStop = false;
-            Controls.Add(label);
-            label.BringToFront();
-            return label;
-        }
-
-        private void StyleFieldLabel(Label label)
-        {
-            label.BackColor = Color.Transparent;
-            label.ForeColor = Color.FromArgb(198, 205, 214);
-            label.Font = new Font("맑은 고딕", 9F, FontStyle.Bold, GraphicsUnit.Point, 129);
-        }
-
-        private void StyleTextBox(TextBox textBox)
-        {
-            textBox.BorderStyle = BorderStyle.FixedSingle;
-            textBox.BackColor = Color.FromArgb(30, 34, 40);
-            textBox.ForeColor = Color.FromArgb(242, 245, 248);
-            textBox.Font = new Font("맑은 고딕", 9F, FontStyle.Regular, GraphicsUnit.Point, 129);
-        }
-
-        private void StyleComboBox(ComboBox comboBox)
-        {
-            comboBox.FlatStyle = FlatStyle.Flat;
-            comboBox.BackColor = Color.FromArgb(30, 34, 40);
-            comboBox.ForeColor = Color.FromArgb(242, 245, 248);
-            comboBox.Font = new Font("맑은 고딕", 9F, FontStyle.Regular, GraphicsUnit.Point, 129);
-        }
-
-        private void StyleCheckBox(CheckBox checkBox)
-        {
-            checkBox.Appearance = Appearance.Button;
-            checkBox.AutoSize = false;
-            checkBox.BackColor = Color.FromArgb(38, 47, 58);
-            checkBox.ForeColor = Color.FromArgb(230, 236, 244);
-            checkBox.Font = new Font("맑은 고딕", 8.5F, FontStyle.Bold, GraphicsUnit.Point, 129);
-            checkBox.Cursor = Cursors.Hand;
-            checkBox.FlatStyle = FlatStyle.Flat;
-            checkBox.TextAlign = ContentAlignment.MiddleCenter;
-            checkBox.FlatAppearance.BorderSize = 1;
-            checkBox.FlatAppearance.BorderColor = Color.FromArgb(86, 104, 122);
-            checkBox.FlatAppearance.MouseOverBackColor = Color.FromArgb(50, 61, 74);
-            checkBox.FlatAppearance.MouseDownBackColor = Color.FromArgb(29, 122, 184);
-            checkBox.FlatAppearance.CheckedBackColor = Color.FromArgb(34, 126, 188);
-        }
-
-        private void StyleButton(Button button, Color backColor, Color borderColor, Color hoverColor)
-        {
-            button.AutoSize = false;
-            button.Dock = DockStyle.None;
-            button.BackColor = backColor;
-            button.ForeColor = Color.FromArgb(246, 248, 250);
-            button.Cursor = Cursors.Hand;
-            button.FlatStyle = FlatStyle.Flat;
-            button.FlatAppearance.BorderColor = borderColor;
-            button.FlatAppearance.BorderSize = 1;
-            button.FlatAppearance.MouseDownBackColor = ControlPaint.Dark(backColor);
-            button.FlatAppearance.MouseOverBackColor = hoverColor;
-            button.Font = new Font("맑은 고딕", 9F, FontStyle.Bold, GraphicsUnit.Point, 129);
-            button.Padding = new Padding(0);
-            button.TextAlign = ContentAlignment.MiddleCenter;
-            button.UseVisualStyleBackColor = false;
-        }
-
-        private void PlaceControl(Control control, int x, int y, int width, int height)
-        {
-            control.Location = new Point(x, y);
-            control.Size = new Size(width, height);
-            control.Anchor = AnchorStyles.Top | AnchorStyles.Left;
-            control.BringToFront();
-        }
-
-        private void ApplyModernLayout()
-        {
-            SuspendLayout();
-
-            ClientSize = new Size(900, 830);
-            BackColor = Color.FromArgb(18, 21, 26);
-            ForeColor = Color.FromArgb(240, 243, 247);
-            Font = new Font("맑은 고딕", 9F, FontStyle.Regular, GraphicsUnit.Point, 129);
-
-            Font eyebrowFont = new Font("맑은 고딕", 8.5F, FontStyle.Bold, GraphicsUnit.Point, 129);
-            Font titleFont = new Font("맑은 고딕", 22F, FontStyle.Bold, GraphicsUnit.Point, 129);
-            Font sectionFont = new Font("맑은 고딕", 10F, FontStyle.Bold, GraphicsUnit.Point, 129);
-            Font smallFont = new Font("맑은 고딕", 8.5F, FontStyle.Bold, GraphicsUnit.Point, 129);
-
-            CreateLayoutLabel("eyebrowLabel", "GLOBAL CLIENT PATCHER", 34, 30, 260, 22, eyebrowFont, Color.FromArgb(166, 218, 255));
-            CreateLayoutLabel("titleLabel", "FFXIV 한글 패치", 32, 56, 480, 52, titleFont, Color.White);
-            CreateLayoutLabel("subtitleLabel", "일본어 / 영어 클라이언트", 36, 108, 320, 24, smallFont, Color.FromArgb(220, 227, 236));
-            CreateLayoutLabel(
-                "modeLabel",
-#if TEST_BUILD
-                "TEST BUILD",
-#else
-                "RELEASE",
-#endif
-                758,
-                40,
-                118,
-                28,
-                smallFont,
-#if TEST_BUILD
-                Color.FromArgb(255, 202, 113)
-#else
-                Color.FromArgb(125, 220, 151)
-#endif
-                );
-            CreateLayoutLabel("pathsSectionLabel", "클라이언트", 54, 254, 180, 24, sectionFont, Color.FromArgb(236, 241, 247));
-            CreateLayoutLabel("actionsSectionLabel", "패치 작업", 54, 596, 180, 24, sectionFont, Color.FromArgb(236, 241, 247));
-            CreateLayoutLabel("statusSectionLabel", "상태", 54, 716, 180, 24, sectionFont, Color.FromArgb(236, 241, 247));
-            CreateLayoutLabel("baseLanguageOptionsLabel", "원문 유지", 58, 486, 92, 20, smallFont, Color.FromArgb(198, 205, 214));
-
-            StyleFieldLabel(globalPathLabel);
-            StyleFieldLabel(koreaPathLabel);
-            StyleFieldLabel(targetLanguageLabel);
-            StyleFieldLabel(debugFontProfileLabel);
-            StyleTextBox(globalPathTextBox);
-            StyleTextBox(koreaPathTextBox);
-            StyleComboBox(targetLanguageComboBox);
-            StyleComboBox(debugFontProfileComboBox);
-            StyleCheckBox(preserveBaseBnpcNamesCheckBox);
-            StyleCheckBox(preserveBaseActionNamesCheckBox);
-            StyleCheckBox(preserveBaseCommonPhrasesCheckBox);
-
-            Color neutral = Color.FromArgb(42, 50, 61);
-            Color neutralBorder = Color.FromArgb(82, 96, 112);
-            Color neutralHover = Color.FromArgb(56, 67, 80);
-            Color primary = Color.FromArgb(34, 126, 188);
-            Color primaryBorder = Color.FromArgb(90, 184, 235);
-            Color primaryHover = Color.FromArgb(42, 145, 214);
-            Color success = Color.FromArgb(32, 139, 94);
-            Color successBorder = Color.FromArgb(91, 204, 148);
-            Color successHover = Color.FromArgb(40, 160, 110);
-            Color caution = Color.FromArgb(151, 111, 38);
-            Color cautionBorder = Color.FromArgb(218, 169, 70);
-            Color cautionHover = Color.FromArgb(174, 129, 46);
-            Color danger = Color.FromArgb(147, 59, 67);
-            Color dangerBorder = Color.FromArgb(218, 101, 110);
-            Color dangerHover = Color.FromArgb(171, 70, 79);
-
-            foreach (Button button in new Button[]
-            {
-                globalPathBrowseButton,
-                koreaPathBrowseButton,
-                detectPathsButton,
-                resetPathsButton,
-                openReleaseButton,
-                openLogsButton,
-                cleanupButton,
-                preflightCheckButton
-            })
-            {
-                StyleButton(button, neutral, neutralBorder, neutralHover);
-            }
-
-            StyleButton(restoreBackupButton, caution, cautionBorder, cautionHover);
-            StyleButton(debugBuildReleaseButton, success, successBorder, successHover);
-            StyleButton(buildReleaseButton, primary, primaryBorder, primaryHover);
-            StyleButton(installButton, primary, primaryBorder, primaryHover);
-            StyleButton(chatOnlyInstallButton, neutral, neutralBorder, neutralHover);
-            StyleButton(removeButton, danger, dangerBorder, dangerHover);
-
-            PlaceControl(globalPathLabel, 42, 290, 220, 20);
-            PlaceControl(globalPathTextBox, 42, 314, 720, 28);
-            PlaceControl(globalPathBrowseButton, 778, 313, 80, 30);
-
-            PlaceControl(koreaPathLabel, 42, 354, 220, 20);
-            PlaceControl(koreaPathTextBox, 42, 378, 720, 28);
-            PlaceControl(koreaPathBrowseButton, 778, 377, 80, 30);
-
-            PlaceControl(targetLanguageLabel, 42, 418, 220, 20);
-            PlaceControl(targetLanguageComboBox, 42, 442, 260, 30);
-            PlaceControl(detectPathsButton, 318, 441, 170, 32);
-            PlaceControl(resetPathsButton, 500, 441, 132, 32);
-            PlaceControl(debugFontProfileLabel, 646, 418, 212, 20);
-            PlaceControl(debugFontProfileComboBox, 646, 442, 212, 30);
-            PlaceControl(preserveBaseBnpcNamesCheckBox, 166, 483, 128, 30);
-            PlaceControl(preserveBaseActionNamesCheckBox, 306, 483, 128, 30);
-            PlaceControl(preserveBaseCommonPhrasesCheckBox, 446, 483, 128, 30);
-
-            PlaceControl(openReleaseButton, 42, 526, 194, 32);
-            PlaceControl(openLogsButton, 248, 526, 184, 32);
-            PlaceControl(cleanupButton, 444, 526, 190, 32);
-            PlaceControl(restoreBackupButton, 646, 526, 212, 32);
-
-#if TEST_BUILD
-            PlaceControl(preflightCheckButton, 42, 630, 404, 42);
-            PlaceControl(debugBuildReleaseButton, 458, 630, 400, 42);
-#else
-            PlaceControl(preflightCheckButton, 42, 630, 238, 42);
-            PlaceControl(installButton, 294, 630, 178, 42);
-            PlaceControl(chatOnlyInstallButton, 486, 630, 178, 42);
-            PlaceControl(removeButton, 678, 630, 180, 42);
-#endif
-
-            statusLabel.AutoSize = false;
-            statusLabel.Dock = DockStyle.None;
-            statusLabel.BackColor = Color.FromArgb(30, 36, 44);
-            statusLabel.BorderStyle = BorderStyle.None;
-            statusLabel.ForeColor = Color.White;
-            statusLabel.Padding = new Padding(12, 0, 12, 0);
-            statusLabel.TextAlign = ContentAlignment.MiddleLeft;
-            PlaceControl(statusLabel, 42, 746, 816, 34);
-
-            downloadLabel.AutoSize = false;
-            downloadLabel.Dock = DockStyle.None;
-            downloadLabel.BackColor = Color.Transparent;
-            downloadLabel.ForeColor = Color.FromArgb(198, 205, 214);
-            downloadLabel.Padding = new Padding(0);
-            downloadLabel.TextAlign = ContentAlignment.MiddleLeft;
-            PlaceControl(downloadLabel, 42, 781, 816, 18);
-
-            progressBar.Dock = DockStyle.None;
-            PlaceControl(progressBar, 42, 804, 816, 8);
-
-            ResumeLayout(false);
-        }
-
-        // Display message box from UI thread.
-        private DialogResult ShowMessageBox(MessageBoxButtons buttons, MessageBoxIcon icon, params string[] lines)
-        {
-            // Compile a single string from given text lines.
-            StringBuilder sb = new StringBuilder();
-
-            for (int i = 0; i < lines.Length; i++)
-            {
-                sb.Append(lines[i]);
-
-                // Append 2 new lines in between...
-                if (i != lines.Length - 1)
-                {
-                    sb.Append(Environment.NewLine);
-                    sb.Append(Environment.NewLine);
-                }
-            }
-
-            // Display message box on UI thread with given parameters.
-            return (DialogResult)Invoke(new Func<DialogResult>(() =>
-            {
-                return MessageBox.Show(sb.ToString(), Text, buttons, icon);
-            }));
+            view.ShowMessage(kind, lines);
         }
 
         private void ShowPreflightResultDialog(string summary, int failures, int warnings, string logPath, IList<string> lines)
         {
-            Invoke(new Action(() =>
-            {
-                using (Form dialog = new Form())
-                {
-                    dialog.Text = "사전 점검 결과";
-                    dialog.StartPosition = FormStartPosition.CenterParent;
-                    dialog.FormBorderStyle = FormBorderStyle.FixedDialog;
-                    dialog.MinimizeBox = false;
-                    dialog.MaximizeBox = false;
-                    dialog.ClientSize = new Size(760, 560);
-                    dialog.BackColor = Color.FromArgb(20, 24, 30);
-                    dialog.Font = new Font("맑은 고딕", 9F, FontStyle.Regular, GraphicsUnit.Point, 129);
-
-                    Color accent = failures > 0
-                        ? Color.FromArgb(235, 92, 92)
-                        : (warnings > 0 ? Color.FromArgb(232, 184, 92) : Color.FromArgb(86, 190, 128));
-
-                    TableLayoutPanel root = new TableLayoutPanel();
-                    root.Dock = DockStyle.Fill;
-                    root.Padding = new Padding(18);
-                    root.BackColor = dialog.BackColor;
-                    root.ColumnCount = 1;
-                    root.RowCount = 5;
-                    root.RowStyles.Add(new RowStyle(SizeType.Absolute, 58));
-                    root.RowStyles.Add(new RowStyle(SizeType.Absolute, 44));
-                    root.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
-                    root.RowStyles.Add(new RowStyle(SizeType.Absolute, 34));
-                    root.RowStyles.Add(new RowStyle(SizeType.Absolute, 46));
-                    dialog.Controls.Add(root);
-
-                    Label titleLabel = new Label();
-                    titleLabel.Dock = DockStyle.Fill;
-                    titleLabel.AutoSize = false;
-                    titleLabel.Text = summary;
-                    titleLabel.ForeColor = accent;
-                    titleLabel.Font = new Font("맑은 고딕", 15F, FontStyle.Bold, GraphicsUnit.Point, 129);
-                    titleLabel.TextAlign = ContentAlignment.MiddleLeft;
-                    root.Controls.Add(titleLabel, 0, 0);
-
-                    FlowLayoutPanel statPanel = new FlowLayoutPanel();
-                    statPanel.Dock = DockStyle.Fill;
-                    statPanel.FlowDirection = FlowDirection.LeftToRight;
-                    statPanel.WrapContents = false;
-                    statPanel.BackColor = dialog.BackColor;
-                    root.Controls.Add(statPanel, 0, 1);
-
-                    AddPreflightStatLabel(statPanel, "실패 " + failures.ToString(), failures > 0 ? Color.FromArgb(94, 36, 40) : Color.FromArgb(32, 38, 46), failures > 0 ? Color.FromArgb(255, 185, 185) : Color.FromArgb(190, 198, 208));
-                    AddPreflightStatLabel(statPanel, "주의 " + warnings.ToString(), warnings > 0 ? Color.FromArgb(86, 66, 28) : Color.FromArgb(32, 38, 46), warnings > 0 ? Color.FromArgb(255, 222, 150) : Color.FromArgb(190, 198, 208));
-                    AddPreflightStatLabel(statPanel, "전체 " + (lines == null ? 0 : lines.Count).ToString(), Color.FromArgb(32, 38, 46), Color.FromArgb(220, 226, 234));
-
-                    ListView listView = new ListView();
-                    listView.Dock = DockStyle.Fill;
-                    listView.View = View.Details;
-                    listView.FullRowSelect = true;
-                    listView.GridLines = false;
-                    listView.HeaderStyle = ColumnHeaderStyle.Nonclickable;
-                    listView.BackColor = Color.FromArgb(26, 31, 38);
-                    listView.ForeColor = Color.FromArgb(230, 235, 242);
-                    listView.BorderStyle = BorderStyle.FixedSingle;
-                    listView.Columns.Add("상태", 76);
-                    listView.Columns.Add("점검 항목", 245);
-                    listView.Columns.Add("상세", 395);
-
-                    foreach (string rawLine in lines ?? new string[0])
-                    {
-                        string state = "정보";
-                        string text = rawLine ?? string.Empty;
-                        Color rowColor = Color.FromArgb(215, 222, 230);
-
-                        if (text.StartsWith("[OK]", StringComparison.OrdinalIgnoreCase))
-                        {
-                            state = "OK";
-                            text = text.Substring(4).Trim();
-                            rowColor = Color.FromArgb(140, 220, 165);
-                        }
-                        else if (text.StartsWith("[주의]", StringComparison.OrdinalIgnoreCase))
-                        {
-                            state = "주의";
-                            text = text.Substring(4).Trim();
-                            rowColor = Color.FromArgb(255, 218, 135);
-                        }
-                        else if (text.StartsWith("[실패]", StringComparison.OrdinalIgnoreCase))
-                        {
-                            state = "실패";
-                            text = text.Substring(4).Trim();
-                            rowColor = Color.FromArgb(255, 170, 170);
-                        }
-
-                        string item = text;
-                        string detail = string.Empty;
-                        int colon = text.IndexOf(':');
-                        if (colon > 0 && colon < text.Length - 1)
-                        {
-                            item = text.Substring(0, colon).Trim();
-                            detail = text.Substring(colon + 1).Trim();
-                        }
-
-                        ListViewItem listItem = new ListViewItem(state);
-                        listItem.SubItems.Add(item);
-                        listItem.SubItems.Add(detail);
-                        listItem.ForeColor = rowColor;
-                        listView.Items.Add(listItem);
-                    }
-
-                    root.Controls.Add(listView, 0, 2);
-
-                    Label logLabel = new Label();
-                    logLabel.Dock = DockStyle.Fill;
-                    logLabel.AutoSize = false;
-                    logLabel.Text = "로그: " + logPath;
-                    logLabel.ForeColor = Color.FromArgb(178, 188, 200);
-                    logLabel.TextAlign = ContentAlignment.MiddleLeft;
-                    root.Controls.Add(logLabel, 0, 3);
-
-                    FlowLayoutPanel buttonPanel = new FlowLayoutPanel();
-                    buttonPanel.Dock = DockStyle.Fill;
-                    buttonPanel.FlowDirection = FlowDirection.RightToLeft;
-                    buttonPanel.WrapContents = false;
-                    buttonPanel.BackColor = dialog.BackColor;
-                    root.Controls.Add(buttonPanel, 0, 4);
-
-                    Button closeButton = CreateDialogButton("닫기", Color.FromArgb(64, 72, 84), Color.White);
-                    closeButton.DialogResult = DialogResult.OK;
-                    buttonPanel.Controls.Add(closeButton);
-
-                    Button openLogButton = CreateDialogButton("로그 열기", Color.FromArgb(58, 90, 142), Color.White);
-                    openLogButton.Click += (sender, args) =>
-                    {
-                        try
-                        {
-                            if (!string.IsNullOrEmpty(logPath) && File.Exists(logPath))
-                            {
-                                Process.Start(new ProcessStartInfo(logPath) { UseShellExecute = true });
-                            }
-                        }
-                        catch
-                        {
-                            MessageBox.Show("로그 파일을 열 수 없어요.", Text, MessageBoxButtons.OK, MessageBoxIcon.Warning);
-                        }
-                    };
-                    buttonPanel.Controls.Add(openLogButton);
-
-                    dialog.AcceptButton = closeButton;
-                    dialog.ShowDialog(this);
-                }
-            }));
+            view.SetPreflightResult(summary, failures, warnings, logPath, lines);
         }
 
         private void ShowOperationResultDialog(string title, string summary, string logPath, IList<KeyValuePair<string, string>> details)
         {
-            Invoke(new Action(() =>
-            {
-                using (Form dialog = new Form())
-                {
-                    dialog.Text = title;
-                    dialog.StartPosition = FormStartPosition.CenterParent;
-                    dialog.FormBorderStyle = FormBorderStyle.FixedDialog;
-                    dialog.MinimizeBox = false;
-                    dialog.MaximizeBox = false;
-                    dialog.ClientSize = new Size(720, 440);
-                    dialog.BackColor = Color.FromArgb(20, 24, 30);
-                    dialog.Font = new Font("맑은 고딕", 9F, FontStyle.Regular, GraphicsUnit.Point, 129);
-
-                    TableLayoutPanel root = new TableLayoutPanel();
-                    root.Dock = DockStyle.Fill;
-                    root.Padding = new Padding(18);
-                    root.BackColor = dialog.BackColor;
-                    root.ColumnCount = 1;
-                    root.RowCount = 4;
-                    root.RowStyles.Add(new RowStyle(SizeType.Absolute, 72));
-                    root.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
-                    root.RowStyles.Add(new RowStyle(SizeType.Absolute, 34));
-                    root.RowStyles.Add(new RowStyle(SizeType.Absolute, 46));
-                    dialog.Controls.Add(root);
-
-                    Label titleLabel = new Label();
-                    titleLabel.Dock = DockStyle.Fill;
-                    titleLabel.AutoSize = false;
-                    titleLabel.Text = title + Environment.NewLine + summary;
-                    titleLabel.ForeColor = Color.FromArgb(126, 208, 154);
-                    titleLabel.Font = new Font("맑은 고딕", 13F, FontStyle.Bold, GraphicsUnit.Point, 129);
-                    titleLabel.TextAlign = ContentAlignment.MiddleLeft;
-                    root.Controls.Add(titleLabel, 0, 0);
-
-                    ListView listView = new ListView();
-                    listView.Dock = DockStyle.Fill;
-                    listView.View = View.Details;
-                    listView.FullRowSelect = true;
-                    listView.GridLines = false;
-                    listView.HeaderStyle = ColumnHeaderStyle.Nonclickable;
-                    listView.BackColor = Color.FromArgb(26, 31, 38);
-                    listView.ForeColor = Color.FromArgb(230, 235, 242);
-                    listView.BorderStyle = BorderStyle.FixedSingle;
-                    listView.Columns.Add("항목", 170);
-                    listView.Columns.Add("내용", 500);
-
-                    foreach (KeyValuePair<string, string> detail in details ?? new KeyValuePair<string, string>[0])
-                    {
-                        ListViewItem item = new ListViewItem(detail.Key ?? string.Empty);
-                        item.SubItems.Add(detail.Value ?? string.Empty);
-                        item.ForeColor = Color.FromArgb(224, 231, 240);
-                        listView.Items.Add(item);
-                    }
-
-                    root.Controls.Add(listView, 0, 1);
-
-                    Label logLabel = new Label();
-                    logLabel.Dock = DockStyle.Fill;
-                    logLabel.AutoSize = false;
-                    logLabel.Text = "로그: " + logPath;
-                    logLabel.ForeColor = Color.FromArgb(178, 188, 200);
-                    logLabel.TextAlign = ContentAlignment.MiddleLeft;
-                    root.Controls.Add(logLabel, 0, 2);
-
-                    FlowLayoutPanel buttonPanel = new FlowLayoutPanel();
-                    buttonPanel.Dock = DockStyle.Fill;
-                    buttonPanel.FlowDirection = FlowDirection.RightToLeft;
-                    buttonPanel.WrapContents = false;
-                    buttonPanel.BackColor = dialog.BackColor;
-                    root.Controls.Add(buttonPanel, 0, 3);
-
-                    Button closeButton = CreateDialogButton("닫기", Color.FromArgb(64, 72, 84), Color.White);
-                    closeButton.DialogResult = DialogResult.OK;
-                    buttonPanel.Controls.Add(closeButton);
-
-                    Button openLogButton = CreateDialogButton("로그 열기", Color.FromArgb(58, 90, 142), Color.White);
-                    openLogButton.Click += (sender, args) =>
-                    {
-                        try
-                        {
-                            if (!string.IsNullOrEmpty(logPath) && File.Exists(logPath))
-                            {
-                                Process.Start(new ProcessStartInfo(logPath) { UseShellExecute = true });
-                            }
-                        }
-                        catch
-                        {
-                            MessageBox.Show("로그 파일을 열 수 없어요.", Text, MessageBoxButtons.OK, MessageBoxIcon.Warning);
-                        }
-                    };
-                    buttonPanel.Controls.Add(openLogButton);
-
-                    dialog.AcceptButton = closeButton;
-                    dialog.ShowDialog(this);
-                }
-            }));
+            view.ShowOperationResult(title, summary, logPath, details);
         }
 
-        private void AddPreflightStatLabel(FlowLayoutPanel panel, string text, Color backColor, Color foreColor)
-        {
-            Label label = new Label();
-            label.AutoSize = false;
-            label.Width = 108;
-            label.Height = 28;
-            label.Margin = new Padding(0, 4, 10, 4);
-            label.BackColor = backColor;
-            label.ForeColor = foreColor;
-            label.Font = new Font("맑은 고딕", 9F, FontStyle.Bold, GraphicsUnit.Point, 129);
-            label.Text = text;
-            label.TextAlign = ContentAlignment.MiddleCenter;
-            panel.Controls.Add(label);
-        }
-
-        private Button CreateDialogButton(string text, Color backColor, Color foreColor)
-        {
-            Button button = new Button();
-            button.Text = text;
-            button.Width = 104;
-            button.Height = 32;
-            button.Margin = new Padding(8, 7, 0, 0);
-            button.FlatStyle = FlatStyle.Flat;
-            button.FlatAppearance.BorderColor = Color.FromArgb(92, 104, 120);
-            button.FlatAppearance.MouseOverBackColor = ControlPaint.Light(backColor, 0.12f);
-            button.FlatAppearance.MouseDownBackColor = ControlPaint.Dark(backColor, 0.12f);
-            button.BackColor = backColor;
-            button.ForeColor = foreColor;
-            button.Font = new Font("맑은 고딕", 9F, FontStyle.Bold, GraphicsUnit.Point, 129);
-            button.UseVisualStyleBackColor = false;
-            return button;
-        }
-
-        // Update status label text always from UI thread.
         private void UpdateStatusLabel(string text, bool isRed = false)
         {
-            Invoke(new Action(() =>
-            {
-                statusLabel.Text = text;
-                statusLabel.ForeColor = isRed ? Color.Red : Color.White;
-            }));
+            view.SetStatus(text, isRed);
         }
 
-        // Update download label text always from UI thread.
         private void UpdateDownloadLabel(string text)
         {
-            Invoke(new Action(() =>
-            {
-                downloadLabel.Text = text;
-            }));
+            view.SetSubStatus(text);
         }
 
         private void UpdatePathTextBoxes()
         {
-            Action action = () =>
-            {
-                globalPathTextBox.Text = string.IsNullOrEmpty(targetDir) ? "(미설정)" : targetDir;
-                koreaPathTextBox.Text = string.IsNullOrEmpty(koreaSourceDir) ? "(미설정)" : koreaSourceDir;
-            };
-
-            if (InvokeRequired) Invoke(action);
-            else action();
+            view.SetPaths(targetDir, koreaSourceDir);
         }
 
-        private void SetPathBrowseButtonsEnabled(bool enabled)
-        {
-            Action action = () =>
-            {
-                globalPathBrowseButton.Enabled = enabled;
-                koreaPathBrowseButton.Enabled = enabled;
-                targetLanguageComboBox.Enabled = enabled;
-                preserveBaseBnpcNamesCheckBox.Enabled = enabled;
-                preserveBaseActionNamesCheckBox.Enabled = enabled;
-                preserveBaseCommonPhrasesCheckBox.Enabled = enabled;
-                debugFontProfileComboBox.Enabled = enabled;
-                detectPathsButton.Enabled = enabled;
-                resetPathsButton.Enabled = enabled;
-                openReleaseButton.Enabled = enabled;
-                openLogsButton.Enabled = enabled;
-                cleanupButton.Enabled = enabled;
-#if TEST_BUILD
-                restoreBackupButton.Enabled = enabled;
-#else
-                restoreBackupButton.Enabled = enabled;
-#endif
-            };
-
-            if (InvokeRequired) Invoke(action);
-            else action();
-        }
-
-        // Close the form always from UI thread.
         private void CloseForm()
         {
-            Invoke(new Action(() =>
-            {
-                Close();
-            }));
+            view.CloseView();
         }
+
+        #endregion
 
         // Validates the target client directory by checking if required files are present.
         // Return the directory back if valid, else return null.
@@ -1338,53 +587,132 @@ namespace FFXIVKoreanPatch.Main
 
         private void SetActionButtonsEnabled(bool enabled)
         {
-            Action action = () =>
+            bool hasGlobalClient = HasValidGlobalClient();
+            bool hasKoreaClient = HasValidKoreaClient();
+            string[] fullPatchSelection = GetPatchFilesForSelection(true, true);
+            string[] fontPatchSelection = GetPatchFilesForSelection(false, true);
+            bool fullHasCleanBase = hasGlobalClient && CanApplyPatchFilesWithCurrentIndexState(fullPatchSelection);
+            bool fontHasCleanBase = hasGlobalClient && CanApplyPatchFilesWithCurrentIndexState(fontPatchSelection);
+            bool fontBlockedOutside = hasGlobalClient && HasPatchedIndexesOutsideSelection(fontPatchSelection);
+            bool fullBlockedOutside = hasGlobalClient && HasPatchedIndexesOutsideSelection(fullPatchSelection);
+
+            DashboardState state = new DashboardState();
+            state.ControlsEnabled = enabled;
+            state.State = DetectClientPatchState();
+            state.StateDetail = string.IsNullOrEmpty(targetVersion) ? null : "클라이언트 " + targetVersion;
+
+#if TEST_BUILD
+            state.CanFullPatch = false;
+            state.CanFontPatch = false;
+            state.CanRemove = false;
+            state.CanTestPatch = enabled && hasGlobalClient && hasKoreaClient;
+            state.GuardNote = null;
+#else
+            state.CanFullPatch = enabled && hasGlobalClient && hasKoreaClient && lastPreflightPassed &&
+                fullHasCleanBase && !fullBlockedOutside;
+            state.CanFontPatch = enabled && hasGlobalClient && hasKoreaClient && lastPreflightPassed &&
+                fontHasCleanBase && !fontBlockedOutside;
+            state.CanRemove = enabled && hasGlobalClient;
+            state.CanTestPatch = false;
+            state.GuardNote = BuildGuardNote(
+                enabled,
+                hasGlobalClient,
+                hasKoreaClient,
+                fullHasCleanBase,
+                fontBlockedOutside,
+                state.CanFullPatch,
+                state.CanFontPatch);
+#endif
+
+            view.ApplyDashboard(state);
+        }
+
+        private string BuildGuardNote(
+            bool enabled,
+            bool hasGlobalClient,
+            bool hasKoreaClient,
+            bool fullHasCleanBase,
+            bool fontBlockedOutside,
+            bool canFull,
+            bool canFont)
+        {
+            if (!enabled || !hasGlobalClient)
             {
-                bool hasGlobalClient = HasValidGlobalClient();
-                bool hasKoreaClient = HasValidKoreaClient();
-                string[] fullPatchSelection = GetPatchFilesForSelection(true, true);
-                string[] fontPatchSelection = GetPatchFilesForSelection(false, true);
-                bool canApplyFullPatch = enabled && hasGlobalClient && hasKoreaClient && lastPreflightPassed &&
-                    CanApplyPatchFilesWithCurrentIndexState(fullPatchSelection) &&
-                    !HasPatchedIndexesOutsideSelection(fullPatchSelection);
-                bool canApplyFontPatch = enabled && hasGlobalClient && hasKoreaClient && lastPreflightPassed &&
-                    CanApplyPatchFilesWithCurrentIndexState(fontPatchSelection) &&
-                    !HasPatchedIndexesOutsideSelection(fontPatchSelection);
+                return null;
+            }
 
-                globalPathBrowseButton.Enabled = enabled;
-                koreaPathBrowseButton.Enabled = enabled;
-                targetLanguageComboBox.Enabled = enabled;
-                preserveBaseBnpcNamesCheckBox.Enabled = enabled;
-                preserveBaseActionNamesCheckBox.Enabled = enabled;
-                preserveBaseCommonPhrasesCheckBox.Enabled = enabled;
-                detectPathsButton.Enabled = enabled;
-                resetPathsButton.Enabled = enabled;
-                openReleaseButton.Enabled = enabled;
-                openLogsButton.Enabled = enabled;
-                cleanupButton.Enabled = enabled;
-#if TEST_BUILD
-                restoreBackupButton.Enabled = enabled;
-#else
-                restoreBackupButton.Enabled = enabled;
-#endif
-                preflightCheckButton.Enabled = enabled;
-#if TEST_BUILD
-                debugBuildReleaseButton.Enabled = enabled && hasGlobalClient && hasKoreaClient;
-                buildReleaseButton.Enabled = false;
-                installButton.Enabled = false;
-                chatOnlyInstallButton.Enabled = false;
-                removeButton.Enabled = false;
-#else
-                debugBuildReleaseButton.Enabled = false;
-                buildReleaseButton.Enabled = false;
-                installButton.Enabled = canApplyFullPatch;
-                chatOnlyInstallButton.Enabled = canApplyFontPatch;
-                removeButton.Enabled = enabled && hasGlobalClient;
-#endif
-            };
+            if (!hasKoreaClient)
+            {
+                return "한국 서버 클라이언트 경로가 설정되지 않았습니다. '변경' 또는 '자동 탐색'으로 지정해주세요. 한글 원문은 한국 서버 클라이언트에서 읽어옵니다.";
+            }
 
-            if (InvokeRequired) Invoke(action);
-            else action();
+            if (preflightHasRun && !lastPreflightPassed)
+            {
+                return "사전 점검에서 실패한 항목이 있어 패치 버튼을 잠갔습니다. 아래 점검 카드에서 실패 항목을 해결한 뒤 '다시 점검'을 눌러주세요.";
+            }
+
+            if (lastPreflightPassed && !canFont && fontBlockedOutside && canFull)
+            {
+                return "폰트만 패치를 사용할 수 없어요 — 텍스트/UI 패치(전체 패치)가 이미 적용되어 있습니다. 폰트만 패치로 전환하려면 먼저 '패치 제거'로 원본 상태로 되돌려주세요. (전체 패치 재적용은 가능합니다.)";
+            }
+
+            if (lastPreflightPassed && !canFull && !fullHasCleanBase)
+            {
+                return "clean base index를 찾을 수 없어 패치 버튼을 잠갔습니다. '패치 제거' 또는 런처 파일 검사/복구로 원본 index를 되돌린 뒤 다시 점검해주세요.";
+            }
+
+            return null;
+        }
+
+        private ClientPatchState DetectClientPatchState()
+        {
+            if (!HasValidGlobalClient())
+            {
+                return ClientPatchState.NoClient;
+            }
+
+            string sqpackDir = GetTargetSqpackDir();
+            bool fontPatched;
+            bool uiPatched;
+            bool textPatched;
+            try
+            {
+                fontPatched = IsPackageIndexPatched(sqpackDir, "000000");
+                uiPatched = IsPackageIndexPatched(sqpackDir, "060000");
+                textPatched = IsPackageIndexPatched(sqpackDir, "0a0000");
+            }
+            catch
+            {
+                return ClientPatchState.Unreadable;
+            }
+
+            if (!fontPatched && !uiPatched && !textPatched)
+            {
+                return ClientPatchState.Clean;
+            }
+
+            if (fontPatched && uiPatched && textPatched)
+            {
+                return ClientPatchState.Full;
+            }
+
+            if (fontPatched && !uiPatched && !textPatched)
+            {
+                return ClientPatchState.FontOnly;
+            }
+
+            return ClientPatchState.Mixed;
+        }
+
+        private bool IsPackageIndexPatched(string sqpackDir, string packageName)
+        {
+            string indexPath = Path.Combine(sqpackDir, packageName + ".win32.index");
+            if (!File.Exists(indexPath))
+            {
+                return false;
+            }
+
+            return CountPatchedDataFileEntries(indexPath) > 0;
         }
 
         private bool RefreshTargetVersion()
@@ -1400,34 +728,12 @@ namespace FFXIVKoreanPatch.Main
 
         private void SetProgressMarquee(bool enabled)
         {
-            Action action = () =>
-            {
-                progressBar.Style = enabled ? ProgressBarStyle.Marquee : ProgressBarStyle.Continuous;
-                progressBar.MarqueeAnimationSpeed = enabled ? 30 : 0;
-                if (!enabled)
-                {
-                    progressBar.Value = 0;
-                }
-            };
-
-            if (InvokeRequired) Invoke(action);
-            else action();
+            view.SetProgressMarquee(enabled);
         }
 
         private void SetProgressValue(int percent)
         {
-            if (percent < 0) percent = 0;
-            if (percent > 100) percent = 100;
-
-            Action action = () =>
-            {
-                progressBar.Style = ProgressBarStyle.Continuous;
-                progressBar.MarqueeAnimationSpeed = 0;
-                progressBar.Value = percent;
-            };
-
-            if (InvokeRequired) Invoke(action);
-            else action();
+            view.SetProgressValue(percent);
         }
 
         private static string QuoteArgument(string value)
@@ -1457,7 +763,7 @@ namespace FFXIVKoreanPatch.Main
         {
             string localAppData = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
             string rootDir = string.IsNullOrEmpty(localAppData)
-                ? Path.Combine(Application.CommonAppDataPath, "runtime-data")
+                ? Path.Combine(LegacyPaths.CommonAppDataPath, "runtime-data")
                 : Path.Combine(localAppData, "FFXIVKoreanPatch");
 
             Directory.CreateDirectory(rootDir);
@@ -1518,12 +824,9 @@ namespace FFXIVKoreanPatch.Main
                 }
             }
 
-            suppressBaseLanguageOptionSave = true;
-            preserveBaseBnpcNamesCheckBox.Checked = bnpc;
-            preserveBaseActionNamesCheckBox.Checked = actions;
-            preserveBaseCommonPhrasesCheckBox.Checked = commonPhrases;
-            suppressBaseLanguageOptionSave = false;
-            SyncBaseLanguageNameOptionsFromUi();
+            preserveBaseBnpcNames = bnpc;
+            preserveBaseActionNames = actions;
+            preserveBaseCommonPhrases = commonPhrases;
         }
 
         private void SaveBaseLanguageNameOptionSettings()
@@ -1538,12 +841,6 @@ namespace FFXIVKoreanPatch.Main
             File.WriteAllLines(path, lines, Encoding.UTF8);
         }
 
-        private void SyncBaseLanguageNameOptionsFromUi()
-        {
-            preserveBaseBnpcNames = preserveBaseBnpcNamesCheckBox != null && preserveBaseBnpcNamesCheckBox.Checked;
-            preserveBaseActionNames = preserveBaseActionNamesCheckBox != null && preserveBaseActionNamesCheckBox.Checked;
-            preserveBaseCommonPhrases = preserveBaseCommonPhrasesCheckBox != null && preserveBaseCommonPhrasesCheckBox.Checked;
-        }
 
         private string FormatBaseLanguageNameOptionSummary()
         {
@@ -1557,7 +854,7 @@ namespace FFXIVKoreanPatch.Main
             string versionKey = "unknown";
             try
             {
-                versionKey = File.GetLastWriteTimeUtc(Application.ExecutablePath).Ticks.ToString("x");
+                versionKey = File.GetLastWriteTimeUtc(LegacyPaths.ExecutablePath).Ticks.ToString("x");
             }
             catch
             {
@@ -1626,10 +923,10 @@ namespace FFXIVKoreanPatch.Main
 
             string[] candidatePaths = new string[]
             {
-                Path.Combine(Application.StartupPath, "FFXIVPatchGenerator.exe"),
-                Path.GetFullPath(Path.Combine(Application.StartupPath, @"..\..\..\FFXIVPatchGenerator\bin\Release\FFXIVPatchGenerator.exe")),
-                Path.GetFullPath(Path.Combine(Application.StartupPath, @"..\..\..\FFXIVPatchGenerator\bin\Debug\FFXIVPatchGenerator.exe")),
-                Path.GetFullPath(Path.Combine(Application.StartupPath, @"..\..\..\..\FFXIVPatchGenerator\bin\Release\FFXIVPatchGenerator.exe"))
+                Path.Combine(LegacyPaths.StartupPath, "FFXIVPatchGenerator.exe"),
+                Path.GetFullPath(Path.Combine(LegacyPaths.StartupPath, @"..\..\..\FFXIVPatchGenerator\bin\Release\FFXIVPatchGenerator.exe")),
+                Path.GetFullPath(Path.Combine(LegacyPaths.StartupPath, @"..\..\..\FFXIVPatchGenerator\bin\Debug\FFXIVPatchGenerator.exe")),
+                Path.GetFullPath(Path.Combine(LegacyPaths.StartupPath, @"..\..\..\..\FFXIVPatchGenerator\bin\Release\FFXIVPatchGenerator.exe"))
             };
 
             foreach (string candidatePath in candidatePaths)
@@ -1680,7 +977,7 @@ namespace FFXIVKoreanPatch.Main
             string[] candidatePaths = new string[]
             {
                 string.IsNullOrEmpty(generatorDir) ? null : Path.Combine(generatorDir, "patch-policy.json"),
-                Path.Combine(Application.StartupPath, "patch-policy.json")
+                Path.Combine(LegacyPaths.StartupPath, "patch-policy.json")
             };
 
             foreach (string candidatePath in candidatePaths)
@@ -2532,8 +1829,8 @@ namespace FFXIVKoreanPatch.Main
             return new string[]
             {
                 GetBackupRootDir(),
-                Path.Combine(Application.StartupPath, "backups"),
-                Path.Combine(Application.CommonAppDataPath, "backups")
+                Path.Combine(LegacyPaths.StartupPath, "backups"),
+                Path.Combine(LegacyPaths.CommonAppDataPath, "backups")
             }.Distinct(StringComparer.OrdinalIgnoreCase);
         }
 
@@ -3122,8 +2419,8 @@ namespace FFXIVKoreanPatch.Main
             }
 
             string languageRoot = Path.Combine(GetRuntimeDataRootDir(), "generated-release", targetLanguageCode);
-            string legacyStartupLanguageRoot = Path.Combine(Application.StartupPath, "generated-release", targetLanguageCode);
-            string commonLanguageRoot = Path.Combine(Application.CommonAppDataPath, "generated-release", targetLanguageCode);
+            string legacyStartupLanguageRoot = Path.Combine(LegacyPaths.StartupPath, "generated-release", targetLanguageCode);
+            string commonLanguageRoot = Path.Combine(LegacyPaths.CommonAppDataPath, "generated-release", targetLanguageCode);
             string latest = FindLatestDirectory(languageRoot, legacyStartupLanguageRoot, commonLanguageRoot);
             if (!string.IsNullOrEmpty(latest))
             {
@@ -3131,8 +2428,8 @@ namespace FFXIVKoreanPatch.Main
             }
 
             string appRoot = Path.Combine(GetRuntimeDataRootDir(), "generated-release");
-            string legacyStartupRoot = Path.Combine(Application.StartupPath, "generated-release");
-            string commonRoot = Path.Combine(Application.CommonAppDataPath, "generated-release");
+            string legacyStartupRoot = Path.Combine(LegacyPaths.StartupPath, "generated-release");
+            string commonRoot = Path.Combine(LegacyPaths.CommonAppDataPath, "generated-release");
             return FindLatestDirectory(appRoot, legacyStartupRoot, commonRoot);
         }
 
@@ -3140,7 +2437,7 @@ namespace FFXIVKoreanPatch.Main
         {
             if (string.IsNullOrEmpty(folderPath) || !Directory.Exists(folderPath))
             {
-                MessageBox.Show(missingMessage, Text, MessageBoxButtons.OK, MessageBoxIcon.Information);
+                ShowMessage(ViewMessageKind.Info, missingMessage);
                 return;
             }
 
@@ -3156,11 +2453,11 @@ namespace FFXIVKoreanPatch.Main
             return new string[]
             {
                 Path.Combine(GetRuntimeDataRootDir(), "generated-release"),
-                Path.Combine(Application.CommonAppDataPath, "generated-release"),
-                Path.Combine(Application.StartupPath, "generated-release"),
+                Path.Combine(LegacyPaths.CommonAppDataPath, "generated-release"),
+                Path.Combine(LegacyPaths.StartupPath, "generated-release"),
                 GetLogRootDir(),
-                Path.Combine(Application.StartupPath, "logs"),
-                Path.Combine(Application.CommonAppDataPath, "logs")
+                Path.Combine(LegacyPaths.StartupPath, "logs"),
+                Path.Combine(LegacyPaths.CommonAppDataPath, "logs")
             }.Distinct(StringComparer.OrdinalIgnoreCase);
         }
 
@@ -3393,8 +2690,8 @@ namespace FFXIVKoreanPatch.Main
                     .Concat(new string[]
                     {
                         Path.Combine(GetRuntimeDataRootDir(), "restore-baseline"),
-                        Path.Combine(Application.StartupPath, "restore-baseline"),
-                        Path.Combine(Application.CommonAppDataPath, "restore-baseline")
+                        Path.Combine(LegacyPaths.StartupPath, "restore-baseline"),
+                        Path.Combine(LegacyPaths.CommonAppDataPath, "restore-baseline")
                     })
                     .Distinct(StringComparer.OrdinalIgnoreCase)
                     .ToArray());
@@ -3417,65 +2714,15 @@ namespace FFXIVKoreanPatch.Main
                 StringComparison.OrdinalIgnoreCase);
         }
 
-        private string SelectBackupDirectory()
+        private List<string> BuildBackupCandidateList()
         {
-            DirectoryInfo[] backups = EnumerateBackupCandidateDirs()
+            return EnumerateBackupCandidateDirs()
                 .Where(HasRestorableBackupFiles)
                 .Select(path => new DirectoryInfo(path))
                 .OrderByDescending(directory => directory.LastWriteTimeUtc)
                 .Take(30)
-                .ToArray();
-            if (backups.Length == 0)
-            {
-                return null;
-            }
-
-            using (Form dialog = new Form())
-            using (ListBox listBox = new ListBox())
-            using (Button restoreButton = new Button())
-            using (Button cancelButton = new Button())
-            {
-                dialog.Text = "백업 선택";
-                dialog.StartPosition = FormStartPosition.CenterParent;
-                dialog.FormBorderStyle = FormBorderStyle.FixedDialog;
-                dialog.MaximizeBox = false;
-                dialog.MinimizeBox = false;
-                dialog.ClientSize = new Size(560, 320);
-
-                listBox.Location = new Point(12, 12);
-                listBox.Size = new Size(536, 250);
-                listBox.Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right | AnchorStyles.Bottom;
-                listBox.DisplayMember = "FullName";
-
-                foreach (DirectoryInfo backup in backups)
-                {
-                    listBox.Items.Add(backup);
-                }
-
-                restoreButton.Text = "복구";
-                restoreButton.Location = new Point(372, 278);
-                restoreButton.Size = new Size(84, 28);
-                restoreButton.DialogResult = DialogResult.OK;
-
-                cancelButton.Text = "취소";
-                cancelButton.Location = new Point(464, 278);
-                cancelButton.Size = new Size(84, 28);
-                cancelButton.DialogResult = DialogResult.Cancel;
-
-                dialog.Controls.Add(listBox);
-                dialog.Controls.Add(restoreButton);
-                dialog.Controls.Add(cancelButton);
-                dialog.AcceptButton = restoreButton;
-                dialog.CancelButton = cancelButton;
-
-                listBox.SelectedIndex = 0;
-                if (dialog.ShowDialog(this) != DialogResult.OK || listBox.SelectedItem == null)
-                {
-                    return null;
-                }
-
-                return ((DirectoryInfo)listBox.SelectedItem).FullName;
-            }
+                .Select(directory => directory.FullName)
+                .ToList();
         }
 
         private void RestoreSelectedBackup(string backupDir)
@@ -3561,10 +2808,10 @@ namespace FFXIVKoreanPatch.Main
             {
                 Path.Combine(GetRuntimeDataRootDir(), "generated-release"),
                 Path.Combine(GetRuntimeDataRootDir(), "restore-baseline"),
-                Path.Combine(Application.StartupPath, "generated-release"),
-                Path.Combine(Application.StartupPath, "restore-baseline"),
-                Path.Combine(Application.CommonAppDataPath, "generated-release"),
-                Path.Combine(Application.CommonAppDataPath, "restore-baseline")
+                Path.Combine(LegacyPaths.StartupPath, "generated-release"),
+                Path.Combine(LegacyPaths.StartupPath, "restore-baseline"),
+                Path.Combine(LegacyPaths.CommonAppDataPath, "generated-release"),
+                Path.Combine(LegacyPaths.CommonAppDataPath, "restore-baseline")
             };
 
             foreach (string root in roots)
@@ -3721,6 +2968,7 @@ namespace FFXIVKoreanPatch.Main
         {
             try
             {
+                view.SetPreflightRunning();
                 UpdateStatusLabel("사전 점검 중...");
                 UpdateDownloadLabel("");
                 SetProgressValue(0);
@@ -3905,6 +3153,7 @@ namespace FFXIVKoreanPatch.Main
                 string logPath = WriteOperationLog("preflight", lines);
 
                 lastPreflightPassed = failures == 0;
+                preflightHasRun = true;
                 UpdateStatusLabel(summary, failures > 0);
                 SetProgressValue(failures == 0 ? 100 : 0);
 
@@ -3913,11 +3162,11 @@ namespace FFXIVKoreanPatch.Main
             catch (Exception exception)
             {
                 lastPreflightPassed = false;
+                preflightHasRun = true;
                 UpdateStatusLabel("사전 점검 실패", true);
                 string logPath = WriteOperationLog("preflight-error", new string[] { exception.ToString() });
-                ShowMessageBox(
-                    MessageBoxButtons.OK,
-                    MessageBoxIcon.Error,
+                ShowMessage(
+                    ViewMessageKind.Error,
                     "사전 점검 중 오류가 발생했어요.",
                     "로그: " + logPath,
                     "에러 내용:",
@@ -3925,6 +3174,7 @@ namespace FFXIVKoreanPatch.Main
             }
             finally
             {
+                preflightBusy = false;
                 SetActionButtonsEnabled(true);
             }
         }
@@ -3933,52 +3183,33 @@ namespace FFXIVKoreanPatch.Main
         {
             if (string.IsNullOrEmpty(targetDir))
             {
-                MessageBox.Show("글로벌 서버 클라이언트 경로가 설정되지 않았어요.", Text, MessageBoxButtons.OK, MessageBoxIcon.Error);
+                ShowMessage(ViewMessageKind.Error, "글로벌 서버 클라이언트 경로가 설정되지 않았어요.");
                 return false;
             }
 
-            DialogResult result = MessageBox.Show(
-                actionName + " 작업은 실제 글로벌 서버 클라이언트 폴더에 파일을 복사합니다." + Environment.NewLine + Environment.NewLine +
-                "대상 경로:" + Environment.NewLine +
-                targetDir + Environment.NewLine + Environment.NewLine +
-                "작업 전에 현재 파일은 아래 백업 폴더에 저장됩니다." + Environment.NewLine +
-                GetBackupRootDir() + Environment.NewLine + Environment.NewLine +
-                "계속할까요?",
-                Text,
-                MessageBoxButtons.YesNo,
-                MessageBoxIcon.Warning,
-                MessageBoxDefaultButton.Button2);
-
-            return result == DialogResult.Yes;
+            return view.ShowConfirm(
+                actionName,
+                actionName + " 작업은 실제 글로벌 서버 클라이언트 폴더에 파일을 복사합니다.",
+                "대상 경로:" + Environment.NewLine + targetDir,
+                "작업 전에 현재 파일은 아래 백업 폴더에 저장됩니다." + Environment.NewLine + GetBackupRootDir(),
+                "계속할까요?");
         }
 
         #endregion
 
         #region Event Handlers
 
-        // Show progress using progress bar.
-        private void initialChecker_ProgressChanged(object sender, ProgressChangedEventArgs e)
-        {
-            progressBar.Value = e.ProgressPercentage;
-        }
-
-        // Background worker that does initial checks.
-        private void initialChecker_DoWork(object sender, DoWorkEventArgs e)
+        // Initial environment check, ported from the WinForms BackgroundWorker.
+        private void InitialCheckWork()
         {
             try
             {
-                // Wait until the UI is ready.
-                while (!statusLabel.IsHandleCreated) { }
-
                 UpdateStatusLabel("환경 체크 중...");
 
                 // Check if the patch program is already running, and terminate if it is.
                 if (Process.GetProcessesByName(mainFileName).Length > 1)
                 {
-                    ShowMessageBox(
-                        MessageBoxButtons.OK,
-                        MessageBoxIcon.Error,
-                        "FFXIV 한글 패치 프로그램이 이미 실행중이에요.");
+                    ShowMessage(ViewMessageKind.Error, "FFXIV 한글 패치 프로그램이 이미 실행중이에요.");
                     CloseForm();
                     return;
                 }
@@ -3992,9 +3223,8 @@ namespace FFXIVKoreanPatch.Main
 #else
                 if (Process.GetProcesses().Any(p => gameProcessNames.Contains(p.ProcessName.ToLower())))
                 {
-                    ShowMessageBox(
-                        MessageBoxButtons.OK,
-                        MessageBoxIcon.Error,
+                    ShowMessage(
+                        ViewMessageKind.Error,
                         "FFXIV가 이미 실행중이에요.",
                         "FFXIV를 종료한 후 한글 패치 프로그램을 다시 실행해주세요.");
                     CloseForm();
@@ -4006,91 +3236,8 @@ namespace FFXIVKoreanPatch.Main
                 // Release builds generate patch files locally and should not depend on old upstream release assets.
                 UpdateStatusLabel("로컬 생성 모드로 실행 중...");
 
-                // Try to detect FFXIV client path.
                 UpdateStatusLabel("글로벌 서버 클라이언트를 찾는 중...");
-
-                try
-                {
-                    // Check windows registry uninstall list to find the FFXIV installation.
-                    string[] uninstallKeyNames = new string[]
-                    {
-                        "SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Uninstall",
-                        "SOFTWARE\\WOW6432Node\\Microsoft\\Windows\\CurrentVersion\\Uninstall"
-                    };
-
-                    string[] uninstallSteamKeyNames = new string[]
-                    {
-                        $"{uninstallKeyNames[0]}\\Steam App 39210",
-                        $"{uninstallKeyNames[1]}\\Steam App 39210"
-                    };
-
-                    // Check steam registry first...
-                    using (RegistryKey localMachine = RegistryKey.OpenBaseKey(RegistryHive.LocalMachine, Environment.Is64BitOperatingSystem ? RegistryView.Registry64 : RegistryView.Registry32))
-                    {
-                        foreach (string uninstallSteamKeyName in uninstallSteamKeyNames)
-                        {
-                            if (!string.IsNullOrEmpty(targetDir)) break;
-
-                            using (RegistryKey uninstallKey = localMachine.OpenSubKey(uninstallSteamKeyName))
-                            {
-                                if (uninstallKey == null) continue;
-
-                                object installLocation = uninstallKey.GetValue("InstallLocation");
-                                if (installLocation == null) continue;
-
-                                TryUseTargetDir(installLocation.ToString());
-                            }
-                        }
-
-                        // If target directory is still not set, search for square enix installation path.
-                        if (string.IsNullOrEmpty(targetDir))
-                        {
-                            foreach(string uninstallKeyName in uninstallKeyNames)
-                            {
-                                if (!string.IsNullOrEmpty(targetDir)) break;
-
-                                using (RegistryKey uninstallKey = localMachine.OpenSubKey(uninstallKeyName))
-                                {
-                                    if (uninstallKey == null) continue;
-
-                                    foreach (string subKeyName in uninstallKey.GetSubKeyNames())
-                                    {
-                                        if (!string.IsNullOrEmpty(targetDir)) break;
-
-                                        using (RegistryKey subKey = uninstallKey.OpenSubKey(subKeyName))
-                                        {
-                                            if (subKey == null) continue;
-
-                                            object displayName = subKey.GetValue("DisplayName");
-                                            if (displayName == null || !IsGlobalClientDisplayName(displayName.ToString())) continue;
-
-                                            object installLocation = subKey.GetValue("InstallLocation");
-                                            if (installLocation != null && TryUseTargetDir(installLocation.ToString())) continue;
-
-                                            object iconPath = subKey.GetValue("DisplayIcon");
-                                            if (iconPath == null) continue;
-
-                                            TryUseTargetDir(iconPath.ToString());
-                                        }
-                                    }
-                                }
-                            }
-                        }
-
-                        if (string.IsNullOrEmpty(targetDir))
-                        {
-                            foreach (string knownGameDir in GetKnownGameDirs())
-                            {
-                                if (TryUseTargetDir(knownGameDir)) break;
-                            }
-                        }
-                    }
-                }
-                catch
-                {
-                    // Any exception happened during dtection, just set directory to not found so user can select it.
-                    targetDir = string.Empty;
-                }
+                DetectGlobalClient();
 
                 UpdateStatusLabel("한국 서버 클라이언트를 찾는 중...");
                 DetectKoreaClient();
@@ -4099,13 +3246,10 @@ namespace FFXIVKoreanPatch.Main
                 if (string.IsNullOrEmpty(targetDir))
                 {
                     UpdateStatusLabel("글로벌 서버 클라이언트 경로를 수동으로 지정해주세요.", true);
-                    SetPathBrowseButtonsEnabled(true);
-                    Invoke(new Action(() =>
-                    {
-                        progressBar.Value = 0;
-                        downloadLabel.Text = "";
-                    }));
-                    Invoke(new Action(StartInitialPreflightCheck));
+                    SetProgressValue(0);
+                    UpdateDownloadLabel("");
+                    SetActionButtonsEnabled(true);
+                    StartInitialPreflightCheck();
                     return;
                 }
 
@@ -4115,44 +3259,53 @@ namespace FFXIVKoreanPatch.Main
 #if TEST_BUILD
                 UpdateStatusLabel("테스트 빌드: 한글 채팅 레지스트리 설치 확인을 생략합니다.");
 #else
-                // Check registry for scancode map.
-                using (RegistryKey keyboardLayoutKey = Registry.LocalMachine.OpenSubKey("SYSTEM\\CurrentControlSet\\Control\\Keyboard Layout", true))
+                // Check registry for scancode map. Opening HKLM for write needs
+                // elevation; if that fails we skip the install rather than
+                // killing startup (release builds run elevated via the manifest).
+                try
                 {
-                    if (keyboardLayoutKey != null)
+                    using (RegistryKey keyboardLayoutKey = Registry.LocalMachine.OpenSubKey("SYSTEM\\CurrentControlSet\\Control\\Keyboard Layout", true))
                     {
-                        object scancodeMap = keyboardLayoutKey.GetValue("Scancode Map");
-
-                        // If scancode map doesn't exist or is invalid...
-                        if (scancodeMap == null || !this.scancodeMap.SequenceEqual((byte[])scancodeMap))
+                        if (keyboardLayoutKey != null)
                         {
-                            // Install scancode map.
-                            UpdateStatusLabel("한글 채팅 레지스트리 설치 중...");
+                            object scancodeMap = keyboardLayoutKey.GetValue("Scancode Map");
 
-                            ShowMessageBox(
-                                MessageBoxButtons.OK,
-                                MessageBoxIcon.Information,
-                                "한글 채팅 레지스트리를 설치할게요.",
-                                "설치가 끝난 후 컴퓨터를 재시작하지 않으면 FFXIV 클라이언트 내부에서 한/영 키 입력이 제대로 동작하지 않을 수 있어요.");
+                            // If scancode map doesn't exist or is invalid...
+                            if (scancodeMap == null || !this.scancodeMap.SequenceEqual((byte[])scancodeMap))
+                            {
+                                // Install scancode map.
+                                UpdateStatusLabel("한글 채팅 레지스트리 설치 중...");
 
-                            keyboardLayoutKey.SetValue("Scancode Map", this.scancodeMap);
+                                ShowMessage(
+                                    ViewMessageKind.Info,
+                                    "한글 채팅 레지스트리를 설치할게요.",
+                                    "설치가 끝난 후 컴퓨터를 재시작하지 않으면 FFXIV 클라이언트 내부에서 한/영 키 입력이 제대로 동작하지 않을 수 있어요.");
 
-                            ShowMessageBox(
-                                MessageBoxButtons.OK,
-                                MessageBoxIcon.Information,
-                                "한글 채팅 레지스트리 설치가 완료되었어요.",
-                                "컴퓨터를 재시작한 후 다시 실행해주세요.");
+                                keyboardLayoutKey.SetValue("Scancode Map", this.scancodeMap);
 
-                            CloseForm();
-                            return;
+                                ShowMessage(
+                                    ViewMessageKind.Info,
+                                    "한글 채팅 레지스트리 설치가 완료되었어요.",
+                                    "컴퓨터를 재시작한 후 다시 실행해주세요.");
+
+                                CloseForm();
+                                return;
+                            }
                         }
                     }
+                }
+                catch (System.Security.SecurityException)
+                {
+                    UpdateStatusLabel("한글 채팅 레지스트리를 확인할 권한이 없어 건너뛰었습니다. 관리자 권한으로 실행하면 자동 설치됩니다.");
+                }
+                catch (UnauthorizedAccessException)
+                {
+                    UpdateStatusLabel("한글 채팅 레지스트리를 확인할 권한이 없어 건너뛰었습니다. 관리자 권한으로 실행하면 자동 설치됩니다.");
                 }
 #endif
 
                 // Check the target client version.
                 UpdateStatusLabel("클라이언트 버전 체크 중...");
-
-                // Read the version from target client.
                 RefreshTargetVersion();
 
                 // This fork does not download prebuilt patch releases.
@@ -4160,99 +3313,52 @@ namespace FFXIVKoreanPatch.Main
                 UpdateDownloadLabel("");
 
                 // Check all done!
-                UpdateStatusLabel($"버전 {targetVersion}, 로컬 생성 모드", false);
-
-                Invoke(new Action(() =>
-                {
-                    bool hasGlobalClient = HasValidGlobalClient();
-                    bool hasKoreaClient = HasValidKoreaClient();
-
-                    globalPathBrowseButton.Enabled = true;
-                    koreaPathBrowseButton.Enabled = true;
-                    targetLanguageComboBox.Enabled = true;
-                    detectPathsButton.Enabled = true;
-                    resetPathsButton.Enabled = true;
-                    openReleaseButton.Enabled = true;
-                    openLogsButton.Enabled = true;
-                    cleanupButton.Enabled = true;
-#if TEST_BUILD
-                    debugBuildReleaseButton.Enabled = hasGlobalClient && hasKoreaClient;
-                    preflightCheckButton.Enabled = true;
-                    restoreBackupButton.Enabled = true;
-                    buildReleaseButton.Enabled = false;
-                    installButton.Enabled = false;
-                    chatOnlyInstallButton.Enabled = false;
-                    removeButton.Enabled = false;
-#else
-                    debugBuildReleaseButton.Enabled = false;
-                    preflightCheckButton.Enabled = true;
-                    restoreBackupButton.Enabled = true;
-                    buildReleaseButton.Enabled = false;
-                    string[] fullPatchSelection = GetPatchFilesForSelection(true, true);
-                    string[] fontPatchSelection = GetPatchFilesForSelection(false, true);
-                    installButton.Enabled = hasGlobalClient && hasKoreaClient && lastPreflightPassed &&
-                        CanApplyPatchFilesWithCurrentIndexState(fullPatchSelection) &&
-                        !HasPatchedIndexesOutsideSelection(fullPatchSelection);
-                    chatOnlyInstallButton.Enabled = hasGlobalClient && hasKoreaClient && lastPreflightPassed &&
-                        CanApplyPatchFilesWithCurrentIndexState(fontPatchSelection) &&
-                        !HasPatchedIndexesOutsideSelection(fontPatchSelection);
-                    removeButton.Enabled = hasGlobalClient;
-#endif
-                    progressBar.Value = 0;
-                    downloadLabel.Text = "";
-                }));
-                Invoke(new Action(StartInitialPreflightCheck));
+                UpdateStatusLabel("버전 " + targetVersion + ", 로컬 생성 모드", false);
+                SetProgressValue(0);
+                SetActionButtonsEnabled(true);
+                StartInitialPreflightCheck();
             }
             catch (Exception exception)
             {
-                ShowMessageBox(
-                    MessageBoxButtons.OK,
-                    MessageBoxIcon.Error,
+                ShowMessage(
+                    ViewMessageKind.Error,
                     "처리되지 않은 예외가 발생했어요.",
                     "에러 내용:",
                     exception.ToString());
                 CloseForm();
-                return;
             }
         }
 
-        private string SelectGameDirectory(string title, out string failureReason)
+        private string SelectGameDirectory(string title, out bool cancelled, out string failureReason)
         {
+            cancelled = false;
             failureReason = null;
 
-            using (OpenFileDialog dialog = new OpenFileDialog())
+            string selectedFile = view.SelectGameExecutablePath(title);
+            if (string.IsNullOrEmpty(selectedFile))
             {
-                dialog.CheckFileExists = true;
-                dialog.CheckPathExists = true;
-                dialog.DefaultExt = "exe";
-                dialog.Filter = "FFXIV|ffxiv_dx11.exe";
-                dialog.Multiselect = false;
-                dialog.Title = title;
-
-                if (dialog.ShowDialog() != DialogResult.OK)
-                {
-                    return null;
-                }
-
-                List<string> failedCandidates = new List<string>();
-                foreach (string candidateDir in GetCandidateTargetDirs(dialog.FileName).Distinct(StringComparer.OrdinalIgnoreCase))
-                {
-                    string checkedDir;
-                    string candidateFailureReason;
-                    if (TryCheckTargetDir(candidateDir, out checkedDir, out candidateFailureReason))
-                    {
-                        return checkedDir;
-                    }
-
-                    failedCandidates.Add(candidateDir + " - " + candidateFailureReason);
-                }
-
-                failureReason =
-                    "Selected file: " + dialog.FileName + Environment.NewLine +
-                    "Checked candidates:" + Environment.NewLine +
-                    string.Join(Environment.NewLine, failedCandidates.Take(6));
+                cancelled = true;
                 return null;
             }
+
+            List<string> failedCandidates = new List<string>();
+            foreach (string candidateDir in GetCandidateTargetDirs(selectedFile).Distinct(StringComparer.OrdinalIgnoreCase))
+            {
+                string checkedDir;
+                string candidateFailureReason;
+                if (TryCheckTargetDir(candidateDir, out checkedDir, out candidateFailureReason))
+                {
+                    return checkedDir;
+                }
+
+                failedCandidates.Add(candidateDir + " - " + candidateFailureReason);
+            }
+
+            failureReason =
+                "Selected file: " + selectedFile + Environment.NewLine +
+                "Checked candidates:" + Environment.NewLine +
+                string.Join(Environment.NewLine, failedCandidates.Take(6));
+            return null;
         }
 
         private string WriteManualPathSelectionFailureLog(string operation, string failureReason)
@@ -4267,10 +3373,16 @@ namespace FFXIVKoreanPatch.Main
             return WriteOperationLog(operation, lines);
         }
 
-        private void globalPathBrowseButton_Click(object sender, EventArgs e)
+        public void BrowseGlobalPath()
         {
+            bool cancelled;
             string failureReason;
-            string selectedDir = SelectGameDirectory("글로벌 서버 클라이언트 ffxiv_dx11.exe 파일을 선택해주세요...", out failureReason);
+            string selectedDir = SelectGameDirectory("글로벌 서버 클라이언트 ffxiv_dx11.exe 파일을 선택해주세요...", out cancelled, out failureReason);
+            if (cancelled)
+            {
+                return;
+            }
+
             if (string.IsNullOrEmpty(selectedDir))
             {
                 string logPath = WriteManualPathSelectionFailureLog("manual-global-path-select-error", failureReason);
@@ -4281,7 +3393,7 @@ namespace FFXIVKoreanPatch.Main
                 }
 
                 message += Environment.NewLine + Environment.NewLine + "로그: " + logPath;
-                MessageBox.Show(message, Text, MessageBoxButtons.OK, MessageBoxIcon.Error);
+                ShowMessage(ViewMessageKind.Error, message);
                 return;
             }
 
@@ -4291,14 +3403,20 @@ namespace FFXIVKoreanPatch.Main
             UpdatePathTextBoxes();
             UpdateStatusLabel(string.IsNullOrEmpty(koreaSourceDir)
                 ? "한국 서버 클라이언트 경로를 확인하거나 수동으로 지정해주세요."
-                : $"버전 {targetVersion}, 글로벌/한국 서버 클라이언트 경로 설정 완료. 사전 점검을 실행해주세요.");
+                : "버전 " + targetVersion + ", 글로벌/한국 서버 클라이언트 경로 설정 완료. 사전 점검을 실행해주세요.");
             SetActionButtonsEnabled(true);
         }
 
-        private void koreaPathBrowseButton_Click(object sender, EventArgs e)
+        public void BrowseKoreaPath()
         {
+            bool cancelled;
             string failureReason;
-            string selectedDir = SelectGameDirectory("한국 서버 클라이언트 ffxiv_dx11.exe 파일을 선택해주세요...", out failureReason);
+            string selectedDir = SelectGameDirectory("한국 서버 클라이언트 ffxiv_dx11.exe 파일을 선택해주세요...", out cancelled, out failureReason);
+            if (cancelled)
+            {
+                return;
+            }
+
             if (string.IsNullOrEmpty(selectedDir))
             {
                 string logPath = WriteManualPathSelectionFailureLog("manual-korea-path-select-error", failureReason);
@@ -4309,7 +3427,7 @@ namespace FFXIVKoreanPatch.Main
                 }
 
                 message += Environment.NewLine + Environment.NewLine + "로그: " + logPath;
-                MessageBox.Show(message, Text, MessageBoxButtons.OK, MessageBoxIcon.Error);
+                ShowMessage(ViewMessageKind.Error, message);
                 return;
             }
 
@@ -4318,16 +3436,13 @@ namespace FFXIVKoreanPatch.Main
             UpdatePathTextBoxes();
             UpdateStatusLabel(string.IsNullOrEmpty(targetDir)
                 ? "글로벌 서버 클라이언트 경로를 확인하거나 수동으로 지정해주세요."
-                : $"버전 {targetVersion}, 글로벌/한국 서버 클라이언트 경로 설정 완료. 사전 점검을 실행해주세요.");
-            if (!string.IsNullOrEmpty(targetDir))
-            {
-                SetActionButtonsEnabled(true);
-            }
+                : "버전 " + targetVersion + ", 글로벌/한국 서버 클라이언트 경로 설정 완료. 사전 점검을 실행해주세요.");
+            SetActionButtonsEnabled(true);
         }
 
-        private void targetLanguageComboBox_SelectedIndexChanged(object sender, EventArgs e)
+        public void SetTargetLanguage(int selectedIndex)
         {
-            if (targetLanguageComboBox.SelectedIndex == 1)
+            if (selectedIndex == 1)
             {
                 targetLanguageCode = "en";
                 targetLanguageDisplayName = "영어";
@@ -4339,27 +3454,25 @@ namespace FFXIVKoreanPatch.Main
             }
 
             MarkPreflightRequired();
-            if (statusLabel != null && statusLabel.IsHandleCreated)
-            {
-                UpdateStatusLabel("베이스 클라이언트 언어: " + targetLanguageDisplayName + " (" + targetLanguageCode + "), 사전 점검을 다시 실행해주세요.");
-            }
+            UpdateStatusLabel("베이스 클라이언트 언어: " + targetLanguageDisplayName + " (" + targetLanguageCode + "), 사전 점검을 다시 실행해주세요.");
+            SetActionButtonsEnabled(true);
         }
 
-        private void preserveBaseLanguageOptionCheckBox_CheckedChanged(object sender, EventArgs e)
+        public void SetPreserveOptions(bool bnpc, bool actionNames, bool commonPhrases)
         {
-            SyncBaseLanguageNameOptionsFromUi();
-            if (!suppressBaseLanguageOptionSave)
-            {
-                SaveBaseLanguageNameOptionSettings();
-            }
-
-            if (!suppressBaseLanguageOptionSave && statusLabel != null && statusLabel.IsHandleCreated)
-            {
-                UpdateStatusLabel("원문 유지 옵션: " + FormatBaseLanguageNameOptionSummary());
-            }
+            preserveBaseBnpcNames = bnpc;
+            preserveBaseActionNames = actionNames;
+            preserveBaseCommonPhrases = commonPhrases;
+            SaveBaseLanguageNameOptionSettings();
+            UpdateStatusLabel("원문 유지 옵션: " + FormatBaseLanguageNameOptionSummary());
         }
 
-        private void detectPathsButton_Click(object sender, EventArgs e)
+        public void SetFontPatchProfile(string profileValue)
+        {
+            fontPatchProfile = string.IsNullOrEmpty(profileValue) ? "full" : profileValue;
+        }
+
+        public void DetectPaths()
         {
             targetDir = string.Empty;
             koreaSourceDir = string.Empty;
@@ -4385,7 +3498,7 @@ namespace FFXIVKoreanPatch.Main
             SetActionButtonsEnabled(true);
         }
 
-        private void resetPathsButton_Click(object sender, EventArgs e)
+        public void ResetPaths()
         {
             targetDir = string.Empty;
             koreaSourceDir = string.Empty;
@@ -4401,27 +3514,36 @@ namespace FFXIVKoreanPatch.Main
             SetActionButtonsEnabled(true);
         }
 
-        private void openReleaseButton_Click(object sender, EventArgs e)
+        public void OpenReleaseFolder()
         {
             OpenFolder(ResolveReleaseFolderToOpen(), "열 수 있는 생성 release 폴더가 아직 없습니다.");
         }
 
-        private void openLogsButton_Click(object sender, EventArgs e)
+        public void OpenLogsFolder()
         {
             string logRoot = GetLogRootDir();
             Directory.CreateDirectory(logRoot);
             OpenFolder(logRoot, "로그 폴더가 아직 없습니다.");
         }
 
-        private void cleanupButton_Click(object sender, EventArgs e)
+        public void OpenLastLog()
         {
-            DialogResult result = MessageBox.Show(
-                "generated-release와 logs에서 30일 지난 파일과 빈 폴더를 정리할까요?\r\n\r\n백업과 로컬 복구 기준은 자동 정리하지 않습니다.",
-                Text,
-                MessageBoxButtons.YesNo,
-                MessageBoxIcon.Question,
-                MessageBoxDefaultButton.Button2);
-            if (result != DialogResult.Yes)
+            if (!string.IsNullOrEmpty(lastLogPath) && File.Exists(lastLogPath))
+            {
+                Process.Start(new ProcessStartInfo(lastLogPath) { UseShellExecute = true });
+                return;
+            }
+
+            OpenLogsFolder();
+        }
+
+        public void RequestCleanup()
+        {
+            bool confirmed = view.ShowConfirm(
+                "오래된 파일 정리",
+                "generated-release와 logs에서 30일 지난 파일과 빈 폴더를 정리할까요?",
+                "백업과 로컬 복구 기준은 자동 정리하지 않습니다.");
+            if (!confirmed)
             {
                 return;
             }
@@ -4431,67 +3553,55 @@ namespace FFXIVKoreanPatch.Main
                 List<string> logLines = new List<string>();
                 int deleted = CleanupOldManagedFiles(30, logLines);
                 string logPath = WriteOperationLog("cleanup", logLines);
-                MessageBox.Show(
-                    "정리가 완료되었어요." + Environment.NewLine + Environment.NewLine +
-                    "삭제한 항목: " + deleted + Environment.NewLine +
-                    "로그: " + logPath,
-                    Text,
-                    MessageBoxButtons.OK,
-                    MessageBoxIcon.Information);
+                ShowMessage(
+                    ViewMessageKind.Info,
+                    "정리가 완료되었어요.",
+                    "삭제한 항목: " + deleted,
+                    "로그: " + logPath);
             }
             catch (Exception exception)
             {
                 string logPath = WriteOperationLog("cleanup-error", new string[] { exception.ToString() });
-                MessageBox.Show(
-                    "정리 중 오류가 발생했어요." + Environment.NewLine + Environment.NewLine +
-                    "로그: " + logPath + Environment.NewLine +
-                    exception,
-                    Text,
-                    MessageBoxButtons.OK,
-                    MessageBoxIcon.Error);
+                ShowMessage(
+                    ViewMessageKind.Error,
+                    "정리 중 오류가 발생했어요.",
+                    "로그: " + logPath,
+                    exception.ToString());
             }
         }
 
-        private void restoreBackupButton_Click(object sender, EventArgs e)
+        public void RequestRestoreBackup()
         {
 #if TEST_BUILD
-            MessageBox.Show("테스트 빌드에서는 실제 글로벌 서버 클라이언트 폴더를 변경할 수 없어요.", Text, MessageBoxButtons.OK, MessageBoxIcon.Warning);
-            return;
+            ShowMessage(ViewMessageKind.Warning, "테스트 빌드에서는 실제 글로벌 서버 클라이언트 폴더를 변경할 수 없어요.");
 #else
-            string backupDir = SelectBackupDirectory();
+            List<string> backups = BuildBackupCandidateList();
+            if (backups.Count == 0)
+            {
+                ShowMessage(
+                    ViewMessageKind.Info,
+                    "복구할 수 있는 백업을 찾지 못했습니다.",
+                    "패치 제거는 [패치 제거] 버튼을 사용해주세요.",
+                    "백업 검색 위치:" + Environment.NewLine + GetBackupSearchRootsText());
+                return;
+            }
+
+            string backupDir = view.PickBackupDirectory(backups);
             if (string.IsNullOrEmpty(backupDir))
             {
-                MessageBox.Show(
-                    "복구할 수 있는 백업을 찾지 못했습니다.\r\n\r\n패치 제거는 [한글 패치 제거] 버튼을 사용해주세요.\r\n\r\n백업 검색 위치:\r\n" + GetBackupSearchRootsText(),
-                    Text,
-                    MessageBoxButtons.OK,
-                    MessageBoxIcon.Information);
                 return;
             }
 
             if (!HasRestorableBackupFiles(backupDir))
             {
-                MessageBox.Show(
-                    "선택한 백업 폴더에 복구 가능한 index/dat 파일이 없습니다.\r\n\r\n백업 폴더:\r\n" + backupDir,
-                    Text,
-                    MessageBoxButtons.OK,
-                    MessageBoxIcon.Information);
+                ShowMessage(
+                    ViewMessageKind.Info,
+                    "선택한 백업 폴더에 복구 가능한 index/dat 파일이 없습니다.",
+                    "백업 폴더:" + Environment.NewLine + backupDir);
                 return;
             }
 
             if (!ConfirmActualClientWrite("백업으로 복구"))
-            {
-                return;
-            }
-
-            DialogResult result = MessageBox.Show(
-                "선택한 백업으로 글로벌 서버 클라이언트 파일을 되돌릴까요?" + Environment.NewLine + Environment.NewLine +
-                backupDir,
-                Text,
-                MessageBoxButtons.YesNo,
-                MessageBoxIcon.Warning,
-                MessageBoxDefaultButton.Button2);
-            if (result != DialogResult.Yes)
             {
                 return;
             }
@@ -4503,20 +3613,21 @@ namespace FFXIVKoreanPatch.Main
             catch (Exception exception)
             {
                 string logPath = WriteOperationLog("backup-restore-error", new string[] { "Backup: " + backupDir, exception.ToString() });
-                MessageBox.Show(
-                    "백업 복구 중 오류가 발생했어요." + Environment.NewLine + Environment.NewLine +
-                    "로그: " + logPath + Environment.NewLine +
-                    exception,
-                    Text,
-                    MessageBoxButtons.OK,
-                    MessageBoxIcon.Error);
+                ShowMessage(
+                    ViewMessageKind.Error,
+                    "백업 복구 중 오류가 발생했어요.",
+                    "로그: " + logPath,
+                    exception.ToString());
             }
+
+            // Restoring may change the installed patch state, so refresh gates.
+            SetActionButtonsEnabled(true);
 #endif
         }
 
         private void StartLocalPatchBuild(bool includeTextPatch, bool includeFontPatch, bool debugApply)
         {
-            if (buildReleaseWorker.IsBusy)
+            if (buildBusy)
             {
                 return;
             }
@@ -4526,27 +3637,25 @@ namespace FFXIVKoreanPatch.Main
 #if !TEST_BUILD
             if (!debugApply && !lastPreflightPassed)
             {
-                MessageBox.Show("사전 점검을 통과한 뒤에 실제 글로벌 서버 클라이언트에 적용할 수 있어요.", Text, MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                ShowMessage(ViewMessageKind.Warning, "사전 점검을 통과한 뒤에 실제 글로벌 서버 클라이언트에 적용할 수 있어요.");
                 SetActionButtonsEnabled(true);
                 return;
             }
 
             if (!debugApply && !CanApplyPatchFilesWithCurrentIndexState(selectedPatchFiles))
             {
-                MessageBox.Show("clean base index를 찾을 수 없습니다. 기존 패치를 제거하거나 orig.* index 파일을 복구한 뒤 다시 진행해주세요.", Text, MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                ShowMessage(ViewMessageKind.Warning, "clean base index를 찾을 수 없습니다. 기존 패치를 제거하거나 orig.* index 파일을 복구한 뒤 다시 진행해주세요.");
                 SetActionButtonsEnabled(true);
                 return;
             }
 
             if (!debugApply && HasPatchedIndexesOutsideSelection(selectedPatchFiles))
             {
-                MessageBox.Show(
+                ShowMessage(
+                    ViewMessageKind.Warning,
                     "지금 선택한 패치가 덮지 않는 텍스트/UI 패치가 이미 적용되어 있어요." + Environment.NewLine +
-                    "예: 전체 한글 패치가 적용된 상태에서 폰트만 패치를 겹쳐 적용하면 클라이언트가 섞인 상태가 되어 글자가 깨질 수 있어요." + Environment.NewLine + Environment.NewLine +
-                    "먼저 '한글 패치 제거'로 원본 상태로 되돌린 뒤 원하는 패치를 적용해주세요.",
-                    Text,
-                    MessageBoxButtons.OK,
-                    MessageBoxIcon.Warning);
+                    "예: 전체 한글 패치가 적용된 상태에서 폰트만 패치를 겹쳐 적용하면 클라이언트가 섞인 상태가 되어 글자가 깨질 수 있어요.",
+                    "먼저 '패치 제거'로 원본 상태로 되돌린 뒤 원하는 패치를 적용해주세요.");
                 SetActionButtonsEnabled(true);
                 return;
             }
@@ -4555,35 +3664,20 @@ namespace FFXIVKoreanPatch.Main
             buildTextPatch = includeTextPatch;
             buildFontPatch = includeFontPatch;
             useDebugApplyPath = debugApply;
+            buildBusy = true;
             SetActionButtonsEnabled(false);
-            buildReleaseWorker.RunWorkerAsync();
+            RunBackground(BuildReleaseWork);
         }
 
-        private void buildReleaseButton_Click(object sender, EventArgs e)
-        {
-#if TEST_BUILD
-            MessageBox.Show("테스트 빌드에서는 실제 글로벌 서버 클라이언트 폴더에 적용할 수 없어요. 테스트 자동 패치를 사용해주세요.", Text, MessageBoxButtons.OK, MessageBoxIcon.Warning);
-            return;
-#else
-            if (!ConfirmActualClientWrite("한국 서버 클라이언트로 자동 패치"))
-            {
-                return;
-            }
-
-            StartLocalPatchBuild(true, true, false);
-#endif
-        }
-
-        private void debugBuildReleaseButton_Click(object sender, EventArgs e)
+        public void RequestTestPatch()
         {
             StartLocalPatchBuild(true, true, true);
         }
 
-        private void installButton_Click(object sender, EventArgs e)
+        public void RequestFullPatch()
         {
 #if TEST_BUILD
-            MessageBox.Show("테스트 빌드에서는 실제 글로벌 서버 클라이언트 폴더에 설치할 수 없어요.", Text, MessageBoxButtons.OK, MessageBoxIcon.Warning);
-            return;
+            ShowMessage(ViewMessageKind.Warning, "테스트 빌드에서는 실제 글로벌 서버 클라이언트 폴더에 설치할 수 없어요.");
 #else
             if (!ConfirmActualClientWrite("전체 한글 패치"))
             {
@@ -4594,13 +3688,12 @@ namespace FFXIVKoreanPatch.Main
 #endif
         }
 
-        private void chatOnlyInstallButton_Click(object sender, EventArgs e)
+        public void RequestFontPatch()
         {
 #if TEST_BUILD
-            MessageBox.Show("테스트 빌드에서는 실제 글로벌 서버 클라이언트 폴더에 설치할 수 없어요.", Text, MessageBoxButtons.OK, MessageBoxIcon.Warning);
-            return;
+            ShowMessage(ViewMessageKind.Warning, "테스트 빌드에서는 실제 글로벌 서버 클라이언트 폴더에 설치할 수 없어요.");
 #else
-            if (!ConfirmActualClientWrite("한글 폰트 패치"))
+            if (!ConfirmActualClientWrite("폰트만 패치"))
             {
                 return;
             }
@@ -4609,34 +3702,37 @@ namespace FFXIVKoreanPatch.Main
 #endif
         }
 
-        private void removeButton_Click(object sender, EventArgs e)
+        public void RequestRemove()
         {
 #if TEST_BUILD
-            MessageBox.Show("테스트 빌드에서는 실제 글로벌 서버 클라이언트 폴더를 변경할 수 없어요.", Text, MessageBoxButtons.OK, MessageBoxIcon.Warning);
-            return;
+            ShowMessage(ViewMessageKind.Warning, "테스트 빌드에서는 실제 글로벌 서버 클라이언트 폴더를 변경할 수 없어요.");
 #else
-            if (!ConfirmActualClientWrite("한글 패치 제거"))
+            if (removeBusy)
             {
                 return;
             }
 
-            // Block further inputs.
-            SetActionButtonsEnabled(false);
+            if (!ConfirmActualClientWrite("패치 제거"))
+            {
+                return;
+            }
 
-            // Start the background worker to remove the korean patch.
-            removeWorker.RunWorkerAsync();
+            removeBusy = true;
+            SetActionButtonsEnabled(false);
+            RunBackground(RemoveWork);
 #endif
         }
 
         private void StartPreflightCheck()
         {
-            if (preflightWorker.IsBusy)
+            if (preflightBusy)
             {
                 return;
             }
 
+            preflightBusy = true;
             SetActionButtonsEnabled(false);
-            preflightWorker.RunWorkerAsync();
+            RunBackground(PreflightCheckWork);
         }
 
         private void StartInitialPreflightCheck()
@@ -4650,7 +3746,7 @@ namespace FFXIVKoreanPatch.Main
             StartPreflightCheck();
         }
 
-        private void preflightCheckButton_Click(object sender, EventArgs e)
+        public void RequestPreflight()
         {
             StartPreflightCheck();
         }
@@ -4682,13 +3778,7 @@ namespace FFXIVKoreanPatch.Main
 
         private string GetSelectedFontPatchProfile()
         {
-            if (debugFontProfileComboBox == null)
-            {
-                return "full";
-            }
-
-            FontProfileItem item = debugFontProfileComboBox.SelectedItem as FontProfileItem;
-            return item == null || string.IsNullOrEmpty(item.Value) ? "full" : item.Value;
+            return string.IsNullOrEmpty(fontPatchProfile) ? "full" : fontPatchProfile;
         }
 
         private void BuildReleaseWork()
@@ -4939,9 +4029,8 @@ namespace FFXIVKoreanPatch.Main
                 logLines.Add("ERROR:");
                 logLines.Add(exception.ToString());
                 string logPath = WriteOperationLog("build-release-error", logLines);
-                ShowMessageBox(
-                    MessageBoxButtons.OK,
-                    MessageBoxIcon.Error,
+                ShowMessage(
+                    ViewMessageKind.Error,
                     "패치 release 생성에 실패했어요.",
                     "로그: " + logPath,
                     "에러 내용:",
@@ -4949,12 +4038,13 @@ namespace FFXIVKoreanPatch.Main
             }
             finally
             {
+                buildBusy = false;
                 SetProgressMarquee(false);
                 SetActionButtonsEnabled(true);
             }
         }
 
-        private void LegacyWorkerRestoreWork(bool isRemove)
+        private void RemoveWork()
         {
             List<string> logLines = new List<string>();
 
@@ -4963,11 +4053,6 @@ namespace FFXIVKoreanPatch.Main
 #if TEST_BUILD
                 throw new InvalidOperationException("테스트 빌드에서는 실제 글로벌 서버 클라이언트 폴더에 파일을 복사할 수 없어요.");
 #else
-                if (!isRemove)
-                {
-                    throw new InvalidOperationException("기존 원격 설치 모드는 더 이상 사용하지 않아요. 전체 한글 패치 또는 한글 폰트 패치 버튼은 로컬 생성기를 통해 처리됩니다.");
-                }
-
                 string restoreSourceDir;
                 string localBackupDir;
                 if (RestoreFromLocalOrigIndexes(out restoreSourceDir, out localBackupDir))
@@ -5007,52 +4092,45 @@ namespace FFXIVKoreanPatch.Main
             }
             catch (Exception exception)
             {
-                UpdateStatusLabel(isRemove ? "한글 패치 제거 실패" : "패치 설치 실패", true);
+                UpdateStatusLabel("한글 패치 제거 실패", true);
                 SetProgressValue(0);
                 logLines.Add("ERROR:");
                 logLines.Add(exception.ToString());
-                string logPath = WriteOperationLog(isRemove ? "remove-error" : "install-error", logLines);
-                ShowMessageBox(
-                    MessageBoxButtons.OK,
-                    MessageBoxIcon.Error,
+                string logPath = WriteOperationLog("remove-error", logLines);
+                ShowMessage(
+                    ViewMessageKind.Error,
                     "처리되지 않은 예외가 발생했어요.",
                     "로그: " + logPath,
                     "에러 내용:",
                     exception.ToString());
-                return;
             }
             finally
             {
+                removeBusy = false;
                 SetActionButtonsEnabled(true);
             }
-        }
-
-        private void installWorker_DoWork(object sender, DoWorkEventArgs e)
-        {
-            LegacyWorkerRestoreWork(false);
-        }
-
-        private void buildReleaseWorker_DoWork(object sender, DoWorkEventArgs e)
-        {
-            BuildReleaseWork();
-        }
-
-        private void preflightWorker_DoWork(object sender, DoWorkEventArgs e)
-        {
-            PreflightCheckWork();
-        }
-
-        private void chatOnlyWorker_DoWork(object sender, DoWorkEventArgs e)
-        {
-            LegacyWorkerRestoreWork(false);
-        }
-
-        private void removeWorker_DoWork(object sender, DoWorkEventArgs e)
-        {
-            LegacyWorkerRestoreWork(true);
         }
 
         #endregion
     }
 
+    // Path helpers preserved from the WinForms era so legacy data folders keep
+    // resolving to the same locations (backups, generated-release, logs).
+    internal static class LegacyPaths
+    {
+        public static string StartupPath
+        {
+            get { return System.Windows.Forms.Application.StartupPath; }
+        }
+
+        public static string CommonAppDataPath
+        {
+            get { return System.Windows.Forms.Application.CommonAppDataPath; }
+        }
+
+        public static string ExecutablePath
+        {
+            get { return System.Windows.Forms.Application.ExecutablePath; }
+        }
+    }
 }
