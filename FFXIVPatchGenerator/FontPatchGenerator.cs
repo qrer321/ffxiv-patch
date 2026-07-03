@@ -151,15 +151,6 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
             "common/font/font_krn_1.tex"
         };
 
-        private static readonly string[] FontOnlyPatchPaths = new string[]
-        {
-            "common/font/KrnAXIS_120.fdt",
-            "common/font/KrnAXIS_140.fdt",
-            "common/font/KrnAXIS_180.fdt",
-            "common/font/KrnAXIS_360.fdt",
-            "common/font/font_krn_1.tex"
-        };
-
         private static readonly DerivedLobbyFontSpec[] Derived4kLobbyFonts = new DerivedLobbyFontSpec[]
         {
             new DerivedLobbyFontSpec("common/font/AXIS_36_lobby.fdt", "common/font/AXIS_36.fdt"),
@@ -394,9 +385,7 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
             {
                 FontGlyphRepairContext glyphRepair = TryCreateFontGlyphRepairContext(fontPackage, mpdStream, globalArchive, _options.FontOnly, _lobbyVisibleCjkCodepoints);
                 TargetedGlyphRepairContext dialogueGlyphRepair = TryCreateDialogueGlyphArtifactRepairContext(fontPackage, mpdStream);
-                ProtectedHangulGlyphContext protectedHangulGlyphs = _options.FontOnly
-                    ? TryCreateFontOnlyProtectedCleanGlyphContext(globalArchive)
-                    : TryCreateProtectedHangulGlyphContext(fontPackage, mpdStream, globalArchive);
+                ProtectedHangulGlyphContext protectedHangulGlyphs = TryCreateProtectedHangulGlyphContext(fontPackage, mpdStream, globalArchive);
                 Dictionary<string, List<FontTexturePatch>> texturePatches = new Dictionary<string, List<FontTexturePatch>>(StringComparer.OrdinalIgnoreCase);
                 Dictionary<string, byte[]> patchedTexturePayloadsByPath = new Dictionary<string, byte[]>(StringComparer.OrdinalIgnoreCase);
                 LobbyHangulGlyphAllocationCache lobbyHangulAllocationCache = new LobbyHangulGlyphAllocationCache();
@@ -3655,7 +3644,7 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
 
             Dictionary<string, byte[]> sourceTextures = new Dictionary<string, byte[]>(StringComparer.OrdinalIgnoreCase);
             int changed = 0;
-            bool allocateCleanAsciiCell = !_options.FontOnly && ShouldAllocateCleanAsciiCell(normalizedPath);
+            bool allocateCleanAsciiCell = ShouldAllocateCleanAsciiCell(normalizedPath);
             int cleanAsciiTexturePadding = GetCleanAsciiTexturePadding(normalizedPath);
             bool repointFullEntry = !ShouldAllocateCleanAsciiInOriginalTargetTexture(normalizedPath) &&
                                     ShouldRepointCleanAsciiFullEntry(normalizedPath);
@@ -6149,16 +6138,14 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
 
         private static bool IsFontOnlyPatchPath(string path)
         {
-            string normalized = NormalizeGamePath(path);
-            for (int i = 0; i < FontOnlyPatchPaths.Length; i++)
-            {
-                if (string.Equals(normalized, FontOnlyPatchPaths[i], StringComparison.OrdinalIgnoreCase))
-                {
-                    return true;
-                }
-            }
-
-            return false;
+            // Font-only ships the same in-game font treatment as the full patch
+            // (TTMP payloads plus clean ASCII/damage-number/PUA protections) so
+            // Korean text typed or received in a base-language client renders
+            // through the shared AXIS routes instead of the '=' fallback. Lobby
+            // FDTs/textures stay clean: font-only does not localize lobby text,
+            // and leaving them untouched keeps the HD/FHD lobby page budget out
+            // of scope entirely.
+            return NormalizeGamePath(path).IndexOf("_lobby", StringComparison.OrdinalIgnoreCase) < 0;
         }
 
         private static bool IsFontOnlyGameAxisFontPath(string path)
@@ -6452,8 +6439,7 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
 
         private static bool ShouldMarkTtmpFontOccupancyForFontOnly(string path)
         {
-            string normalized = NormalizeGamePath(path);
-            return normalized.IndexOf("/krnaxis_", StringComparison.OrdinalIgnoreCase) >= 0;
+            return IsFontOnlyPatchPath(path);
         }
 
         private static void MarkGlobalFontGlyphOccupancy(FontGlyphRepairContext context, SqPackArchive globalArchive)
@@ -6915,11 +6901,6 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
             }
 
             return context.PatchCount == 0 ? null : context;
-        }
-
-        private static ProtectedHangulGlyphContext TryCreateFontOnlyProtectedCleanGlyphContext(SqPackArchive globalArchive)
-        {
-            return null;
         }
 
         private static void AddProtectedCleanGlyphs(

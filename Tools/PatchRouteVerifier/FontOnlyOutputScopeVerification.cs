@@ -34,22 +34,25 @@ namespace FfxivKoreanPatch.PatchRouteVerifier
                 "manifest.json"
             };
 
-            private static readonly string[] FontOnlyAllowedPatchedFontEntries = new string[]
-            {
-                "common/font/KrnAXIS_120.fdt",
-                "common/font/KrnAXIS_140.fdt",
-                "common/font/KrnAXIS_180.fdt",
-                "common/font/KrnAXIS_360.fdt",
-                "common/font/font_krn_1.tex"
-            };
-
             private static readonly string[] FontOnlyRequiredPatchedFontEntries = new string[]
             {
                 "common/font/KrnAXIS_120.fdt",
                 "common/font/KrnAXIS_140.fdt",
                 "common/font/KrnAXIS_180.fdt",
-                "common/font/KrnAXIS_360.fdt"
+                "common/font/KrnAXIS_360.fdt",
+                "common/font/AXIS_12.fdt",
+                "common/font/AXIS_14.fdt",
+                "common/font/AXIS_18.fdt",
+                "common/font/AXIS_36.fdt",
+                "common/font/font1.tex"
             };
+
+            // Font-only ships the full in-game font treatment; only lobby FDTs
+            // and lobby textures must stay byte-identical to the clean client.
+            private static bool IsFontOnlyAllowedPatchedFontEntry(string gamePath)
+            {
+                return gamePath.IndexOf("_lobby", StringComparison.OrdinalIgnoreCase) < 0;
+            }
 
             private static readonly string[] FontOnlyGuardedFontEntries = new string[]
             {
@@ -124,7 +127,11 @@ namespace FfxivKoreanPatch.PatchRouteVerifier
                 "common/font/KrnAXIS_120.fdt",
                 "common/font/KrnAXIS_140.fdt",
                 "common/font/KrnAXIS_180.fdt",
-                "common/font/KrnAXIS_360.fdt"
+                "common/font/KrnAXIS_360.fdt",
+                "common/font/AXIS_12.fdt",
+                "common/font/AXIS_14.fdt",
+                "common/font/AXIS_18.fdt",
+                "common/font/AXIS_36.fdt"
             };
 
             private static readonly uint[] FontOnlyKoreanSmokeCodepoints = new uint[]
@@ -189,7 +196,6 @@ namespace FfxivKoreanPatch.PatchRouteVerifier
                 using (SqPackIndexFile outputIndex = new SqPackIndexFile(outputIndexPath))
                 using (SqPackIndexFile originalIndex = new SqPackIndexFile(originalIndexPath))
                 {
-                    HashSet<string> allowed = new HashSet<string>(FontOnlyAllowedPatchedFontEntries, StringComparer.OrdinalIgnoreCase);
                     HashSet<string> changedEntries = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
                     int allowedChanges = 0;
                     int blockedChanges = 0;
@@ -205,7 +211,7 @@ namespace FfxivKoreanPatch.PatchRouteVerifier
                             continue;
                         }
 
-                        if (allowed.Contains(gamePath))
+                        if (IsFontOnlyAllowedPatchedFontEntry(gamePath))
                         {
                             changedEntries.Add(gamePath);
                             allowedChanges++;

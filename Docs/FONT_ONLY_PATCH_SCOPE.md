@@ -47,6 +47,38 @@ The accepted `font-only` scope is again strict:
 
 Do not add `AXIS_*`, `Jupiter_*`, `TrumpGothic_*`, `Miedinger*`, `Meidinger*`, `font1.tex`, `font2.tex`, `font3.tex`, lobby fonts, EXD text, or UI texture files to `font-only` unless a verifier first proves the exact target route and clean shared-atlas safety. Dalamud/plugin issues must be debugged as shared game-font route safety, not by broadening `font-only`.
 
+## 2026-07-03 Widening: full in-game font treatment
+
+The strict KrnAXIS-only scope left the live symptom unsolved: the base-language
+client renders chat and UI text through the shared `AXIS_*` routes, so Korean
+input still fell back to `=`. The precondition set above ("a verifier first
+proves the exact target route and clean shared-atlas safety") is now met by the
+full patch's font pipeline:
+
+- `third-party-game-font-safety` (fonts=14) plus damage-number route/neighborhood,
+  in-game clean ASCII, protected PUA, and TTMP Hangul preservation checks all
+  pass on the full-patch output (2026-07-03 r9 20-check regression), and the
+  live Dalamud/damage fly-text breaks were user-confirmed fixed on 2026-05-17.
+
+`font-only` therefore now ships the **same in-game font treatment as the full
+patch** — TTMP FDT/texture payloads plus the clean ASCII/number/symbol, damage
+digit, and party PUA protections — for every non-lobby font file. Differences
+from the full patch's `000000`:
+
+- Lobby FDTs and `font_lobby*.tex` stay byte-identical to the clean client
+  (font-only does not localize lobby text, and this keeps the HD/FHD lobby
+  page budget out of scope).
+- Korean-text-specific visual scaling stays off (ActionDetail high-scale,
+  PvP profile downscale, lobby Hangul allocation, start-screen kerning,
+  dialogue artifact fix): the affected labels remain base-language text in
+  font-only, and skipping them keeps patched glyphs strictly TTMP-identical,
+  so the source-preservation checks pass without intentional-change waivers.
+
+`font-only-output-scope` enforces the new contract: any non-lobby font entry
+may change, lobby entries must not, `AXIS_12/14/18/36` + `KrnAXIS_*` +
+`font1.tex` must change, and Hangul smoke glyphs must be visible in both
+`KrnAXIS_*` and `AXIS_12/14/18/36`.
+
 Latest generated check for the corrected full-patch side: `.tmp\thirdparty-safe-ja-r7` passes `third-party-game-font-safety` (`fonts=14`, `glyphs=159889`) plus combat damage, in-game clean ASCII, TTMP Hangul texture-neighborhood, reported Hangul phrase, and ActionDetail checks. The user confirmed the live Dalamud/third-party Korean font break is fixed on 2026-05-17.
 
 ## Required Verification
