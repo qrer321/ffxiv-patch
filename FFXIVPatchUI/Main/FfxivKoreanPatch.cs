@@ -1342,10 +1342,14 @@ namespace FFXIVKoreanPatch.Main
             {
                 bool hasGlobalClient = HasValidGlobalClient();
                 bool hasKoreaClient = HasValidKoreaClient();
+                string[] fullPatchSelection = GetPatchFilesForSelection(true, true);
+                string[] fontPatchSelection = GetPatchFilesForSelection(false, true);
                 bool canApplyFullPatch = enabled && hasGlobalClient && hasKoreaClient && lastPreflightPassed &&
-                    CanApplyPatchFilesWithCurrentIndexState(GetPatchFilesForSelection(true, true));
+                    CanApplyPatchFilesWithCurrentIndexState(fullPatchSelection) &&
+                    !HasPatchedIndexesOutsideSelection(fullPatchSelection);
                 bool canApplyFontPatch = enabled && hasGlobalClient && hasKoreaClient && lastPreflightPassed &&
-                    CanApplyPatchFilesWithCurrentIndexState(GetPatchFilesForSelection(false, true));
+                    CanApplyPatchFilesWithCurrentIndexState(fontPatchSelection) &&
+                    !HasPatchedIndexesOutsideSelection(fontPatchSelection);
 
                 globalPathBrowseButton.Enabled = enabled;
                 koreaPathBrowseButton.Enabled = enabled;
@@ -2184,6 +2188,50 @@ namespace FFXIVKoreanPatch.Main
 
             foreach (string fileName in restoreFiles)
             {
+                string indexPath = Path.Combine(sqpackDir, fileName);
+                if (!File.Exists(indexPath))
+                {
+                    continue;
+                }
+
+                try
+                {
+                    if (CountPatchedDataFileEntries(indexPath) > 0)
+                    {
+                        return true;
+                    }
+                }
+                catch
+                {
+                    // If index state cannot be read, keep real-client patch buttons locked.
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
+        // Applying a narrower patch over a wider one leaves the client in a
+        // mixed state (e.g. font-only 000000 over a full patch keeps Korean
+        // 0a0000 text rendered with fonts that no longer carry lobby Hangul).
+        // A selection is only applicable when every restore index it does NOT
+        // cover is still clean.
+        private bool HasPatchedIndexesOutsideSelection(IEnumerable<string> selectedPatchFiles)
+        {
+            string sqpackDir = GetTargetSqpackDir();
+            if (string.IsNullOrEmpty(sqpackDir) || !Directory.Exists(sqpackDir))
+            {
+                return false;
+            }
+
+            HashSet<string> selected = new HashSet<string>(selectedPatchFiles, StringComparer.OrdinalIgnoreCase);
+            foreach (string fileName in restoreFiles)
+            {
+                if (selected.Contains(fileName))
+                {
+                    continue;
+                }
+
                 string indexPath = Path.Combine(sqpackDir, fileName);
                 if (!File.Exists(indexPath))
                 {
@@ -3819,6 +3867,12 @@ namespace FFXIVKoreanPatch.Main
                     AddPreflightIndexStatus(lines, ref failures, ref warnings, "000000.win32.index2");
                     AddPreflightIndexStatus(lines, ref failures, ref warnings, "060000.win32.index");
                     AddPreflightIndexStatus(lines, ref failures, ref warnings, "060000.win32.index2");
+
+                    if (HasPatchedIndexesOutsideSelection(GetPatchFilesForSelection(false, true)))
+                    {
+                        warnings++;
+                        lines.Add("[주의] 텍스트/UI 패치가 적용된 상태라 '폰트만 패치' 버튼을 비활성화합니다. 폰트만 패치로 전환하려면 먼저 한글 패치 제거로 원본 상태로 되돌려주세요. (전체 패치 재적용은 가능합니다.)");
+                    }
                 }
 
                 try
@@ -4134,10 +4188,14 @@ namespace FFXIVKoreanPatch.Main
                     preflightCheckButton.Enabled = true;
                     restoreBackupButton.Enabled = true;
                     buildReleaseButton.Enabled = false;
+                    string[] fullPatchSelection = GetPatchFilesForSelection(true, true);
+                    string[] fontPatchSelection = GetPatchFilesForSelection(false, true);
                     installButton.Enabled = hasGlobalClient && hasKoreaClient && lastPreflightPassed &&
-                        CanApplyPatchFilesWithCurrentIndexState(GetPatchFilesForSelection(true, true));
+                        CanApplyPatchFilesWithCurrentIndexState(fullPatchSelection) &&
+                        !HasPatchedIndexesOutsideSelection(fullPatchSelection);
                     chatOnlyInstallButton.Enabled = hasGlobalClient && hasKoreaClient && lastPreflightPassed &&
-                        CanApplyPatchFilesWithCurrentIndexState(GetPatchFilesForSelection(false, true));
+                        CanApplyPatchFilesWithCurrentIndexState(fontPatchSelection) &&
+                        !HasPatchedIndexesOutsideSelection(fontPatchSelection);
                     removeButton.Enabled = hasGlobalClient;
 #endif
                     progressBar.Value = 0;
@@ -4476,6 +4534,19 @@ namespace FFXIVKoreanPatch.Main
             if (!debugApply && !CanApplyPatchFilesWithCurrentIndexState(selectedPatchFiles))
             {
                 MessageBox.Show("clean base index를 찾을 수 없습니다. 기존 패치를 제거하거나 orig.* index 파일을 복구한 뒤 다시 진행해주세요.", Text, MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                SetActionButtonsEnabled(true);
+                return;
+            }
+
+            if (!debugApply && HasPatchedIndexesOutsideSelection(selectedPatchFiles))
+            {
+                MessageBox.Show(
+                    "지금 선택한 패치가 덮지 않는 텍스트/UI 패치가 이미 적용되어 있어요." + Environment.NewLine +
+                    "예: 전체 한글 패치가 적용된 상태에서 폰트만 패치를 겹쳐 적용하면 클라이언트가 섞인 상태가 되어 글자가 깨질 수 있어요." + Environment.NewLine + Environment.NewLine +
+                    "먼저 '한글 패치 제거'로 원본 상태로 되돌린 뒤 원하는 패치를 적용해주세요.",
+                    Text,
+                    MessageBoxButtons.OK,
+                    MessageBoxIcon.Warning);
                 SetActionButtonsEnabled(true);
                 return;
             }
