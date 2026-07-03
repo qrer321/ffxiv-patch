@@ -595,6 +595,10 @@ namespace FFXIVKoreanPatch.Main
             bool fontHasCleanBase = hasGlobalClient && CanApplyPatchFilesWithCurrentIndexState(fontPatchSelection);
             bool fontBlockedOutside = hasGlobalClient && HasPatchedIndexesOutsideSelection(fontPatchSelection);
             bool fullBlockedOutside = hasGlobalClient && HasPatchedIndexesOutsideSelection(fullPatchSelection);
+            // Any installed patch (font-only, full, or mixed) locks every apply
+            // button: a fresh patch must always start from a clean client, so the
+            // user removes the current patch first. Only "패치 제거" stays live.
+            bool clientAlreadyPatched = hasGlobalClient && HasPatchedTargetIndexes();
 
             DashboardState state = new DashboardState();
             state.ControlsEnabled = enabled;
@@ -609,19 +613,18 @@ namespace FFXIVKoreanPatch.Main
             state.GuardNote = null;
 #else
             state.CanFullPatch = enabled && hasGlobalClient && hasKoreaClient && lastPreflightPassed &&
-                fullHasCleanBase && !fullBlockedOutside;
+                fullHasCleanBase && !fullBlockedOutside && !clientAlreadyPatched;
             state.CanFontPatch = enabled && hasGlobalClient && hasKoreaClient && lastPreflightPassed &&
-                fontHasCleanBase && !fontBlockedOutside;
+                fontHasCleanBase && !fontBlockedOutside && !clientAlreadyPatched;
             state.CanRemove = enabled && hasGlobalClient;
             state.CanTestPatch = false;
             state.GuardNote = BuildGuardNote(
                 enabled,
                 hasGlobalClient,
                 hasKoreaClient,
+                clientAlreadyPatched,
                 fullHasCleanBase,
-                fontBlockedOutside,
-                state.CanFullPatch,
-                state.CanFontPatch);
+                state.CanFullPatch);
 #endif
 
             view.ApplyDashboard(state);
@@ -631,14 +634,21 @@ namespace FFXIVKoreanPatch.Main
             bool enabled,
             bool hasGlobalClient,
             bool hasKoreaClient,
+            bool clientAlreadyPatched,
             bool fullHasCleanBase,
-            bool fontBlockedOutside,
-            bool canFull,
-            bool canFont)
+            bool canFull)
         {
             if (!enabled || !hasGlobalClient)
             {
                 return null;
+            }
+
+            // Any installed patch locks both apply buttons. Removing is the only
+            // way forward, and it does not need the Korea client, so this takes
+            // priority over the Korea-path / preflight notes below.
+            if (clientAlreadyPatched)
+            {
+                return "이미 한글 패치가 적용된 상태예요. 다른 패치를 적용하려면 먼저 '패치 제거'로 원본(클린) 상태로 되돌린 뒤 진행해주세요.";
             }
 
             if (!hasKoreaClient)
@@ -649,11 +659,6 @@ namespace FFXIVKoreanPatch.Main
             if (preflightHasRun && !lastPreflightPassed)
             {
                 return "사전 점검에서 실패한 항목이 있어 패치 버튼을 잠갔습니다. 아래 점검 카드에서 실패 항목을 해결한 뒤 '다시 점검'을 눌러주세요.";
-            }
-
-            if (lastPreflightPassed && !canFont && fontBlockedOutside && canFull)
-            {
-                return "폰트만 패치를 사용할 수 없어요 — 텍스트/UI 패치(전체 패치)가 이미 적용되어 있습니다. 폰트만 패치로 전환하려면 먼저 '패치 제거'로 원본 상태로 되돌려주세요. (전체 패치 재적용은 가능합니다.)";
             }
 
             if (lastPreflightPassed && !canFull && !fullHasCleanBase)
@@ -3116,10 +3121,10 @@ namespace FFXIVKoreanPatch.Main
                     AddPreflightIndexStatus(lines, ref failures, ref warnings, "060000.win32.index");
                     AddPreflightIndexStatus(lines, ref failures, ref warnings, "060000.win32.index2");
 
-                    if (HasPatchedIndexesOutsideSelection(GetPatchFilesForSelection(false, true)))
+                    if (HasPatchedTargetIndexes())
                     {
                         warnings++;
-                        lines.Add("[주의] 텍스트/UI 패치가 적용된 상태라 '폰트만 패치' 버튼을 비활성화합니다. 폰트만 패치로 전환하려면 먼저 한글 패치 제거로 원본 상태로 되돌려주세요. (전체 패치 재적용은 가능합니다.)");
+                        lines.Add("[주의] 이미 한글 패치가 적용된 상태라 모든 패치 버튼을 비활성화합니다. 다른 패치를 적용하려면 먼저 한글 패치 제거로 원본(클린) 상태로 되돌린 뒤 진행해주세요.");
                     }
                 }
 
@@ -3649,12 +3654,12 @@ namespace FFXIVKoreanPatch.Main
                 return;
             }
 
-            if (!debugApply && HasPatchedIndexesOutsideSelection(selectedPatchFiles))
+            if (!debugApply && HasPatchedTargetIndexes())
             {
                 ShowMessage(
                     ViewMessageKind.Warning,
-                    "지금 선택한 패치가 덮지 않는 텍스트/UI 패치가 이미 적용되어 있어요." + Environment.NewLine +
-                    "예: 전체 한글 패치가 적용된 상태에서 폰트만 패치를 겹쳐 적용하면 클라이언트가 섞인 상태가 되어 글자가 깨질 수 있어요.",
+                    "이미 한글 패치가 적용된 상태예요." + Environment.NewLine +
+                    "패치는 항상 원본(클린) 상태에서 새로 적용해야 클라이언트가 섞이지 않아요.",
                     "먼저 '패치 제거'로 원본 상태로 되돌린 뒤 원하는 패치를 적용해주세요.");
                 SetActionButtonsEnabled(true);
                 return;
