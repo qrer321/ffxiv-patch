@@ -21,8 +21,8 @@ namespace FfxivKoreanPatch.PatchRouteVerifier
 
             private const double PvpReferenceMinRatio = 0.86d;
             private const double PvpReferenceMaxRatio = 1.18d;
-            private const double PvpNumericMinRatio = 0.86d;
-            private const double PvpNumericMaxRatio = 1.18d;
+            private const double PvpNumericMinRatio = 1.16d;
+            private const double PvpNumericMaxRatio = 1.42d;
             private const double PvpSourcePreserveMinRatio = 0.96d;
             private const double PvpSourcePreserveMaxRatio = 1.04d;
 
@@ -116,7 +116,14 @@ namespace FfxivKoreanPatch.PatchRouteVerifier
                         VerifyActionDetailValueHeight(fontPath, phrase.Korean, phraseBounds, numeric);
                     }
 
-                    if (IsPvpVisualScaleCandidateFontPath(fontPath))
+                    if (PvpProfileVisualScaleGlyphs.IsTargetFontPath(fontPath))
+                    {
+                        // Visual-scale targets are cropped and downscaled by the
+                        // generator; they must land in the digit-height window
+                        // instead of preserving the raw TTMP source scale.
+                        VerifyPvpNumericScale(fontPath, phrase, phraseBounds, numeric, true);
+                    }
+                    else if (IsPvpVisualScaleCandidateFontPath(fontPath))
                     {
                         VerifyPvpNumericScale(fontPath, phrase, phraseBounds, numeric, false);
                         VerifyPvpTtmpSourceScale(fontPath, phrase, phraseBounds);

@@ -138,6 +138,9 @@
     <Compile Include="..\..\FFXIVPatchGenerator\ActionDetailHighScaleHangulGlyphs.cs">
       <Link>Generator\ActionDetailHighScaleHangulGlyphs.cs</Link>
     </Compile>
+    <Compile Include="..\..\FFXIVPatchGenerator\PvpProfileVisualScaleGlyphs.cs">
+      <Link>Generator\PvpProfileVisualScaleGlyphs.cs</Link>
+    </Compile>
     <Compile Include="..\..\FFXIVPatchGenerator\LobbyScaledHangulPhrases.cs">
       <Link>Generator\LobbyScaledHangulPhrases.cs</Link>
     </Compile>

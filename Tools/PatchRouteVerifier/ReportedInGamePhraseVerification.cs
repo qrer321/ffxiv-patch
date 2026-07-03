@@ -19,19 +19,22 @@ namespace FfxivKoreanPatch.PatchRouteVerifier
 
                 HashSet<string> fontPaths = CollectReportedInGamePhraseFontPaths();
                 HashSet<uint> actionDetailHighScaleCodepoints = CollectActionDetailHighScaleHangulCodepointSet();
+                HashSet<uint> pvpProfileVisualScaleCodepoints = CollectPvpProfileVisualScaleHangulCodepointSet();
                 for (int phraseIndex = 0; phraseIndex < ReportedInGameHangulPhrases.Length; phraseIndex++)
                 {
                     VerifyReportedInGameHangulPhrase(
                         ReportedInGameHangulPhrases[phraseIndex],
                         fontPaths,
-                        actionDetailHighScaleCodepoints);
+                        actionDetailHighScaleCodepoints,
+                        pvpProfileVisualScaleCodepoints);
                 }
             }
 
             private void VerifyReportedInGameHangulPhrase(
                 string phrase,
                 HashSet<string> fontPaths,
-                HashSet<uint> actionDetailHighScaleCodepoints)
+                HashSet<uint> actionDetailHighScaleCodepoints,
+                HashSet<uint> pvpProfileVisualScaleCodepoints)
             {
                 int compared = 0;
                 foreach (string fontPath in fontPaths)
@@ -147,6 +150,31 @@ namespace FfxivKoreanPatch.PatchRouteVerifier
                         continue;
                     }
 
+                    if (IsExpectedPvpProfileVisualScaleRepair(
+                        fontPath,
+                        phrase,
+                        pvpProfileVisualScaleCodepoints,
+                        sourcePixels,
+                        targetPixels,
+                        sourceLayout,
+                        targetLayout))
+                    {
+                        Pass(
+                            "{0} phrase [{1}] accepts PvP visual-scale repair: glyphs={2}/{3}, width={4}/{5}, overlap={6}/{7}, pixels={8}/{9}",
+                            fontPath,
+                            Escape(phrase),
+                            targetLayout.Glyphs,
+                            sourceLayout.Glyphs,
+                            targetLayout.Width,
+                            sourceLayout.Width,
+                            targetLayout.OverlapPixels,
+                            sourceLayout.OverlapPixels,
+                            targetPixels.Pixels.Count,
+                            sourcePixels.Pixels.Count);
+                        compared++;
+                        continue;
+                    }
+
                     Fail(
                         "{0} phrase [{1}] differs from TTMP source: glyphs={2}/{3}, width={4}/{5}, overlap={6}/{7}, pixels={8}/{9}",
                         fontPath,
@@ -205,6 +233,70 @@ namespace FfxivKoreanPatch.PatchRouteVerifier
 
                 return targetPixels.Pixels.Count >= sourcePixels.Pixels.Count &&
                        targetPixels.Pixels.Count >= 10;
+            }
+
+            private bool IsExpectedPvpProfileVisualScaleRepair(
+                string fontPath,
+                string phrase,
+                HashSet<uint> pvpProfileVisualScaleCodepoints,
+                PhraseRenderSnapshot sourcePixels,
+                PhraseRenderSnapshot targetPixels,
+                PhraseLayoutResult sourceLayout,
+                PhraseLayoutResult targetLayout)
+            {
+                if (!PhraseUsesPvpProfileVisualScaleRepairedHangul(fontPath, phrase, pvpProfileVisualScaleCodepoints))
+                {
+                    return false;
+                }
+
+                if (targetLayout.Glyphs != sourceLayout.Glyphs ||
+                    targetPixels.Glyphs != sourcePixels.Glyphs)
+                {
+                    return false;
+                }
+
+                if (targetLayout.OverlapPixels > sourceLayout.OverlapPixels + 3)
+                {
+                    return false;
+                }
+
+                double widthRatio = sourceLayout.Width == 0
+                    ? 1d
+                    : (double)targetLayout.Width / sourceLayout.Width;
+                if (widthRatio < 0.45d || widthRatio > 1.05d)
+                {
+                    return false;
+                }
+
+                return targetPixels.Pixels.Count >= Math.Max(10, (int)(sourcePixels.Pixels.Count * 0.25d));
+            }
+
+            private static bool PhraseUsesPvpProfileVisualScaleRepairedHangul(
+                string fontPath,
+                string phrase,
+                HashSet<uint> repairedCodepoints)
+            {
+                if (!PvpProfileVisualScaleGlyphs.IsTargetFontPath(fontPath) ||
+                    repairedCodepoints == null)
+                {
+                    return false;
+                }
+
+                for (int i = 0; i < phrase.Length; i++)
+                {
+                    uint codepoint = ReadCodepoint(phrase, ref i);
+                    if (!IsHangulCodepoint(codepoint))
+                    {
+                        continue;
+                    }
+
+                    if (repairedCodepoints.Contains(codepoint))
+                    {
+                        return true;
+                    }
+                }
+
+                return false;
             }
 
             private static HashSet<string> CollectReportedInGamePhraseFontPaths()

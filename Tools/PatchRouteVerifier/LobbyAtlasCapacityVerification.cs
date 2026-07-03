@@ -368,6 +368,17 @@ namespace FfxivKoreanPatch.PatchRouteVerifier
 
                             foreach (string fontPath in groupFonts)
                             {
+                                if (IsLobbyLargeLabelDisplayFont(fontPath))
+                                {
+                                    // Display-label fonts carry only the
+                                    // visual-scale large-label subset; the
+                                    // body text on these screens routes
+                                    // through the AXIS lobby fonts. Their
+                                    // label coverage is asserted by
+                                    // lobby-large-label-scale-layouts.
+                                    continue;
+                                }
+
                                 LobbyFontGlyphRequirement requirement = GetOrAddRequirement(requirements, fontPath);
                                 requirement.Groups.Add(group.Name);
                                 requirement.Screens.UnionWith(group.Screens);
@@ -441,6 +452,12 @@ namespace FfxivKoreanPatch.PatchRouteVerifier
                 }
 
                 return rows;
+            }
+
+            private static bool IsLobbyLargeLabelDisplayFont(string fontPath)
+            {
+                return string.Equals(fontPath, "common/font/TrumpGothic_23_lobby.fdt", StringComparison.OrdinalIgnoreCase) ||
+                       string.Equals(fontPath, "common/font/TrumpGothic_34_lobby.fdt", StringComparison.OrdinalIgnoreCase);
             }
 
             private HashSet<string> ResolveCoverageGroupFonts(

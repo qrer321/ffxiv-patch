@@ -15,6 +15,7 @@ namespace FfxivKoreanPatch.PatchRouteVerifier
                 new LobbyLargeLabelScaleCase("character-deity-23", "common/font/TrumpGothic_23_lobby.fdt", "common/font/AXIS_18_lobby.fdt", "니메이아", "ニメーヤ"),
                 new LobbyLargeLabelScaleCase("character-class-23", "common/font/TrumpGothic_23_lobby.fdt", "common/font/AXIS_18_lobby.fdt", "레벨 100 암흑기사", "レベル100暗黒騎士"),
                 new LobbyLargeLabelScaleCase("character-location-23", "common/font/TrumpGothic_23_lobby.fdt", "common/font/AXIS_18_lobby.fdt", "지고천 거리", "ジゴテン街"),
+                new LobbyLargeLabelScaleCase("start-system-config-title-34", "common/font/TrumpGothic_34_lobby.fdt", "common/font/TrumpGothic_34.fdt", "시스템 설정", "システムコンフィグ"),
                 new LobbyLargeLabelScaleCase("character-race-gender-34", "common/font/TrumpGothic_34_lobby.fdt", "common/font/TrumpGothic_34.fdt", "로스가르 여", "ロスガル"),
                 new LobbyLargeLabelScaleCase("character-tribe-34", "common/font/TrumpGothic_34_lobby.fdt", "common/font/TrumpGothic_34.fdt", "떠도는 별", "ロスト"),
                 new LobbyLargeLabelScaleCase("character-birthday-34", "common/font/TrumpGothic_34_lobby.fdt", "common/font/TrumpGothic_34.fdt", "그림자 5월 11일", "霊5月11日"),
@@ -125,7 +126,11 @@ namespace FfxivKoreanPatch.PatchRouteVerifier
                 string normalized = (fontPath ?? string.Empty).Replace('\\', '/');
                 if (string.Equals(normalized, "common/font/TrumpGothic_34_lobby.fdt", StringComparison.OrdinalIgnoreCase))
                 {
-                    return new LobbyLargeLabelScaleExpectation(0.90d, 1.22d, 0.90d, 24.0d, 38.0d, 0.82d, 2.70d);
+                    // The 150%+ lobby renders this font natively while the base
+                    // language shows ~1.5x-scaled AXIS_18_lobby text (~21.6px).
+                    // The pixel ceiling rejects the oversized state (30.6-35px)
+                    // that overran the auxiliary text next to the title.
+                    return new LobbyLargeLabelScaleExpectation(0.85d, 1.06d, 0.85d, 24.0d, 30.5d, 1.40d, 2.20d);
                 }
 
                 return new LobbyLargeLabelScaleExpectation(1.04d, 1.16d, 1.02d, 17.0d, 24.0d, 0.82d, 1.80d);
