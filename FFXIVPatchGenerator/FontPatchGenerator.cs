@@ -6381,15 +6381,19 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
             }
 
             FontGlyphRepairContext context = new FontGlyphRepairContext();
-            if (fontOnly)
+            // font1/font2 are shipped from the TTMP payload (the 4096 Korean
+            // atlas) in both modes, so their allocators must be built from that
+            // same TTMP texture. font-only previously built them from the clean
+            // 1024 client atlas, so the free-space map disagreed with the
+            // written 4096 texture and the ASCII/PUA repairs relocated glyphs to
+            // coordinates that collide with TTMP content. In-game rendering
+            // tolerated it, but Dalamud's game-font atlas rendered those
+            // relocated English/icon glyphs as smeared boxes. Full patch always
+            // used the TTMP allocators here; align font-only with it.
+            AddFontAtlasAllocator(context, fontPackage, mpdStream, Font1TexturePath);
+            AddFontAtlasAllocator(context, fontPackage, mpdStream, Font2TexturePath);
+            if (!fontOnly)
             {
-                AddGlobalFontAtlasAllocator(context, globalArchive, Font1TexturePath);
-                AddGlobalFontAtlasAllocator(context, globalArchive, Font2TexturePath);
-            }
-            else
-            {
-                AddFontAtlasAllocator(context, fontPackage, mpdStream, Font1TexturePath);
-                AddFontAtlasAllocator(context, fontPackage, mpdStream, Font2TexturePath);
                 AddFontAtlasAllocator(context, fontPackage, mpdStream, Font3TexturePath);
             }
 
