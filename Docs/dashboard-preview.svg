@@ -1,0 +1,131 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 780 566" width="780" height="566" role="img" aria-label="FFXIV 한글 패치 대시보드 미리보기">
+  <defs>
+    <linearGradient id="logoGrad" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#E8C886"/>
+      <stop offset="1" stop-color="#8A6D3A"/>
+    </linearGradient>
+    <linearGradient id="bannerGrad" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#22303F"/>
+      <stop offset="0.55" stop-color="#141B26"/>
+      <stop offset="1" stop-color="#0E1016"/>
+    </linearGradient>
+    <radialGradient id="glowGold" cx="0.3" cy="0.3" r="0.6">
+      <stop offset="0" stop-color="#D4AF6A" stop-opacity="0.28"/>
+      <stop offset="1" stop-color="#D4AF6A" stop-opacity="0"/>
+    </radialGradient>
+    <radialGradient id="glowBlue" cx="0.75" cy="0.4" r="0.6">
+      <stop offset="0" stop-color="#6AA7D4" stop-opacity="0.22"/>
+      <stop offset="1" stop-color="#6AA7D4" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="goldBtn" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#2E2923"/>
+      <stop offset="1" stop-color="#18181A"/>
+    </linearGradient>
+    <linearGradient id="blueBtn" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#171F29"/>
+      <stop offset="1" stop-color="#0E1016"/>
+    </linearGradient>
+    <linearGradient id="progressGrad" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="#A8853F"/>
+      <stop offset="1" stop-color="#E8C886"/>
+    </linearGradient>
+    <clipPath id="bannerClip">
+      <rect x="2" y="42" width="776" height="107"/>
+    </clipPath>
+  </defs>
+
+  <g font-family="'Malgun Gothic','Apple SD Gothic Neo','Segoe UI',sans-serif">
+
+    <!-- window -->
+    <rect x="1" y="1" width="778" height="564" rx="12" fill="#0E1016" stroke="#262C3A"/>
+
+    <!-- title bar -->
+    <path d="M 2 42 V 13 Q 2 2 13 2 H 767 Q 778 2 778 13 V 42 Z" fill="#0A0C11"/>
+    <line x1="2" y1="42" x2="778" y2="42" stroke="#1E2430"/>
+    <rect x="16" y="13" width="19" height="19" rx="4" fill="url(#logoGrad)"/>
+    <text x="25.5" y="27" font-size="11" font-weight="bold" fill="#0E1016" text-anchor="middle">&#10022;</text>
+    <text x="44" y="27" font-size="12.5" font-weight="600" fill="#E8E6E1">FFXIV 한글 패치</text>
+    <text x="744" y="27" font-size="12" fill="#626C7D" text-anchor="middle">&#9472;</text>
+    <text x="766" y="27" font-size="12" fill="#626C7D" text-anchor="middle">&#10005;</text>
+
+    <!-- banner -->
+    <g clip-path="url(#bannerClip)">
+      <rect x="2" y="42" width="776" height="107" fill="url(#bannerGrad)"/>
+      <ellipse cx="230" cy="70" rx="260" ry="120" fill="url(#glowGold)"/>
+      <ellipse cx="600" cy="80" rx="240" ry="120" fill="url(#glowBlue)"/>
+    </g>
+
+    <!-- status + settings card -->
+    <rect x="24" y="157" width="732" height="173" rx="10" fill="#151923" stroke="#1E2430"/>
+    <circle cx="45" cy="180" r="5" fill="#7EC98F"/>
+    <text x="57" y="184" font-size="13.5" font-weight="bold" fill="#E8E6E1">패치 준비 완료</text>
+    <rect x="156" y="171" width="76" height="18" rx="9" fill="#1A1F2B" stroke="#1E2430"/>
+    <text x="194" y="184" font-size="10.5" fill="#9AA3B2" text-anchor="middle">일본어 기반</text>
+
+    <!-- global client row -->
+    <text x="40" y="212" font-size="12" fill="#9AA3B2">글로벌 클라이언트</text>
+    <rect x="156" y="196" width="520" height="24" rx="7" fill="#1A1F2B" stroke="#1E2430"/>
+    <text x="166" y="212" font-size="11.5" fill="#E8E6E1" font-family="'Cascadia Code','Consolas',monospace">D:\SquareEnix\FINAL FANTASY XIV - A Realm Reborn\game</text>
+    <rect x="684" y="196" width="56" height="24" rx="7" fill="#1A1F2B" stroke="#262C3A"/>
+    <text x="712" y="212" font-size="12" fill="#9AA3B2" text-anchor="middle">변경</text>
+
+    <!-- korea client row -->
+    <text x="40" y="244" font-size="12" fill="#9AA3B2">한국 클라이언트</text>
+    <rect x="156" y="228" width="520" height="24" rx="7" fill="#1A1F2B" stroke="#1E2430"/>
+    <text x="166" y="244" font-size="11.5" fill="#E8E6E1" font-family="'Cascadia Code','Consolas',monospace">E:\FINAL FANTASY XIV - KOREA\game</text>
+    <rect x="684" y="228" width="56" height="24" rx="7" fill="#1A1F2B" stroke="#262C3A"/>
+    <text x="712" y="244" font-size="12" fill="#9AA3B2" text-anchor="middle">변경</text>
+
+    <!-- base language row -->
+    <text x="40" y="279" font-size="12" fill="#9AA3B2">베이스 언어</text>
+    <rect x="156" y="262" width="180" height="26" rx="7" fill="#1A1F2B" stroke="#262C3A"/>
+    <text x="168" y="279" font-size="12" fill="#E8E6E1">일본어 (ja)</text>
+    <text x="322" y="279" font-size="11" fill="#626C7D" text-anchor="middle">&#9662;</text>
+    <rect x="346" y="262" width="72" height="26" rx="7" fill="#1A1F2B" stroke="#262C3A"/>
+    <text x="382" y="279" font-size="12" fill="#9AA3B2" text-anchor="middle">자동 탐색</text>
+    <rect x="426" y="262" width="52" height="26" rx="7" fill="#1A1F2B" stroke="#262C3A"/>
+    <text x="452" y="279" font-size="12" fill="#9AA3B2" text-anchor="middle">리셋</text>
+
+    <!-- keep-original chips -->
+    <text x="40" y="312" font-size="12" fill="#9AA3B2">원문 유지</text>
+    <rect x="156" y="298" width="58" height="24" rx="12" fill="none" stroke="#262C3A"/>
+    <text x="185" y="314" font-size="12" fill="#626C7D" text-anchor="middle">보스명</text>
+    <rect x="220" y="298" width="58" height="24" rx="12" fill="none" stroke="#262C3A"/>
+    <text x="249" y="314" font-size="12" fill="#626C7D" text-anchor="middle">기술명</text>
+    <rect x="284" y="298" width="58" height="24" rx="12" fill="#24211A" stroke="#73D4AF6A"/>
+    <text x="313" y="314" font-size="12" fill="#E8C886" text-anchor="middle">상용구</text>
+    <text x="352" y="314" font-size="11" fill="#626C7D">체크하면 해당 텍스트는 원문을 유지합니다</text>
+
+    <!-- main actions -->
+    <rect x="24" y="342" width="273" height="62" rx="10" fill="url(#goldBtn)" stroke="#D4AF6A" stroke-opacity="0.5"/>
+    <text x="39" y="369" font-size="14.5" font-weight="bold" fill="#E8C886">전체 한글 패치</text>
+    <text x="39" y="389" font-size="11.5" fill="#9AA3B2">UI · 대사 · 폰트 전체를 한국어로 교체</text>
+
+    <rect x="308" y="342" width="218" height="62" rx="10" fill="url(#blueBtn)" stroke="#6AA7D4" stroke-opacity="0.35"/>
+    <text x="323" y="369" font-size="14.5" font-weight="bold" fill="#6AA7D4">폰트만 패치</text>
+    <text x="323" y="389" font-size="11.5" fill="#9AA3B2">채팅의 한글만 표시</text>
+
+    <rect x="537" y="342" width="218" height="62" rx="10" fill="#151923" stroke="#D4746A" stroke-opacity="0.3"/>
+    <text x="552" y="369" font-size="14.5" font-weight="bold" fill="#D4746A">패치 제거</text>
+    <text x="552" y="389" font-size="11.5" fill="#9AA3B2">게임 파일을 원본으로 복원</text>
+
+    <!-- preflight card -->
+    <rect x="24" y="416" width="732" height="40" rx="10" fill="#151923" stroke="#1E2430"/>
+    <circle cx="44" cy="436" r="4" fill="#7EC98F"/>
+    <text x="56" y="440" font-size="12.5" fill="#E8E6E1">사전 점검 통과 · 모든 필수 항목 확인됨</text>
+    <text x="600" y="440" font-size="12" fill="#9AA3B2">&#9656; 자세히</text>
+    <rect x="676" y="424" width="64" height="24" rx="7" fill="#1A1F2B" stroke="#262C3A"/>
+    <text x="708" y="440" font-size="11.5" fill="#9AA3B2" text-anchor="middle">다시 점검</text>
+
+    <!-- advanced card -->
+    <rect x="24" y="468" width="732" height="40" rx="10" fill="#151923" stroke="#1E2430"/>
+    <text x="42" y="492" font-size="12.5" fill="#9AA3B2">&#9656; 고급 기능 — 백업 복구 · 폴더 · 정리</text>
+
+    <!-- footer: status + progress -->
+    <text x="24" y="529" font-size="12" fill="#9AA3B2">패치를 선택하세요</text>
+    <rect x="636" y="518" width="62" height="20" rx="6" fill="#1A1F2B" stroke="#262C3A"/>
+    <text x="667" y="532" font-size="11" fill="#9AA3B2" text-anchor="middle">로그 보기</text>
+    <text x="756" y="530" font-size="12" fill="#9AA3B2" text-anchor="end">대기</text>
+    <rect x="24" y="542" width="732" height="6" rx="3" fill="#1A1F2B"/>
+  </g>
+</svg>
