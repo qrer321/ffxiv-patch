@@ -2453,25 +2453,32 @@ namespace FFXIVKoreanPatch.Main
             });
         }
 
-        private IEnumerable<string> GetManagedRootDirs()
+        private IEnumerable<string> GetManagedReleaseRootDirs()
         {
             return new string[]
             {
                 Path.Combine(GetRuntimeDataRootDir(), "generated-release"),
                 Path.Combine(LegacyPaths.CommonAppDataPath, "generated-release"),
-                Path.Combine(LegacyPaths.StartupPath, "generated-release"),
+                Path.Combine(LegacyPaths.StartupPath, "generated-release")
+            }.Distinct(StringComparer.OrdinalIgnoreCase);
+        }
+
+        private IEnumerable<string> GetManagedLogRootDirs()
+        {
+            return new string[]
+            {
                 GetLogRootDir(),
                 Path.Combine(LegacyPaths.StartupPath, "logs"),
                 Path.Combine(LegacyPaths.CommonAppDataPath, "logs")
             }.Distinct(StringComparer.OrdinalIgnoreCase);
         }
 
-        private int CleanupOldManagedFiles(int olderThanDays, List<string> logLines)
+        private int CleanupOldFilesInRoots(IEnumerable<string> roots, int olderThanDays, List<string> logLines)
         {
             DateTime threshold = DateTime.Now.AddDays(-olderThanDays);
             int deleted = 0;
 
-            foreach (string root in GetManagedRootDirs())
+            foreach (string root in roots)
             {
                 if (!Directory.Exists(root)) continue;
 
@@ -2499,6 +2506,71 @@ namespace FFXIVKoreanPatch.Main
                     Directory.Delete(directory, false);
                     deleted++;
                     logLines.Add("Deleted empty directory: " + directory);
+                }
+            }
+
+            return deleted;
+        }
+
+        // Every patch apply/restore writes a fresh timestamped backup folder holding full
+        // index/dat copies, so these pile up over time. Keep only the most recent backup and
+        // delete the older ones to reclaim disk space; the latest still allows "백업으로 복구".
+        private int CleanupOldBackups(List<string> logLines)
+        {
+            List<string> backupDirs = new List<string>();
+            HashSet<string> seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+            foreach (string root in GetBackupRootDirs())
+            {
+                if (!Directory.Exists(root)) continue;
+
+                string[] children;
+                try
+                {
+                    children = Directory.GetDirectories(root);
+                }
+                catch
+                {
+                    continue;
+                }
+
+                foreach (string child in children)
+                {
+                    if (seen.Add(child))
+                    {
+                        backupDirs.Add(child);
+                    }
+                }
+            }
+
+            if (backupDirs.Count <= 1)
+            {
+                return 0;
+            }
+
+            string keepDir = backupDirs
+                .OrderByDescending(GetDirectoryLastWriteTimeUtcSafe)
+                .ThenByDescending(dir => Path.GetFileName(dir), StringComparer.OrdinalIgnoreCase)
+                .First();
+            logLines.Add("Kept latest backup: " + keepDir);
+
+            int deleted = 0;
+            foreach (string dir in backupDirs)
+            {
+                if (string.Equals(dir, keepDir, StringComparison.OrdinalIgnoreCase))
+                {
+                    continue;
+                }
+
+                try
+                {
+                    Directory.Delete(dir, true);
+                    deleted++;
+                    logLines.Add("Deleted old backup: " + dir);
+                }
+                catch (Exception exception)
+                {
+                    logLines.Add("Failed to delete backup: " + dir + " (" + exception.Message + ")");
                 }
             }
 
@@ -3546,8 +3618,8 @@ namespace FFXIVKoreanPatch.Main
         {
             bool confirmed = view.ShowConfirm(
                 "오래된 파일 정리",
-                "generated-release와 logs에서 30일 지난 파일과 빈 폴더를 정리할까요?",
-                "백업과 로컬 복구 기준은 자동 정리하지 않습니다.");
+                "generated-release는 30일, 로그는 7일 지난 파일을 정리하고, 패치 백업은 최신 1개만 남길까요?",
+                "이전 백업 폴더는 삭제됩니다. 로컬 복구 기준(restore-baseline)은 정리하지 않습니다.");
             if (!confirmed)
             {
                 return;
@@ -3556,12 +3628,15 @@ namespace FFXIVKoreanPatch.Main
             try
             {
                 List<string> logLines = new List<string>();
-                int deleted = CleanupOldManagedFiles(30, logLines);
+                int deleted = CleanupOldFilesInRoots(GetManagedReleaseRootDirs(), 30, logLines);
+                int deletedLogs = CleanupOldFilesInRoots(GetManagedLogRootDirs(), 7, logLines);
+                int deletedBackups = CleanupOldBackups(logLines);
                 string logPath = WriteOperationLog("cleanup", logLines);
                 ShowMessage(
                     ViewMessageKind.Info,
                     "정리가 완료되었어요.",
-                    "삭제한 항목: " + deleted,
+                    "삭제한 항목: " + (deleted + deletedLogs + deletedBackups)
+                        + " (로그 " + deletedLogs + "개, 이전 백업 " + deletedBackups + "개 포함)",
                     "로그: " + logPath);
             }
             catch (Exception exception)
@@ -4052,6 +4127,7 @@ namespace FFXIVKoreanPatch.Main
         private void RemoveWork()
         {
             List<string> logLines = new List<string>();
+            bool restoreSucceeded = false;
 
             try
             {
@@ -4086,6 +4162,7 @@ namespace FFXIVKoreanPatch.Main
                         "로컬 orig index로 글로벌 서버 클라이언트를 복구했습니다.",
                         localRestoreLogPath,
                         resultDetails);
+                    restoreSucceeded = true;
                     return;
                 }
 
@@ -4112,7 +4189,17 @@ namespace FFXIVKoreanPatch.Main
             finally
             {
                 removeBusy = false;
-                SetActionButtonsEnabled(true);
+                if (restoreSucceeded)
+                {
+                    // Auto re-run preflight so the dashboard reflects the now-clean client
+                    // (patch buttons unlock, state refresh) without a manual "다시 점검".
+                    // StartPreflightCheck owns the action-button enabled state from here.
+                    StartPreflightCheck();
+                }
+                else
+                {
+                    SetActionButtonsEnabled(true);
+                }
             }
         }
 
