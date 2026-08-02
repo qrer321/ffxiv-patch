@@ -46,7 +46,12 @@ namespace FfxivKoreanPatch.PatchRouteVerifier
                 new InGameUldCandidate("action-menu", "ui/uld/ActionMenu.uld"),
                 new InGameUldCandidate("action-bar", "ui/uld/ActionBar.uld"),
                 new InGameUldCandidate("party-list", "ui/uld/PartyList.uld"),
-                new InGameUldCandidate("alliance-list", "ui/uld/AllianceList.uld"),
+                new InGameUldCandidate("social", "ui/uld/Social.uld"),
+                new InGameUldCandidate("social-party-members", "ui/uld/PartyMemberList.uld"),
+                new InGameUldCandidate("free-company", "ui/uld/FreeCompany.uld"),
+                new InGameUldCandidate("free-company-profile", "ui/uld/FreeCompanyProfile.uld"),
+                new InGameUldCandidate("free-company-members", "ui/uld/FreeCompanyMember.uld"),
+                new InGameUldCandidate("alliance-list", "ui/uld/AllianceList.uld", true),
                 new InGameUldCandidate("enemy-list", "ui/uld/EnemyList.uld"),
                 new InGameUldCandidate("name-plate", "ui/uld/NamePlate.uld"),
                 new InGameUldCandidate("chat-log", "ui/uld/ChatLog.uld"),
@@ -118,17 +123,148 @@ namespace FfxivKoreanPatch.PatchRouteVerifier
             {
                 string routeReportPath = Path.Combine(reportDir, "ingame-uld-font-routes.tsv");
                 InGameUldSurveyStats stats = new InGameUldSurveyStats();
+                List<InGameUldCandidate> candidates = CollectInGameFontRiskUldCandidates();
 
                 using (StreamWriter writer = CreateUtf8Writer(routeReportPath))
                 {
-                    writer.WriteLine("area\tuld\tpresent\tclean_text_nodes\tpatched_text_nodes\tnode_offset\tclean_font_id\tclean_font_size\tclean_font_path\tpatched_font_id\tpatched_font_size\tpatched_font_path\trisk\trender_state_preserved\terror");
-                    for (int i = 0; i < InGameFontRiskUldCandidates.Length; i++)
+                    writer.WriteLine("area\tuld\tpresent\tclean_text_nodes\tpatched_text_nodes\tnode_offset\tnode_size\tcontainer_type\tcontainer_id\tnode_id\tx\ty\twidth\theight\ttext_id\talignment\ttext_flags\tsheet_type\tchar_spacing\tline_spacing\ttext_flags2\tclean_font_id\tclean_font_size\tclean_font_path\tpatched_font_id\tpatched_font_size\tpatched_font_path\trisk\trender_state_preserved\terror");
+                    for (int i = 0; i < candidates.Count; i++)
                     {
-                        WriteInGameUldRouteRows(writer, fontSummaries, InGameFontRiskUldCandidates[i], stats);
+                        WriteInGameUldRouteRows(writer, fontSummaries, candidates[i], stats);
                     }
                 }
 
                 return stats;
+            }
+
+            private List<InGameUldCandidate> CollectInGameFontRiskUldCandidates()
+            {
+                List<InGameUldCandidate> candidates = new List<InGameUldCandidate>();
+                HashSet<string> paths = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+                for (int i = 0; i < InGameFontRiskUldCandidates.Length; i++)
+                {
+                    InGameUldCandidate candidate = InGameFontRiskUldCandidates[i];
+                    if (paths.Add(candidate.Path))
+                    {
+                        candidates.Add(candidate);
+                    }
+                }
+
+                string gameExecutablePath = Path.GetFullPath(
+                    Path.Combine(_globalUiSqpack, "..", "..", "ffxiv_dx11.exe"));
+                if (!File.Exists(gameExecutablePath))
+                {
+                    return candidates;
+                }
+
+                foreach (string identifier in ReadAsciiIdentifiers(gameExecutablePath))
+                {
+                    string path = "ui/uld/" + identifier + ".uld";
+                    if (paths.Contains(path) || !IsValidCleanUldPath(path))
+                    {
+                        continue;
+                    }
+
+                    paths.Add(path);
+                    candidates.Add(new InGameUldCandidate("discovered", path));
+                }
+
+                candidates.Sort(CompareInGameUldCandidates);
+                return candidates;
+            }
+
+            private bool IsValidCleanUldPath(string path)
+            {
+                byte[] packed;
+                if (!_cleanUi.TryReadPackedFile(path, out packed))
+                {
+                    return false;
+                }
+
+                try
+                {
+                    byte[] uld = SqPackArchive.UnpackStandardFile(packed);
+                    return HasRange(uld, 0, UldHeaderSize) && HasAsciiMagic(uld, 0, UldHeaderMagic);
+                }
+                catch (InvalidDataException)
+                {
+                    return false;
+                }
+                catch (EndOfStreamException)
+                {
+                    return false;
+                }
+            }
+
+            private static IEnumerable<string> ReadAsciiIdentifiers(string path)
+            {
+                const int MinimumLength = 3;
+                const int MaximumLength = 80;
+                HashSet<string> identifiers = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+                StringBuilder current = new StringBuilder(MaximumLength);
+                bool overflow = false;
+                using (FileStream stream = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.ReadWrite))
+                {
+                    int value;
+                    while ((value = stream.ReadByte()) >= 0)
+                    {
+                        if (IsAsciiIdentifierCharacter(value))
+                        {
+                            if (current.Length < MaximumLength)
+                            {
+                                current.Append((char)value);
+                            }
+                            else
+                            {
+                                overflow = true;
+                            }
+
+                            continue;
+                        }
+
+                        AddAsciiIdentifier(identifiers, current, overflow, MinimumLength);
+                        current.Length = 0;
+                        overflow = false;
+                    }
+                }
+
+                AddAsciiIdentifier(identifiers, current, overflow, MinimumLength);
+                return identifiers;
+            }
+
+            private static void AddAsciiIdentifier(
+                HashSet<string> identifiers,
+                StringBuilder current,
+                bool overflow,
+                int minimumLength)
+            {
+                if (overflow || current.Length < minimumLength)
+                {
+                    return;
+                }
+
+                char first = current[0];
+                if (!((first >= 'A' && first <= 'Z') ||
+                      (first >= 'a' && first <= 'z') ||
+                      first == '_'))
+                {
+                    return;
+                }
+
+                identifiers.Add(current.ToString());
+            }
+
+            private static bool IsAsciiIdentifierCharacter(int value)
+            {
+                return (value >= 'A' && value <= 'Z') ||
+                       (value >= 'a' && value <= 'z') ||
+                       (value >= '0' && value <= '9') ||
+                       value == '_';
+            }
+
+            private static int CompareInGameUldCandidates(InGameUldCandidate left, InGameUldCandidate right)
+            {
+                return StringComparer.OrdinalIgnoreCase.Compare(left.Path, right.Path);
             }
 
             private void WriteInGameUldRouteRows(
@@ -152,6 +288,22 @@ namespace FfxivKoreanPatch.PatchRouteVerifier
                         candidate.Area,
                         candidate.Path,
                         "no",
+                        string.Empty,
+                        string.Empty,
+                        string.Empty,
+                        string.Empty,
+                        string.Empty,
+                        string.Empty,
+                        string.Empty,
+                        string.Empty,
+                        string.Empty,
+                        string.Empty,
+                        string.Empty,
+                        string.Empty,
+                        string.Empty,
+                        string.Empty,
+                        string.Empty,
+                        string.Empty,
                         string.Empty,
                         string.Empty,
                         string.Empty,
@@ -203,6 +355,21 @@ namespace FfxivKoreanPatch.PatchRouteVerifier
                         cleanFonts.Count.ToString(),
                         patchedFonts.Count.ToString(),
                         "0x" + cleanNode.NodeOffset.ToString("X"),
+                        cleanNode.NodeSize.ToString(),
+                        cleanNode.ContainerType,
+                        cleanNode.ContainerId.ToString(),
+                        cleanNode.NodeId.ToString(),
+                        cleanNode.X.ToString(),
+                        cleanNode.Y.ToString(),
+                        cleanNode.Width.ToString(),
+                        cleanNode.Height.ToString(),
+                        cleanNode.TextId.ToString(),
+                        cleanNode.Alignment.ToString(),
+                        cleanNode.TextFlags.ToString(),
+                        cleanNode.SheetType.ToString(),
+                        cleanNode.CharSpacing.ToString(),
+                        cleanNode.LineSpacing.ToString(),
+                        cleanNode.TextFlags2.ToString(),
                         cleanNode.FontId.ToString(),
                         cleanNode.FontSize.ToString(),
                         cleanFontPath,
@@ -332,7 +499,23 @@ namespace FfxivKoreanPatch.PatchRouteVerifier
                         {
                             int columnIndex = stringColumns[columnListIndex];
                             ExcelColumnDefinition column = header.Columns[columnIndex];
-                            byte[] bytes = file.GetStringBytes(row, header, columnIndex);
+                            byte[] bytes;
+                            try
+                            {
+                                bytes = file.GetStringBytes(row, header, columnIndex);
+                            }
+                            catch (Exception ex)
+                            {
+                                WriteSheetReadError(
+                                    errorWriter,
+                                    sheet,
+                                    exdPath + "#row=" + row.RowId.ToString() + ";column=" + columnIndex.ToString(),
+                                    ex.GetType().Name,
+                                    ex.Message);
+                                stats.ReadErrors++;
+                                continue;
+                            }
+
                             string value = bytes == null ? string.Empty : Encoding.UTF8.GetString(bytes);
                             if (!ContainsHangul(value))
                             {

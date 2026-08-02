@@ -486,7 +486,9 @@ namespace FfxivKoreanPatch.PatchRouteVerifier
                 return new string[]
                 {
                     DataCenterTitleUldPath,
-                    DataCenterWorldmapUldPath
+                    DataCenterWorldmapUldPath,
+                    PartyBonusRoleFontPatch.UldPath,
+                    DutyFinderRoleFontPatch.UldPath
                 };
             }
 

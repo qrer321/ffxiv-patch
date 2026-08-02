@@ -41,6 +41,9 @@
     <Compile Include="FontPatchGenerator.cs" />
     <Compile Include="ActionDetailHighScaleHangulGlyphs.cs" />
     <Compile Include="PvpProfileVisualScaleGlyphs.cs" />
+    <Compile Include="SharedUi100PercentHangulGlyphs.cs" />
+    <Compile Include="PartyBonusRoleFontPatch.cs" />
+    <Compile Include="DutyFinderRoleFontPatch.cs" />
     <Compile Include="LobbyScaledHangulPhrases.cs" />
     <Compile Include="LobbyHangulCoverage.cs" />
     <Compile Include="UiPatchGenerator.cs" />

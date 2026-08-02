@@ -137,6 +137,16 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
                     PartyListTargetBaseTexPath,
                     PartyListTargetBaseTexPath,
                     "Korean PartyList target texture");
+                patched += PatchPartyBonusRoleFont(
+                    globalUiArchive,
+                    mutableIndex,
+                    mutableIndex2,
+                    datWriter);
+                patched += PatchDutyFinderRoleFont(
+                    globalUiArchive,
+                    mutableIndex,
+                    mutableIndex2,
+                    datWriter);
                 // Keep data-center lobby ULD font slots byte-for-byte clean.
                 // The font patch preserves the clean global glyph route instead.
                 patched += CopyIconSheetImages(
@@ -252,6 +262,48 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
             mutableIndex.SetFileOffset(targetPath, PatchDatId, offset);
             mutableIndex2.SetFileOffset(targetPath, PatchDatId, offset);
             Console.WriteLine("UI texture patched: {0}", targetPath);
+            return 1;
+        }
+
+        private static int PatchPartyBonusRoleFont(
+            SqPackArchive globalUiArchive,
+            SqPackIndexFile mutableIndex,
+            SqPackIndex2File mutableIndex2,
+            SqPackDatWriter datWriter)
+        {
+            byte[] sourceUld = globalUiArchive.ReadFile(PartyBonusRoleFontPatch.UldPath);
+            byte[] patchedUld = PartyBonusRoleFontPatch.Apply(sourceUld);
+            long offset = datWriter.WriteStandardFile(patchedUld);
+            mutableIndex.SetFileOffset(PartyBonusRoleFontPatch.UldPath, PatchDatId, offset);
+            mutableIndex2.SetFileOffset(PartyBonusRoleFontPatch.UldPath, PatchDatId, offset);
+            Console.WriteLine(
+                "UI ULD patched: {0} role font {1}/{2} -> {3}/{4}",
+                PartyBonusRoleFontPatch.UldPath,
+                PartyBonusRoleFontPatch.SourceFontId,
+                PartyBonusRoleFontPatch.SourceFontSize,
+                PartyBonusRoleFontPatch.TargetFontId,
+                PartyBonusRoleFontPatch.TargetFontSize);
+            return 1;
+        }
+
+        private static int PatchDutyFinderRoleFont(
+            SqPackArchive globalUiArchive,
+            SqPackIndexFile mutableIndex,
+            SqPackIndex2File mutableIndex2,
+            SqPackDatWriter datWriter)
+        {
+            byte[] sourceUld = globalUiArchive.ReadFile(DutyFinderRoleFontPatch.UldPath);
+            byte[] patchedUld = DutyFinderRoleFontPatch.Apply(sourceUld);
+            long offset = datWriter.WriteStandardFile(patchedUld);
+            mutableIndex.SetFileOffset(DutyFinderRoleFontPatch.UldPath, PatchDatId, offset);
+            mutableIndex2.SetFileOffset(DutyFinderRoleFontPatch.UldPath, PatchDatId, offset);
+            Console.WriteLine(
+                "UI ULD patched: {0} role-tab fonts {1}/{2} -> {3}/{4}",
+                DutyFinderRoleFontPatch.UldPath,
+                DutyFinderRoleFontPatch.SourceFontId,
+                DutyFinderRoleFontPatch.SourceFontSize,
+                DutyFinderRoleFontPatch.TargetFontId,
+                DutyFinderRoleFontPatch.TargetFontSize);
             return 1;
         }
 

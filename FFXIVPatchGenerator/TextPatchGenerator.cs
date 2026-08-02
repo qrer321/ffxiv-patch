@@ -225,6 +225,7 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
 
         private readonly BuildOptions _options;
         private readonly BuildReport _report = new BuildReport();
+        private readonly HashSet<uint> _patchedOutputHangulCodepoints = new HashSet<uint>();
         private RsvStringResolver _rsvResolver = RsvStringResolver.Empty;
 
         public TextPatchGenerator(BuildOptions options)
@@ -327,7 +328,7 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
             if (_options.IncludeFont)
             {
                 ProgressReporter.Report(90, "폰트 패치 생성 중");
-                new FontPatchGenerator(_options, _report).Build();
+                new FontPatchGenerator(_options, _report, _patchedOutputHangulCodepoints).Build();
                 if (_options.ShouldBuildUiTextureFix)
                 {
                     ProgressReporter.Report(98, "UI texture patch build");
@@ -692,6 +693,7 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
                     continue;
                 }
 
+                AddPatchedOutputHangulCodepoints(patchResult.Data, globalHeader, stringColumns);
                 long datOffset = datWriter.WriteStandardFile(patchResult.Data);
                 mutableIndex.SetFileOffset(targetPath, 1, datOffset);
                 mutableIndex2.SetFileOffset(targetPath, 1, datOffset);
@@ -867,6 +869,50 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
                    ", rows=" + anonymizeResult.RowsChanged.ToString() +
                    ", prompts=" + anonymizeResult.PromptRowsChanged.ToString() +
                    ", inputs=" + anonymizeResult.PhraseRowsChanged.ToString();
+        }
+
+        private void AddPatchedOutputHangulCodepoints(
+            byte[] exdData,
+            ExcelHeader header,
+            List<int> stringColumns)
+        {
+            if (exdData == null || header == null || stringColumns == null || stringColumns.Count == 0)
+            {
+                return;
+            }
+
+            ExcelDataFile file = ExcelDataFile.Parse(exdData);
+            for (int rowIndex = 0; rowIndex < file.Rows.Count; rowIndex++)
+            {
+                ExcelDataRow row = file.Rows[rowIndex];
+                for (int columnIndex = 0; columnIndex < stringColumns.Count; columnIndex++)
+                {
+                    byte[] bytes = file.GetStringBytes(row, header, stringColumns[columnIndex]);
+                    if (bytes == null || bytes.Length == 0)
+                    {
+                        continue;
+                    }
+
+                    string text = Encoding.UTF8.GetString(bytes);
+                    for (int charIndex = 0; charIndex < text.Length; charIndex++)
+                    {
+                        uint codepoint = text[charIndex];
+                        if (IsOutputHangulCodepoint(codepoint))
+                        {
+                            _patchedOutputHangulCodepoints.Add(codepoint);
+                        }
+                    }
+                }
+            }
+        }
+
+        private static bool IsOutputHangulCodepoint(uint codepoint)
+        {
+            return (codepoint >= 0xAC00u && codepoint <= 0xD7A3u) ||
+                   (codepoint >= 0x1100u && codepoint <= 0x11FFu) ||
+                   (codepoint >= 0x3130u && codepoint <= 0x318Fu) ||
+                   (codepoint >= 0xA960u && codepoint <= 0xA97Fu) ||
+                   (codepoint >= 0xD7B0u && codepoint <= 0xD7FFu);
         }
 
         private static bool HasCrossLanguageSafetyRows(PatchSheetPolicy sheetPolicy)

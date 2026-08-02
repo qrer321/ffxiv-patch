@@ -112,6 +112,7 @@ namespace FfxivKoreanPatch.PatchRouteVerifier
             "common/font/AXIS_14.fdt",
             "common/font/AXIS_18.fdt",
             "common/font/AXIS_36.fdt",
+            "common/font/AXIS_96.fdt",
             "common/font/KrnAXIS_120.fdt",
             "common/font/KrnAXIS_140.fdt",
             "common/font/KrnAXIS_180.fdt",

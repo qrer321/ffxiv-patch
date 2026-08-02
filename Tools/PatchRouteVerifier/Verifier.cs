@@ -28,7 +28,7 @@ namespace FfxivKoreanPatch.PatchRouteVerifier
             private readonly CompositeArchive _cleanUi;
             private readonly CompositeArchive _koreanFont;
             private readonly TtmpFontPackage _ttmpFont;
-            private readonly Dictionary<string, byte[]> _textureCache = new Dictionary<string, byte[]>(StringComparer.OrdinalIgnoreCase);
+            private readonly Dictionary<string, Texture> _textureCache = new Dictionary<string, Texture>(StringComparer.OrdinalIgnoreCase);
             private readonly string _glyphDumpDir;
             private readonly string[] _selectedChecks;
             private readonly bool _compareAppliedOutput;

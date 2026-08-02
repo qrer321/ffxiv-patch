@@ -88,6 +88,8 @@
     <Compile Include="HangulSourcePreservationVerification.cs" />
     <Compile Include="InGameCleanAsciiGlyphVerification.cs" />
     <Compile Include="InGameFontRiskSurveyVerification.cs" />
+    <Compile Include="InGameFontScaleSurveyVerification.cs" />
+    <Compile Include="InGameFontScaleRouteVerification.cs" />
     <Compile Include="InGameTextureNeighborhoodVerification.cs" />
     <Compile Include="KoreanLobbyFontSourceVerification.cs" />
     <Compile Include="LobbyGlyphDiagnosticComparison.cs" />
@@ -119,6 +121,7 @@
     <Compile Include="ProtectedGlyphVerification.cs" />
     <Compile Include="PvpProfileFontVerification.cs" />
     <Compile Include="ReportedInGamePhraseVerification.cs" />
+    <Compile Include="SharedUiFontConsistencyVerification.cs" />
     <Compile Include="ThirdPartyGameFontSafetyVerification.cs" />
     <Compile Include="TtmpFontPackage.cs" />
     <Compile Include="TtmpGlyphRendering.cs" />
@@ -140,6 +143,15 @@
     </Compile>
     <Compile Include="..\..\FFXIVPatchGenerator\PvpProfileVisualScaleGlyphs.cs">
       <Link>Generator\PvpProfileVisualScaleGlyphs.cs</Link>
+    </Compile>
+    <Compile Include="..\..\FFXIVPatchGenerator\SharedUi100PercentHangulGlyphs.cs">
+      <Link>Generator\SharedUi100PercentHangulGlyphs.cs</Link>
+    </Compile>
+    <Compile Include="..\..\FFXIVPatchGenerator\PartyBonusRoleFontPatch.cs">
+      <Link>Generator\PartyBonusRoleFontPatch.cs</Link>
+    </Compile>
+    <Compile Include="..\..\FFXIVPatchGenerator\DutyFinderRoleFontPatch.cs">
+      <Link>Generator\DutyFinderRoleFontPatch.cs</Link>
     </Compile>
     <Compile Include="..\..\FFXIVPatchGenerator\LobbyScaledHangulPhrases.cs">
       <Link>Generator\LobbyScaledHangulPhrases.cs</Link>

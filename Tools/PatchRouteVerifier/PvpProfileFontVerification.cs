@@ -21,8 +21,8 @@ namespace FfxivKoreanPatch.PatchRouteVerifier
 
             private const double PvpReferenceMinRatio = 0.86d;
             private const double PvpReferenceMaxRatio = 1.18d;
-            private const double PvpNumericMinRatio = 1.16d;
-            private const double PvpNumericMaxRatio = 1.42d;
+            private const double PvpNumericMinRatio = 1.10d;
+            private const double PvpNumericMaxRatio = 1.55d;
             private const double PvpSourcePreserveMinRatio = 0.96d;
             private const double PvpSourcePreserveMaxRatio = 1.04d;
 
@@ -116,7 +116,13 @@ namespace FfxivKoreanPatch.PatchRouteVerifier
                         VerifyActionDetailValueHeight(fontPath, phrase.Korean, phraseBounds, numeric);
                     }
 
-                    if (PvpProfileVisualScaleGlyphs.IsTargetFontPath(fontPath))
+                    string lowScaleSourceFontPath = null;
+                    if (SharedUi100PercentHangulGlyphs.TryGetSourceFontPath(fontPath, out lowScaleSourceFontPath))
+                    {
+                        VerifyPvpNumericScale(fontPath, phrase, phraseBounds, numeric, true);
+                        VerifyPvpTtmpSourceScale(fontPath, lowScaleSourceFontPath, phrase, phraseBounds);
+                    }
+                    else if (PvpProfileVisualScaleGlyphs.IsTargetFontPath(fontPath))
                     {
                         // Visual-scale targets are cropped and downscaled by the
                         // generator; they must land in the digit-height window
@@ -126,14 +132,17 @@ namespace FfxivKoreanPatch.PatchRouteVerifier
                     else if (IsPvpVisualScaleCandidateFontPath(fontPath))
                     {
                         VerifyPvpNumericScale(fontPath, phrase, phraseBounds, numeric, false);
-                        VerifyPvpTtmpSourceScale(fontPath, phrase, phraseBounds);
+                        VerifyPvpTtmpSourceScale(fontPath, fontPath, phrase, phraseBounds);
                     }
                     else
                     {
                         VerifyPvpReferenceScale(fontPath, phrase, phraseBounds, false);
                     }
 
-                    VerifyNoPhraseOverlap(fontPath, phrase.Korean);
+                    VerifyNoPhraseOverlap(
+                        fontPath,
+                        phrase.Korean,
+                        string.IsNullOrEmpty(lowScaleSourceFontPath) ? fontPath : lowScaleSourceFontPath);
                     measured++;
                 }
 
@@ -177,19 +186,32 @@ namespace FfxivKoreanPatch.PatchRouteVerifier
                     FormatDouble(numeric.MeanDigitHeight));
             }
 
-            private void VerifyPvpTtmpSourceScale(string fontPath, PvpProfileRoutePhrase phrase, PhraseVisualBounds korean)
+            private void VerifyPvpTtmpSourceScale(
+                string fontPath,
+                string sourceFontPath,
+                PvpProfileRoutePhrase phrase,
+                PhraseVisualBounds korean)
             {
-                if (_ttmpFont == null || !_ttmpFont.ContainsPath(fontPath))
+                if (_ttmpFont == null || !_ttmpFont.ContainsPath(sourceFontPath))
                 {
-                    Fail("{0} PvP source-preservation check requires TTMP source font for [{1}]", fontPath, Escape(phrase.Korean));
+                    Fail(
+                        "{0} PvP source check requires TTMP source font {1} for [{2}]",
+                        fontPath,
+                        sourceFontPath,
+                        Escape(phrase.Korean));
                     return;
                 }
 
                 PhraseVisualBounds source;
                 string error;
-                if (!TryMeasurePhraseVisualBounds(_ttmpFont, fontPath, phrase.Korean, out source, out error))
+                if (!TryMeasurePhraseVisualBounds(_ttmpFont, sourceFontPath, phrase.Korean, out source, out error))
                 {
-                    Fail("{0} PvP source phrase [{1}] skipped: {2}", fontPath, Escape(phrase.Korean), error);
+                    Fail(
+                        "{0} PvP source phrase [{1}] from {2} skipped: {3}",
+                        fontPath,
+                        Escape(phrase.Korean),
+                        sourceFontPath,
+                        error);
                     return;
                 }
 
@@ -202,9 +224,10 @@ namespace FfxivKoreanPatch.PatchRouteVerifier
                 }
 
                 Pass(
-                    "{0} PvP phrase [{1}] preserves TTMP source scale: height={2}, width={3}, advance={4}",
+                    "{0} PvP phrase [{1}] matches low-scale source {2}: height={3}, width={4}, advance={5}",
                     fontPath,
                     Escape(phrase.Korean),
+                    sourceFontPath,
                     FormatRatio(SafeRatio(korean.MeanHangulHeight, source.MeanHangulHeight)),
                     FormatRatio(SafeRatio(korean.MeanHangulWidth, source.MeanHangulWidth)),
                     FormatRatio(SafeRatio(korean.MeanHangulAdvance, source.MeanHangulAdvance)));

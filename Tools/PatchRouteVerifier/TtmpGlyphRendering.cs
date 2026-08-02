@@ -36,8 +36,8 @@ namespace FfxivKoreanPatch.PatchRouteVerifier
             private Texture ReadFontTexture(TtmpFontPackage package, string texturePath)
             {
                 string cacheKey = package.CacheKey + "|" + texturePath;
-                byte[] rawTexture;
-                if (!_textureCache.TryGetValue(cacheKey, out rawTexture))
+                Texture texture;
+                if (!_textureCache.TryGetValue(cacheKey, out texture))
                 {
                     byte[] packed;
                     if (!package.TryReadPackedFile(texturePath, out packed))
@@ -45,11 +45,11 @@ namespace FfxivKoreanPatch.PatchRouteVerifier
                         throw new FileNotFoundException("TTMP texture was not found", texturePath);
                     }
 
-                    rawTexture = UnpackTextureFile(packed);
-                    _textureCache.Add(cacheKey, rawTexture);
+                    texture = ReadA4R4G4B4Texture(UnpackTextureFile(packed));
+                    _textureCache.Add(cacheKey, texture);
                 }
 
-                return ReadA4R4G4B4Texture(rawTexture);
+                return texture;
             }
         }
     }

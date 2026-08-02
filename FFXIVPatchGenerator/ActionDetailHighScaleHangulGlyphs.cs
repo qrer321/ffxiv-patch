@@ -31,6 +31,32 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
         public const string RivalWingsPhrase = "\uACBD\uC7C1\uC758 \uB0A0\uAC1C";
         public const string PvpActionsPhrase = "PvP \uAE30\uC220";
         public const string TacticalCommunicationPhrase = "\uC804\uB7B5\uC801 \uB300\uD654";
+        public const string PartyBonusPhrase = "\uD30C\uD2F0 \uBCF4\uB108\uC2A4";
+        public const string DefensePhrase = "\uBC29\uC5B4";
+        public const string HealingPhrase = "\uD68C\uBCF5";
+        public const string MeleeAttackPhrase = "\uADFC\uAC70\uB9AC \uACF5\uACA9";
+        public const string RangedPhysicalAttackPhrase = "\uC6D0\uAC70\uB9AC \uBB3C\uB9AC \uACF5\uACA9";
+        public const string RangedMagicAttackPhrase = "\uC6D0\uAC70\uB9AC \uB9C8\uBC95 \uACF5\uACA9";
+        public const string DutyFinderRoleHeadingPhrase = "\uC5ED\uD560";
+        public const string DutyFinderAttackRolePhrase = "\uACF5\uACA9 \uC5ED\uD560";
+        public const string DutyFinderDefenseRolePhrase = "\uBC29\uC5B4 \uC5ED\uD560";
+        public const string DutyFinderHealingRolePhrase = "\uD68C\uBCF5 \uC5ED\uD560";
+
+        public static readonly string[] PartyBonusRolePhrases = new string[]
+        {
+            DefensePhrase,
+            HealingPhrase,
+            MeleeAttackPhrase,
+            RangedPhysicalAttackPhrase,
+            RangedMagicAttackPhrase
+        };
+
+        public static readonly string[] DutyFinderRolePhrases = new string[]
+        {
+            DutyFinderAttackRolePhrase,
+            DutyFinderDefenseRolePhrase,
+            DutyFinderHealingRolePhrase
+        };
 
         public static readonly string[] FallbackPhrases = new string[]
         {
@@ -51,7 +77,17 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
             FrontlinePhrase,
             RivalWingsPhrase,
             PvpActionsPhrase,
-            TacticalCommunicationPhrase
+            TacticalCommunicationPhrase,
+            PartyBonusPhrase,
+            DefensePhrase,
+            HealingPhrase,
+            MeleeAttackPhrase,
+            RangedPhysicalAttackPhrase,
+            RangedMagicAttackPhrase,
+            DutyFinderRoleHeadingPhrase,
+            DutyFinderAttackRolePhrase,
+            DutyFinderDefenseRolePhrase,
+            DutyFinderHealingRolePhrase
         };
 
         public static readonly string[] LargeUiLabelSheetNames = new string[]
@@ -66,7 +102,9 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
 
         public static readonly AddonRowRange[] AddonRowRanges = new AddonRowRange[]
         {
-            new AddonRowRange(699, 714)
+            new AddonRowRange(699, 714),
+            new AddonRowRange(1075, 1075),
+            new AddonRowRange(1619, 1623)
         };
 
         // Critical/direct-hit fly text uses clean damage digits and punctuation,

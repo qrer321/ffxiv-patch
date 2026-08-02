@@ -9,8 +9,8 @@ namespace FfxivKoreanPatch.PatchRouteVerifier
             private Texture ReadFontTexture(CompositeArchive archive, string texturePath)
             {
                 string cacheKey = archive.CacheKey + "|" + texturePath;
-                byte[] rawTexture;
-                if (!_textureCache.TryGetValue(cacheKey, out rawTexture))
+                Texture texture;
+                if (!_textureCache.TryGetValue(cacheKey, out texture))
                 {
                     byte[] packed;
                     if (!archive.TryReadPackedFile(texturePath, out packed))
@@ -18,11 +18,11 @@ namespace FfxivKoreanPatch.PatchRouteVerifier
                         throw new FileNotFoundException("texture was not found", texturePath);
                     }
 
-                    rawTexture = UnpackTextureFile(packed);
-                    _textureCache.Add(cacheKey, rawTexture);
+                    texture = ReadA4R4G4B4Texture(UnpackTextureFile(packed));
+                    _textureCache.Add(cacheKey, texture);
                 }
 
-                return ReadA4R4G4B4Texture(rawTexture);
+                return texture;
             }
         }
     }

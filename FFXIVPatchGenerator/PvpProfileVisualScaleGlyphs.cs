@@ -5,13 +5,15 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
         public const double HangulToDigitRatio = 1.03d;
         public const double JupiterCanvasScaleCompensation = 1.0d;
 
-        public static readonly string[] TargetFontPaths = new string[]
+        // Jupiter_16/20 are shared by Action, PvP, and Free Company ULDs.
+        // Route-local PvP sizing must not mutate their global Hangul glyphs.
+        public static readonly string[] TargetFontPaths = new string[0];
+
+        // Keep the retired transform's allocation footprint until all later
+        // atlas writers have been migrated away from the shared allocator.
+        // The generator reserves these cells without changing FDT/TEX payloads.
+        public static readonly string[] LegacyAtlasReservationFontPaths = new string[]
         {
-            // Source-preserving these routes makes Korean PvP labels overflow
-            // or look oversized in their ULD areas. The generator crops visible
-            // source pixels before scaling, so these targets render around the
-            // verifier's 1.16..1.42 digit-height window rather than the raw
-            // source ratio.
             "common/font/Jupiter_16.fdt",
             "common/font/Jupiter_20.fdt"
         };
@@ -49,6 +51,20 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
             for (int i = 0; i < TargetFontPaths.Length; i++)
             {
                 if (string.Equals(normalized, TargetFontPaths[i], System.StringComparison.OrdinalIgnoreCase))
+                {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
+        public static bool IsLegacyAtlasReservationFontPath(string path)
+        {
+            string normalized = Normalize(path);
+            for (int i = 0; i < LegacyAtlasReservationFontPaths.Length; i++)
+            {
+                if (string.Equals(normalized, LegacyAtlasReservationFontPaths[i], System.StringComparison.OrdinalIgnoreCase))
                 {
                     return true;
                 }

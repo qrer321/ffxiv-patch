@@ -1,3 +1,5 @@
+using System;
+
 namespace FfxivKoreanPatch.PatchRouteVerifier
 {
     internal static partial class PatchRouteVerifier
@@ -7,52 +9,92 @@ namespace FfxivKoreanPatch.PatchRouteVerifier
         private const byte UldMeidingerFontId = 2;
         private const byte UldTrumpGothicFontId = 3;
         private const byte UldJupiterFontId = 4;
-
-        private static readonly UldFontSizeAlias[] EmptyUldFontSizeAliases = new UldFontSizeAlias[0];
+        private const byte UldJupiterLargeFontId = 5;
 
         private static readonly UldFontFamilyRoute[] UldFontFamilyRoutes = new UldFontFamilyRoute[]
         {
             new UldFontFamilyRoute(
                 UldAxisFontId,
                 "common/font/AXIS_",
-                new byte[] { 12, 14, 18, 36, 96 },
-                new UldFontSizeAlias[] { new UldFontSizeAlias(34, 36) }),
+                new UldFontTier[]
+                {
+                    new UldFontTier(96, 9.6d),
+                    new UldFontTier(12, 12d),
+                    new UldFontTier(14, 14d),
+                    new UldFontTier(18, 18d),
+                    new UldFontTier(36, 36d)
+                }),
             new UldFontFamilyRoute(
                 UldMiedingerMedFontId,
                 "common/font/MiedingerMid_",
-                new byte[] { 10, 12, 14, 18, 36 },
-                EmptyUldFontSizeAliases),
+                new UldFontTier[]
+                {
+                    new UldFontTier(10, 10d),
+                    new UldFontTier(12, 12d),
+                    new UldFontTier(14, 14d),
+                    new UldFontTier(18, 18d),
+                    new UldFontTier(36, 36d)
+                }),
             new UldFontFamilyRoute(
                 UldMeidingerFontId,
                 "common/font/Meidinger_",
-                new byte[] { 16, 20, 40 },
-                EmptyUldFontSizeAliases),
+                new UldFontTier[]
+                {
+                    new UldFontTier(16, 16d),
+                    new UldFontTier(20, 20d),
+                    new UldFontTier(40, 40d)
+                }),
             new UldFontFamilyRoute(
                 UldTrumpGothicFontId,
                 "common/font/TrumpGothic_",
-                new byte[] { 23, 34, 68, 184 },
-                EmptyUldFontSizeAliases),
+                new UldFontTier[]
+                {
+                    new UldFontTier(184, 18.4d),
+                    new UldFontTier(23, 23d),
+                    new UldFontTier(34, 34d),
+                    new UldFontTier(68, 68d)
+                }),
             new UldFontFamilyRoute(
                 UldJupiterFontId,
                 "common/font/Jupiter_",
-                new byte[] { 16, 20, 23, 45, 46, 90 },
-                new UldFontSizeAlias[]
+                new UldFontTier[]
                 {
-                    new UldFontSizeAlias(12, 16),
-                    new UldFontSizeAlias(18, 20)
+                    new UldFontTier(16, 16d),
+                    new UldFontTier(20, 20d),
+                    new UldFontTier(23, 23d),
+                    new UldFontTier(46, 46d)
+                }),
+            new UldFontFamilyRoute(
+                UldJupiterLargeFontId,
+                "common/font/Jupiter_",
+                new UldFontTier[]
+                {
+                    new UldFontTier(45, 45d),
+                    new UldFontTier(90, 90d)
                 })
         };
 
         private static string ResolveUldFontPath(byte fontId, byte fontSize, bool lobby)
         {
+            return ResolveUldFontPathAtScale(fontId, fontSize, 100, lobby);
+        }
+
+        private static string ResolveUldFontPathAtScale(byte fontId, byte fontSize, int uiScalePercent, bool lobby)
+        {
+            if (uiScalePercent <= 0)
+            {
+                return null;
+            }
+
+            double requestedSize = fontSize * (uiScalePercent / 100d);
             string suffix = lobby ? "_lobby.fdt" : ".fdt";
             for (int i = 0; i < UldFontFamilyRoutes.Length; i++)
             {
                 UldFontFamilyRoute route = UldFontFamilyRoutes[i];
-                int resolvedFontSize;
-                if (route.FontId == fontId && route.TryResolveFontSize(fontSize, out resolvedFontSize))
+                int fileFontSize;
+                if (route.FontId == fontId && route.TryResolveClosestTier(requestedSize, out fileFontSize))
                 {
-                    return route.PathPrefix + resolvedFontSize.ToString() + suffix;
+                    return route.PathPrefix + fileFontSize.ToString() + suffix;
                 }
             }
 
@@ -63,56 +105,51 @@ namespace FfxivKoreanPatch.PatchRouteVerifier
         {
             public readonly byte FontId;
             public readonly string PathPrefix;
-            private readonly byte[] _directFontSizes;
-            private readonly UldFontSizeAlias[] _sizeAliases;
+            private readonly UldFontTier[] _tiers;
 
-            public UldFontFamilyRoute(
-                byte fontId,
-                string pathPrefix,
-                byte[] directFontSizes,
-                UldFontSizeAlias[] sizeAliases)
+            public UldFontFamilyRoute(byte fontId, string pathPrefix, UldFontTier[] tiers)
             {
                 FontId = fontId;
                 PathPrefix = pathPrefix;
-                _directFontSizes = directFontSizes;
-                _sizeAliases = sizeAliases;
+                _tiers = tiers;
             }
 
-            public bool TryResolveFontSize(byte fontSize, out int resolvedFontSize)
+            public bool TryResolveClosestTier(double requestedSize, out int fileFontSize)
             {
-                for (int i = 0; i < _sizeAliases.Length; i++)
+                fileFontSize = 0;
+                if (_tiers == null || _tiers.Length == 0)
                 {
-                    UldFontSizeAlias alias = _sizeAliases[i];
-                    if (alias.UldFontSize == fontSize)
+                    return false;
+                }
+
+                UldFontTier best = _tiers[0];
+                double bestDistance = Math.Abs(requestedSize - best.NominalSize);
+                for (int i = 1; i < _tiers.Length; i++)
+                {
+                    UldFontTier candidate = _tiers[i];
+                    double distance = Math.Abs(requestedSize - candidate.NominalSize);
+                    if (distance < bestDistance ||
+                        (Math.Abs(distance - bestDistance) < 0.0001d && candidate.NominalSize > best.NominalSize))
                     {
-                        resolvedFontSize = alias.FileFontSize;
-                        return true;
+                        best = candidate;
+                        bestDistance = distance;
                     }
                 }
 
-                for (int i = 0; i < _directFontSizes.Length; i++)
-                {
-                    if (_directFontSizes[i] == fontSize)
-                    {
-                        resolvedFontSize = fontSize;
-                        return true;
-                    }
-                }
-
-                resolvedFontSize = 0;
-                return false;
+                fileFontSize = best.FileFontSize;
+                return true;
             }
         }
 
-        private struct UldFontSizeAlias
+        private struct UldFontTier
         {
-            public readonly byte UldFontSize;
             public readonly int FileFontSize;
+            public readonly double NominalSize;
 
-            public UldFontSizeAlias(byte uldFontSize, int fileFontSize)
+            public UldFontTier(int fileFontSize, double nominalSize)
             {
-                UldFontSize = uldFontSize;
                 FileFontSize = fileFontSize;
+                NominalSize = nominalSize;
             }
         }
     }

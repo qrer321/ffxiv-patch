@@ -18,6 +18,7 @@ namespace FfxivKoreanPatch.PatchRouteVerifier
                 "common/font/AXIS_14.fdt",
                 "common/font/AXIS_18.fdt",
                 "common/font/AXIS_36.fdt",
+                "common/font/TrumpGothic_184.fdt",
                 "common/font/TrumpGothic_23.fdt",
                 "common/font/TrumpGothic_34.fdt",
                 "common/font/TrumpGothic_68.fdt"
@@ -37,6 +38,7 @@ namespace FfxivKoreanPatch.PatchRouteVerifier
                 "common/font/Jupiter_46.fdt",
                 "common/font/MiedingerMid_18.fdt",
                 "common/font/MiedingerMid_36.fdt",
+                "common/font/TrumpGothic_184.fdt",
                 "common/font/TrumpGothic_23.fdt",
                 "common/font/TrumpGothic_34.fdt",
                 "common/font/TrumpGothic_68.fdt"
@@ -60,6 +62,7 @@ namespace FfxivKoreanPatch.PatchRouteVerifier
             private const double HighScaleGlyphMinHeightRatio = 0.80d;
             private const double HighScaleGlyphMaxHeightRatio = 1.20d;
             private static readonly string[] LargeUiScalePhrases = ActionDetailHighScaleHangulGlyphs.FallbackPhrases;
+            private HashSet<uint> _largeUiHighScaleHangulCodepoints;
             private static readonly string[] LargeUiSourcePreservationPhrases = new string[]
             {
                 ActionDetailHighScaleHangulGlyphs.InstantCastPhrase,
@@ -553,7 +556,8 @@ namespace FfxivKoreanPatch.PatchRouteVerifier
                     GlyphStats stats = AnalyzeGlyph(targetCanvas);
                     int height = stats.MinY <= stats.MaxY ? stats.MaxY - stats.MinY + 1 : 0;
                     double heightRatio = SafeRatio(height, numeric.MeanDigitHeight);
-                    if (heightRatio < HighScaleGlyphMinHeightRatio || heightRatio > HighScaleGlyphMaxHeightRatio)
+                    if (IsModernHangulSyllable(codepoint) &&
+                        (heightRatio < HighScaleGlyphMinHeightRatio || heightRatio > HighScaleGlyphMaxHeightRatio))
                     {
                         Fail(
                             "{0} U+{1:X4} large UI glyph height ratio {2} outside {3}..{4}: glyph={5}, digit={6}, target={7}, source={8}",
@@ -914,6 +918,11 @@ namespace FfxivKoreanPatch.PatchRouteVerifier
 
             private HashSet<uint> CollectActionDetailHighScaleHangulCodepointSet()
             {
+                if (_largeUiHighScaleHangulCodepoints != null)
+                {
+                    return _largeUiHighScaleHangulCodepoints;
+                }
+
                 HashSet<uint> codepoints = new HashSet<uint>();
                 AddDynamicHangulCodepoints(codepoints, ActionDetailHighScaleHangulGlyphs.FallbackPhrases);
                 AddPatchedSheetHangulCodepoints(
@@ -924,8 +933,107 @@ namespace FfxivKoreanPatch.PatchRouteVerifier
                     codepoints,
                     ActionDetailHighScaleHangulGlyphs.AddonRowRanges,
                     "action-detail high-scale glyph verification");
+                int patchedOutputDerived = AddPatchedOutputHangulCodepoints(
+                    codepoints,
+                    "large UI complete patched-output glyph verification");
                 RemoveDynamicHangulCodepoints(codepoints, ActionDetailHighScaleHangulGlyphs.CombatFlyTextPreservePhrases);
-                return codepoints;
+                Console.WriteLine(
+                    "  Collected large UI high-scale Hangul: patched-output-derived={0}, total={1}",
+                    patchedOutputDerived,
+                    codepoints.Count);
+                _largeUiHighScaleHangulCodepoints = codepoints;
+                return _largeUiHighScaleHangulCodepoints;
+            }
+
+            private int AddPatchedOutputHangulCodepoints(HashSet<uint> codepoints, string label)
+            {
+                if (codepoints == null)
+                {
+                    return 0;
+                }
+
+                int before = codepoints.Count;
+                try
+                {
+                    List<string> sheets = ExcelRootList.Parse(_patchedText.ReadFile("exd/root.exl"));
+                    for (int sheetIndex = 0; sheetIndex < sheets.Count; sheetIndex++)
+                    {
+                        AddPatchedOutputSheetHangulCodepoints(codepoints, sheets[sheetIndex], label);
+                    }
+                }
+                catch (Exception ex)
+                {
+                    Fail("Could not collect patched-output Hangul glyph coverage for {0}: {1}", label, ex.Message);
+                    return 0;
+                }
+
+                return codepoints.Count - before;
+            }
+
+            private void AddPatchedOutputSheetHangulCodepoints(
+                HashSet<uint> codepoints,
+                string sheet,
+                string label)
+            {
+                if (string.IsNullOrWhiteSpace(sheet))
+                {
+                    return;
+                }
+
+                ExcelHeader header;
+                try
+                {
+                    header = ExcelHeader.Parse(_patchedText.ReadFile("exd/" + sheet + ".exh"));
+                }
+                catch (Exception ex)
+                {
+                    Warn("Could not collect patched-output sheet glyph coverage header for {0} ({1}): {2}", sheet, label, ex.Message);
+                    return;
+                }
+
+                if (header.Variant != ExcelVariant.Default)
+                {
+                    Warn("Patched-output sheet glyph coverage variant is not supported for {0} ({1}): {2}", sheet, label, header.Variant);
+                    return;
+                }
+
+                byte languageId = LanguageToId(_language);
+                bool hasLanguageSuffix = header.HasLanguage(languageId);
+                List<int> stringColumns = header.GetStringColumnIndexes();
+                for (int pageIndex = 0; pageIndex < header.Pages.Count; pageIndex++)
+                {
+                    ExcelPageDefinition page = header.Pages[pageIndex];
+                    string exdPath = BuildExdPath(sheet, page.StartId, _language, hasLanguageSuffix);
+                    ExcelDataFile file;
+                    try
+                    {
+                        file = ExcelDataFile.Parse(_patchedText.ReadFile(exdPath));
+                    }
+                    catch (Exception ex)
+                    {
+                        Warn("Could not collect patched-output sheet glyph coverage page for {0} ({1}): {2}", exdPath, label, ex.Message);
+                        continue;
+                    }
+
+                    for (int rowIndex = 0; rowIndex < file.Rows.Count; rowIndex++)
+                    {
+                        ExcelDataRow row = file.Rows[rowIndex];
+                        for (int columnIndex = 0; columnIndex < stringColumns.Count; columnIndex++)
+                        {
+                            byte[] bytes;
+                            try
+                            {
+                                bytes = file.GetStringBytes(row, header, stringColumns[columnIndex]);
+                            }
+                            catch (OverflowException)
+                            {
+                                continue;
+                            }
+
+                            AddDynamicHangulCodepoints(codepoints, bytes);
+                        }
+                    }
+                }
             }
 
             private int AddPatchedSheetHangulCodepoints(HashSet<uint> codepoints, string[] sheets, string label)

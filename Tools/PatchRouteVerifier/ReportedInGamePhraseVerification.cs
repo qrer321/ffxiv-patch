@@ -39,6 +39,13 @@ namespace FfxivKoreanPatch.PatchRouteVerifier
                 int compared = 0;
                 foreach (string fontPath in fontPaths)
                 {
+                    // Jupiter_16/20 are validated against their complete mapped
+                    // low-scale sources by shared-ui-font-consistency.
+                    if (SharedUi100PercentHangulGlyphs.IsTargetFontPath(fontPath))
+                    {
+                        continue;
+                    }
+
                     // Visual-scale TrumpGothic routes are intentionally validated
                     // by action-detail-scale-layouts. This phrase-level source
                     // check remains strict for combat terms and other fonts.

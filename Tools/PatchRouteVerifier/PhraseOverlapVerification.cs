@@ -394,6 +394,11 @@ namespace FfxivKoreanPatch.PatchRouteVerifier
 
             private void VerifyNoPhraseOverlap(string fontPath, string phrase)
             {
+                VerifyNoPhraseOverlap(fontPath, phrase, fontPath);
+            }
+
+            private void VerifyNoPhraseOverlap(string fontPath, string phrase, string ttmpBaselineFontPath)
+            {
                 PhraseLayoutResult layout;
                 string error;
                 if (!TryMeasurePhraseLayout(_patchedFont, fontPath, phrase, true, out layout, out error))
@@ -442,17 +447,18 @@ namespace FfxivKoreanPatch.PatchRouteVerifier
                     PhraseLayoutResult sourceLayout;
                     string sourceError;
                     if (_ttmpFont != null &&
-                        _ttmpFont.ContainsPath(fontPath) &&
-                        TryMeasurePhraseLayout(_ttmpFont, fontPath, phrase, out sourceLayout, out sourceError) &&
+                        _ttmpFont.ContainsPath(ttmpBaselineFontPath) &&
+                        TryMeasurePhraseLayout(_ttmpFont, ttmpBaselineFontPath, phrase, out sourceLayout, out sourceError) &&
                         layout.OverlapPixels <= sourceLayout.OverlapPixels)
                     {
                         Pass(
-                            "{0} phrase [{1}] layout glyphs={2}, width={3}, overlap={4} matches TTMP baseline={5}",
+                            "{0} phrase [{1}] layout glyphs={2}, width={3}, overlap={4} matches TTMP {5} baseline={6}",
                             fontPath,
                             Escape(phrase),
                             layout.Glyphs,
                             layout.Width,
                             layout.OverlapPixels,
+                            ttmpBaselineFontPath,
                             sourceLayout.OverlapPixels);
                         return;
                     }
