@@ -153,7 +153,7 @@ UI 텍스처 패치는 `060000` UI 패키지를 대상으로 하며 새 `060000.
 
 - `ui/uld/PartyListTargetBase.tex`: 파티 리스트에서 본인을 표시하는 번호/glyph 텍스처 차이를 보정합니다.
 - `ui/uld/PartyMemberList.uld`: 플레이어 간 교류 창의 파티 보너스 역할명 노드만 `TrumpGothic 19`에서 `AXIS 12`로 변경합니다. 컴포넌트/노드 구조, 위치, 크기, 정렬, 간격, 인스턴스 수가 예상값과 모두 일치할 때만 두 폰트 바이트를 수정하며, 구조가 달라지면 생성을 중단합니다.
-- `ui/uld/ContentsFinder.uld`: 임무 찾기 역할 탭의 `역할` 노드와 동적 `공격 역할`/`방어 역할`/`회복 역할` 노드만 `TrumpGothic 23`에서 `AXIS 12`로 변경합니다. widget/node ID, 위치, 크기, TextId, 정렬, 플래그, 간격이 예상값과 모두 일치할 때만 네 폰트 바이트를 수정하며, 구조가 달라지면 생성을 중단합니다.
+- `ui/uld/ContentsFinder.uld`, `ui/uld/RaidFinder.uld`: 일반/고난도 임무 찾기 역할 탭의 `역할` 노드와 동적 `공격 역할`/`방어 역할`/`회복 역할` 노드만 `TrumpGothic 23`에서 `AXIS 12`로 변경합니다. widget/node ID, 위치, 크기, TextId, 정렬, 플래그, 간격이 예상값과 모두 일치할 때만 각 파일의 네 폰트 바이트를 수정하며, 구조가 달라지면 생성을 중단합니다. 같은 탭의 직업명 노드는 원래 `Jupiter 23`과 180x34 영역을 유지합니다.
 - `ScreenImage` 언어별 이미지: `exd/screenimage.exh`와 `screenimage_*.exd`에서 `Lang` 플래그가 켜진 이미지 ID를 읽고, 글로벌 대상 언어 폴더(`ja` 또는 `en`)의 `ui/icon/...` 파일을 한국 서버 `ko` 이미지로 교체합니다.
 - `CutScreenImage` 언어별 이미지: 지역 이동, 던전/컨텐츠 진입, 컷신 전환에서 쓰이는 타이틀 이미지 ID를 읽어 같은 방식으로 한국 서버 `ko` 이미지를 복사합니다.
 - `TerritoryType` 언어별 이미지: 필드 지역 진입 시 표시되는 지역 타이틀 이미지 ID를 읽어, 저지/중부 라노시아처럼 `PlaceName` 문자열과 별도로 렌더링되는 이미지형 지역명을 한국 서버 `ko` 이미지로 보정합니다. 지역명 아래에 표시되는 `+2000` 계열 부제 이미지도 함께 복사합니다.
@@ -189,6 +189,12 @@ UI 텍스처 패치는 `060000` UI 패키지를 대상으로 하며 새 `060000.
 --rsv-map <file>                RSV token map JSON 파일
 --anonymize-quest-chat-phrases  현재 비활성화/no-op, quest say sheet 커버리지 완료 전까지 적용하지 않음
 --diagnostic-csv <sheet>        지정 sheet의 row/column 비교 CSV 출력
+--preserve-base-bnpc-names     BNpcName 이름을 베이스 클라이언트 언어로 유지
+--preserve-base-action-names   기술 이름을 베이스 클라이언트 언어로 유지
+--preserve-base-common-phrases 상용구를 베이스 클라이언트 언어로 유지
+--preserve-base-duty-names     ContentFinderCondition 임무명/짧은 임무명을 베이스 클라이언트 언어로 유지
+--preserve-base-language-groups <csv>
+                                위 원문 유지 그룹을 CSV로 지정
 --base-index <file>             clean 0a0000.win32.index 지정
 --base-index2 <file>            clean 0a0000.win32.index2 지정
 --include-font                  텍스트와 폰트 패치를 함께 생성

@@ -488,7 +488,8 @@ namespace FfxivKoreanPatch.PatchRouteVerifier
                     DataCenterTitleUldPath,
                     DataCenterWorldmapUldPath,
                     PartyBonusRoleFontPatch.UldPath,
-                    DutyFinderRoleFontPatch.UldPath
+                    DutyFinderRoleFontPatch.NormalUldPath,
+                    DutyFinderRoleFontPatch.HighEndUldPath
                 };
             }
 

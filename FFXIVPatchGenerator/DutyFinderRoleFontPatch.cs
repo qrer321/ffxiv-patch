@@ -5,10 +5,17 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
 {
     internal static class DutyFinderRoleFontPatch
     {
-        public const string UldPath = "ui/uld/ContentsFinder.uld";
+        public const string NormalUldPath = "ui/uld/ContentsFinder.uld";
+        public const string HighEndUldPath = "ui/uld/RaidFinder.uld";
+        public static readonly string[] UldPaths = new string[]
+        {
+            NormalUldPath,
+            HighEndUldPath
+        };
         public const uint WidgetId = 1;
         public const uint RoleHeadingNodeId = 24;
         public const uint RoleValueNodeId = 28;
+        public const uint JobNameNodeId = 32;
         public const short TextY = 5;
         public const ushort TextHeight = 26;
         public const short RoleHeadingX = 10;
@@ -17,10 +24,17 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
         public const short RoleValueX = 74;
         public const ushort RoleValueWidth = 70;
         public const uint RoleValueTextId = 0;
+        public const short JobNameX = 40;
+        public const short JobNameY = 17;
+        public const ushort JobNameWidth = 180;
+        public const ushort JobNameHeight = 34;
+        public const uint JobNameTextId = 0;
         public const byte SourceFontId = 3;
         public const byte SourceFontSize = 23;
         public const byte TargetFontId = 0;
         public const byte TargetFontSize = 12;
+        public const byte JobNameFontId = 4;
+        public const byte JobNameFontSize = 23;
         public const byte AlignmentLeft = 3;
 
         public const int TextNodeHeaderSize = 88;
@@ -51,17 +65,23 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
         private const int UldTextFlags2OffsetInExtra = 20;
         private const int UldTextNodeType = 3;
 
-        public static byte[] Apply(byte[] sourceUld)
+        public static byte[] Apply(string uldPath, byte[] sourceUld)
         {
+            if (!IsSupportedUldPath(uldPath))
+            {
+                throw new ArgumentException("Unsupported Duty Finder ULD path: " + (uldPath ?? string.Empty), "uldPath");
+            }
+
             DutyFinderRoleTextNodes nodes;
             string error;
             if (!TryFindRoleTextNodes(sourceUld, out nodes, out error))
             {
-                throw new InvalidDataException(UldPath + " role-tab node validation failed: " + error);
+                throw new InvalidDataException(uldPath + " role-tab node validation failed: " + error);
             }
 
-            ValidateSourceContract(sourceUld, nodes.RoleHeading, true);
-            ValidateSourceContract(sourceUld, nodes.RoleValue, false);
+            ValidateSourceContract(uldPath, sourceUld, nodes.RoleHeading, true);
+            ValidateSourceContract(uldPath, sourceUld, nodes.RoleValue, false);
+            ValidateJobNameSourceContract(uldPath, sourceUld, nodes.JobName);
 
             byte[] patched = (byte[])sourceUld.Clone();
             patched[nodes.RoleHeading.FontOffset] = TargetFontId;
@@ -69,6 +89,12 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
             patched[nodes.RoleValue.FontOffset] = TargetFontId;
             patched[nodes.RoleValue.FontSizeOffset] = TargetFontSize;
             return patched;
+        }
+
+        private static bool IsSupportedUldPath(string uldPath)
+        {
+            return string.Equals(uldPath, NormalUldPath, StringComparison.OrdinalIgnoreCase) ||
+                   string.Equals(uldPath, HighEndUldPath, StringComparison.OrdinalIgnoreCase);
         }
 
         public static bool TryFindRoleTextNodes(
@@ -117,6 +143,7 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
             int widgetMatches = 0;
             int headingMatches = 0;
             int roleValueMatches = 0;
+            int jobNameMatches = 0;
             int cursor = listOffset + UldListHeaderSize;
             for (uint widgetIndex = 0; widgetIndex < widgetCount; widgetIndex++)
             {
@@ -162,6 +189,11 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
                             roleValueMatches++;
                             result.RoleValue = CreateNode(cursor, nodeSize);
                         }
+                        else if (nodeId == JobNameNodeId)
+                        {
+                            jobNameMatches++;
+                            result.JobName = CreateNode(cursor, nodeSize);
+                        }
                     }
 
                     cursor += nodeSize;
@@ -174,10 +206,11 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
                 return false;
             }
 
-            if (headingMatches != 1 || roleValueMatches != 1)
+            if (headingMatches != 1 || roleValueMatches != 1 || jobNameMatches != 1)
             {
-                error = "expected one heading/value node, found " +
-                        headingMatches.ToString() + "/" + roleValueMatches.ToString();
+                error = "expected one heading/value/job-name node, found " +
+                        headingMatches.ToString() + "/" + roleValueMatches.ToString() + "/" +
+                        jobNameMatches.ToString();
                 return false;
             }
 
@@ -196,6 +229,7 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
         }
 
         private static void ValidateSourceContract(
+            string uldPath,
             byte[] uld,
             DutyFinderRoleTextNode node,
             bool heading)
@@ -203,7 +237,7 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
             int extraOffset = node.NodeOffset + TextNodeHeaderSize;
             if (node.NodeSize < UldTextNodeMinSize || !HasRange(uld, node.NodeOffset, node.NodeSize))
             {
-                throw new InvalidDataException(UldPath + " role-tab text node is truncated.");
+                throw new InvalidDataException(uldPath + " role-tab text node is truncated.");
             }
 
             int nodeType = unchecked((int)Endian.ReadUInt32LE(uld, node.NodeOffset + UldNodeTypeOffset));
@@ -242,7 +276,62 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
                 textFlags2 != 6)
             {
                 throw new InvalidDataException(
-                    UldPath + " role-tab source contract changed: node=" + nodeId.ToString() +
+                    uldPath + " role-tab source contract changed: node=" + nodeId.ToString() +
+                    ", type=" + nodeType.ToString() +
+                    ", rect=" + x.ToString() + "," + y.ToString() + "," + width.ToString() + "," + height.ToString() +
+                    ", text=" + textId.ToString() +
+                    ", align=" + alignment.ToString() +
+                    ", font=" + fontId.ToString() + "/" + fontSize.ToString() +
+                    ", flags=" + textFlags.ToString() + "/" + textFlags2.ToString() +
+                    ", spacing=" + charSpacing.ToString() + "/" + lineSpacing.ToString() +
+                    ", sheet=" + sheetType.ToString());
+            }
+        }
+
+        private static void ValidateJobNameSourceContract(
+            string uldPath,
+            byte[] uld,
+            DutyFinderRoleTextNode node)
+        {
+            int extraOffset = node.NodeOffset + TextNodeHeaderSize;
+            if (node.NodeSize < UldTextNodeMinSize || !HasRange(uld, node.NodeOffset, node.NodeSize))
+            {
+                throw new InvalidDataException(uldPath + " job-name text node is truncated.");
+            }
+
+            int nodeType = unchecked((int)Endian.ReadUInt32LE(uld, node.NodeOffset + UldNodeTypeOffset));
+            uint nodeId = Endian.ReadUInt32LE(uld, node.NodeOffset + UldNodeIdOffset);
+            short x = unchecked((short)Endian.ReadUInt16LE(uld, node.NodeOffset + UldNodeXOffset));
+            short y = unchecked((short)Endian.ReadUInt16LE(uld, node.NodeOffset + UldNodeYOffset));
+            ushort width = Endian.ReadUInt16LE(uld, node.NodeOffset + UldNodeWidthOffset);
+            ushort height = Endian.ReadUInt16LE(uld, node.NodeOffset + UldNodeHeightOffset);
+            uint textId = Endian.ReadUInt32LE(uld, extraOffset + UldTextIdOffsetInExtra);
+            byte alignment = uld[extraOffset + UldTextAlignmentOffsetInExtra];
+            byte fontId = uld[node.FontOffset];
+            byte fontSize = uld[node.FontSizeOffset];
+            byte textFlags = uld[extraOffset + UldTextFlagsOffsetInExtra];
+            byte sheetType = uld[extraOffset + UldTextSheetTypeOffsetInExtra];
+            byte charSpacing = uld[extraOffset + UldTextCharSpacingOffsetInExtra];
+            byte lineSpacing = uld[extraOffset + UldTextLineSpacingOffsetInExtra];
+            byte textFlags2 = uld[extraOffset + UldTextFlags2OffsetInExtra];
+            if (nodeType != UldTextNodeType ||
+                nodeId != JobNameNodeId ||
+                x != JobNameX ||
+                y != JobNameY ||
+                width != JobNameWidth ||
+                height != JobNameHeight ||
+                textId != JobNameTextId ||
+                alignment != AlignmentLeft ||
+                fontId != JobNameFontId ||
+                fontSize != JobNameFontSize ||
+                textFlags != 128 ||
+                sheetType != 0 ||
+                charSpacing != 0 ||
+                lineSpacing != 0 ||
+                textFlags2 != 6)
+            {
+                throw new InvalidDataException(
+                    uldPath + " job-name source contract changed: node=" + nodeId.ToString() +
                     ", type=" + nodeType.ToString() +
                     ", rect=" + x.ToString() + "," + y.ToString() + "," + width.ToString() + "," + height.ToString() +
                     ", text=" + textId.ToString() +
@@ -281,6 +370,7 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
         {
             public DutyFinderRoleTextNode RoleHeading;
             public DutyFinderRoleTextNode RoleValue;
+            public DutyFinderRoleTextNode JobName;
         }
 
         internal struct DutyFinderRoleTextNode

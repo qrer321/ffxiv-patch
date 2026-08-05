@@ -429,6 +429,7 @@
                   <ToggleButton x:Name="ChipBnpc" Style="{StaticResource Chip}" Content="보스명"/>
                   <ToggleButton x:Name="ChipAction" Style="{StaticResource Chip}" Content="기술명" Margin="6,0,0,0"/>
                   <ToggleButton x:Name="ChipCommon" Style="{StaticResource Chip}" Content="상용구" Margin="6,0,0,0"/>
+                  <ToggleButton x:Name="ChipDuty" Style="{StaticResource Chip}" Content="임무명" Margin="6,0,0,0"/>
                   <TextBlock Text="체크하면 해당 텍스트는 번역하지 않고 원문을 유지합니다" Foreground="{StaticResource TextFaint}"
                              FontSize="11" VerticalAlignment="Center" Margin="12,0,0,0"/>
                 </StackPanel>

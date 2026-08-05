@@ -59,6 +59,7 @@ namespace FfxivKoreanPatch.PatchRouteVerifier
                 new InGameUldCandidate("character", "ui/uld/Character.uld"),
                 new InGameUldCandidate("status", "ui/uld/Status.uld"),
                 new InGameUldCandidate("content-finder", "ui/uld/ContentsFinder.uld"),
+                new InGameUldCandidate("high-end-content-finder", "ui/uld/RaidFinder.uld"),
                 new InGameUldCandidate("content-info", "ui/uld/ContentsInfo.uld"),
                 new InGameUldCandidate("hud-layout", "ui/uld/HudLayout.uld"),
                 new InGameUldCandidate("teleport", "ui/uld/Teleport.uld"),

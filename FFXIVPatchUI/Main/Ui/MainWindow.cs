@@ -80,6 +80,7 @@ namespace FFXIVKoreanPatch.Main
         private readonly ToggleButton chipBnpc;
         private readonly ToggleButton chipAction;
         private readonly ToggleButton chipCommon;
+        private readonly ToggleButton chipDuty;
         private readonly Button fullPatchButton;
         private readonly Button fontPatchButton;
         private readonly Button removeButton;
@@ -159,6 +160,7 @@ namespace FFXIVKoreanPatch.Main
             chipBnpc = Find<ToggleButton>("ChipBnpc");
             chipAction = Find<ToggleButton>("ChipAction");
             chipCommon = Find<ToggleButton>("ChipCommon");
+            chipDuty = Find<ToggleButton>("ChipDuty");
             fullPatchButton = Find<Button>("FullPatchButton");
             fontPatchButton = Find<Button>("FontPatchButton");
             removeButton = Find<Button>("RemoveButton");
@@ -305,6 +307,7 @@ namespace FFXIVKoreanPatch.Main
             chipBnpc.IsChecked = controller.PreserveBaseBnpcNames;
             chipAction.IsChecked = controller.PreserveBaseActionNames;
             chipCommon.IsChecked = controller.PreserveBaseCommonPhrases;
+            chipDuty.IsChecked = controller.PreserveBaseDutyNames;
             suppressOptionEvents = false;
 
             globalBrowseButton.Click += (sender, args) => controller.BrowseGlobalPath();
@@ -326,7 +329,8 @@ namespace FFXIVKoreanPatch.Main
                     controller.SetPreserveOptions(
                         chipBnpc.IsChecked == true,
                         chipAction.IsChecked == true,
-                        chipCommon.IsChecked == true);
+                        chipCommon.IsChecked == true,
+                        chipDuty.IsChecked == true);
                 }
             };
             chipBnpc.Checked += chipHandler;
@@ -335,6 +339,8 @@ namespace FFXIVKoreanPatch.Main
             chipAction.Unchecked += chipHandler;
             chipCommon.Checked += chipHandler;
             chipCommon.Unchecked += chipHandler;
+            chipDuty.Checked += chipHandler;
+            chipDuty.Unchecked += chipHandler;
 
             fullPatchButton.Click += (sender, args) => controller.RequestFullPatch();
             fontPatchButton.Click += (sender, args) => controller.RequestFontPatch();

@@ -65,6 +65,11 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
             4,
             8
         };
+        private static readonly ushort[] BaseLanguageDutyNameColumnOffsets = new ushort[]
+        {
+            0,
+            4
+        };
         private static readonly string[] BaseLanguageBossNameColumnSheets = new string[]
         {
             "BNpcName"
@@ -82,9 +87,14 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
         {
             "Completion"
         };
+        private static readonly string[] BaseLanguageDutyNameColumnSheets = new string[]
+        {
+            "ContentFinderCondition"
+        };
         private const string BaseLanguageGroupBnpcName = "bnpcname";
         private const string BaseLanguageGroupActions = "actions";
         private const string BaseLanguageGroupCommonPhrases = "commonphrases";
+        private const string BaseLanguageGroupDutyNames = "dutynames";
 
         private readonly HashSet<string> _deleteFiles = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         private readonly Dictionary<string, PatchSheetPolicy> _sheets = new Dictionary<string, PatchSheetPolicy>(StringComparer.OrdinalIgnoreCase);
@@ -156,6 +166,11 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
             if (HasBaseLanguageGroup(preserveBaseLanguageGroups, BaseLanguageGroupCommonPhrases))
             {
                 ApplyBaseLanguageColumns(policy, BaseLanguageCommonPhraseColumnSheets, BaseLanguageCommonPhraseColumnOffsets);
+            }
+
+            if (HasBaseLanguageGroup(preserveBaseLanguageGroups, BaseLanguageGroupDutyNames))
+            {
+                ApplyBaseLanguageColumns(policy, BaseLanguageDutyNameColumnSheets, BaseLanguageDutyNameColumnOffsets);
             }
 
             // Global Addon rows 44/45/49 are compact h/m/s time-unit labels.
@@ -306,6 +321,17 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
                 case "completion":
                 case "completions":
                     return BaseLanguageGroupCommonPhrases;
+
+                case "duty":
+                case "duties":
+                case "dutyname":
+                case "dutynames":
+                case "duty-name":
+                case "duty-names":
+                case "content":
+                case "content-name":
+                case "content-names":
+                    return BaseLanguageGroupDutyNames;
 
                 default:
                     return null;

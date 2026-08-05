@@ -292,19 +292,26 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
             SqPackIndex2File mutableIndex2,
             SqPackDatWriter datWriter)
         {
-            byte[] sourceUld = globalUiArchive.ReadFile(DutyFinderRoleFontPatch.UldPath);
-            byte[] patchedUld = DutyFinderRoleFontPatch.Apply(sourceUld);
-            long offset = datWriter.WriteStandardFile(patchedUld);
-            mutableIndex.SetFileOffset(DutyFinderRoleFontPatch.UldPath, PatchDatId, offset);
-            mutableIndex2.SetFileOffset(DutyFinderRoleFontPatch.UldPath, PatchDatId, offset);
-            Console.WriteLine(
-                "UI ULD patched: {0} role-tab fonts {1}/{2} -> {3}/{4}",
-                DutyFinderRoleFontPatch.UldPath,
-                DutyFinderRoleFontPatch.SourceFontId,
-                DutyFinderRoleFontPatch.SourceFontSize,
-                DutyFinderRoleFontPatch.TargetFontId,
-                DutyFinderRoleFontPatch.TargetFontSize);
-            return 1;
+            int patched = 0;
+            for (int pathIndex = 0; pathIndex < DutyFinderRoleFontPatch.UldPaths.Length; pathIndex++)
+            {
+                string uldPath = DutyFinderRoleFontPatch.UldPaths[pathIndex];
+                byte[] sourceUld = globalUiArchive.ReadFile(uldPath);
+                byte[] patchedUld = DutyFinderRoleFontPatch.Apply(uldPath, sourceUld);
+                long offset = datWriter.WriteStandardFile(patchedUld);
+                mutableIndex.SetFileOffset(uldPath, PatchDatId, offset);
+                mutableIndex2.SetFileOffset(uldPath, PatchDatId, offset);
+                Console.WriteLine(
+                    "UI ULD patched: {0} role-tab fonts {1}/{2} -> {3}/{4}",
+                    uldPath,
+                    DutyFinderRoleFontPatch.SourceFontId,
+                    DutyFinderRoleFontPatch.SourceFontSize,
+                    DutyFinderRoleFontPatch.TargetFontId,
+                    DutyFinderRoleFontPatch.TargetFontSize);
+                patched++;
+            }
+
+            return patched;
         }
 
         private int CopyIconSheetImages(

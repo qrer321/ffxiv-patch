@@ -144,6 +144,7 @@ namespace FFXIVKoreanPatch.Main
         private bool preserveBaseBnpcNames;
         private bool preserveBaseActionNames;
         private bool preserveBaseCommonPhrases;
+        private bool preserveBaseDutyNames;
 
         // Output directory used when generating release files locally.
         private string releaseOutputDir = string.Empty;
@@ -194,6 +195,11 @@ namespace FFXIVKoreanPatch.Main
         public bool PreserveBaseCommonPhrases
         {
             get { return preserveBaseCommonPhrases; }
+        }
+
+        public bool PreserveBaseDutyNames
+        {
+            get { return preserveBaseDutyNames; }
         }
 
         // Called once by the view after the main window is loaded.
@@ -792,6 +798,7 @@ namespace FFXIVKoreanPatch.Main
             bool bnpc = false;
             bool actions = false;
             bool commonPhrases = false;
+            bool dutyNames = false;
             string path = GetPatchOptionSettingsPath();
             if (File.Exists(path))
             {
@@ -826,12 +833,17 @@ namespace FFXIVKoreanPatch.Main
                     {
                         commonPhrases = enabled;
                     }
+                    else if (string.Equals(key, "preserveBaseDutyNames", StringComparison.OrdinalIgnoreCase))
+                    {
+                        dutyNames = enabled;
+                    }
                 }
             }
 
             preserveBaseBnpcNames = bnpc;
             preserveBaseActionNames = actions;
             preserveBaseCommonPhrases = commonPhrases;
+            preserveBaseDutyNames = dutyNames;
         }
 
         private void SaveBaseLanguageNameOptionSettings()
@@ -841,7 +853,8 @@ namespace FFXIVKoreanPatch.Main
             {
                 "preserveBaseBnpcNames=" + (preserveBaseBnpcNames ? "true" : "false"),
                 "preserveBaseActionNames=" + (preserveBaseActionNames ? "true" : "false"),
-                "preserveBaseCommonPhrases=" + (preserveBaseCommonPhrases ? "true" : "false")
+                "preserveBaseCommonPhrases=" + (preserveBaseCommonPhrases ? "true" : "false"),
+                "preserveBaseDutyNames=" + (preserveBaseDutyNames ? "true" : "false")
             };
             File.WriteAllLines(path, lines, Encoding.UTF8);
         }
@@ -851,7 +864,8 @@ namespace FFXIVKoreanPatch.Main
         {
             return "BNpcName=" + (preserveBaseBnpcNames ? "preserve" : "korean") +
                    ", Actions=" + (preserveBaseActionNames ? "preserve" : "korean") +
-                   ", CommonPhrases=" + (preserveBaseCommonPhrases ? "preserve" : "korean");
+                   ", CommonPhrases=" + (preserveBaseCommonPhrases ? "preserve" : "korean") +
+                   ", DutyNames=" + (preserveBaseDutyNames ? "preserve" : "korean");
         }
 
         private string GetEmbeddedToolDir()
@@ -3535,11 +3549,12 @@ namespace FFXIVKoreanPatch.Main
             SetActionButtonsEnabled(true);
         }
 
-        public void SetPreserveOptions(bool bnpc, bool actionNames, bool commonPhrases)
+        public void SetPreserveOptions(bool bnpc, bool actionNames, bool commonPhrases, bool dutyNames)
         {
             preserveBaseBnpcNames = bnpc;
             preserveBaseActionNames = actionNames;
             preserveBaseCommonPhrases = commonPhrases;
+            preserveBaseDutyNames = dutyNames;
             SaveBaseLanguageNameOptionSettings();
             UpdateStatusLabel("원문 유지 옵션: " + FormatBaseLanguageNameOptionSummary());
         }
@@ -3930,6 +3945,11 @@ namespace FFXIVKoreanPatch.Main
                 if (buildTextPatch && preserveBaseCommonPhrases)
                 {
                     arguments += " --preserve-base-common-phrases";
+                }
+
+                if (buildTextPatch && preserveBaseDutyNames)
+                {
+                    arguments += " --preserve-base-duty-names";
                 }
 
                 if (!buildTextPatch && buildFontPatch)

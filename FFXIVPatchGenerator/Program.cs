@@ -121,6 +121,8 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
             Console.WriteLine("                     Keep action/skill name columns in the base client language.");
             Console.WriteLine("  --preserve-base-common-phrases");
             Console.WriteLine("                     Keep Completion/common phrase columns in the base client language.");
+            Console.WriteLine("  --preserve-base-duty-names");
+            Console.WriteLine("                     Keep ContentFinderCondition Name/NameShort columns in the base client language.");
             Console.WriteLine("  --preserve-base-language-groups <csv>");
             Console.WriteLine("                     Keep named text groups in the base client language. Example: battle-npc,actions,common-phrases");
             Console.WriteLine("  --diagnostic-csv   Export row/column comparison CSV for a sheet.");
@@ -332,6 +334,12 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
                     string.Equals(arg, "--preserve-base-completion", StringComparison.OrdinalIgnoreCase))
                 {
                     options.AddBaseLanguageGroup("commonphrases");
+                    continue;
+                }
+
+                if (string.Equals(arg, "--preserve-base-duty-names", StringComparison.OrdinalIgnoreCase))
+                {
+                    options.AddBaseLanguageGroup("dutynames");
                     continue;
                 }
 

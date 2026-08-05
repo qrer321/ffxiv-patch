@@ -13,13 +13,19 @@ namespace FfxivKoreanPatch.PatchRouteVerifier
             private const uint PartyBonusComponentId = PartyBonusRoleFontPatch.ComponentId;
             private const uint PartyBonusTextNodeId = PartyBonusRoleFontPatch.TextNodeId;
             private const int PartyBonusComponentInstances = PartyBonusRoleFontPatch.ComponentInstanceCount;
-            private const string DutyFinderUldPath = DutyFinderRoleFontPatch.UldPath;
             private const uint DutyFinderWidgetId = DutyFinderRoleFontPatch.WidgetId;
             private const uint DutyFinderRoleHeadingNodeId = DutyFinderRoleFontPatch.RoleHeadingNodeId;
             private const uint DutyFinderRoleValueNodeId = DutyFinderRoleFontPatch.RoleValueNodeId;
+            private const uint DutyFinderJobNameNodeId = DutyFinderRoleFontPatch.JobNameNodeId;
             private const int ScaleRouteFailureLimit = 16;
 
             private static readonly int[] InGameUiScalePercents = new int[] { 100, 150, 200, 300 };
+            private static readonly string[] DutyFinderJobNamePhrases = new string[]
+            {
+                "\uAC74\uBE0C\uB808\uC774\uCEE4",
+                "\uC554\uD751\uAE30\uC0AC",
+                "\uD53D\uD1A0\uB9E8\uC11C"
+            };
 
             private void VerifyInGameFontScaleRoutes()
             {
@@ -232,17 +238,28 @@ namespace FfxivKoreanPatch.PatchRouteVerifier
                 ExpectText("Addon", 2784, ActionDetailHighScaleHangulGlyphs.DutyFinderDefenseRolePhrase);
                 ExpectText("Addon", 2785, ActionDetailHighScaleHangulGlyphs.DutyFinderHealingRolePhrase);
                 ExpectText("Addon", 2786, ActionDetailHighScaleHangulGlyphs.DutyFinderAttackRolePhrase);
+                ExpectText("ClassJob", 32, DutyFinderJobNamePhrases[1]);
+                ExpectText("ClassJob", 37, DutyFinderJobNamePhrases[0]);
+                ExpectText("ClassJob", 42, DutyFinderJobNamePhrases[2]);
 
+                for (int pathIndex = 0; pathIndex < DutyFinderRoleFontPatch.UldPaths.Length; pathIndex++)
+                {
+                    VerifyDutyFinderRoleFontScale(DutyFinderRoleFontPatch.UldPaths[pathIndex]);
+                }
+            }
+
+            private void VerifyDutyFinderRoleFontScale(string uldPath)
+            {
                 byte[] cleanUld;
                 byte[] patchedUld;
                 try
                 {
-                    cleanUld = _cleanUi.ReadFile(DutyFinderUldPath);
-                    patchedUld = _patchedUi.ReadFile(DutyFinderUldPath);
+                    cleanUld = _cleanUi.ReadFile(uldPath);
+                    patchedUld = _patchedUi.ReadFile(uldPath);
                 }
                 catch (Exception ex)
                 {
-                    Fail("{0} Duty Finder role-tab read error: {1}", DutyFinderUldPath, ex.Message);
+                    Fail("{0} Duty Finder role-tab read error: {1}", uldPath, ex.Message);
                     return;
                 }
 
@@ -251,33 +268,38 @@ namespace FfxivKoreanPatch.PatchRouteVerifier
                 string locatorError;
                 if (!DutyFinderRoleFontPatch.TryFindRoleTextNodes(cleanUld, out cleanLocator, out locatorError))
                 {
-                    Fail("{0} clean role-tab lookup failed: {1}", DutyFinderUldPath, locatorError);
+                    Fail("{0} clean role-tab lookup failed: {1}", uldPath, locatorError);
                     return;
                 }
 
                 if (!DutyFinderRoleFontPatch.TryFindRoleTextNodes(patchedUld, out patchedLocator, out locatorError))
                 {
-                    Fail("{0} patched role-tab lookup failed: {1}", DutyFinderUldPath, locatorError);
+                    Fail("{0} patched role-tab lookup failed: {1}", uldPath, locatorError);
                     return;
                 }
 
-                VerifyDutyFinderUldByteDelta(cleanUld, patchedUld, cleanLocator, patchedLocator);
+                VerifyDutyFinderUldByteDelta(uldPath, cleanUld, patchedUld, cleanLocator, patchedLocator);
 
                 List<UldTextNodeFont> cleanNodes = GetUldTextNodeFonts(cleanUld);
                 List<UldTextNodeFont> patchedNodes = GetUldTextNodeFonts(patchedUld);
                 UldTextNodeFont cleanHeading;
                 UldTextNodeFont cleanRoleValue;
+                UldTextNodeFont cleanJobName;
                 UldTextNodeFont patchedHeading;
                 UldTextNodeFont patchedRoleValue;
-                if (!TryFindDutyFinderRoleNode(cleanNodes, DutyFinderRoleHeadingNodeId, "clean heading", out cleanHeading) ||
-                    !TryFindDutyFinderRoleNode(cleanNodes, DutyFinderRoleValueNodeId, "clean role value", out cleanRoleValue) ||
-                    !TryFindDutyFinderRoleNode(patchedNodes, DutyFinderRoleHeadingNodeId, "patched heading", out patchedHeading) ||
-                    !TryFindDutyFinderRoleNode(patchedNodes, DutyFinderRoleValueNodeId, "patched role value", out patchedRoleValue))
+                UldTextNodeFont patchedJobName;
+                if (!TryFindDutyFinderRoleNode(uldPath, cleanNodes, DutyFinderRoleHeadingNodeId, "clean heading", out cleanHeading) ||
+                    !TryFindDutyFinderRoleNode(uldPath, cleanNodes, DutyFinderRoleValueNodeId, "clean role value", out cleanRoleValue) ||
+                    !TryFindDutyFinderRoleNode(uldPath, cleanNodes, DutyFinderJobNameNodeId, "clean job name", out cleanJobName) ||
+                    !TryFindDutyFinderRoleNode(uldPath, patchedNodes, DutyFinderRoleHeadingNodeId, "patched heading", out patchedHeading) ||
+                    !TryFindDutyFinderRoleNode(uldPath, patchedNodes, DutyFinderRoleValueNodeId, "patched role value", out patchedRoleValue) ||
+                    !TryFindDutyFinderRoleNode(uldPath, patchedNodes, DutyFinderJobNameNodeId, "patched job name", out patchedJobName))
                 {
                     return;
                 }
 
                 bool headingContract = VerifyDutyFinderRoleNodeContract(
+                    uldPath,
                     cleanHeading,
                     DutyFinderRoleHeadingNodeId,
                     DutyFinderRoleFontPatch.RoleHeadingX,
@@ -287,6 +309,7 @@ namespace FfxivKoreanPatch.PatchRouteVerifier
                     DutyFinderRoleFontPatch.SourceFontSize,
                     "clean heading");
                 bool roleValueContract = VerifyDutyFinderRoleNodeContract(
+                    uldPath,
                     cleanRoleValue,
                     DutyFinderRoleValueNodeId,
                     DutyFinderRoleFontPatch.RoleValueX,
@@ -296,6 +319,7 @@ namespace FfxivKoreanPatch.PatchRouteVerifier
                     DutyFinderRoleFontPatch.SourceFontSize,
                     "clean role value");
                 bool patchedHeadingContract = VerifyDutyFinderRoleNodeContract(
+                    uldPath,
                     patchedHeading,
                     DutyFinderRoleHeadingNodeId,
                     DutyFinderRoleFontPatch.RoleHeadingX,
@@ -305,6 +329,7 @@ namespace FfxivKoreanPatch.PatchRouteVerifier
                     DutyFinderRoleFontPatch.TargetFontSize,
                     "patched heading");
                 bool patchedRoleValueContract = VerifyDutyFinderRoleNodeContract(
+                    uldPath,
                     patchedRoleValue,
                     DutyFinderRoleValueNodeId,
                     DutyFinderRoleFontPatch.RoleValueX,
@@ -313,18 +338,28 @@ namespace FfxivKoreanPatch.PatchRouteVerifier
                     DutyFinderRoleFontPatch.TargetFontId,
                     DutyFinderRoleFontPatch.TargetFontSize,
                     "patched role value");
+                bool cleanJobContract = VerifyDutyFinderJobNameNodeContract(uldPath, cleanJobName, "clean job name");
+                bool patchedJobContract = VerifyDutyFinderJobNameNodeContract(uldPath, patchedJobName, "patched job name");
                 if (!headingContract || !roleValueContract ||
-                    !patchedHeadingContract || !patchedRoleValueContract)
+                    !patchedHeadingContract || !patchedRoleValueContract ||
+                    !cleanJobContract || !patchedJobContract)
                 {
                     return;
                 }
 
-                string[] expectedRoutes = new string[]
+                string[] expectedRoleRoutes = new string[]
                 {
                     "common/font/AXIS_12.fdt",
                     "common/font/AXIS_18.fdt",
                     "common/font/AXIS_18.fdt",
                     "common/font/AXIS_36.fdt"
+                };
+                string[] expectedJobRoutes = new string[]
+                {
+                    "common/font/Jupiter_23.fdt",
+                    "common/font/Jupiter_46.fdt",
+                    "common/font/Jupiter_46.fdt",
+                    "common/font/Jupiter_46.fdt"
                 };
                 string[] headingPhrases = new string[]
                 {
@@ -344,15 +379,24 @@ namespace FfxivKoreanPatch.PatchRouteVerifier
                         patchedRoleValue.FontSize,
                         scale,
                         false);
-                    if (!string.Equals(headingFontPath, expectedRoutes[scaleIndex], StringComparison.OrdinalIgnoreCase) ||
-                        !string.Equals(roleValueFontPath, expectedRoutes[scaleIndex], StringComparison.OrdinalIgnoreCase))
+                    string jobNameFontPath = ResolveUldFontPathAtScale(
+                        patchedJobName.FontId,
+                        patchedJobName.FontSize,
+                        scale,
+                        false);
+                    if (!string.Equals(headingFontPath, expectedRoleRoutes[scaleIndex], StringComparison.OrdinalIgnoreCase) ||
+                        !string.Equals(roleValueFontPath, expectedRoleRoutes[scaleIndex], StringComparison.OrdinalIgnoreCase) ||
+                        !string.Equals(jobNameFontPath, expectedJobRoutes[scaleIndex], StringComparison.OrdinalIgnoreCase))
                     {
                         Fail(
-                            "Duty Finder role tabs {0}% expected {1}, heading={2}, value={3}",
+                            "{0} Duty Finder tabs {1}% expected role={2}, job={3}; heading={4}, value={5}, jobName={6}",
+                            uldPath,
                             scale,
-                            expectedRoutes[scaleIndex],
+                            expectedRoleRoutes[scaleIndex],
+                            expectedJobRoutes[scaleIndex],
                             headingFontPath ?? "unmapped",
-                            roleValueFontPath ?? "unmapped");
+                            roleValueFontPath ?? "unmapped",
+                            jobNameFontPath ?? "unmapped");
                         continue;
                     }
 
@@ -361,23 +405,34 @@ namespace FfxivKoreanPatch.PatchRouteVerifier
                         scale,
                         patchedHeading,
                         headingPhrases,
-                        "heading");
+                        uldPath + " heading");
                     VerifyDutyFinderRolePhraseMetrics(
                         roleValueFontPath,
                         scale,
                         patchedRoleValue,
                         ActionDetailHighScaleHangulGlyphs.DutyFinderRolePhrases,
-                        "role value");
+                        uldPath + " role value");
+                    VerifyDutyFinderRolePhraseMetrics(
+                        jobNameFontPath,
+                        scale,
+                        patchedJobName,
+                        DutyFinderJobNamePhrases,
+                        uldPath + " job name");
                     Pass(
-                        "Duty Finder role tabs {0}% route FontType={1}/Size={2} to {3}",
+                        "{0} Duty Finder tabs {1}% route role={2}/{3} to {4}, job={5}/{6} to {7}",
+                        uldPath,
                         scale,
                         patchedHeading.FontId,
                         patchedHeading.FontSize,
-                        headingFontPath);
+                        headingFontPath,
+                        patchedJobName.FontId,
+                        patchedJobName.FontSize,
+                        jobNameFontPath);
                 }
             }
 
             private void VerifyDutyFinderUldByteDelta(
+                string uldPath,
                 byte[] cleanUld,
                 byte[] patchedUld,
                 DutyFinderRoleFontPatch.DutyFinderRoleTextNodes cleanLocator,
@@ -385,11 +440,12 @@ namespace FfxivKoreanPatch.PatchRouteVerifier
             {
                 if (cleanUld.Length != patchedUld.Length ||
                     cleanLocator.RoleHeading.NodeOffset != patchedLocator.RoleHeading.NodeOffset ||
-                    cleanLocator.RoleValue.NodeOffset != patchedLocator.RoleValue.NodeOffset)
+                    cleanLocator.RoleValue.NodeOffset != patchedLocator.RoleValue.NodeOffset ||
+                    cleanLocator.JobName.NodeOffset != patchedLocator.JobName.NodeOffset)
                 {
                     Fail(
                         "{0} Duty Finder role-tab ULD structure changed: cleanLength={1}, patchedLength={2}, heading=0x{3:X}/0x{4:X}, value=0x{5:X}/0x{6:X}",
-                        DutyFinderUldPath,
+                        uldPath,
                         cleanUld.Length,
                         patchedUld.Length,
                         cleanLocator.RoleHeading.NodeOffset,
@@ -427,7 +483,7 @@ namespace FfxivKoreanPatch.PatchRouteVerifier
                 {
                     Fail(
                         "{0} Duty Finder role-tab ULD expected only four font bytes to change: differences={1}, unexpected={2}, heading={3}/{4}, value={5}/{6}",
-                        DutyFinderUldPath,
+                        uldPath,
                         differences,
                         unexpectedDifferences,
                         patchedUld[cleanLocator.RoleHeading.FontOffset],
@@ -439,7 +495,7 @@ namespace FfxivKoreanPatch.PatchRouteVerifier
 
                 Pass(
                     "{0} Duty Finder role-tab ULD changed only font bytes at 0x{1:X}/0x{2:X} and 0x{3:X}/0x{4:X}",
-                    DutyFinderUldPath,
+                    uldPath,
                     cleanLocator.RoleHeading.FontOffset,
                     cleanLocator.RoleHeading.FontSizeOffset,
                     cleanLocator.RoleValue.FontOffset,
@@ -447,6 +503,7 @@ namespace FfxivKoreanPatch.PatchRouteVerifier
             }
 
             private bool TryFindDutyFinderRoleNode(
+                string uldPath,
                 List<UldTextNodeFont> nodes,
                 uint nodeId,
                 string label,
@@ -470,7 +527,7 @@ namespace FfxivKoreanPatch.PatchRouteVerifier
                 {
                     Fail(
                         "{0} expected one Duty Finder {1} node (widget={2}, node={3}), found={4}",
-                        DutyFinderUldPath,
+                        uldPath,
                         label,
                         DutyFinderWidgetId,
                         nodeId,
@@ -482,6 +539,7 @@ namespace FfxivKoreanPatch.PatchRouteVerifier
             }
 
             private bool VerifyDutyFinderRoleNodeContract(
+                string uldPath,
                 UldTextNodeFont node,
                 uint expectedNodeId,
                 short expectedX,
@@ -508,7 +566,7 @@ namespace FfxivKoreanPatch.PatchRouteVerifier
                 {
                     Fail(
                         "{0} Duty Finder {1} contract changed: node={2}, rect={3},{4},{5},{6}, text={7}, font={8}/{9}, align={10}, flags={11}/{12}, sheet={13}, spacing={14}/{15}",
-                        DutyFinderUldPath,
+                        uldPath,
                         label,
                         node.NodeId,
                         node.X,
@@ -529,7 +587,61 @@ namespace FfxivKoreanPatch.PatchRouteVerifier
 
                 Pass(
                     "{0} Duty Finder {1} node contract is stable: rect={2},{3},{4},{5}, font={6}/{7}",
-                    DutyFinderUldPath,
+                    uldPath,
+                    label,
+                    node.X,
+                    node.Y,
+                    node.Width,
+                    node.Height,
+                    node.FontId,
+                    node.FontSize);
+                return true;
+            }
+
+            private bool VerifyDutyFinderJobNameNodeContract(
+                string uldPath,
+                UldTextNodeFont node,
+                string label)
+            {
+                if (node.NodeId != DutyFinderJobNameNodeId ||
+                    node.X != DutyFinderRoleFontPatch.JobNameX ||
+                    node.Y != DutyFinderRoleFontPatch.JobNameY ||
+                    node.Width != DutyFinderRoleFontPatch.JobNameWidth ||
+                    node.Height != DutyFinderRoleFontPatch.JobNameHeight ||
+                    node.TextId != DutyFinderRoleFontPatch.JobNameTextId ||
+                    node.FontId != DutyFinderRoleFontPatch.JobNameFontId ||
+                    node.FontSize != DutyFinderRoleFontPatch.JobNameFontSize ||
+                    node.Alignment != DutyFinderRoleFontPatch.AlignmentLeft ||
+                    node.TextFlags != 128 ||
+                    node.SheetType != 0 ||
+                    node.CharSpacing != 0 ||
+                    node.LineSpacing != 0 ||
+                    node.TextFlags2 != 6)
+                {
+                    Fail(
+                        "{0} Duty Finder {1} contract changed: node={2}, rect={3},{4},{5},{6}, text={7}, font={8}/{9}, align={10}, flags={11}/{12}, sheet={13}, spacing={14}/{15}",
+                        uldPath,
+                        label,
+                        node.NodeId,
+                        node.X,
+                        node.Y,
+                        node.Width,
+                        node.Height,
+                        node.TextId,
+                        node.FontId,
+                        node.FontSize,
+                        node.Alignment,
+                        node.TextFlags,
+                        node.TextFlags2,
+                        node.SheetType,
+                        node.CharSpacing,
+                        node.LineSpacing);
+                    return false;
+                }
+
+                Pass(
+                    "{0} Duty Finder {1} node contract is stable: rect={2},{3},{4},{5}, font={6}/{7}",
+                    uldPath,
                     label,
                     node.X,
                     node.Y,
