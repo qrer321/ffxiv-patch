@@ -61,6 +61,15 @@ namespace FfxivKoreanPatch.PatchRouteVerifier
                 ExpectAnyTextColumnNotContains("custom/007/ctsmycentrancehard_00706", 1, "突入する");
                 ExpectAnyTextColumnNotContains("custom/007/ctsmycentrancehard_00706", 3, "話を聞く");
             }
+            private void VerifyRsvAutoTranslateDelimiters()
+            {
+                Console.WriteLine("[EXD] RSV auto-translate delimiters");
+                ExpectText(
+                    "InstanceContentTextData",
+                    45500,
+                    "   \uE040 여기는 처음 옵니다.   \uE041 \n   \uE040 잘 부탁합니다!   \uE041 ");
+            }
+
 
         }
     }

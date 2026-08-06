@@ -29,6 +29,7 @@ namespace FfxivKoreanPatch.PatchRouteVerifier
                     new VerificationStep("world-visit", VerifyWorldVisitRows),
                     new VerificationStep("configuration-sharing", VerifyConfigurationSharingRows),
                     new VerificationStep("bozja-entrance", VerifyBozjaEntranceRows),
+                    new VerificationStep("rsv-auto-translate-delimiters", VerifyRsvAutoTranslateDelimiters),
                     new VerificationStep("occult-crescent-support-jobs", VerifyOccultCrescentSupportJobRows),
                     new VerificationStep("data-center-title-glyphs", VerifyDataCenterTitleGlyphs),
                     new VerificationStep("clean-ascii-font-routes", VerifyCleanAsciiFontRoutes),

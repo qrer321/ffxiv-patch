@@ -71,11 +71,96 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
                     continue;
                 }
 
-                values[entry.Key] = Encoding.UTF8.GetBytes(entry.Value);
+                string repairedValue = RestoreKnownAutoTranslateDelimiters(entry.Key, entry.Value);
+                values[entry.Key] = Encoding.UTF8.GetBytes(repairedValue);
             }
 
             return new RsvStringResolver(values, sourceRsvLanguageId, fullPath);
         }
+        private static string RestoreKnownAutoTranslateDelimiters(string token, string value)
+        {
+            const char autoTranslateOpen = '\uE040';
+            const char autoTranslateClose = '\uE041';
+
+            if (!IsKefkaAutoTranslateGreetingToken(token))
+            {
+                return value;
+            }
+
+            if (HasBalancedDelimiterSequence(value, autoTranslateOpen, autoTranslateClose))
+            {
+                return value;
+            }
+
+            // The upstream RSV extractor flattens these two private-use glyphs to ASCII 7 and 8.
+            if (!HasBalancedDelimiterSequence(value, '7', '8'))
+            {
+                throw new InvalidDataException("Known RSV auto-translate delimiter shape changed: " + token);
+            }
+
+            char[] repaired = value.ToCharArray();
+            for (int i = 0; i < repaired.Length; i++)
+            {
+                if (repaired[i] == '7')
+                {
+                    repaired[i] = autoTranslateOpen;
+                }
+                else if (repaired[i] == '8')
+                {
+                    repaired[i] = autoTranslateClose;
+                }
+            }
+
+            return new string(repaired);
+        }
+
+        private static bool IsKefkaAutoTranslateGreetingToken(string token)
+        {
+            return token.StartsWith("_rsv_45500_-1_", StringComparison.Ordinal) &&
+                   token.EndsWith("_S13095D61_E13095D61", StringComparison.Ordinal);
+        }
+
+        private static bool HasBalancedDelimiterSequence(string value, char open, char close)
+        {
+            int first = 0;
+            while (first < value.Length && char.IsWhiteSpace(value[first]))
+            {
+                first++;
+            }
+
+            int last = value.Length - 1;
+            while (last >= first && char.IsWhiteSpace(value[last]))
+            {
+                last--;
+            }
+
+            if (last <= first || value[first] != open || value[last] != close)
+            {
+                return false;
+            }
+
+            bool expectOpen = true;
+            int delimiterCount = 0;
+            for (int i = first; i <= last; i++)
+            {
+                char character = value[i];
+                if (character != open && character != close)
+                {
+                    continue;
+                }
+
+                if (character != (expectOpen ? open : close))
+                {
+                    return false;
+                }
+
+                expectOpen = !expectOpen;
+                delimiterCount++;
+            }
+
+            return delimiterCount >= 2 && expectOpen;
+        }
+
 
         public RsvResolutionResult Resolve(byte[] input)
         {

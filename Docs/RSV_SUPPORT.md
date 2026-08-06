@@ -9,6 +9,7 @@
 - Set `FFXIV_RSV_MAP_PATH` before running `Scripts\build-release.ps1` or `Scripts\build-test.ps1` to embed a local RSV map instead of downloading the default URL.
 - RSV replacement runs after a final EXD string is selected from the Korean source row and before the row is serialized.
 - Rows or columns intentionally preserved in the base/global language are not RSV-replaced. Those keep the base client RSV token so the base client/server path can resolve it normally.
+- `InstanceContentTextData#45500` is a known upstream extraction exception: its auto-translate delimiters arrive as ASCII `7`/`8`. The resolver repairs only the matching `_rsv_45500_*_S13095D61_E13095D61` key family to U+E040/U+E041 and rejects an unexpected or unbalanced delimiter shape.
 
 ## Language IDs
 
@@ -33,6 +34,11 @@ This is why a Korean source token such as `_rsv_..._-1_6_...` must not be interp
 - Resolved sheets in the full run: `action`, `instancecontenttextdata`, `npcyell`, `status`.
 
 Use `patch-diagnostics.tsv` for sheet-level checks and diagnostic CSV notes such as `rsv-resolved=1` or `rsv-unresolved=1`.
+
+2026-08-07 delimiter-glyph verification:
+
+- The pre-fix generated EXD reproduced literal `7`/`8` in `InstanceContentTextData#45500`.
+- The corrected generated EXD contains U+E040/U+E041 around both Korean phrases. The full 15-check route regression also confirms the BattleTalk `AXIS_18.fdt` glyph entries and texture neighborhoods remain identical to the clean client.
 
 ## Follow-up
 
