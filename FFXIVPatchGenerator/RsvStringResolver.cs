@@ -71,94 +71,41 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
                     continue;
                 }
 
-                string repairedValue = RestoreKnownAutoTranslateDelimiters(entry.Key, entry.Value);
-                values[entry.Key] = Encoding.UTF8.GetBytes(repairedValue);
+                values[entry.Key] = EncodeRsvValue(entry.Key, entry.Value);
             }
 
             return new RsvStringResolver(values, sourceRsvLanguageId, fullPath);
         }
-        private static string RestoreKnownAutoTranslateDelimiters(string token, string value)
+
+        private static byte[] EncodeRsvValue(string token, string value)
         {
-            const char autoTranslateOpen = '\uE040';
-            const char autoTranslateClose = '\uE041';
-
-            if (!IsKefkaAutoTranslateGreetingToken(token))
+            if (!IsKefkaKoreanAutoTranslateGreetingToken(token))
             {
-                return value;
+                return Encoding.UTF8.GetBytes(value);
             }
 
-            if (HasBalancedDelimiterSequence(value, autoTranslateOpen, autoTranslateClose))
+            const string extractedValue =
+                "   7 여기는 처음 옵니다.   8 \n   7 잘 부탁합니다!   8 ";
+            if (!string.Equals(value, extractedValue, StringComparison.Ordinal))
             {
-                return value;
+                throw new InvalidDataException("Known RSV auto-translate greeting changed: " + token);
             }
 
-            // The upstream RSV extractor flattens these two private-use glyphs to ASCII 7 and 8.
-            if (!HasBalancedDelimiterSequence(value, '7', '8'))
+            // Completion group 2 keys 24 and 27. Fixed macros store group - 1.
+            return new byte[]
             {
-                throw new InvalidDataException("Known RSV auto-translate delimiter shape changed: " + token);
-            }
-
-            char[] repaired = value.ToCharArray();
-            for (int i = 0; i < repaired.Length; i++)
-            {
-                if (repaired[i] == '7')
-                {
-                    repaired[i] = autoTranslateOpen;
-                }
-                else if (repaired[i] == '8')
-                {
-                    repaired[i] = autoTranslateClose;
-                }
-            }
-
-            return new string(repaired);
+                0x20, 0x20, 0x20,
+                0x02, 0x2E, 0x03, 0x02, 0x19, 0x03,
+                0x20, 0x0A, 0x20, 0x20, 0x20,
+                0x02, 0x2E, 0x03, 0x02, 0x1C, 0x03,
+                0x20
+            };
         }
 
-        private static bool IsKefkaAutoTranslateGreetingToken(string token)
+        private static bool IsKefkaKoreanAutoTranslateGreetingToken(string token)
         {
-            return token.StartsWith("_rsv_45500_-1_", StringComparison.Ordinal) &&
+            return token.StartsWith("_rsv_45500_-1_6_", StringComparison.Ordinal) &&
                    token.EndsWith("_S13095D61_E13095D61", StringComparison.Ordinal);
-        }
-
-        private static bool HasBalancedDelimiterSequence(string value, char open, char close)
-        {
-            int first = 0;
-            while (first < value.Length && char.IsWhiteSpace(value[first]))
-            {
-                first++;
-            }
-
-            int last = value.Length - 1;
-            while (last >= first && char.IsWhiteSpace(value[last]))
-            {
-                last--;
-            }
-
-            if (last <= first || value[first] != open || value[last] != close)
-            {
-                return false;
-            }
-
-            bool expectOpen = true;
-            int delimiterCount = 0;
-            for (int i = first; i <= last; i++)
-            {
-                char character = value[i];
-                if (character != open && character != close)
-                {
-                    continue;
-                }
-
-                if (character != (expectOpen ? open : close))
-                {
-                    return false;
-                }
-
-                expectOpen = !expectOpen;
-                delimiterCount++;
-            }
-
-            return delimiterCount >= 2 && expectOpen;
         }
 
 
