@@ -1,4 +1,6 @@
 using System;
+using System.Collections.Generic;
+using System.Text;
 
 namespace FfxivKoreanPatch.PatchRouteVerifier
 {
@@ -64,26 +66,35 @@ namespace FfxivKoreanPatch.PatchRouteVerifier
 
             private void VerifyRsvAutoTranslateDelimiters()
             {
-                Console.WriteLine("[EXD] RSV auto-translate payloads");
+                Console.WriteLine("[EXD] RSV auto-translate colored brackets");
+
+                byte[] open = new byte[]
+                {
+                    0x02, 0x13, 0x06, 0xFE, 0xFF, 0x7F, 0xBF, 0x5F, 0x03,
+                    0xEE, 0x81, 0x80,
+                    0x02, 0x13, 0x02, 0xEC, 0x03
+                };
+                byte[] close = new byte[]
+                {
+                    0x02, 0x13, 0x06, 0xFE, 0xFF, 0xC1, 0x58, 0x4F, 0x03,
+                    0xEE, 0x81, 0x81,
+                    0x02, 0x13, 0x02, 0xEC, 0x03
+                };
+                byte[] newLine = new byte[] { 0x02, 0x10, 0x01, 0x03 };
+
+                List<byte> expected = new List<byte>(128);
+                expected.AddRange(open);
+                expected.AddRange(Encoding.UTF8.GetBytes("여기는 처음 옵니다."));
+                expected.AddRange(close);
+                expected.AddRange(newLine);
+                expected.AddRange(open);
+                expected.AddRange(Encoding.UTF8.GetBytes("잘 부탁합니다!"));
+                expected.AddRange(close);
+
                 ExpectBytes(
                     "InstanceContentTextData#45500/" + _language,
                     GetFirstStringBytes(_patchedText, "InstanceContentTextData", 45500, _language),
-                    new byte[]
-                    {
-                        0x20, 0x20, 0x20,
-                        0x02, 0x2E, 0x03, 0x02, 0x19, 0x03,
-                        0x20, 0x0A, 0x20, 0x20, 0x20,
-                        0x02, 0x2E, 0x03, 0x02, 0x1C, 0x03,
-                        0x20
-                    });
-                ExpectEqual(
-                    "Completion#224/" + _language,
-                    GetStringColumnByOffset(_patchedText, "Completion", 224, _language, 0),
-                    "여기는 처음 옵니다.");
-                ExpectEqual(
-                    "Completion#227/" + _language,
-                    GetStringColumnByOffset(_patchedText, "Completion", 227, _language, 0),
-                    "잘 부탁합니다!");
+                    expected.ToArray());
             }
 
 

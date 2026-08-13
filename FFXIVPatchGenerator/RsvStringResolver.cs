@@ -13,6 +13,28 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
             -1,
             null);
 
+        private static readonly byte[] AutoTranslateOpenGlyph = new byte[]
+        {
+            0x02, 0x13, 0x06, 0xFE, 0xFF, 0x7F, 0xBF, 0x5F, 0x03,
+            0xEE, 0x81, 0x80,
+            0x02, 0x13, 0x02, 0xEC, 0x03
+        };
+
+        private static readonly byte[] AutoTranslateCloseGlyph = new byte[]
+        {
+            0x02, 0x13, 0x06, 0xFE, 0xFF, 0xC1, 0x58, 0x4F, 0x03,
+            0xEE, 0x81, 0x81,
+            0x02, 0x13, 0x02, 0xEC, 0x03
+        };
+
+        private static readonly byte[] SeStringNewLine =
+        {
+            0x02, 0x10, 0x01, 0x03
+        };
+
+        private static readonly byte[] KefkaKoreanAutoTranslateGreeting =
+            BuildKefkaKoreanAutoTranslateGreeting();
+
         private readonly Dictionary<string, byte[]> _values;
         private readonly int _sourceRsvLanguageId;
 
@@ -91,21 +113,40 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
                 throw new InvalidDataException("Known RSV auto-translate greeting changed: " + token);
             }
 
-            // Completion group 2 keys 24 and 27. Fixed macros store group - 1.
-            return new byte[]
-            {
-                0x20, 0x20, 0x20,
-                0x02, 0x2E, 0x03, 0x02, 0x19, 0x03,
-                0x20, 0x0A, 0x20, 0x20, 0x20,
-                0x02, 0x2E, 0x03, 0x02, 0x1C, 0x03,
-                0x20
-            };
+            return KefkaKoreanAutoTranslateGreeting;
         }
 
         private static bool IsKefkaKoreanAutoTranslateGreetingToken(string token)
         {
-            return token.StartsWith("_rsv_45500_-1_6_", StringComparison.Ordinal) &&
-                   token.EndsWith("_S13095D61_E13095D61", StringComparison.Ordinal);
+            const string keyPrefix = "_rsv_45500_-1_6_0_";
+            const string keySuffix = "_S13095D61_E13095D61";
+            return string.Equals(token, keyPrefix + "0" + keySuffix, StringComparison.Ordinal) ||
+                   string.Equals(token, keyPrefix + "1" + keySuffix, StringComparison.Ordinal);
+        }
+
+        private static byte[] BuildKefkaKoreanAutoTranslateGreeting()
+        {
+            using (MemoryStream output = new MemoryStream(128))
+            {
+                WriteBytes(output, AutoTranslateOpenGlyph);
+                WriteUtf8(output, "여기는 처음 옵니다.");
+                WriteBytes(output, AutoTranslateCloseGlyph);
+                WriteBytes(output, SeStringNewLine);
+                WriteBytes(output, AutoTranslateOpenGlyph);
+                WriteUtf8(output, "잘 부탁합니다!");
+                WriteBytes(output, AutoTranslateCloseGlyph);
+                return output.ToArray();
+            }
+        }
+
+        private static void WriteUtf8(Stream output, string value)
+        {
+            WriteBytes(output, Encoding.UTF8.GetBytes(value));
+        }
+
+        private static void WriteBytes(Stream output, byte[] bytes)
+        {
+            output.Write(bytes, 0, bytes.Length);
         }
 
 

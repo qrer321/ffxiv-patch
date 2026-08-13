@@ -9,7 +9,7 @@
 - Set `FFXIV_RSV_MAP_PATH` before running `Scripts\build-release.ps1` or `Scripts\build-test.ps1` to embed a local RSV map instead of downloading the default URL.
 - RSV replacement runs after a final EXD string is selected from the Korean source row and before the row is serialized.
 - Rows or columns intentionally preserved in the base/global language are not RSV-replaced. Those keep the base client RSV token so the base client/server path can resolve it normally.
-- `InstanceContentTextData#45500` is a known upstream extraction exception: its two fixed auto-translate macros arrive as ASCII `7`/`8` around the Korean phrases. For the exact Korean `_rsv_45500_-1_6_*_S13095D61_E13095D61` key/value contract, the resolver emits `MacroCode.Fixed` payloads for Completion group/key `2/24` and `2/27`. It rejects any changed source value instead of guessing. The payloads, not U+E040/U+E041 characters, carry the auto-translate lookup semantics.
+- `InstanceContentTextData#45500` is a known upstream extraction exception: its auto-translate bracket decoration arrives as ASCII `7`/`8`, and its SeString newline macro arrives as `\n`. The direct EXD replacement path cannot preserve the native RSV consumer's formatting behavior. For the two exact Korean keys and exact extracted value, the resolver writes literal Korean phrases, explicitly tinted U+E040/U+E041 bracket glyphs, and an actual SeString newline macro. Any changed key or value is left untouched or rejected instead of guessed.
 
 ## Language IDs
 
@@ -35,10 +35,11 @@ This is why a Korean source token such as `_rsv_..._-1_6_...` must not be interp
 
 Use `patch-diagnostics.tsv` for sheet-level checks and diagnostic CSV notes such as `rsv-resolved=1` or `rsv-unresolved=1`.
 
-2026-08-08 fixed-macro verification:
+2026-08-13 colored-bracket correction:
 
-- The first attempted repair inserted U+E040/U+E041 as UTF-8 text. Live testing rejected it because the client rendered black arrow glyphs rather than auto-translate brackets.
-- The corrected generated EXD contains exact fixed-macro envelopes `02 2E 03 02 19 03` and `02 2E 03 02 1C 03`, followed through the generated archive to `InstanceContentTextData#45500`. The same check confirms patched Completion rows 224 and 227 contain `여기는 처음 옵니다.` and `잘 부탁합니다!`. `.tmp/kefka-fixedmacro-patched-output-ja-20260808` passes the complete 15-check route regression.
+- Direct U+E040/U+E041 characters used the dialogue's default text color and appeared black in live testing.
+- Replacing the phrases with valid `MacroCode.Fixed` Completion payloads was also rejected by live testing: the `InstanceContentTextData` speech path displayed `ケフカ:` followed only by the remaining whitespace/newline. A generated-archive byte check had proved only that the payload bytes were present, not that this UI path evaluated them.
+- The replacement representation avoids `Fixed`: green `Color` push + U+E040 + color pop, literal Korean phrase, red `Color` push + U+E041 + color pop, and `02 10 01 03` for the line break. The selected bracket tints are RGBA `#7FBF5FFF` and `#C1584FFF`, matching the game's green-open/red-close convention shown in the reference client capture. Publish remains blocked until this exact representation is confirmed in the live encounter.
 
 ## Follow-up
 
