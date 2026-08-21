@@ -1,4 +1,5 @@
 using System;
+using System.Text;
 
 namespace FfxivKoreanPatch.PatchRouteVerifier
 {
@@ -64,26 +65,31 @@ namespace FfxivKoreanPatch.PatchRouteVerifier
 
             private void VerifyRsvAutoTranslateDelimiters()
             {
-                Console.WriteLine("[EXD] RSV auto-translate payloads");
+                Console.WriteLine("[EXD] native RSV auto-translate token preservation");
+                int rsvLanguageId;
+                if (string.Equals(_language, "ja", StringComparison.OrdinalIgnoreCase))
+                {
+                    rsvLanguageId = 0;
+                }
+                else if (string.Equals(_language, "en", StringComparison.OrdinalIgnoreCase))
+                {
+                    rsvLanguageId = 1;
+                }
+                else
+                {
+                    Fail(
+                        "InstanceContentTextData#45500 native RSV token has no verifier language mapping: {0}",
+                        _language);
+                    return;
+                }
+
+                string expectedToken =
+                    "_rsv_45500_-1_" + rsvLanguageId.ToString() + "_0_0_S13095D61_E13095D61";
                 ExpectBytes(
                     "InstanceContentTextData#45500/" + _language,
                     GetFirstStringBytes(_patchedText, "InstanceContentTextData", 45500, _language),
-                    new byte[]
-                    {
-                        0x20, 0x20, 0x20,
-                        0x02, 0x2E, 0x03, 0x02, 0x19, 0x03,
-                        0x20, 0x0A, 0x20, 0x20, 0x20,
-                        0x02, 0x2E, 0x03, 0x02, 0x1C, 0x03,
-                        0x20
-                    });
-                ExpectEqual(
-                    "Completion#224/" + _language,
-                    GetStringColumnByOffset(_patchedText, "Completion", 224, _language, 0),
-                    "여기는 처음 옵니다.");
-                ExpectEqual(
-                    "Completion#227/" + _language,
-                    GetStringColumnByOffset(_patchedText, "Completion", 227, _language, 0),
-                    "잘 부탁합니다!");
+                    Encoding.ASCII.GetBytes(expectedToken));
+                ExpectTextContains("InstanceContentTextData", 45501, "죽을 준비");
             }
 
 

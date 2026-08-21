@@ -71,42 +71,12 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
                     continue;
                 }
 
-                values[entry.Key] = EncodeRsvValue(entry.Key, entry.Value);
+                values[entry.Key] = Encoding.UTF8.GetBytes(entry.Value);
             }
 
             return new RsvStringResolver(values, sourceRsvLanguageId, fullPath);
         }
 
-        private static byte[] EncodeRsvValue(string token, string value)
-        {
-            if (!IsKefkaKoreanAutoTranslateGreetingToken(token))
-            {
-                return Encoding.UTF8.GetBytes(value);
-            }
-
-            const string extractedValue =
-                "   7 여기는 처음 옵니다.   8 \n   7 잘 부탁합니다!   8 ";
-            if (!string.Equals(value, extractedValue, StringComparison.Ordinal))
-            {
-                throw new InvalidDataException("Known RSV auto-translate greeting changed: " + token);
-            }
-
-            // Completion group 2 keys 24 and 27. Fixed macros store group - 1.
-            return new byte[]
-            {
-                0x20, 0x20, 0x20,
-                0x02, 0x2E, 0x03, 0x02, 0x19, 0x03,
-                0x20, 0x0A, 0x20, 0x20, 0x20,
-                0x02, 0x2E, 0x03, 0x02, 0x1C, 0x03,
-                0x20
-            };
-        }
-
-        private static bool IsKefkaKoreanAutoTranslateGreetingToken(string token)
-        {
-            return token.StartsWith("_rsv_45500_-1_6_", StringComparison.Ordinal) &&
-                   token.EndsWith("_S13095D61_E13095D61", StringComparison.Ordinal);
-        }
 
 
         public RsvResolutionResult Resolve(byte[] input)

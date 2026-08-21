@@ -9,7 +9,7 @@
 - Set `FFXIV_RSV_MAP_PATH` before running `Scripts\build-release.ps1` or `Scripts\build-test.ps1` to embed a local RSV map instead of downloading the default URL.
 - RSV replacement runs after a final EXD string is selected from the Korean source row and before the row is serialized.
 - Rows or columns intentionally preserved in the base/global language are not RSV-replaced. Those keep the base client RSV token so the base client/server path can resolve it normally.
-- `InstanceContentTextData#45500` is a known upstream extraction exception: its two fixed auto-translate macros arrive as ASCII `7`/`8` around the Korean phrases. For the exact Korean `_rsv_45500_-1_6_*_S13095D61_E13095D61` key/value contract, the resolver emits `MacroCode.Fixed` payloads for Completion group/key `2/24` and `2/27`. It rejects any changed source value instead of guessing. The payloads, not U+E040/U+E041 characters, carry the auto-translate lookup semantics.
+- `InstanceContentTextData#45500` is preserved from the selected global language. The battle-dialogue renderer did not evaluate synthesized `MacroCode.Fixed` payloads, while U+E040/U+E041 text only imitated the visible brackets. Keeping the original RSV token lets the client resolve and render the two phrases through its native auto-translate path. Other `InstanceContentTextData` RSV rows remain translated.
 
 ## Language IDs
 
@@ -35,10 +35,10 @@ This is why a Korean source token such as `_rsv_..._-1_6_...` must not be interp
 
 Use `patch-diagnostics.tsv` for sheet-level checks and diagnostic CSV notes such as `rsv-resolved=1` or `rsv-unresolved=1`.
 
-2026-08-08 fixed-macro verification:
+2026-08-13 native auto-translate correction:
 
-- The first attempted repair inserted U+E040/U+E041 as UTF-8 text. Live testing rejected it because the client rendered black arrow glyphs rather than auto-translate brackets.
-- The corrected generated EXD contains exact fixed-macro envelopes `02 2E 03 02 19 03` and `02 2E 03 02 1C 03`, followed through the generated archive to `InstanceContentTextData#45500`. The same check confirms patched Completion rows 224 and 227 contain `여기는 처음 옵니다.` and `잘 부탁합니다!`. `.tmp/kefka-fixedmacro-patched-output-ja-20260808` passes the complete 15-check route regression.
+- Direct U+E040/U+E041 text and synthesized `MacroCode.Fixed` payloads were both rejected by live testing because neither reproduced the native battle-dialogue auto-translate presentation.
+- The verifier now requires `InstanceContentTextData#45500` to contain exactly the selected global language's original `_rsv_45500` token. Literal Hangul, PUA glyphs, color macros, and `Fixed` payloads therefore cannot pass this check.
 
 ## Follow-up
 

@@ -53,6 +53,7 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
             new RowRange(809, 816)
         };
         private const uint LobbyDataCenterConnectingRow = 808;
+        private const uint KefkaNativeAutoTranslateGreetingRow = 45500;
         private static readonly uint[] GlobalDataCenterTravelAddonRows = new uint[] { 12514, 12525 };
         private const ushort NameColumnOffset = 0;
         private static readonly ushort[] BaseLanguageNameColumnOffsets = new ushort[]
@@ -146,6 +147,7 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
         {
             PatchPolicy policy = new PatchPolicy();
             PatchSheetPolicy addonPolicy = policy.GetOrCreateSheetPolicy("Addon");
+            PatchSheetPolicy instanceContentTextDataPolicy = policy.GetOrCreateSheetPolicy("InstanceContentTextData");
             PatchSheetPolicy lobbyPolicy = policy.GetOrCreateSheetPolicy("Lobby");
             PatchSheetPolicy mainCommandPolicy = policy.GetOrCreateSheetPolicy("MainCommand");
             PatchSheetPolicy mkdSupportJobPolicy = policy.GetOrCreateSheetPolicy("MkdSupportJob");
@@ -172,6 +174,12 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
             {
                 ApplyBaseLanguageColumns(policy, BaseLanguageDutyNameColumnSheets, BaseLanguageDutyNameColumnOffsets);
             }
+
+            // This Kefka line contains two auto-translate phrases. Inline Fixed
+            // macros are not evaluated by the battle-dialogue renderer, and PUA
+            // bracket glyphs only imitate the appearance. Preserve the global RSV
+            // token so the client resolves and renders its native phrase payload.
+            instanceContentTextDataPolicy.PreserveGlobalRow(KefkaNativeAutoTranslateGreetingRow);
 
             // Global Addon rows 44/45/49 are compact h/m/s time-unit labels.
             // Korean "시간/분/초" overflows narrow global UI slots such as icon timers.
