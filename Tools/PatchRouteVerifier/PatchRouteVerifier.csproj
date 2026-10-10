@@ -181,6 +181,15 @@
     <Compile Include="..\..\FFXIVPatchGenerator\RsvStringResolver.cs">
       <Link>Generator\RsvStringResolver.cs</Link>
     </Compile>
+    <Compile Include="..\..\FFXIVPatchGenerator\PlayerNameFormTransfer.cs">
+      <Link>Generator\PlayerNameFormTransfer.cs</Link>
+    </Compile>
+    <Compile Include="..\..\FFXIVPatchGenerator\SayQuestPhraseLocalizer.cs">
+      <Link>Generator\SayQuestPhraseLocalizer.cs</Link>
+    </Compile>
+    <Compile Include="..\..\FFXIVPatchGenerator\ExdRowRewriter.cs">
+      <Link>Generator\ExdRowRewriter.cs</Link>
+    </Compile>
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
 </Project>

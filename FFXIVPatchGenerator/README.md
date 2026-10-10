@@ -84,6 +84,7 @@ UI가 release 폴더를 적용할 때는 별도로 `manifest.json`을 생성해 
 - `Addon` row `876`, `2338`, `6166`은 SeString 내부 길이값을 깨지 않도록 글로벌 영어 템플릿을 사용합니다. 버프/남은시간 UI에서 `시간`, `분`이 좁은 영역 밖으로 나가는 문제를 줄이기 위한 예외입니다.
 - `Addon` row `10952`는 파티 리스트 본인 표시 glyph가 한글 폰트 적용 후 `=`로 보이는 문제를 피하기 위해 대상 글로벌 언어의 원본 PUA 토큰을 유지합니다. 또한 본인 표시 번호를 1~8로 바꾸는 설정을 고려해 패치되는 각 FDT에는 본인 번호 전용 PUA glyph `U+E0E1`~`U+E0E8`을 같은 FDT의 박스형 번호 glyph `U+E0B1`~`U+E0B8` 좌표로 alias합니다. 인스턴스/legacy circled marker로 쓰이는 `U+E0B1`~`U+E0B8` 자체는 alias 소스 모양을 유지한 채 clean cell/base+mip 보호 대상으로 검증합니다. 추가 PUA는 수동 나열 대신 각 보호 route에서 clean/source와 patched target 양쪽에 존재하는 glyph를 자동 수집해 같은 방식으로 보호합니다.
 - `--anonymize-quest-chat-phrases`는 현재 비활성화/no-op입니다. `quest/*` sheet 커버리지가 불완전하므로 기존 익명화 구현은 feature gate 뒤에 보존하고, UI 전체 패치에서는 더 이상 자동으로 켜지지 않습니다.
+- `--say-quest-phrases base`를 지정하면 채팅 `말하기`로 문구를 입력하는 퀘스트의 정답 문구 row를 베이스 언어 원문으로 유지하고, 한국어 퀘스트 목표·일지·시스템 안내의 따옴표 속 한국어 문구 뒤에 `(원문)`을 덧붙입니다. 정답 row는 `SAY`/`SAYTODO` 키 또는 일본어 `「Say」モード` 안내의 『』 문구와 같은 `SYSTEM` row로 찾습니다. 추리형 퀘스트는 대사 속 언급에도 원문을 덧붙입니다. 정답 row가 평문이 아니거나 정답 원문 중 하나라도 안내에 표시할 수 없으면 그 퀘스트는 한국어로 유지합니다. 기본값 `ko`는 기존 출력과 같습니다. 회귀 테스트는 `Scripts\test-say-quest-phrases.ps1`로 실행합니다.
 - 한국 서버 대사의 풀네임 매크로 `<String(gstr(1))>`는 글로벌 일본어 원문의 `<Split(<String(gstr(1))>, " ", 1|2)>` 호칭(이름/성)으로 바꿉니다. 별도 옵션 없이 항상 적용됩니다. 한국어 대사는 일본어 원문을 따르므로 영어 베이스(`--target-language en`)에서도 일본어 EXD를 기준으로 합니다. 원문 호칭이 한 종류면 모든 이름 참조에, 섞여 있으면 참조 수가 같을 때만 순서대로 적용합니다. 한국어 조사 매크로(`Josa`/`JosaRo`)의 주어는 직전에 출력되는 호칭을 따르며, 조건 분기 때문에 그 호칭을 하나로 정할 수 없거나 `Split` 인자·SeString 파싱이 올바르지 않으면 한국어 원문(풀네임)을 유지합니다. 회귀 테스트는 `Scripts\test-name-forms.ps1`로 실행합니다.
 - `--rsv-map <file>`을 지정하면 RSV token JSON map을 읽어 한국 서버 source row의 `_rsv_...` 토큰을 실제 문자열로 치환합니다. 지정하지 않으면 실행 파일 옆 `rsv.json`, 현재 작업 디렉터리 `rsv.json` 순서로 자동 탐색합니다.
 - 데이터센터 화면의 한글 proxy glyph 방식은 FDT/텍스처 atlas 불일치 시 읽을 수 없는 글자로 노출될 수 있어 릴리즈 기본값에서 제외했습니다.
@@ -219,6 +220,8 @@ UI 텍스처 패치는 `060000` UI 패키지를 대상으로 하며 새 `060000.
 --policy <file>                 JSON 패치 정책 파일
 --rsv-map <file>                RSV token map JSON 파일
 --anonymize-quest-chat-phrases  현재 비활성화/no-op, quest say sheet 커버리지 완료 전까지 적용하지 않음
+--say-quest-phrases ko|base     말하기 퀘스트 입력 문구, 기본 ko
+                                base: 정답 문구를 베이스 언어로 유지하고 안내에 "한국어(원문)" 표시
 --diagnostic-csv <sheet>        지정 sheet의 row/column 비교 CSV 출력
 --text-profile <name>           텍스트 구성: full(기본), story, custom
 --text-scope-outcomes <csv>     custom의 8개 범위를 ko/base로 모두 지정

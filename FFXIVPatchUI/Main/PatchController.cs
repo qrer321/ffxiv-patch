@@ -151,6 +151,9 @@ namespace FFXIVKoreanPatch.Main
         private bool preserveBasePlaceNames;
         private bool preserveBaseRemainderText;
         private bool preserveBaseUiAssets;
+        // Say quests expect the base-language phrase (shown in Korean prompts) instead of Hangul,
+        // which other players on the global servers cannot read.
+        private bool sayQuestPhrasesBase = true;
         private static readonly string[] outcomeSettingKeys =
             { "story", "bnpc", "actions", "duty", "item", "place", "common", "remainder", "uiAssets" };
         private bool[] customDraft = new bool[9];
@@ -257,6 +260,11 @@ namespace FFXIVKoreanPatch.Main
         public bool PreserveBaseUiAssets
         {
             get { return preserveBaseUiAssets; }
+        }
+
+        public bool SayQuestPhrasesBase
+        {
+            get { return sayQuestPhrasesBase; }
         }
 
         private bool IsWorkActive
@@ -932,6 +940,14 @@ namespace FFXIVKoreanPatch.Main
                 targetLanguageDisplayName = targetLanguageCode == "en" ? "영어" : "일본어";
             }
 
+            if (settings.TryGetValue("sayQuestPhrases", out value))
+            {
+                bool useBaseLanguage;
+                if (!TryParseScopeOutcome(value, out useBaseLanguage))
+                    throw new FormatException(path + ": sayQuestPhrases는 ko 또는 base이어야 합니다.");
+                sayQuestPhrasesBase = useBaseLanguage;
+            }
+
             string loadedProfile;
             settings.TryGetValue("textProfile", out loadedProfile);
             if (loadedProfile != null &&
@@ -1080,7 +1096,8 @@ namespace FFXIVKoreanPatch.Main
                 var lines = new List<string>
                 {
                     "targetLanguage=" + targetLanguageCode,
-                    "textProfile=" + textProfile
+                    "textProfile=" + textProfile,
+                    "sayQuestPhrases=" + FormatScopeOutcome(sayQuestPhrasesBase)
                 };
                 bool[] outcomes = GetScopeOutcomes();
                 for (int i = 0; i < outcomes.Length; i++)
@@ -1154,6 +1171,8 @@ namespace FFXIVKoreanPatch.Main
                 arguments += " --skip-ui-texture-fix";
             }
 
+            arguments += " --say-quest-phrases " + FormatScopeOutcome(sayQuestPhrasesBase);
+
             return arguments;
         }
 
@@ -1168,7 +1187,8 @@ namespace FFXIVKoreanPatch.Main
                    ", PlaceNames=" + FormatScopeOutcome(preserveBasePlaceNames) +
                    ", CommonPhrases=" + FormatScopeOutcome(preserveBaseCommonPhrases) +
                    ", Remainder=" + FormatScopeOutcome(preserveBaseRemainderText) +
-                   ", UIAssets=" + FormatScopeOutcome(preserveBaseUiAssets);
+                   ", UIAssets=" + FormatScopeOutcome(preserveBaseUiAssets) +
+                   ", SayQuestPhrases=" + FormatScopeOutcome(sayQuestPhrasesBase);
         }
 
         private string GetTextProfileDisplayName()
@@ -2533,6 +2553,7 @@ namespace FFXIVKoreanPatch.Main
             AppendJsonString(sb, "textScopeOutcomes", buildTextPatch ? GetTextScopeOutcomesArgument() :
                 string.Join(",", outcomeSettingKeys.Take(8).Select(key => key + "=base")));
             AppendJsonString(sb, "uiAssets", FormatScopeOutcome(!buildTextPatch || preserveBaseUiAssets));
+            AppendJsonString(sb, "sayQuestPhrases", FormatScopeOutcome(buildTextPatch && sayQuestPhrasesBase));
             sb.AppendLine("  \"includeFont\": " + (buildFontPatch || buildTextPatch ? "true" : "false") + ",");
             sb.AppendLine("  \"debugApply\": " + (debugApply ? "true" : "false") + ",");
             sb.AppendLine("  \"files\": [");
@@ -3936,6 +3957,16 @@ namespace FFXIVKoreanPatch.Main
 
             SaveTextConfigurationSettings();
             UpdateStatusLabel("텍스트·UI 구성: " + GetTextProfileDisplayName());
+            SetActionButtonsEnabled(true);
+        }
+
+        public void SetSayQuestPhrases(bool useBaseLanguage)
+        {
+            if (IsWorkActive) return;
+            sayQuestPhrasesBase = useBaseLanguage;
+            MarkPreflightRequired();
+            SaveTextConfigurationSettings();
+            UpdateStatusLabel("말하기 퀘스트 입력 문구: " + (useBaseLanguage ? targetLanguageDisplayName : "한국어"));
             SetActionButtonsEnabled(true);
         }
 

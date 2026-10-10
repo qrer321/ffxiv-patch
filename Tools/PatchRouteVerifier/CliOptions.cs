@@ -19,6 +19,7 @@ namespace FfxivKoreanPatch.PatchRouteVerifier
             public string FontPackDir;
             public string BaselineOutputPath;
             public string RsvMapPath;
+            public string SayQuestPhrases = "ko";
             public string TargetLanguage = "ja";
             public string SourceLanguage = "ko";
             public string SheetLimit;
@@ -77,6 +78,10 @@ namespace FfxivKoreanPatch.PatchRouteVerifier
                     else if (string.Equals(arg, "--baseline-output", StringComparison.OrdinalIgnoreCase))
                     {
                         options.BaselineOutputPath = RequireValue(args, ref i, arg);
+                    }
+                    else if (string.Equals(arg, "--say-quest-phrases", StringComparison.OrdinalIgnoreCase))
+                    {
+                        options.SayQuestPhrases = RequireValue(args, ref i, arg);
                     }
                     else if (string.Equals(arg, "--rsv-map", StringComparison.OrdinalIgnoreCase))
                     {

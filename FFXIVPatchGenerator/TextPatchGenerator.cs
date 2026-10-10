@@ -693,6 +693,7 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
                 {
                     continue;
                 }
+                ExcelDataFile japaneseReference = LoadJapaneseReferencePage(sheetName, page, globalHeader, globalArchive, targetUsesLanguageSuffix);
                 ExdPatchResult patchResult = ExdStringPatcher.PatchDefaultVariant(
                     targetExd,
                     globalHeader,
@@ -701,13 +702,15 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
                     sourceMaps,
                     allowRowKeyFallback,
                     stringPatchPolicy,
-                    LoadNameFormReferencePage(sheetName, page, globalHeader, globalArchive, targetUsesLanguageSuffix));
+                    japaneseReference);
                 if (jobSubtitleRemapped)
                 {
                     // This target-language snapshot must not enter the secondary-language safety pass.
                     sheetPolicy.SetRowColumnRemap(1975, 0, originalJobSubtitleRemap);
                 }
-                string anonymizeNote = ApplyQuestChatPhraseAnonymization(sheetName, globalHeader, ref patchResult);
+                string phraseNote = JoinPatchNotes(
+                    ApplyQuestChatPhraseAnonymization(sheetName, globalHeader, ref patchResult),
+                    ApplySayQuestPhrases(sheetName, globalHeader, targetExd, japaneseReference, ref patchResult));
                 _report.ProtectedUiStrings += patchResult.ProtectedUiStrings;
                 _report.RsvRows += patchResult.RsvRows;
                 _report.RsvStrings += patchResult.RsvStrings;
@@ -733,7 +736,7 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
                         patchResult.RsvStrings,
                         BuildPatchNote(
                             JoinPatchNotes(
-                                JoinPatchNotes(allowRowKeyFallback ? "row-key fallback allowed" : "row-key fallback not allowed", anonymizeNote),
+                                JoinPatchNotes(allowRowKeyFallback ? "row-key fallback allowed" : "row-key fallback not allowed", phraseNote),
                                 BuildRsvResolutionNote(patchResult)),
                             patchResult.ProtectedUiStrings));
                     continue;
@@ -758,7 +761,7 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
                     patchResult.RsvRows,
                     patchResult.RsvStrings,
                     BuildPatchNote(
-                        JoinPatchNotes(anonymizeNote, BuildRsvResolutionNote(patchResult)),
+                        JoinPatchNotes(phraseNote, BuildRsvResolutionNote(patchResult)),
                         patchResult.ProtectedUiStrings));
 
                 if (_report.PagesPatched % 100 == 0)
@@ -786,8 +789,9 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
         }
 
         // Korean text is translated from Japanese, so the Japanese page is the most faithful source of
-        // where the player is called by first or last name. English often rephrases or drops the name.
-        private ExcelDataFile LoadNameFormReferencePage(
+        // where the player is called by first or last name, and of the phrases say quests expect.
+        // English often rephrases or drops them. Null for a Japanese target (its own page is used).
+        private ExcelDataFile LoadJapaneseReferencePage(
             string sheetName,
             ExcelPageDefinition page,
             ExcelHeader globalHeader,
@@ -1080,6 +1084,46 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
                         languageCode);
                 }
             }
+        }
+
+        private string ApplySayQuestPhrases(
+            string sheetName,
+            ExcelHeader header,
+            ExcelDataFile cleanTarget,
+            ExcelDataFile japaneseReference,
+            ref ExdPatchResult patchResult)
+        {
+            if (_options.SayQuestPhrases != SayQuestPhraseMode.Base ||
+                patchResult == null ||
+                !patchResult.Changed ||
+                !SayQuestPhraseLocalizer.IsCandidateSheet(sheetName))
+            {
+                return string.Empty;
+            }
+
+            SayQuestPhraseResult result;
+            patchResult.Data = SayQuestPhraseLocalizer.ApplyToPage(
+                header,
+                cleanTarget,
+                japaneseReference ?? cleanTarget,
+                patchResult.Data,
+                out result);
+            if (!result.IsSayQuest || (!result.KeptKorean && result.Replacements.Count == 0))
+            {
+                return string.Empty;
+            }
+
+            if (result.KeptKorean)
+            {
+                _report.SayQuestsKeptKorean++;
+                return "say-quest-phrases kept-korean";
+            }
+
+            _report.SayQuestsLocalized++;
+            _report.SayQuestPhraseRows += result.PhraseRows;
+            _report.SayQuestAnnotatedRows += result.AnnotatedRows;
+            return "say-quest-phrases base phrases=" + result.PhraseRows.ToString() +
+                   ", annotated=" + result.AnnotatedRows.ToString();
         }
 
         private string ApplyQuestChatPhraseAnonymization(string sheetName, ExcelHeader header, ref ExdPatchResult patchResult)

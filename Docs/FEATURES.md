@@ -41,6 +41,7 @@
 - 기본값은 기존 동작을 유지하는 `전체 한글`
 - 이전 UI의 `story` 저장값은 Story만 한국어인 9개 결과의 `custom`으로 마이그레이션
 - 이전 6개 `preserveBase...` 키는 하나라도 `true`이면 `custom`, 모두 `false`이면 `full`로 읽음
+- `말하기 퀘스트 입력 문구`를 `한국어`/베이스 언어(기본값)로 선택. 텍스트 범위와 별개의 설정이며 `전체 한글`/`직접 설정` 전환과 관계없이 유지. 스토리·퀘스트 텍스트가 베이스 언어면 비활성화. `sayQuestPhrases=base|ko`로 저장하고 제너레이터에 `--say-quest-phrases`로 전달
 - `targetLanguage`, `textProfile`, 9개 적용 결과와 별도의 `custom.*` 초안을 저장. 전체 한글로 전환해도 직접 설정을 보존
 - 설정 파일은 원자적으로 교체하며 저장 실패는 하단에 계속 표시. 읽기 불가/잘못된 설정은 초기화 오류로 안내
 - 본문 스크롤과 하단 고정 적용 영역을 분리. 현재 설치 상태와 다음 선택을 구분하고 좁은 화면에서는 텍스트 범위를 한 열로 표시
@@ -151,6 +152,7 @@
 - 검증기에서 스토리/비스토리/mixed page, `InstanceContentTextData` row `999`/`1000` 경계, UI asset 부재, Full 출력 hash 회귀를 독립 검사
 - Story 시나리오와 Full 기준선 비교는 `--checks`로 명시적으로 선택할 때만 실행. 일반 검증 기본 실행에 서로 다른 프로필을 섞지 않음
 - Story 검증은 한국어 원본과 구별되는 실제 비교 대상이 필요하며, 원본 누락에 따른 베이스 폴백은 한국어 검증 수에 포함하지 않음
+- Story 검증의 기대값은 제너레이터와 같이 플레이어 호칭 변환과 RSV 치환을 적용하고, `--say-quest-phrases base`를 지정하면 말하기 퀘스트 문구 처리도 적용. 한국어 원본이 없어 베이스 텍스트로 남은 셀에도 적용하며, 읽을 수 없는 선택적 일본어 참조 page는 제너레이터와 같이 대상 page로 대체
 
 ### 공통
 
@@ -169,6 +171,7 @@
   - 보호한 UI 토큰 수
   - RSV 포함 row/string 수
   - 익명화한 say quest 문구/row 수
+  - 말하기 퀘스트 입력 문구 설정과 베이스 언어로 바꾼 퀘스트·정답 row·안내 row 수, 한국어로 유지한 퀘스트 수
   - mapping 누락 page 수
   - 원본/대상 page 누락 수
   - 미지원 sheet 수
@@ -211,6 +214,13 @@
   - 플레이어 이름 `Split`은 구분자(공백 1자)와 인덱스(1 또는 2)까지 검증하고, 하나라도 맞지 않거나 SeString 파싱에 실패하면 한국어 원문 유지
   - 원문에 이름/성 호칭이 없는 row, 글로벌 fallback row, literal remap은 그대로 유지. 처리/유지 수는 `Name forms applied`/`Name forms kept full`로 출력
   - 회귀 테스트: `Scripts\test-name-forms.ps1`
+- 말하기 퀘스트 입력 문구: `--say-quest-phrases base`이면 `quest/*`에서 말하기 퀘스트의 정답 문구 row를 베이스 언어 원문으로 유지하고, 한국어 안내에 원문을 덧붙임. 기본값 `ko`는 기존 출력과 바이트 단위로 같음
+  - 정답 문구 row: 키 종류가 `SAY`/`SAYTODO*`이거나, `SYSTEM`이면서 일본어 텍스트가 `「Say」モード` 안내의 『』 문구(끝 문장부호 무시)와 같은 row. 화자 키(`..._RYNE_000_145` 등)는 같은 문장이어도 대사로 취급. 영어 베이스도 일본어 EXD로 찾음
+  - 안내 표시: `SEQ`/`TODO`/`SYSTEM` row에서 따옴표로 감싼 한국어 정답 문구 뒤에 `(원문)`을 삽입. 매크로 안은 건드리지 않음. 한 한국어 문구가 단계마다 다른 원문에 대응하면(영어 `I come in peace.`/`Greetings and salutations!`) 같은 row의 베이스 언어 텍스트에 나온 원문을 사용하고, 정할 수 없으면 그 따옴표는 그대로 둠
+  - 추리형 퀘스트(안내에 『』 정답이 없음): 대사를 포함한 모든 row의 따옴표 언급에 원문을 덧붙이고, 따옴표가 없으면 정답 단어 자체에 덧붙임
+  - 안전 규칙: 정답 row가 매크로를 포함하거나 비어 있거나 80자를 넘으면, 안내형 퀘스트에서 정답 원문 하나라도(한 한국어 문구가 여러 원문에 대응하면 각 원문마다) 안내나 대사 어디에도 표시할 수 없으면, 추리형 퀘스트에서 표시할 곳이 하나도 없으면 해당 퀘스트 전체를 한국어로 유지
+  - 정답 판정용 row 목록은 제너레이터와 검증기가 같은 코드(`SayQuestPhraseLocalizer.BuildRows`)로 만들며, 키와 베이스 텍스트는 clean 대상 page에서 읽음
+  - 회귀 테스트: `Scripts\test-say-quest-phrases.ps1`
 - `patch-policy.json` 기반 sheet/row/column 보존과 row/column remap
 - 텍스트 생성 또는 명시적 CSV 진단 시 `patch-diagnostics.tsv` 생성. 모든 텍스트가 Base이면 일반 실행은 자산 전용 경로 사용
 - `--diagnostic-csv` 지정 sheet의 row/column 비교 CSV 생성. Base 셀은 remap/RSV보다 먼저 원문으로 선택
@@ -307,6 +317,7 @@
 - `--allow-patched-global`: 이미 패치된 index 사용 허용, 실험용
 - `--allow-korean-font-fallback`: TTMP 없이 한국 서버 폰트 직접 복사, 실험용
 - `--policy`: JSON 패치 정책 파일
+- `--say-quest-phrases ko|base`: 말하기 퀘스트 입력 문구, 기본 `ko`
 - `--rsv-map`: RSV token map JSON 파일. 지정하지 않으면 실행 파일 옆 `rsv.json`, 현재 작업 디렉터리 `rsv.json` 순서로 자동 탐색
 - `--diagnostic-csv`: 지정 sheet의 row/column 비교 CSV 출력
 - `--allow-version-mismatch`: 글로벌/한국 서버 버전 불일치 허용, 진단용

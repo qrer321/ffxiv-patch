@@ -24,6 +24,7 @@ namespace FfxivKoreanPatch.PatchRouteVerifier
             private readonly string _sheetLimit;
             private readonly string _baselineOutputPath;
             private readonly RsvStringResolver _rsvResolver;
+            private readonly SayQuestPhraseMode _sayQuestPhrases;
             private readonly CompositeArchive _patchedText;
             private readonly CompositeArchive _cleanText;
             private readonly CompositeArchive _koreanText;
@@ -60,8 +61,14 @@ namespace FfxivKoreanPatch.PatchRouteVerifier
                 string cleanFontIndexPath,
                 string cleanUiIndexPath,
                 string baselineOutputPath,
-                string rsvMapPath)
+                string rsvMapPath,
+                string sayQuestPhrases)
             {
+                if (!SayQuestPhraseLocalizer.TryParseMode(sayQuestPhrases, out _sayQuestPhrases))
+                {
+                    throw new ArgumentException("--say-quest-phrases must be ko or base: " + sayQuestPhrases);
+                }
+
                 _output = output;
                 _patchedSqpack = patchedSqpack;
                 _globalTextSqpack = globalTextSqpack;

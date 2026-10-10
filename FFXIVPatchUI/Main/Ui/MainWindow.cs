@@ -104,6 +104,10 @@ namespace FFXIVKoreanPatch.Main
         private readonly ToggleButton scopeCommonBase;
         private readonly ToggleButton scopeRemainderBase;
         private readonly ToggleButton scopeUiAssetsBase;
+        private readonly RadioButton sayQuestKo;
+        private readonly ToggleButton sayQuestBase;
+        private readonly TextBlock sayQuestDescription;
+        private bool controlsEnabled = true;
         private readonly Button fullPatchButton;
         private readonly Button fontPatchButton;
         private readonly Button removeButton;
@@ -210,6 +214,9 @@ namespace FFXIVKoreanPatch.Main
             scopeCommonBase = Find<ToggleButton>("ScopeCommonBase");
             scopeRemainderBase = Find<ToggleButton>("ScopeRemainderBase");
             scopeUiAssetsBase = Find<ToggleButton>("ScopeUiAssetsBase");
+            sayQuestKo = Find<RadioButton>("SayQuestKo");
+            sayQuestBase = Find<ToggleButton>("SayQuestBase");
+            sayQuestDescription = Find<TextBlock>("SayQuestDescription");
             baseScopeButtons = new ToggleButton[]
             {
                 scopeStoryBase, scopeBnpcBase, scopeActionBase, scopeDutyBase, scopeItemBase,
@@ -455,6 +462,15 @@ namespace FFXIVKoreanPatch.Main
                 koreanScopeButtons[i].Checked += scopeHandler;
             }
 
+            sayQuestBase.Checked += (sender, args) =>
+            {
+                if (!suppressOptionEvents) controller.SetSayQuestPhrases(true);
+            };
+            sayQuestKo.Checked += (sender, args) =>
+            {
+                if (!suppressOptionEvents) controller.SetSayQuestPhrases(false);
+            };
+
             fullPatchButton.Click += (sender, args) => controller.RequestFullPatch();
             fontPatchButton.Click += (sender, args) => controller.RequestFontPatch();
             removeButton.Click += (sender, args) => controller.RequestRemove();
@@ -513,6 +529,8 @@ namespace FFXIVKoreanPatch.Main
                 controller.PreserveBaseCommonPhrases,
                 controller.PreserveBaseRemainderText,
                 controller.PreserveBaseUiAssets);
+            sayQuestBase.IsChecked = controller.SayQuestPhrasesBase;
+            sayQuestKo.IsChecked = !controller.SayQuestPhrasesBase;
             SetTextProfileVisuals(controller.TextProfile);
             suppressOptionEvents = previousSuppression;
         }
@@ -542,6 +560,15 @@ namespace FFXIVKoreanPatch.Main
                 koreanScopeButtons[i].IsChecked = baseScopeButtons[i].IsChecked != true;
             }
             UpdateScopeOutcomeLabels();
+            UpdateSayQuestAvailability();
+        }
+
+        // Say quest phrases only exist in Korean when the story text is Korean.
+        private void UpdateSayQuestAvailability()
+        {
+            bool available = controlsEnabled && scopeStoryBase.IsChecked != true;
+            sayQuestKo.IsEnabled = available;
+            sayQuestBase.IsEnabled = available;
         }
 
         private void SetTextProfileVisuals(string profile)
@@ -586,6 +613,11 @@ namespace FFXIVKoreanPatch.Main
                 AutomationProperties.SetName(baseScopeButtons[i], scopeNames[i] + ": " + baseLanguage);
                 AutomationProperties.SetName(koreanScopeButtons[i], scopeNames[i] + ": 한국어");
             }
+            sayQuestBase.Content = baseLanguage;
+            sayQuestDescription.Text = "선택한 언어로 채팅창에 입력하면 인식합니다." + Environment.NewLine + baseLanguage +
+                "를 선택하면 퀘스트 안내에 '안녕하세요(" + (index == 1 ? "Hello" : "こんにちは") + ")'처럼 함께 표기됩니다.";
+            AutomationProperties.SetName(sayQuestBase, "말하기 퀘스트 입력 문구: " + baseLanguage);
+            AutomationProperties.SetName(sayQuestKo, "말하기 퀘스트 입력 문구: 한국어");
         }
 
 
@@ -740,6 +772,8 @@ namespace FFXIVKoreanPatch.Main
                     baseScopeButtons[i].IsEnabled = state.ControlsEnabled;
                     koreanScopeButtons[i].IsEnabled = state.ControlsEnabled;
                 }
+                controlsEnabled = state.ControlsEnabled;
+                UpdateSayQuestAvailability();
                 restoreBackupButton.IsEnabled = state.ControlsEnabled;
                 openReleaseButton.IsEnabled = state.ControlsEnabled;
                 openLogsButton.IsEnabled = state.ControlsEnabled;

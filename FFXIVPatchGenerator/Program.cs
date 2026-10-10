@@ -55,6 +55,11 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
                 Console.WriteLine("  Say quest rows:       {0}", report.QuestChatRowsAnonymized);
                 Console.WriteLine("  Name forms applied:   {0}", report.NameFormStringsApplied);
                 Console.WriteLine("  Name forms kept full: {0}", report.NameFormStringsSkipped);
+                Console.WriteLine("  Say phrase language:  {0}", SayQuestPhraseLocalizer.FormatMode(options.SayQuestPhrases));
+                Console.WriteLine("  Say quests to base:   {0}", report.SayQuestsLocalized);
+                Console.WriteLine("  Say phrase rows:      {0}", report.SayQuestPhraseRows);
+                Console.WriteLine("  Say prompt rows:      {0}", report.SayQuestAnnotatedRows);
+                Console.WriteLine("  Say quests kept ko:   {0}", report.SayQuestsKeptKorean);
                 Console.WriteLine("  Pages without mapping:{0}", report.PagesSkippedNoMapping);
                 Console.WriteLine("  Missing source pages: {0}", report.MissingSourcePages);
                 Console.WriteLine("  Missing target pages: {0}", report.MissingTargetPages);
@@ -120,6 +125,9 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
             Console.WriteLine("  --sheet            Limit to one root.exl sheet name for testing.");
             Console.WriteLine("  --policy           Optional JSON patch policy file.");
             Console.WriteLine("  --rsv-map          Optional RSV token map JSON. Also auto-detected beside the generator exe.");
+            Console.WriteLine("  --say-quest-phrases ko|base");
+            Console.WriteLine("                     Phrases say quests expect. base keeps the base-language phrase and shows it");
+            Console.WriteLine("                     next to the Korean phrase in prompts. Default: ko.");
             Console.WriteLine("  --anonymize-quest-chat-phrases");
             Console.WriteLine("                     Disabled/no-op until quest say sheet coverage is complete.");
             Console.WriteLine("  --preserve-base-bnpc-names");
@@ -266,6 +274,7 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
         public bool AllowKoreanFontFallback;
         public bool AllowVersionMismatch;
         public bool SkipUiTextureFix;
+        public SayQuestPhraseMode SayQuestPhrases = SayQuestPhraseMode.Korean;
         public bool IncludeCommandSheets = true;
         public readonly HashSet<string> PreserveBaseLanguageGroups = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         public bool AnonymizeQuestChatPhrasesRequested;
@@ -494,6 +503,17 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
                 options.FontPatchProfile = FontPatchProfiles.Normalize(value.Trim('"'));
             }
 
+            if (values.TryGetValue("--say-quest-phrases", out value))
+            {
+                SayQuestPhraseMode sayQuestPhrases;
+                if (!SayQuestPhraseLocalizer.TryParseMode(value.Trim('"'), out sayQuestPhrases))
+                {
+                    throw new ArgumentException("--say-quest-phrases must be ko or base: " + value);
+                }
+
+                options.SayQuestPhrases = sayQuestPhrases;
+            }
+
             if (values.TryGetValue("--preserve-base-language-groups", out value))
             {
                 options.AddBaseLanguageGroups(value);
@@ -567,6 +587,10 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
         public int QuestChatRowsAnonymized;
         public int NameFormStringsApplied;
         public int NameFormStringsSkipped;
+        public int SayQuestsLocalized;
+        public int SayQuestPhraseRows;
+        public int SayQuestAnnotatedRows;
+        public int SayQuestsKeptKorean;
         public int PagesSkippedNoMapping;
         public int MissingSourcePages;
         public int MissingTargetPages;
