@@ -228,6 +228,7 @@
   - 자체 번역은 공식 한국어판 전용 행(일본어가 빈 1745~1865행 등)의 표현을 우선 따름. 일본어 참조 page를 읽을 수 없으면 번역을 건너뛰고 `missing-japanese-reference`를 기록
   - 자체 번역이 적용되지 않은 미번역 단어는 글로벌 영어 단어가 인쇄 가능한 ASCII일 때 영어 row를 사용(진단 `keybound-brawler-english-words`, CSV mappingMode `keybound-brawler-english`). 영어도 일본어인 단어는 베이스 원문 유지. 영어 page를 파싱할 수 없으면 `invalid-keybound-brawler-english-page`를 남기고 영어 대체 없이 진행
   - `patch-policy.json`의 보존 row/column, `global_target_rows`/`global_english_rows`, source row override, 단어 column remap이 걸린 row는 영어 대체와 자체 번역을 적용하지 않고 정책 결과를 유지. `--diagnostic-csv`도 같은 판정으로 선택 문자열을 기록
+  - 한글 단어의 반각 물결 `~`(U+007E)는 일본어 원문처럼 전각 `～`(U+FF5E)로 바꿈. 일본어 클라이언트 입력창은 전각 `～`를 넣고 이를 단어의 `～`(또는 `ー`)와만 같게 판정해서, 반각 `~`가 든 단어는 정확히 입력해도 실패했음(사용자 게임 확인). 진단 note `fullwidth-tilde-words=…`, 2026.09.15 데이터에서 18개(공식 14, 자체 번역 4)
   - 2026.09.15 데이터(JA 베이스): 공식 한국어 1496, 자체 번역 292, 빈 단어 79. 일본어 단어는 남지 않음. EN 베이스는 같은 1788행이 한국어이고, 79행 중 28행은 영어판에만 있는 단어라 영어 원문 유지
   - 회귀 테스트: `Scripts\test-keybound-brawler-words.ps1`
 - `patch-policy.json` 기반 sheet/row/column 보존과 row/column remap

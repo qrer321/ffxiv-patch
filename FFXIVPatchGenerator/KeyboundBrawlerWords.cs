@@ -9,7 +9,8 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
     // Column 0 is the word itself rather than a string key, so the sheet is matched by row id only.
     // Words the Korean data still leaves in Japanese take a community translation from
     // KeyboundBrawlerWordTranslations, or else the global English word when it is plain ASCII, so they
-    // can be typed without a Japanese IME.
+    // can be typed without a Japanese IME. Korean words also get the Japanese fullwidth tilde, because
+    // the Japanese client only matches typed tildes against it.
     internal static class KeyboundBrawlerWords
     {
         public const string SheetName = "KTGTypeWordTextData";
@@ -46,55 +47,87 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
             return Encoding.UTF8.GetBytes(translation.Korean);
         }
 
-        // Rewrites the word of every row that FindTranslation translates. Rows for which skipRow returns
-        // true (patch-policy keep, fallback and remap rows) are left alone.
-        public static byte[] ApplyTranslations(
+        // Korean words write the halfwidth tilde (U+007E) while Japanese words use the fullwidth one
+        // (U+FF5E). The Japanese client types the fullwidth tilde and matches it only against U+FF5E
+        // (or the long vowel mark), so Korean words switch to U+FF5E to stay typeable.
+        public static byte[] UseFullwidthTildes(byte[] word)
+        {
+            if (word == null || Array.IndexOf(word, (byte)'~') < 0 || !ContainsHangul(word))
+            {
+                return word;
+            }
+
+            return Encoding.UTF8.GetBytes(Encoding.UTF8.GetString(word).Replace('~', '～'));
+        }
+
+        // Rewrites the word of every row that FindTranslation translates or UseFullwidthTildes changes.
+        // Rows for which skipRow returns true (patch-policy keep, fallback and remap rows) are left alone.
+        // Without a Japanese page only the tildes change.
+        public static byte[] ApplyWordFixes(
             ExcelHeader header,
             ExcelDataFile cleanTarget,
             ExcelDataFile cleanJapanese,
             byte[] patchedPage,
             Func<uint, bool> skipRow,
-            out KeyboundBrawlerTranslationResult result)
+            out KeyboundBrawlerWordResult result)
         {
-            result = new KeyboundBrawlerTranslationResult();
+            result = new KeyboundBrawlerWordResult();
             int columnIndex = header.FindStringColumnIndexByOffset(WordColumnOffset);
-            if (columnIndex < 0 || cleanTarget == null || cleanJapanese == null || patchedPage == null)
+            if (columnIndex < 0 || cleanTarget == null || patchedPage == null)
             {
                 return patchedPage;
             }
 
             Dictionary<uint, ExcelDataRow> targetRows = RowsById(cleanTarget);
-            Dictionary<uint, ExcelDataRow> japaneseRows = RowsById(cleanJapanese);
+            Dictionary<uint, ExcelDataRow> japaneseRows = cleanJapanese == null
+                ? new Dictionary<uint, ExcelDataRow>()
+                : RowsById(cleanJapanese);
             ExcelDataFile patched = ExcelDataFile.Parse(patchedPage);
             Dictionary<uint, byte[]> replacements = new Dictionary<uint, byte[]>();
             for (int i = 0; i < patched.Rows.Count; i++)
             {
                 ExcelDataRow row = patched.Rows[i];
-                ExcelDataRow japaneseRow;
-                if ((skipRow != null && skipRow(row.RowId)) ||
-                    !japaneseRows.TryGetValue(row.RowId, out japaneseRow))
+                if (skipRow != null && skipRow(row.RowId))
                 {
                     continue;
                 }
 
                 byte[] patchedWord = patched.GetStringBytes(row, header, columnIndex);
-                bool japaneseChanged;
-                byte[] translation = FindTranslation(
-                    row.RowId,
-                    patchedWord,
-                    cleanJapanese.GetStringBytes(japaneseRow, header, columnIndex),
-                    out japaneseChanged);
-                if (japaneseChanged)
+                byte[] word = patchedWord;
+                ExcelDataRow japaneseRow;
+                if (japaneseRows.TryGetValue(row.RowId, out japaneseRow))
                 {
-                    result.SkippedChangedJapanese++;
+                    bool japaneseChanged;
+                    byte[] translation = FindTranslation(
+                        row.RowId,
+                        patchedWord,
+                        cleanJapanese.GetStringBytes(japaneseRow, header, columnIndex),
+                        out japaneseChanged);
+                    if (japaneseChanged)
+                    {
+                        result.SkippedChangedJapanese++;
+                    }
+
+                    if (translation != null)
+                    {
+                        word = translation;
+                        result.Translated++;
+                    }
                 }
 
-                if (translation == null)
+                byte[] typeable = UseFullwidthTildes(word);
+                if (!ReferenceEquals(typeable, word))
+                {
+                    word = typeable;
+                    result.FullwidthTildeWords++;
+                }
+
+                if (ReferenceEquals(word, patchedWord))
                 {
                     continue;
                 }
 
-                replacements[row.RowId] = translation;
+                replacements[row.RowId] = word;
                 ExcelDataRow targetRow;
                 if (targetRows.TryGetValue(row.RowId, out targetRow) &&
                     BytesEqual(patchedWord, cleanTarget.GetStringBytes(targetRow, header, columnIndex)))
@@ -103,8 +136,7 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
                 }
             }
 
-            result.Applied = replacements.Count;
-            return result.Applied == 0
+            return replacements.Count == 0
                 ? patchedPage
                 : ExdRowRewriter.RewriteStringColumn(header, patched, columnIndex, replacements);
         }
@@ -241,10 +273,12 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
         }
     }
 
-    internal sealed class KeyboundBrawlerTranslationResult
+    internal sealed class KeyboundBrawlerWordResult
     {
         // Rows whose word was replaced with a community translation.
-        public int Applied;
+        public int Translated;
+        // Rows whose Korean word switched to fullwidth tildes.
+        public int FullwidthTildeWords;
         // Replaced rows whose word still equalled the clean target word before the replacement.
         public int NewlyChanged;
         // Rows with a translation whose clean Japanese word no longer matches it.

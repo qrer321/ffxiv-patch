@@ -1111,20 +1111,15 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
                 return string.Empty;
             }
 
-            if (cleanJapanese == null)
-            {
-                return "keybound-brawler-translations missing-japanese-reference";
-            }
-
-            KeyboundBrawlerTranslationResult result;
-            patchResult.Data = KeyboundBrawlerWords.ApplyTranslations(
+            KeyboundBrawlerWordResult result;
+            patchResult.Data = KeyboundBrawlerWords.ApplyWordFixes(
                 header,
                 cleanTarget,
                 cleanJapanese,
                 patchResult.Data,
                 delegate(uint rowId) { return IsKeyboundBrawlerPolicyRow(sheetPolicy, rowId); },
                 out result);
-            if (result.Applied > 0)
+            if (result.Translated > 0 || result.FullwidthTildeWords > 0)
             {
                 patchResult.Changed = true;
                 patchResult.RowsPatched += result.NewlyChanged;
@@ -1135,8 +1130,11 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
                 AddLimitedWarning("Keybound Brawler translations skipped for changed Japanese words: " + result.SkippedChangedJapanese.ToString());
             }
 
-            return "keybound-brawler-translations applied=" + result.Applied.ToString() +
-                   ", skipped-changed-japanese=" + result.SkippedChangedJapanese.ToString();
+            string translationNote = cleanJapanese == null
+                ? "keybound-brawler-translations missing-japanese-reference"
+                : "keybound-brawler-translations applied=" + result.Translated.ToString() +
+                  ", skipped-changed-japanese=" + result.SkippedChangedJapanese.ToString();
+            return translationNote + ", fullwidth-tilde-words=" + result.FullwidthTildeWords.ToString();
         }
 
         // Rows that patch-policy pins (kept, global fallback, source override or remapped word) keep the
@@ -1664,27 +1662,36 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
                             }
                         }
 
-                        ExcelDataRow wordJapaneseRow;
                         if (wordSheet &&
                             column.Offset == KeyboundBrawlerWords.WordColumnOffset &&
                             string.Equals(action, "replace", StringComparison.Ordinal) &&
-                            !IsKeyboundBrawlerPolicyRow(sheetPolicy, targetRow.RowId) &&
-                            wordJapaneseRows.TryGetValue(targetRow.RowId, out wordJapaneseRow))
+                            !IsKeyboundBrawlerPolicyRow(sheetPolicy, targetRow.RowId))
                         {
-                            bool japaneseChanged;
-                            byte[] translation = KeyboundBrawlerWords.FindTranslation(
-                                targetRow.RowId,
-                                selectedBytes != null && selectedBytes.Length > 0 ? selectedBytes : globalBytes,
-                                wordJapanese.GetStringBytes(wordJapaneseRow, targetHeader, stringColumns[columnIndex]),
-                                out japaneseChanged);
-                            if (translation != null)
+                            ExcelDataRow wordJapaneseRow;
+                            if (wordJapaneseRows.TryGetValue(targetRow.RowId, out wordJapaneseRow))
                             {
-                                selectedBytes = translation;
-                                note = "keybound-brawler-translation";
+                                bool japaneseChanged;
+                                byte[] translation = KeyboundBrawlerWords.FindTranslation(
+                                    targetRow.RowId,
+                                    selectedBytes != null && selectedBytes.Length > 0 ? selectedBytes : globalBytes,
+                                    wordJapanese.GetStringBytes(wordJapaneseRow, targetHeader, stringColumns[columnIndex]),
+                                    out japaneseChanged);
+                                if (translation != null)
+                                {
+                                    selectedBytes = translation;
+                                    note = "keybound-brawler-translation";
+                                }
+                                else if (japaneseChanged)
+                                {
+                                    note = "keybound-brawler-translation skipped-changed-japanese";
+                                }
                             }
-                            else if (japaneseChanged)
+
+                            byte[] typeable = KeyboundBrawlerWords.UseFullwidthTildes(selectedBytes);
+                            if (!ReferenceEquals(typeable, selectedBytes))
                             {
-                                note = "keybound-brawler-translation skipped-changed-japanese";
+                                selectedBytes = typeable;
+                                note = string.IsNullOrEmpty(note) ? "keybound-brawler-fullwidth-tilde" : note + "; keybound-brawler-fullwidth-tilde";
                             }
                         }
 

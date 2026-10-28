@@ -116,7 +116,7 @@ UI 이미지는 아홉 번째 EXD 텍스트 범위가 아닙니다. `custom`에�
 
 이 네 시트만 기존 row-id 매칭 대상에 포함하며 다른 `XBM*` 시트는 일괄 허용하지 않습니다. UI에서는 **전체 한글** 또는 **직접 설정 → 기타 게임 텍스트 → 한국어**로 적용합니다. `remainder=base`이면 다른 7개 범위가 한국어여도 위 문자열은 선택한 일본어/영어 원문을 유지합니다. 일반 **아이템 이름**이나 UI 이미지·전투 NPC 이름·기술 이름 선택만으로는 바뀌지 않습니다. 기타 게임 텍스트는 마수 시련장 전용 옵션이 아니므로 같은 범위의 메뉴·일반 설명도 함께 선택됩니다.
 
-마법자판 난타전(`キーバウンド・ブロウラー`)의 입력 단어 `KTGTypeWordTextData`도 `remainder`입니다. 첫 열이 단어 자체라 string key로 쓰지 않고 row id로만 매칭하며, 둘째 열의 히라가나 읽기는 그대로 둡니다. 한국어 원자료에 아직 일본어로 남은 단어는 `KeyboundBrawlerWordTranslations.cs`의 자체 번역으로 바꿉니다. 각 번역은 clean 일본어 단어가 작성 당시와 같고 패치된 단어에 한글이 없을 때만 적용되므로, 한국 서버에 공식 번역이 생기면 공식 번역을 씁니다. 자체 번역이 적용되지 않은 미번역 단어는 글로벌 영어 단어가 ASCII이면 영어로, 영어도 일본어이면 베이스 원문으로 둡니다. `patch-policy.json`으로 보존·폴백·remap을 지정한 row는 영어 대체와 자체 번역 대상에서 빠집니다. 적용·건너뜀 수는 `patch-diagnostics.tsv`의 `keybound-brawler-translations` note에, 영어 대체 후보 수는 `keybound-brawler-english-words`에 기록됩니다. 회귀 테스트는 `Scripts\test-keybound-brawler-words.ps1`로 실행합니다.
+마법자판 난타전(`キーバウンド・ブロウラー`)의 입력 단어 `KTGTypeWordTextData`도 `remainder`입니다. 첫 열이 단어 자체라 string key로 쓰지 않고 row id로만 매칭하며, 둘째 열의 히라가나 읽기는 그대로 둡니다. 한국어 원자료에 아직 일본어로 남은 단어는 `KeyboundBrawlerWordTranslations.cs`의 자체 번역으로 바꿉니다. 각 번역은 clean 일본어 단어가 작성 당시와 같고 패치된 단어에 한글이 없을 때만 적용되므로, 한국 서버에 공식 번역이 생기면 공식 번역을 씁니다. 자체 번역이 적용되지 않은 미번역 단어는 글로벌 영어 단어가 ASCII이면 영어로, 영어도 일본어이면 베이스 원문으로 둡니다. `patch-policy.json`으로 보존·폴백·remap을 지정한 row는 영어 대체와 자체 번역 대상에서 빠집니다. 한글 단어의 반각 물결 `~`는 일본어 원문처럼 전각 `～`로 바꿉니다. 일본어 클라이언트는 입력한 `～`를 단어의 전각 `～`와만 같게 판정하기 때문입니다(`fullwidth-tilde-words`). 적용·건너뜀 수는 `patch-diagnostics.tsv`의 `keybound-brawler-translations` note에, 영어 대체 후보 수는 `keybound-brawler-english-words`에 기록됩니다. 회귀 테스트는 `Scripts\test-keybound-brawler-words.ps1`로 실행합니다.
 
 ## 진단과 정책 파일
 

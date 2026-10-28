@@ -25,8 +25,14 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
             ExpectEnglishBytes("Korean word with a SeString macro", Cat("ゾンダー", new byte[] { 0x02, 0x10, 0x01, 0x03 }), Text("Zonder"), false);
             ExpectEnglishBytes("English word with a SeString macro", Text("ゾンダー"), Cat("Zonder", new byte[] { 0x02, 0x10, 0x01, 0x03 }), false);
 
+            ExpectTilde("halfwidth tildes in a Korean word become fullwidth", "호히~ 호히~!", "호히～ 호히～!");
+            ExpectTilde("Korean word without a tilde is kept", "부메랑 줘!", null);
+            ExpectTilde("word without Hangul keeps its tilde", "Hi~", null);
+            ExpectTildeBytes("Korean word with a SeString macro keeps its tilde", Cat("호히~", new byte[] { 0x02, 0x10, 0x01, 0x03 }));
+
             ExpectTranslatedPage();
             ExpectEnglishTarget();
+            ExpectTildePage();
             ExpectUntouchedPage();
             ExpectTable();
 
@@ -49,15 +55,15 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
             ExcelHeader header = ExcelHeader.Parse(BuildHeader(ids.Length));
             ExcelDataFile clean = ExcelDataFile.Parse(BuildPage(ids, japanese, readings));
             byte[] patched = BuildPage(ids, patchedWords, readings);
-            KeyboundBrawlerTranslationResult result;
-            byte[] output = KeyboundBrawlerWords.ApplyTranslations(
+            KeyboundBrawlerWordResult result;
+            byte[] output = KeyboundBrawlerWords.ApplyWordFixes(
                 header, clean, clean, patched, delegate(uint rowId) { return rowId == 51; }, out result);
 
             List<string> problems = new List<string>();
             // Only row 243 still had the clean target word; row 39 was already counted as patched.
-            if (result.Applied != 2 || result.NewlyChanged != 1 || result.SkippedChangedJapanese != 1)
+            if (result.Translated != 2 || result.NewlyChanged != 1 || result.SkippedChangedJapanese != 1)
             {
-                problems.Add("applied=" + result.Applied + ", newly changed=" + result.NewlyChanged + ", skipped=" + result.SkippedChangedJapanese);
+                problems.Add("applied=" + result.Translated + ", newly changed=" + result.NewlyChanged + ", skipped=" + result.SkippedChangedJapanese);
             }
 
             ExcelDataFile page = ExcelDataFile.Parse(output);
@@ -100,6 +106,78 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
             Report("words still not Korean take the translation; official Korean, policy rows, unknown rows and changed Japanese stay", problems);
         }
 
+        private static void ExpectTildePage()
+        {
+            // Row 1540: an official Korean word with a tilde. Row 151: a translation with a tilde.
+            // Row 1541: patch-policy pins the row. Row 1: no tilde.
+            uint[] ids = { 1, 151, 1540, 1541 };
+            string[] japanese = { "神羅", "ほひ～！", "なにするんだ、ゴラ～！", "ありがっとね～！" };
+            string[] readings = { "しんら", "ほひ～", "なにするんだごら～", "ありがっとね～" };
+            string[] patchedWords = { "신라", "ほひ～！", "뭐 하는 짓이야~!", "고마워~!" };
+            string[] expectedWords = { "신라", Translation(151).Replace('~', '～'), "뭐 하는 짓이야～!", "고마워~!" };
+
+            ExcelHeader header = ExcelHeader.Parse(BuildHeader(ids.Length));
+            ExcelDataFile clean = ExcelDataFile.Parse(BuildPage(ids, japanese, readings));
+            byte[] patched = BuildPage(ids, patchedWords, readings);
+            KeyboundBrawlerWordResult result;
+            byte[] output = KeyboundBrawlerWords.ApplyWordFixes(
+                header, clean, clean, patched, delegate(uint rowId) { return rowId == 1541; }, out result);
+
+            List<string> problems = new List<string>();
+            if (result.Translated != 1 || result.FullwidthTildeWords != 2 || result.NewlyChanged != 1)
+            {
+                problems.Add("translated=" + result.Translated + ", tildes=" + result.FullwidthTildeWords + ", newly changed=" + result.NewlyChanged);
+            }
+
+            ExcelDataFile page = ExcelDataFile.Parse(output);
+            for (int i = 0; i < ids.Length; i++)
+            {
+                if (!Same(page.GetStringBytesByColumnOffset(page.Rows[i], header, 0), Text(expectedWords[i])))
+                {
+                    problems.Add("row " + ids[i] + " word is " + Encoding.UTF8.GetString(page.GetStringBytesByColumnOffset(page.Rows[i], header, 0)));
+                }
+
+                if (!Same(page.GetStringBytesByColumnOffset(page.Rows[i], header, 4), Text(readings[i])))
+                {
+                    problems.Add("row " + ids[i] + " reading changed");
+                }
+            }
+
+            byte[] withoutJapanese = KeyboundBrawlerWords.ApplyWordFixes(header, clean, null, patched, null, out result);
+            ExcelDataFile tildeOnly = ExcelDataFile.Parse(withoutJapanese);
+            if (result.Translated != 0 || result.FullwidthTildeWords != 2 ||
+                !Same(tildeOnly.GetStringBytesByColumnOffset(tildeOnly.Rows[1], header, 0), Text(patchedWords[1])))
+            {
+                problems.Add("without a Japanese page: translated=" + result.Translated + ", tildes=" + result.FullwidthTildeWords);
+            }
+
+            Report("Korean words get fullwidth tildes, translations included, policy rows kept", problems);
+        }
+
+        private static void ExpectTilde(string name, string word, string expected)
+        {
+            byte[] input = Text(word);
+            byte[] actual = KeyboundBrawlerWords.UseFullwidthTildes(input);
+            List<string> problems = new List<string>();
+            if (expected == null ? !ReferenceEquals(actual, input) : !Same(actual, Text(expected)))
+            {
+                problems.Add("got " + Encoding.UTF8.GetString(actual));
+            }
+
+            Report(name, problems);
+        }
+
+        private static void ExpectTildeBytes(string name, byte[] word)
+        {
+            List<string> problems = new List<string>();
+            if (!ReferenceEquals(KeyboundBrawlerWords.UseFullwidthTildes(word), word))
+            {
+                problems.Add("word was changed");
+            }
+
+            Report(name, problems);
+        }
+
         private static void ExpectEnglishTarget()
         {
             // An English target page: the English fallback word equals the clean target word, so the
@@ -110,19 +188,19 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
             ExcelDataFile cleanEnglish = ExcelDataFile.Parse(BuildPage(ids, new string[] { "Gimme a boomerang!" }, readings));
             ExcelDataFile cleanJapanese = ExcelDataFile.Parse(BuildPage(ids, new string[] { "ブーメランちょうだい！" }, readings));
             byte[] patched = BuildPage(ids, new string[] { "Gimme a boomerang!" }, readings);
-            KeyboundBrawlerTranslationResult result;
-            byte[] output = KeyboundBrawlerWords.ApplyTranslations(header, cleanEnglish, cleanJapanese, patched, null, out result);
+            KeyboundBrawlerWordResult result;
+            byte[] output = KeyboundBrawlerWords.ApplyWordFixes(header, cleanEnglish, cleanJapanese, patched, null, out result);
 
             List<string> problems = new List<string>();
             ExcelDataFile page = ExcelDataFile.Parse(output);
-            if (result.Applied != 1 || result.NewlyChanged != 1 ||
+            if (result.Translated != 1 || result.NewlyChanged != 1 ||
                 !Same(page.GetStringBytesByColumnOffset(page.Rows[0], header, 0), Text(Translation(39))))
             {
-                problems.Add("applied=" + result.Applied + ", newly changed=" + result.NewlyChanged);
+                problems.Add("applied=" + result.Translated + ", newly changed=" + result.NewlyChanged);
             }
 
-            KeyboundBrawlerWords.ApplyTranslations(header, cleanEnglish, cleanEnglish, patched, null, out result);
-            if (result.Applied != 0 || result.SkippedChangedJapanese != 1)
+            KeyboundBrawlerWords.ApplyWordFixes(header, cleanEnglish, cleanEnglish, patched, null, out result);
+            if (result.Translated != 0 || result.SkippedChangedJapanese != 1)
             {
                 problems.Add("an English page used as the Japanese reference was not rejected");
             }
@@ -137,18 +215,18 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
             ExcelHeader header = ExcelHeader.Parse(BuildHeader(ids.Length));
             ExcelDataFile clean = ExcelDataFile.Parse(BuildPage(ids, new string[] { "神羅", "釘バットちょうだい！" }, readings));
             byte[] patched = BuildPage(ids, new string[] { "신라", "못 박힌 배트 줘!" }, readings);
-            KeyboundBrawlerTranslationResult result;
-            byte[] output = KeyboundBrawlerWords.ApplyTranslations(header, clean, clean, patched, null, out result);
+            KeyboundBrawlerWordResult result;
+            byte[] output = KeyboundBrawlerWords.ApplyWordFixes(header, clean, clean, patched, null, out result);
 
             List<string> problems = new List<string>();
-            if (!ReferenceEquals(output, patched) || result.Applied != 0 || result.SkippedChangedJapanese != 0)
+            if (!ReferenceEquals(output, patched) || result.Translated != 0 || result.SkippedChangedJapanese != 0)
             {
                 problems.Add("a page with only Korean words was rebuilt");
             }
 
             byte[] untranslated = BuildPage(ids, new string[] { "신라", "釘バットちょうだい！" }, readings);
-            byte[] missingReference = KeyboundBrawlerWords.ApplyTranslations(header, clean, null, untranslated, null, out result);
-            if (!ReferenceEquals(missingReference, untranslated) || result.Applied != 0)
+            byte[] missingReference = KeyboundBrawlerWords.ApplyWordFixes(header, clean, null, untranslated, null, out result);
+            if (!ReferenceEquals(missingReference, untranslated) || result.Translated != 0)
             {
                 problems.Add("a missing Japanese reference changed the page");
             }
