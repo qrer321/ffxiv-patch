@@ -11,6 +11,7 @@ New-Item -ItemType Directory -Force -Path $outDir | Out-Null
 
 $sources = @(
     (Join-Path $repoRoot "FFXIVPatchGenerator\SupplementTranslations.cs"),
+    (Join-Path $repoRoot "FFXIVPatchGenerator\TypedWordText.cs"),
     (Join-Path $repoRoot "FFXIVPatchGenerator\ExdRowRewriter.cs"),
     (Join-Path $repoRoot "FFXIVPatchGenerator\Excel.cs"),
     (Join-Path $repoRoot "FFXIVPatchGenerator\HashAndEndian.cs"),

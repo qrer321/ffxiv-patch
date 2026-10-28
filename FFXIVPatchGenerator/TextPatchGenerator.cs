@@ -224,13 +224,6 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
             new Regex("^Ykw$", RegexOptions.IgnoreCase | RegexOptions.Compiled)
         };
 
-        // Typing-game word sheets. On a Japanese target their Korean words use the fullwidth tilde
-        // that the typing field enters. See ApplyJapaneseTypedWordTildes.
-        private static readonly Regex[] TypedWordSheets = new Regex[]
-        {
-            new Regex("^KTGTypeWordTextData$", RegexOptions.IgnoreCase | RegexOptions.Compiled),
-        };
-
         private static readonly Regex[] CommandRowKeySwappableSheets = new Regex[]
         {
             new Regex("^ConfigKey$", RegexOptions.IgnoreCase | RegexOptions.Compiled),
@@ -697,7 +690,7 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
                 ColumnRemap originalJobSubtitleRemap = sheetPolicy.GetColumnRemap(1975, 0);
                 bool jobSubtitleRemapped = PrepareCharacterSelectJobSubtitle(
                     sheetName, targetExd, globalHeader, globalArchive, sourceMaps, sheetPolicy, textSheetScopePolicy);
-                WriteDiagnosticCsvIfRequested(sheetName, page.StartId, diagnosticCsvDir, targetExd, sourceMaps, globalHeader, sourceHeader, stringColumns, allowRowKeyFallback, sheetPolicy, textSheetScopePolicy, _rsvResolver);
+                WriteDiagnosticCsvIfRequested(sheetName, page.StartId, diagnosticCsvDir, targetExd, sourceMaps, globalHeader, sourceHeader, stringColumns, allowRowKeyFallback, sheetPolicy, textSheetScopePolicy, _rsvResolver, supplement);
                 if (!textSheetScopePolicy.MayUseKorean)
                 {
                     continue;
@@ -787,6 +780,8 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
             {
                 return;
             }
+
+            ReportUnvisitedSupplementEntries(sheetName, supplement, diagnostics);
 
             PatchSecondaryLanguageSafetyRows(
                 sheetName,
@@ -1174,23 +1169,27 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
                 cleanTarget,
                 patchResult.Data,
                 _options.TargetLanguage,
-                delegate(uint rowId, ushort columnOffset)
-                {
-                    return !scope.ShouldUseKorean(rowId, columnOffset) ||
-                           sheetPolicy.ShouldKeepRow(rowId) ||
-                           sheetPolicy.ShouldKeepColumn(rowId, columnOffset) ||
-                           sheetPolicy.ShouldUseGlobalFallbackRow(rowId) ||
-                           sheetPolicy.SourceRowOverrides.ContainsKey(rowId) ||
-                           sheetPolicy.GetColumnRemap(rowId, columnOffset).Mode != ColumnRemapMode.Default;
-                },
+                delegate(uint rowId, ushort columnOffset) { return IsSupplementSkipped(sheetPolicy, scope, rowId, columnOffset); },
                 out result);
             if (!ReferenceEquals(data, patchResult.Data))
             {
+                // Restoring the target text can undo every Korean change of a page; such a page is not
+                // written, and the key counters never exceed the rows that still differ.
                 patchResult.Data = data;
-                patchResult.Changed = true;
                 patchResult.RowsPatched = CountChangedRows(header, header.GetStringColumnIndexes(), cleanTarget, ExcelDataFile.Parse(data));
+                patchResult.Changed = patchResult.RowsPatched > 0;
+                patchResult.StringKeyRows = Math.Min(patchResult.StringKeyRows, patchResult.RowsPatched);
+                patchResult.RowKeyRows = Math.Min(patchResult.RowKeyRows, patchResult.RowsPatched);
             }
 
+            int official = result.Count(SupplementIssueKind.Official);
+            int stale = result.Count(SupplementIssueKind.Stale);
+            int missing = result.Count(SupplementIssueKind.Missing);
+            _report.SupplementApplied += result.Applied;
+            _report.SupplementRestored += result.Restored;
+            _report.SupplementOfficial += official;
+            _report.SupplementStale += stale;
+            _report.SupplementMissing += missing;
             for (int i = 0; i < result.Issues.Count; i++)
             {
                 SupplementIssue issue = result.Issues[i];
@@ -1205,72 +1204,58 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
 
             return "supplement applied=" + result.Applied.ToString() +
                    ", restored=" + result.Restored.ToString() +
-                   ", official=" + result.Count(SupplementIssueKind.Official).ToString() +
-                   ", stale=" + result.Count(SupplementIssueKind.Stale).ToString() +
-                   ", missing=" + result.Count(SupplementIssueKind.Missing).ToString();
+                   ", official=" + official.ToString() +
+                   ", stale=" + stale.ToString() +
+                   ", missing=" + missing.ToString();
         }
 
-        // The Japanese client's typing field enters a typed tilde as U+FF5E and does not match it with
-        // the U+007E in Korean words, while its own words use only U+FF5E.
+        // Cells the Korean patch leaves alone are left alone by the supplement too.
+        private static bool IsSupplementSkipped(PatchSheetPolicy sheetPolicy, TextSheetScopePolicy scope, uint rowId, ushort columnOffset)
+        {
+            return !scope.ShouldUseKorean(rowId, columnOffset) ||
+                   sheetPolicy.ShouldKeepRow(rowId) ||
+                   sheetPolicy.ShouldKeepColumn(rowId, columnOffset) ||
+                   sheetPolicy.ShouldUseGlobalFallbackRow(rowId) ||
+                   sheetPolicy.SourceRowOverrides.ContainsKey(rowId) ||
+                   sheetPolicy.GetColumnRemap(rowId, columnOffset).Mode != ColumnRemapMode.Default;
+        }
+
+        // Entries no page reached (row not in the target sheet, or col not a string column) are stale.
+        private void ReportUnvisitedSupplementEntries(string sheetName, SupplementSheet supplement, StreamWriter diagnostics)
+        {
+            if (supplement == null)
+            {
+                return;
+            }
+
+            List<SupplementEntry> unvisited = supplement.Unvisited();
+            _report.SupplementStale += unvisited.Count;
+            for (int i = 0; i < unvisited.Count; i++)
+            {
+                WriteDiagnostic(
+                    diagnostics,
+                    sheetName,
+                    "-",
+                    "supplement-stale",
+                    0, 0, 0, 0, 0,
+                    "row=" + unvisited[i].RowId.ToString() + "; col=" + unvisited[i].ColumnOffset.ToString() + "; not in the target sheet");
+            }
+        }
+
         private string ApplyJapaneseTypedWordTildes(string sheetName, ExcelHeader header, ref ExdPatchResult patchResult)
         {
             if (patchResult == null ||
                 !patchResult.Changed ||
                 !string.Equals(_options.TargetLanguage, "ja", StringComparison.OrdinalIgnoreCase) ||
-                !IsTypedWordSheet(sheetName))
+                !TypedWordText.IsTypedWordSheet(sheetName))
             {
                 return string.Empty;
             }
 
-            byte[] fullwidthTilde = Encoding.UTF8.GetBytes("\uFF5E");
-            ExcelDataFile page = ExcelDataFile.Parse(patchResult.Data);
-            List<int> stringColumns = header.GetStringColumnIndexes();
-            int words = 0;
-            for (int stringIndex = 0; stringIndex < stringColumns.Count; stringIndex++)
-            {
-                Dictionary<uint, byte[]> replacements = new Dictionary<uint, byte[]>();
-                for (int rowIndex = 0; rowIndex < page.Rows.Count; rowIndex++)
-                {
-                    ExcelDataRow row = page.Rows[rowIndex];
-                    byte[] word = page.GetStringBytes(row, header, stringColumns[stringIndex]);
-                    if (word == null ||
-                        Array.IndexOf(word, (byte)'~') < 0 ||
-                        Array.IndexOf(word, (byte)0x02) >= 0 ||
-                        !ExdStringPatcher.ContainsHangul(word))
-                    {
-                        continue;
-                    }
-
-                    List<byte> replaced = new List<byte>(word.Length + 4);
-                    for (int i = 0; i < word.Length; i++)
-                    {
-                        if (word[i] == (byte)'~')
-                        {
-                            replaced.AddRange(fullwidthTilde);
-                        }
-                        else
-                        {
-                            replaced.Add(word[i]);
-                        }
-                    }
-
-                    replacements[row.RowId] = replaced.ToArray();
-                }
-
-                if (replacements.Count > 0)
-                {
-                    page = ExcelDataFile.Parse(ExdRowRewriter.RewriteStringColumn(header, page, stringColumns[stringIndex], replacements));
-                    words += replacements.Count;
-                }
-            }
-
-            if (words == 0)
-            {
-                return string.Empty;
-            }
-
-            patchResult.Data = page.Data;
-            return "fullwidth-tilde words=" + words.ToString();
+            int words;
+            patchResult.Data = TypedWordText.UseJapaneseTildes(header, patchResult.Data, out words);
+            _report.TypedWordTildes += words;
+            return words == 0 ? string.Empty : "fullwidth-tilde words=" + words.ToString();
         }
 
         private static int CountChangedRows(ExcelHeader header, List<int> stringColumns, ExcelDataFile clean, ExcelDataFile patched)
@@ -1531,19 +1516,6 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
             return sourceExds;
         }
 
-        private static bool IsTypedWordSheet(string sheetName)
-        {
-            for (int i = 0; i < TypedWordSheets.Length; i++)
-            {
-                if (TypedWordSheets[i].IsMatch(sheetName))
-                {
-                    return true;
-                }
-            }
-
-            return false;
-        }
-
         private void ApplyGlobalTargetSourceRows(
             string sheetName,
             ExcelHeader globalHeader,
@@ -1623,7 +1595,8 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
             bool allowRowKeyFallback,
             PatchSheetPolicy sheetPolicy,
             TextSheetScopePolicy textSheetScopePolicy,
-            RsvStringResolver rsvResolver)
+            RsvStringResolver rsvResolver,
+            SupplementSheet supplement)
         {
             if (!IsDiagnosticCsvRequested(sheetName))
             {
@@ -1698,6 +1671,26 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
                         if (ContainsRsvToken(selectedBytes))
                         {
                             note = string.IsNullOrEmpty(note) ? "rsv" : note + "; rsv";
+                        }
+
+                        // The supplement runs after the Korean patch; report its decision as the selection.
+                        if (supplement != null &&
+                            supplement.Manages(column.Offset) &&
+                            string.Equals(action, "replace", StringComparison.Ordinal) &&
+                            !IsSupplementSkipped(sheetPolicy, textSheetScopePolicy, targetRow.RowId, column.Offset))
+                        {
+                            byte[] beforeSupplement = selectedBytes ?? new byte[0];
+                            SupplementCell cell = supplement.Resolve(targetRow.RowId, column.Offset, beforeSupplement, globalBytes ?? new byte[0], _options.TargetLanguage);
+                            string supplementNote = cell.Applied
+                                ? "supplement-applied"
+                                : cell.HasIssue
+                                    ? "supplement-" + cell.Issue.ToString().ToLowerInvariant()
+                                    : ExdStringPatcher.BytesEqual(cell.Selected, beforeSupplement) ? string.Empty : "supplement-restored";
+                            selectedBytes = cell.Selected;
+                            if (supplementNote.Length > 0)
+                            {
+                                note = string.IsNullOrEmpty(note) ? supplementNote : note + "; " + supplementNote;
+                            }
                         }
 
                         WriteDiagnosticCsvRow(

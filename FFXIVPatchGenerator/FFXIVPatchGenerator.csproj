@@ -60,6 +60,7 @@
     <Compile Include="SayQuestPhraseLocalizer.cs" />
     <Compile Include="ExdRowRewriter.cs" />
     <Compile Include="SupplementTranslations.cs" />
+    <Compile Include="TypedWordText.cs" />
   </ItemGroup>
   <ItemGroup>
     <EmbeddedResource Include="Supplements\*.tsv">

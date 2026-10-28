@@ -1268,7 +1268,7 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
             return true;
         }
 
-        internal static bool ContainsHangul(byte[] bytes)
+        private static bool ContainsHangul(byte[] bytes)
         {
             string text = new UTF8Encoding(false, false).GetString(bytes);
             for (int i = 0; i < text.Length; i++)

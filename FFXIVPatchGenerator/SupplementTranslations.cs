@@ -73,12 +73,28 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
         }
     }
 
+    // The text a managed cell ends up with and what the sheet reports for it.
+    internal sealed class SupplementCell
+    {
+        public byte[] Selected;
+        public bool Applied;
+        public bool HasIssue;
+        public SupplementIssueKind Issue;
+
+        public void SetIssue(bool hasIssue, SupplementIssueKind issue)
+        {
+            HasIssue = hasIssue;
+            Issue = issue;
+        }
+    }
+
     internal sealed class SupplementSheet
     {
         public const string Header = "row\tcol\tja\ten\tko\tsource\tnote";
 
         private readonly Dictionary<ulong, SupplementEntry> _entries = new Dictionary<ulong, SupplementEntry>();
         private readonly HashSet<ushort> _columns = new HashSet<ushort>();
+        private readonly HashSet<ulong> _visited = new HashSet<ulong>();
 
         public int Count
         {
@@ -149,6 +165,72 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
             return sheet;
         }
 
+        public bool Manages(ushort columnOffset)
+        {
+            return _columns.Contains(columnOffset);
+        }
+
+        // Entries no applied page has reached: the row is not in the target sheet, or `col` is not one
+        // of its string columns.
+        public List<SupplementEntry> Unvisited()
+        {
+            List<SupplementEntry> entries = new List<SupplementEntry>();
+            foreach (KeyValuePair<ulong, SupplementEntry> pair in _entries)
+            {
+                if (!_visited.Contains(pair.Key))
+                {
+                    entries.Add(pair.Value);
+                }
+            }
+
+            entries.Sort(delegate(SupplementEntry left, SupplementEntry right)
+            {
+                return left.RowId != right.RowId
+                    ? left.RowId.CompareTo(right.RowId)
+                    : left.ColumnOffset.CompareTo(right.ColumnOffset);
+            });
+            return entries;
+        }
+
+        // Decides one managed cell. patched is the cell after the Korean patch, target the clean target
+        // cell. Shared by Apply and the diagnostic CSV so both report the same text.
+        public SupplementCell Resolve(uint rowId, ushort columnOffset, byte[] patched, byte[] target, string targetLanguage)
+        {
+            SupplementEntry entry;
+            _entries.TryGetValue(Key(rowId, columnOffset), out entry);
+            SupplementCell cell = new SupplementCell { Selected = target };
+            if (SupplementTranslations.ContainsHangul(patched))
+            {
+                cell.Selected = patched;
+                cell.SetIssue(entry != null, SupplementIssueKind.Official);
+                return cell;
+            }
+
+            string expected = entry == null ? string.Empty : entry.TextFor(targetLanguage);
+            if (target.Length == 0)
+            {
+                // The entry was written for text the target no longer has.
+                cell.SetIssue(expected.Length > 0, SupplementIssueKind.Stale);
+                return cell;
+            }
+
+            if (entry == null)
+            {
+                cell.SetIssue(true, SupplementIssueKind.Missing);
+            }
+            else if (string.Equals(expected, Encoding.UTF8.GetString(target), StringComparison.Ordinal))
+            {
+                cell.Selected = Encoding.UTF8.GetBytes(entry.Korean);
+                cell.Applied = true;
+            }
+            else
+            {
+                cell.SetIssue(true, SupplementIssueKind.Stale);
+            }
+
+            return cell;
+        }
+
         // Applies the sheet to a patched page. Only string columns that have entries are managed;
         // other columns (a reading, for example) keep the patched text. skipCell returns true for cells
         // the patch must leave as they are (base-language scope, patch-policy rows and columns).
@@ -177,55 +259,42 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
                 for (int rowIndex = 0; rowIndex < page.Rows.Count; rowIndex++)
                 {
                     ExcelDataRow row = page.Rows[rowIndex];
+                    _visited.Add(Key(row.RowId, columnOffset));
                     if (skipCell != null && skipCell(row.RowId, columnOffset))
                     {
                         continue;
                     }
 
-                    SupplementEntry entry;
-                    _entries.TryGetValue(Key(row.RowId, columnOffset), out entry);
                     byte[] patched = page.GetStringBytes(row, header, columnIndex) ?? new byte[0];
-                    if (ContainsHangul(patched))
-                    {
-                        if (entry != null)
-                        {
-                            result.Issues.Add(Issue(SupplementIssueKind.Official, row.RowId, columnOffset, patched));
-                        }
-
-                        continue;
-                    }
-
                     byte[] target = cleanTarget.GetStringBytes(row.RowId, header, columnIndex) ?? new byte[0];
-                    byte[] selected = target;
-                    if (target.Length > 0)
+                    SupplementCell cell = Resolve(row.RowId, columnOffset, patched, target, targetLanguage);
+                    if (cell.HasIssue)
                     {
-                        string targetText = Encoding.UTF8.GetString(target);
-                        if (entry == null)
+                        result.Issues.Add(new SupplementIssue
                         {
-                            result.Issues.Add(Issue(SupplementIssueKind.Missing, row.RowId, columnOffset, target));
-                        }
-                        else if (string.Equals(entry.TextFor(targetLanguage), targetText, StringComparison.Ordinal))
-                        {
-                            selected = Encoding.UTF8.GetBytes(entry.Korean);
-                            result.Applied++;
-                        }
-                        else
-                        {
-                            result.Issues.Add(Issue(SupplementIssueKind.Stale, row.RowId, columnOffset, target));
-                        }
+                            Kind = cell.Issue,
+                            RowId = row.RowId,
+                            ColumnOffset = columnOffset,
+                            TargetText = Encoding.UTF8.GetString(cell.Issue == SupplementIssueKind.Official ? patched : target),
+                        });
                     }
 
-                    if (BytesEqual(selected, patched))
+                    if (cell.Applied)
+                    {
+                        result.Applied++;
+                    }
+
+                    if (BytesEqual(cell.Selected, patched))
                     {
                         continue;
                     }
 
-                    if (ReferenceEquals(selected, target))
+                    if (!cell.Applied)
                     {
                         result.Restored++;
                     }
 
-                    replacements[row.RowId] = selected;
+                    replacements[row.RowId] = cell.Selected;
                 }
 
                 if (replacements.Count > 0)
@@ -238,37 +307,9 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
             return changed ? page.Data : patchedPage;
         }
 
-        private static SupplementIssue Issue(SupplementIssueKind kind, uint rowId, ushort columnOffset, byte[] text)
-        {
-            return new SupplementIssue
-            {
-                Kind = kind,
-                RowId = rowId,
-                ColumnOffset = columnOffset,
-                TargetText = Encoding.UTF8.GetString(text),
-            };
-        }
-
         private static ulong Key(uint rowId, ushort columnOffset)
         {
             return ((ulong)rowId << 16) | columnOffset;
-        }
-
-        internal static bool ContainsHangul(byte[] bytes)
-        {
-            string text = new UTF8Encoding(false, false).GetString(bytes);
-            for (int i = 0; i < text.Length; i++)
-            {
-                char ch = text[i];
-                if ((ch >= '\uAC00' && ch <= '\uD7A3') ||
-                    (ch >= '\u1100' && ch <= '\u11FF') ||
-                    (ch >= '\u3130' && ch <= '\u318F'))
-                {
-                    return true;
-                }
-            }
-
-            return false;
         }
 
         private static bool BytesEqual(byte[] left, byte[] right)
@@ -299,6 +340,23 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
         public static string ResourceNameFor(string sheetName)
         {
             return ResourcePrefix + sheetName.Replace('/', '_') + ".tsv";
+        }
+
+        public static bool ContainsHangul(byte[] bytes)
+        {
+            string text = new UTF8Encoding(false, false).GetString(bytes);
+            for (int i = 0; i < text.Length; i++)
+            {
+                char ch = text[i];
+                if ((ch >= '\uAC00' && ch <= '\uD7A3') ||
+                    (ch >= '\u1100' && ch <= '\u11FF') ||
+                    (ch >= '\u3130' && ch <= '\u318F'))
+                {
+                    return true;
+                }
+            }
+
+            return false;
         }
 
         // Returns the embedded supplement of a sheet, or null when the sheet has none.

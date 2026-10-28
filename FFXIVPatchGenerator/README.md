@@ -123,11 +123,13 @@ UI 이미지는 아홉 번째 EXD 텍스트 범위가 아닙니다. `custom`에�
 `Supplements/<sheet>.tsv`는 한국 클라이언트에 한국어가 없는 셀의 번역입니다. 빌드할 때 생성기 exe에 `Supplements/<sheet>.tsv` 리소스로 내장됩니다(sheet 경로의 `/`는 `_`). UTF-8 TSV이고 첫 줄은 `row	col	ja	en	ko	source	note`입니다.
 
 - `col`: 문자열 열 offset. 시트에 항목이 있는 열만 처리합니다.
-- `ja`/`en`: 번역 당시의 JA/EN 원문. 대상 원문이 해당 언어 칸과 같을 때만 `ko`를 씁니다. 게임 업데이트로 원문이 바뀌면 원문을 유지하고 `supplement-stale`로 진단합니다.
-- 처리 열에서 한국 텍스트에 한글이 없으면 한국 텍스트(번역되지 않은 일본어 등)를 쓰지 않고 대상 원문을 유지합니다. 한국 공식 한글이 있으면 시트 항목보다 우선하며, 해당 항목은 `supplement-official`로 진단해 지울 수 있게 합니다.
+- `ja`/`en`: 번역 당시의 JA/EN 원문. 대상 원문이 해당 언어 칸과 같을 때만 `ko`를 씁니다. 대상 원문이 바뀌었거나 비었을 때, row가 대상 sheet에 없거나 `col`이 문자열 열이 아닐 때는 원문을 유지하고 `supplement-stale`로 진단합니다.
+- 처리 열에서 한국 텍스트에 한글이 없으면 한국 텍스트(번역되지 않은 일본어 등)를 쓰지 않고 대상 원문을 유지합니다. 이렇게 되돌린 결과 원문과 같아진 page는 출력에 쓰지 않습니다. 한국 공식 한글이 있으면 시트 항목보다 우선하며, 해당 항목은 `supplement-official`로 진단해 지울 수 있게 합니다.
 - 한국어가 없는데 항목도 없는 셀은 `supplement-missing`으로 진단합니다. 진단 행의 note에 row, col, 대상 원문이 있습니다.
+- 실행 요약에 `Supplement applied/restored/official/stale/missing`, `Typed word tildes`를 출력하고, UI 결과창에도 적용·공식·원문 변경·없음 수를 표시합니다.
+- `--diagnostic-csv`는 처리 열의 선택 문자열을 시트 적용 결과로 기록하고 note에 `supplement-applied`/`-restored`/`-official`/`-stale`/`-missing`을 남깁니다. JA 물결 변환은 CSV에 반영하지 않습니다.
 - `source`: `kr-row:<row>`(한국 전용 행의 공식 문구), `kr-term`(같은 시트 한국 공식 표기 조합), `ffxiv-kr`(FFXIV 한국판 다른 시트 표기), `ff7r-ko`(FF7 리메이크 시리즈 한국어판 표기), `community`(커뮤니티 통용 표기), `project`(직접 번역). 근거 행·시트·URL은 `note`에 적습니다.
-- 입력 단어 시트는 한국어 키보드로 입력할 수 있는 문자(한글, 영숫자, 공백, `, . ! ? - ' &`)만 씁니다. `~`는 한국 클라이언트 문구에서 온 경우만 허용합니다. `Scripts\test-supplements.ps1`이 이 규칙과 형식을 검사합니다.
+- 입력 단어 시트(`TypedWordText`)는 한국어 키보드로 입력할 수 있는 문자(한글, 영숫자, 공백, `, . ! ? - ' &`)만 씁니다. `~`는 한국 클라이언트 문구에서 온 경우만 허용합니다. `Scripts\test-supplements.ps1`이 이 규칙과 형식을 검사합니다.
 
 ## 진단과 정책 파일
 
