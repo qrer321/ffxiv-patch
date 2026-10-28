@@ -20,20 +20,20 @@ row	col	ja	en	ko	source	note
 64	0	マテリアちょうだい！	マテリアちょうだい！	마테리아 줘!	ffxiv-kr	Addon#2456; 문형: 엘릭서 줘!(38) 등 한국판 11행
 67	0	ハチマキちょうだい！	Gimme a headband!	머리띠 줘!	kr-term	glossary 1157; 문형: 엘릭서 줘!(38) 등 한국판 11행
 68	0	源氏の小手ちょうだい！	源氏の小手ちょうだい！	겐지의 토시 줘!	kr-term	glossary 1196; 문형: 엘릭서 줘!(38) 등 한국판 11행
-70	0	星の悲鳴が聞こえねえか、クラウドさんよ！	星の悲鳴が聞こえねえか、クラウドさんよ！	별의 비명이 안 들리냐, 클라우드 씨!	kr-term	insheet 星の悲鳴=별의 비명; クラウドさん=클라우드 씨 (171)
+70	0	星の悲鳴が聞こえねえか、クラウドさんよ！	星の悲鳴が聞こえねえか、クラウドさんよ！	별의 비명이 안 들리냐, 클라우드 씨!	kr-term	glossary 13 星の悲鳴=별의 비명; 171 クラウドさん=클라우드 씨
 112	0	マイフレンド	マイフレンド	마이 프렌드	kr-term	glossary 114 마이 프렌드
 116	0	華麗な運転でわたしを酔わせてくれる？	華麗な運転でわたしを酔わせてくれる？	화려한 운전으로 나를 취하게 해 주겠나?	project	Roche line; tone from glossary 115
 140	0	サム	サム	샘	kr-term	glossary 1767 초코보 샘
 141	0	マム	マム	맘	kr-term	glossary 477 마담 맘
-151	0	ほひ～！	ほひ～！	호히~!	kr-row:1794	한국판 전용 문구
-169	0	本当の美しさは心持ち次第	本当の美しさは心持ち次第	아름다움에 성별은 상관없다	kr-row:1793	한국판 전용 문구
+151	0	ほひ～！	ほひ～！	호히~!	kr-row:1794	한국판 전용 행(JA·EN 없음)의 같은 대사
+169	0	本当の美しさは心持ち次第	本当の美しさは心持ち次第	아름다움에 성별은 상관없다	kr-row:1793	한국판 전용 행(JA·EN 없음)의 같은 대사로 판단
 173	0	感想はいらない、他に方法が無かった	感想はいらない、他に方法が無かった	감상은 필요 없다, 다른 방법이 없었다	project	direct translation
 184	0	ベティ	ベティ	베티	project	transliteration
-189	0	でも家族がそろえば、そこがおうちだよ？	でも家族がそろえば、そこがおうちだよ？	가족이 함께 있으면 그곳이 집 아닐까?	kr-row:1822	한국판 전용 문구
-230	0	星より生まれ、星と語り、星を開く	星より生まれ、星と語り、星を開く	별에서 태어나 별과 대화하고 별을 개척한다	kr-term	glossary 1826 (KR-only row: 우리는 별에서 태어나 별과 대화하고 별을 개척한다)
+189	0	でも家族がそろえば、そこがおうちだよ？	でも家族がそろえば、そこがおうちだよ？	가족이 함께 있으면 그곳이 집 아닐까?	kr-row:1822	한국판 전용 행(JA·EN 없음)의 같은 대사
+230	0	星より生まれ、星と語り、星を開く	星より生まれ、星と語り、星を開く	우리는 별에서 태어나 별과 대화하고 별을 개척한다	kr-row:1826	한국판 전용 행(JA·EN 없음)의 같은 대사
 235	0	感傷で曇った目には、なにも見えまい	感傷で曇った目には、なにも見えまい	감상에 흐려진 눈에는 아무것도 보이지 않겠지	project	direct translation
 239	0	でも自由はこわいよね、まるで空みたい	でも自由はこわいよね、まるで空みたい	그치만 자유는 무서워, 꼭 하늘 같아	ff7r-ko	https://namu.wiki/w/에어리스 게인즈버러(파이널 판타지 VII 리메이크) quotes in-game line; matches glossary 1758 꼭 하늘 같아; 、 kept as comma
-240	0	どんなときでもソルジャーの誇りは手放すな	どんなときでもソルジャーの誇りは手放すな	솔저의 긍지를 잃지 마라!	kr-row:1757	한국판 전용 문구
+240	0	どんなときでもソルジャーの誇りは手放すな	どんなときでもソルジャーの誇りは手放すな	솔저의 긍지를 잃지 마라!	kr-row:1757	JA에 없는 행(EN: Protect your honor as a SOLDIER!)의 한국판 문구
 243	0	ゾンダー	ゾンダー	존더	kr-term	glossary 1760 존더 촌장
 263	0		Deepground SOLDIER	딥그라운드 솔저	project	SOLDIER=솔저 (glossary 9); Deepground transliterated
 269	0	セブンスヘブンの看板娘	The Star of Seventh Heaven	세븐스 헤븐의 간판 아가씨	kr-term	glossary 102 세븐스 헤븐; 看板娘=간판 아가씨
@@ -50,7 +50,7 @@ row	col	ja	en	ko	source	note
 280	0	神羅のテーマ	Shinra's Theme	신라의 테마	kr-term	glossary 1 신라
 281	0	からっぽの空	Hollow Skies	텅 빈 하늘	project	からっぽの空
 282	0	鉄クズ迷路	Maze of Scrap Metal	고철 미로	project	鉄クズ迷路
-283	0	神羅魂	Shinra Creed	신라 혼	kr-term	glossary 1 신라; 魂=혼
+283	0	神羅魂	Shinra Creed	신라 정신	kr-term	glossary 1 神羅=신라; 642 アバランチ魂=아발란치 정신
 284	0	反神羅の火	Fires of Resistance	반신라의 불꽃	kr-term	glossary 1 신라
 285	0	お先まっくら	Darkness Ahead	앞날이 캄캄	project	お先まっくら
 286	0	スイート・ハニー	The Sweetest Honey	스위트 허니	project	음차
@@ -62,7 +62,7 @@ row	col	ja	en	ko	source	note
 292	0	エアリスのテーマ	Aerith's Theme	에어리스의 테마	kr-term	glossary 74 에어리스
 293	0	片翼の天使	One-Winged Angel	한쪽 날개의 천사	community	나무위키 https://namu.wiki/w/%ED%95%9C%EC%AA%BD%20%EB%82%A0%EA%B0%9C%EC%9D%98%20%EC%B2%9C%EC%82%AC
 294	0	ライブラリフロア	Corporate Archives	라이브러리 플로어	project	음차
-295	0	あちこち盛られて	A Certain Gaudiness	여기저기 부풀려서	project	あちこち盛られて(드레스업 장면)
+295	0	あちこち盛られて	A Certain Gaudiness	여기저기 꾸며져서	project	盛られる=치장되다(드레스업 장면); EN A Certain Gaudiness
 296	0	鋼鉄の大地	Shining Beacon of Civilization	강철의 대지	project	直訳
 297	0	スピードジャンキー	Speed Demon	스피드 정키	project	음차
 299	0	ランデブーポイント	The Rendezvous Point	랑데부 포인트	kr-term	glossary 984 윌리로 랑데부
@@ -72,13 +72,13 @@ row	col	ja	en	ko	source	note
 303	0	くすぶりの逃走	Under Cover of Smoke	연기 속의 도주	project	くすぶりの逃走
 304	0	ワイルド・デ・チョコボ	Wild de Chocobo	와일드 데 초코보	kr-term	RULES 패턴 X 데 초코보, glossary 149
 305	0	マッスルな者達	The Most Muscular	머슬한 자들	kr-term	glossary 988 머슬 콜로세움
-306	0	真夜中のまちぶせ	Midnight Rendezvous	한밤중의 매복	project	真夜中のまちぶせ
+306	0	真夜中のまちぶせ	Midnight Rendezvous	한밤의 매복	kr-term	glossary 646 真夜中の疾走=한밤의 질주; まちぶせ=매복
 307	0	狂気の培養	Cultivating Madness	광기의 배양	project	直訳
 308	0	すりつぶねじりキル	すりつぶねじりキル	으깨 쥐어뜯어 킬	kr-term	glossary 156 으깨 버린다, 164 쥐어뜯어 버릴까
 309	0	永遠のかくれんぼ	Waiting to Be Found	영원한 숨바꼭질	kr-term	glossary 187 숨바꼭질
 310	0	3秒後を悔いろ	Any Last Words?	3초 후를 후회해라	project	3秒後を悔いろ
 311	0	星に選ばれし者	Those Chosen by the Planet	별에게 선택받은 자	kr-term	glossary 1505 선택받은 자
-312	0	コルネオ杯開幕	Tonight's Corneo Cup	코르네오 컵 개막	project	杯は glossary 없음; Tonight's Corneo Cup
+312	0	コルネオ杯開幕	Tonight's Corneo Cup	코르네오배 개막	project	glossary 142 コルネオ=코르네오; 대회명 X杯=X배
 313	0	教会に咲く花	Flowers Blooming in the Church	교회에 핀 꽃	project	教会に咲く花
 314	0	変な顔しちゃって	The Look on Her Face	이상한 표정 짓고는	project	変な顔しちゃって
 315	0	トロトロの甘い夜	An Unforgettable Night	녹아내리는 달콤한 밤	project	トロトロの甘い夜
@@ -94,7 +94,7 @@ row	col	ja	en	ko	source	note
 326	0	断罪の処刑マシン	Electric Executioners	단죄의 처형 머신	project	断罪の処刑マシン
 327	0	給水塔の約束	A Tower, a Promise	급수탑의 약속	kr-term	glossary 1489 급수탑 광장
 328	0	神羅社員の日常	Another Day at Shinra HQ	신라 사원의 일상	kr-term	glossary 1 신라
-329	0	ここであったが百年目	Just Desserts	여기서 만난 게 운의 끝	project	ここであったが百年目 관용구
+329	0	ここであったが百年目	Just Desserts	여기서 만났으니 끝장이다	project	ここであったが百年目 관용구(만난 이상 끝장)
 330	0	父ちゃん、いってらっしゃい	Daughter's Farewell	아빠, 다녀오세요	kr-term	glossary 107 아빠, 어서 오세요! 형식
 331	0	エアリス救出作戦	エアリス救出作戦	에어리스 구출 작전	kr-term	glossary 74 에어리스, 420 작전
 332	0	ルーファウス社長就任	ルーファウス社長就任	루퍼스 사장 취임	kr-term	glossary 211 루퍼스, 1564 사장 취임
@@ -141,16 +141,16 @@ row	col	ja	en	ko	source	note
 373	0	チョコボ車を追って	Girl in the Chocobo Carriage	초코보 마차를 쫓아서	kr-term	glossary 149 초코보
 374	0	教会の逃走劇	Fleeing the Church	교회의 도주극	project	教会の逃走劇
 375	0	崩落した七番街	Sector 7 in Ruins	붕괴된 7번가	kr-term	glossary 532 7번가
-376	0	神羅バトルシミュレーター	Shinra Combat Simulator	신라 배틀 시뮬레이터	kr-term	glossary 1 신라
+376	0	神羅バトルシミュレーター	Shinra Combat Simulator	신라 배틀 시뮬레이터	ff7r-ko	https://funkygame.tistory.com/1350 FF7R 한국어판 공략 콘텐츠명 신라 배틀 시뮬레이터
 377	0	この一瞬を大切に	Every Moment Matters	이 순간을 소중히	project	この一瞬を大切に
 378	0	悲鳴で歌い、恐怖で踊れ	Chorus of Pain, Dance of Death	비명으로 노래하고 공포로 춤춰라	project	、는 쉼표 없이 처리
 379	0	突然の犯行予告	Unexpected Threat	갑작스러운 범행 예고	project	突然の犯行予告
-380	0	不協和音	Dissonance	불협화음	ffxiv-kr	Action 불협화음 (ffxiv_kr_exact)
+380	0	不協和音	Dissonance	불협화음	ffxiv-kr	Action#5543
 381	0	闇の深淵	The Abyss	어둠의 심연	project	闇の深淵
 382	0	歓喜の叫び	The Throes of Rapture	환희의 외침	project	歓喜の叫び
 383	0	ソノンのテーマ	Sonon's Theme	소논의 테마	kr-term	glossary 426 소논
 384	0	雷帝ラムウ	Ramuh, Lord of Levin	뇌제 라무	kr-term	glossary 249 라무
-385	0	ノー・エクジット	No Escape	노 엑시트	kr-term	glossary 256 노 모그리 형식; 음차
+385	0	ノー・エクジット	No Escape	노 엑시트	project	エクジット=엑시트 음차; ・ 처리는 glossary 256 노 모그리
 386	0	狩りの宣告	Commence the Cleansing	사냥의 선고	kr-term	glossary 1471 운명의 선고
 387	0	闇の囁き	Murmurs from the Darkness	어둠의 속삭임	project	闇の囁き
 389	0	この指とまれ	The Sky's the Limit	여기 여기 붙어라	project	この指とまれ 대응 한국 놀이 구호
@@ -159,7 +159,7 @@ row	col	ja	en	ko	source	note
 392	0	コルネオズビート	Lackey Beatdown	코르네오즈 비트	kr-term	glossary 142 코르네오
 393	0	ほっとけないよ！	Gotta Do Something!	그냥 둘 수 없어!	project	ほっとけない 의역
 394	0	報復の誓い	Revenge Sworn	보복의 맹세	project	誓い=맹세
-396	0	死への序曲	Prelude to Death	죽음으로의 서곡	project	일본어 원문 직역
+396	0	死への序曲	Prelude to Death	죽음의 서곡	project	死への序曲; 한국어 관용 표현 죽음의 서곡
 397	0	メルフィのもとへ	Seeing Melphie Again	멜피에게로	kr-term	268 メルフィ=멜피
 398	0	ユフィ参上！	Your Girl Finally Made It	유피 등장!	kr-term	425 유피; 参上=등장
 399	0	漆黒の闇ネロ	Nero, the Sable	칠흑의 어둠 네로	kr-term	248 네로
@@ -172,20 +172,20 @@ row	col	ja	en	ko	source	note
 406	0	瞳ににじむ災禍	Facing Disaster	눈동자에 번지는 재앙	project	일본어 원문 직역
 407	0	シノビれず、レブリコン	Good Morning, Levrikon?	시노비 실패, 레브리콘	kr-term	1682 시노비; 489 레브리콘; シノビれず(忍べず 말장난)=시노비 실패
 408	0	マテリア製造フロア	Materia Production	마테리아 제조 플로어	project	マテリア 표기는 671 궁극 마테리아
-409	0	サディスティックライド	Sadistic Test Run	새디스틱 라이드	project	음차
+409	0	サディスティックライド	Sadistic Test Run	사디스틱 라이드	project	サディスティック=사디스틱(사디즘·사디스트 통용 표기); ライド=라이드(glossary 702)
 410	0	アバランチ本家のテーマ	Avalanche HQ's Theme	아발란치 본파의 테마	kr-term	아발란치(RULES); 本家=본파(분파와 대비)
 411	0	屈辱のエレベーター	Salt in the Wound	굴욕의 엘리베이터	project	일본어 원문 직역
 412	0	スカーレットの冷笑	Cruelty Personified	스칼렛의 냉소	kr-term	134 스칼렛
 413	0	ペインリアリティマックス	ペインリアリティマックス	페인 리얼리티 맥스	project	음차
-414	0	ぬきあしさしあしシノビアシ	Quiet as a Mouse	살금살금 조심조심 시노비답게	kr-row:1761	한국판 전용 문구
+414	0	ぬきあしさしあしシノビアシ	Quiet as a Mouse	살금살금 조심조심 시노비답게	kr-row:1761	한국판 전용 행(JA·EN 없음)의 같은 대사
 415	0	神羅兵器開発部門	Advanced Weaponry	신라 병기 개발 부문	kr-term	1 신라; 221 병기 개발 부문
 416	0	兵器実験クオリファイ	Rolling Out the Red Carpet	병기 실험 퀄리파이	kr-term	221 병기; クオリファイ 음차
 417	0	究極マテリアの影	The Shadow of Materia	궁극 마테리아의 그림자	kr-term	671 궁극 마테리아
 418	0	ディープグラウンドソルジャー	Deepground SOLDIERs	딥그라운드 솔저	kr-term	9 솔저
 419	0	純白の帝王ヴァイス	Weiss, the Immaculate	순백의 제왕 바이스	kr-term	254 바이스
-421	0	人生は終わりのない迷路だぜ	人生は終わりのない迷路だぜ	인생은 끝이 없는 미로라고	kr-row:1765	한국판 전용 문구
-424	0	ギル	gil	길	ffxiv-kr	Item#1
-497	0	チョコボ・サム	チョコボ・サム	초코보 샘	kr-row:1767	한국판 전용 문구
+421	0	人生は終わりのない迷路だぜ	人生は終わりのない迷路だぜ	인생은 끝이 없는 미로라고	kr-row:1765	JA에 없는 행(EN: Life in the Endless Maze)의 한국판 문구
+424	0	ギル	gil	길	ffxiv-kr	Item#1; 한국판 이 시트는 문장 안에서 GIL(1674)을 쓰지만 단독 단어는 한글 표기 유지
+497	0	チョコボ・サム	チョコボ・サム	초코보 샘	kr-row:1767	JA에 없는 행(EN: Chocobo Sam)의 한국판 문구
 512	0	プレリュード	The Prelude	전주곡	ffxiv-kr	Addon#16291
 513	0	スラムのドン	Don of the Slums	슬럼의 돈	kr-term	85 슬럼; 496 돈 코르네오
 520	0	闇に潜む	Lurking in the Darkness	어둠 속에 숨어	project	일본어 원문 직역
@@ -194,12 +194,12 @@ row	col	ja	en	ko	source	note
 581	0	エレキ・デ・チョコボ	Electric de Chocobo	일렉 데 초코보	kr-term	980/992 X 데 초코보 패턴
 582	0	ヒップ・デ・チョコボ	Hip Hop de Chocobo	힙 데 초코보	kr-term	980/992 패턴; ja ヒップ 기준
 605	0	ティファのテーマ	Tifa's Theme	티파의 테마	kr-term	3 티파
-606	0	バレットのテーマ	Barret's Theme	바레트의 테마	kr-term	insheet バレット=바레트
-607	0	タークスのテーマ	Turks' Theme	턱스의 테마	kr-term	33 턱스
+606	0	バレットのテーマ	Barret's Theme	바레트의 테마	kr-term	glossary 5 バレット=바레트
+607	0	タークスのテーマ	Turks' Theme	턱스의 테마	kr-term	glossary 130 タークス=턱스
 608	0	ゴールドソーサー	Gold Saucer	골드 소서	kr-term	1625 황금빛 낙원 골드 소서; ffxiv-kr PlaceName#503 동일
 612	0	爆破ミッション	Bombing Mission	폭파 미션	project	일본어 원문 직역
 619	0	旅の途中で	On Our Way	여행 도중에	project	일본어 원문 직역
-620	0	忍びの末裔	Descendant of Shinobi	시노비의 후예	kr-row:1763	한국판 전용 문구
+620	0	忍びの末裔	Descendant of Shinobi	시노비의 후예	kr-row:1763	JA에 없는 행(EN: ninjas)의 한국판 문구
 622	0	闘う者達	Let the Battles Begin!	싸우는 자들	project	일본어 원문 직역
 625	0	ケット・シーのテーマ	Cait Sith's Theme	캐트시의 테마	kr-term	1613 캐트시
 626	0	ミッドガル・ブルース	The Midgar Blues	미드가르 블루스	kr-term	113 미드가르
@@ -220,7 +220,7 @@ row	col	ja	en	ko	source	note
 895	0	ニブル山を目指して	Toward Mt. Nibel	니블산을 향해	kr-term	1490 니블산
 896	0	はりきるソルジャー	Eager SOLDIER	의욕 넘치는 솔저	kr-term	9 솔저
 897	0	もっとはりきるソルジャー	Ever-Eager SOLDIER	더욱 의욕 넘치는 솔저	kr-term	9 솔저
-898	0	クイーンズ・ブラッド	Queen's Blood	퀸즈 블러드	community	https://www.youtube.com/watch?v=bgmpmAX0m5g 한국어판 영상 제목 퀸즈 블러드 카드 바우트
+898	0	クイーンズ・ブラッド	Queen's Blood	퀸즈 블러드	ff7r-ko	https://m.blog.naver.com/terry200/223939003732 FF7 리버스 한국어판 공략 경품명 골드 소서 퀸즈 블러드
 899	0	チョコボ・デ・グラスランド	Grasslands de Chocobo	초코보 데 그래스랜드	kr-term	1521 그래스랜드; 980 패턴
 900	0	チャドリーのテーマ	Chadley's Theme	채들리의 테마	kr-term	491 채들리
 902	0	召喚獣バトル	Summon Entities	소환수 배틀	kr-term	901 소환수
@@ -228,22 +228,22 @@ row	col	ja	en	ko	source	note
 904	0	チョコボ・デ・ジュノン	Junon de Chocobo	초코보 데 주논	kr-term	1512 주논; 980 패턴
 905	0	要塞都市ジュノン	Junon - Fortified Metropolis	요새 도시 주논	kr-term	1512 주논; 664 마황 도시 미드가르 문형
 906	0	ろ・ろ・ろ・ローチェ！	Rah, Rah, Roche!	로 로 로 로체!	kr-term	110 로체
-907	0	クイーンズ・ブラッド・ジャムセッション	Queen's Blood Jam Session	퀸즈 블러드 잼 세션	community	https://www.youtube.com/watch?v=bgmpmAX0m5g 퀸즈 블러드
+907	0	クイーンズ・ブラッド・ジャムセッション	Queen's Blood Jam Session	퀸즈 블러드 잼 세션	project	퀸즈 블러드는 FF7 리버스 한국어판 표기(898); ジャムセッション=잼 세션
 910	0	チョコボ・デ・コレル	Corel de Chocobo	초코보 데 코렐	kr-term	1594 코렐산; 980 패턴
 911	0	ヤッホー！コレル山	Let's Go, Mt. Corel!	야호! 코렐산	kr-term	1594 코렐산
 913	0	終末の空	A Portentous Sky	종말의 하늘	project	일본어 원문 직역
 914	0	シノビ・パルクール	Ninjacrobatics	시노비 파쿠르	kr-term	1682 시노비
 915	0	裏切り者の烙印	Mark of a Traitor	배신자의 낙인	kr-term	1370 낙인
 916	0	ウェルカム・トゥ・ゴールドソーサー	Welcome to the Gold Saucer	웰컴 투 골드 소서	kr-term	1625 골드 소서
-917	0		3D Brawler	3D 배틀러	community	https://www.youtube.com/watch?v=EyQ2Kc8gkCQ 한국어 공략 영상 미니 게임 3D 배틀러; EN 전용 행
+917	0		3D Brawler	3D 배틀러	ff7r-ko	https://m.blog.naver.com/terry200/223939003732 FF7 리버스 한국어판 공략 수집품명 3D 배틀러: 이프리트 모델; EN 전용 행
 919	0	フィドル・デ・チョコボ	Fiddle de Chocobo	피들 데 초코보	kr-term	980 패턴
 923	0	決別の銃弾	Best of Friends Together Again	결별의 총탄	project	일본어 원문 직역
 925	0	憎しみの果て	What Hate Does to a Man	증오의 끝	project	일본어 원문 직역
 926	0	コレル砂漠	Corel Desert	코렐 사막	kr-term	1594 코렐산
 927	0	ゴンガガの森	Jungles of Gongaga	곤가가 숲	kr-term	1651 곤가가 마황로
 928	0	チョコボ・デ・ゴンガガ	Gongaga de Chocobo	초코보 데 곤가가	kr-term	1651 곤가가; 980 패턴
-929	0	ウェポンの呼び声	Weapon's Cry	웨폰의 외침	kr-term	1608 웨폰
-930	0	フィーラーの導き	The Whispers Beckon	필러의 인도	kr-term	필러(RULES)
+929	0	ウェポンの呼び声	Weapon's Cry	웨폰의 부름	kr-term	glossary 1608 ウェポン=웨폰; 呼び声=부름
+930	0	フィーラーの導き	The Whispers Beckon	필러의 인도	kr-term	glossary 77 フィーラー=필러
 932	0	もっと急げ！	Hurry Up!	더 서둘러!	project	일본어 원문 직역
 934	0	チョコボ・デ・コスモ	Cosmo de Chocobo	초코보 데 코스모	kr-term	933 코스모 에어리어; 980 패턴
 938	0	谷を守る戦士	谷を守る戦士	계곡을 지키는 전사	project	888 峡谷の戦士=협곡의 전사 참고
@@ -258,13 +258,13 @@ row	col	ja	en	ko	source	note
 948	0	ビッグブリッヂの死闘	Battle on the Big Bridge	빅 브리지의 사투	kr-term	640 사투
 949	0	マッスルスペシャルマッチ	The Fight for Naming Rights	머슬 스페셜 매치	kr-term	988 머슬 콜로세움
 950	0	サボテンダー・カーニバル	Cacneo Carnival	사보텐더 카니발	kr-term	501 사보텐더
-951	0	ドン・トンベリーズ	Enter the Donberry	돈 톤베리즈	kr-term	723 돈 톤베리
+951	0	ドン・トンベリーズ	Enter the Donberry	돈 톤베리 군단	kr-term	glossary 723 돈 톤베리; 1300 モーグリーズ=모그리 군단
 952	0	ディオ軍団のファンファーレ	Dio's Champions	디오 군단의 팡파르	kr-term	1612 디오
 953	0	ラストボヤージュ	Final Voyage	라스트 보야주	project	음차
-955	0	星の声が聞こえる	Listen to the Cries of the Planet	별의 목소리가 들린다	kr-term	13 별의 비명
+955	0	星の声が聞こえる	Listen to the Cries of the Planet	별의 목소리가 들린다	project	星=별(glossary 13 별의 비명); 声=목소리
 956	0	ライフストリームの迷宮	Labyrinth of the Lifestream	라이프 스트림의 미궁	kr-term	609 라이프 스트림; 623 미궁
 957	0	黒マテリア復活	Revival of the Black Materia	흑 마테리아 부활	kr-term	1687 흑 마테리아
-958	0	エアリスの祈り	Her Final Prayer	에어리스의 기도	kr-term	에어리스(RULES); 435 기도
+958	0	エアリスの祈り	Her Final Prayer	에어리스의 기도	kr-term	glossary 74 エアリス=에어리스; 435 기도
 959	0	リユニオンする世界	Just as Worlds Unite	리유니온하는 세계	kr-term	1715 리유니온하는
 960	0	3人のソルジャー	The Three SOLDIERs	3인의 솔저	kr-term	9 솔저
 961	0	世界は交わり、また別れる	So Too Do They Part	세계는 교차하고 다시 갈라진다	project	、는 띄어쓰기 처리
@@ -282,26 +282,26 @@ row	col	ja	en	ko	source	note
 975	0	オモイノカタチ	Shape of My Love	마음의 형태	project	オモイノカタチ=想いの形
 982	0		G-Bike	G 바이크	project	EN 전용 행; G는 영문자 유지
 986	0	ドルフィンスプリント	Dolphin Show	돌핀 스프린트	kr-term	585 돌핀 블로
-1209	0	盗賊の小手	盗賊の小手	도적의 건틀릿	kr-row:1775	한국판 전용 문구
-1276	0	ギルアップ	Gil Up	길 증가	kr-term	materia list pattern glossary 1277 けいけんちアップ=경험치 증가
+1209	0	盗賊の小手	盗賊の小手	도적의 건틀릿	kr-row:1775	JA에 없는 행(EN: noble thief's gloves)의 한국판 문구
+1276	0	ギルアップ	Gil Up	GIL 증가	ff7r-ko	https://funkygame.tistory.com/1341 FF7R 한국어판 독립 마테리아 GIL 증가; glossary 1674 2000GIL
 1570	0	コスタ	コスタ	코스타	kr-term	glossary 1593 코스타의 영웅 조니
 1586	0	ノエミ	Naomi	노에미	project	JA ノエミ transliteration (EN Naomi)
 1614	0		guide moogle	안내 모그리	project	moogle=모그리 (glossary 251); guide=안내
 1623	0	実験サンプル	Lab rat dog.	실험 샘플	community	https://namu.wiki/w/레드 XIII(파이널 판타지 VII 리메이크) uses 실험 샘플; glossary 1590 실험
 1629	0	不運を恨め	You're outta luck.	불운을 원망해라	project	direct translation of JA
 1632	0	ようこそ、黄金の楽園、ゴールドソーサーへ	ようこそ、黄金の楽園、ゴールドソーサーへ	어서 오세요, 황금빛 낙원 골드 소서로	kr-term	glossary 1625 황금빛 낙원 골드 소서
-1633	0	いまのうちだ、楽しめ、クラウド	いまのうちだ、楽しめ、クラウド	마음껏 즐겨라, 클라우드	kr-row:1827	한국판 전용 문구
+1633	0	いまのうちだ、楽しめ、クラウド	いまのうちだ、楽しめ、クラウド	마음껏 즐겨라, 클라우드	kr-row:1827	한국판 전용 행(JA·EN 없음)의 같은 대사
 1635	0	ヘイ・ユー！みなさんの未来占うで～！	ヘイ・ユー！みなさんの未来占うで～！	헤이 유! 여러분의 미래를 점쳐드리겠습니다~!	kr-term	glossary 1776 헤이 유! + 1777 (KR splits of this JA line); cf https://namu.wiki/w/캐트시(파이널 판타지 VII 리메이크)
-1637	0	無駄な抵抗をやめ、ただちに投降せよ	無駄な抵抗をやめ、ただちに投降せよ	즉시 저항을 멈추고 항복해라	kr-row:1778	한국판 전용 문구
+1637	0	無駄な抵抗をやめ、ただちに投降せよ	無駄な抵抗をやめ、ただちに投降せよ	즉시 저항을 멈추고 항복해라	kr-row:1778	JA에 없는 행(EN: Pull over and exit the vehicle now!)의 한국판 문구
 1643	0	うひょー、もうヤケクソだもんねー！	うひょー、もうヤケクソだもんねー！	으헤헤, 이젠 될 대로 되라지!	kr-term	うひょ=으헤헤 (glossary 204); rest translated
-1707	0	いらっしゃいませ～！	いらっしゃいませ～！	어서 오십쇼~	kr-row:1759	한국판 전용 문구
+1707	0	いらっしゃいませ～！	いらっしゃいませ～！	어서 오십쇼~	kr-row:1759	JA에 없는 행(EN: Come and get it!)의 한국판 문구
 1711	0	このマテリアがきっと、世界を救う	このマテリアがきっと、世界を救う	이 마테리아가 분명 세상을 구할 거야	community	https://namu.wiki/w/클라우드 스트라이프(파이널 판타지 VII 리메이크) quotes 이 마테리아가 세상을 구할 거야; 분명 added for きっと
-1752	0		Come on! Let's push it past the redline!	자, 한계 너머까지 밟아 보자고!	project	EN-only Roche line translated from EN
+1752	0		Come on! Let's push it past the redline!	자! 한계 너머까지 밟아 보자고!	project	EN-only Roche line translated from EN; 원문에 없는 쉼표 제거
 1753	0		Don't be shy, little kitten.	부끄러워하지 마, 새끼 고양아	project	EN-only; kitten wording from glossary 1862 새끼 고양아
-1754	0		Nailed it, I know. Thank you. Moving on.	완벽했지, 알아. 고마워. 다음으로	project	EN-only translated from EN
+1754	0		Nailed it, I know. Thank you. Moving on.	완벽했지, 알아. 고마워. 다음.	project	EN-only translated from EN
 1755	0		Round and round it goes.	빙글빙글 돌아간다	project	EN-only; 빙글빙글 per glossary 1329
 1764	0		Moonlight Thievery	달밤의 대도둑	project	FF7R track JA 月夜の大泥棒 https://video-game-music.net/jp/tracks/019dd8f5-7d88-7139-b739-a3c37f52be9d ; no KR official title found
-1770	0		Mother. I have come for you.	어머니, 데리러 왔어	project	EN-only; 어머니 + 반말 per glossary 227
+1770	0		Mother. I have come for you.	어머니. 데리러 왔어	project	EN-only; 어머니 + 반말 per glossary 227; 원문 마침표 유지
 1771	0		This planet is my birthright.	이 별은 본래 내 것이다	project	EN-only translated from EN
 1772	0		Let that righteous anger guide you.	그 정당한 분노에 몸을 맡겨라	project	EN-only; 분노 per glossary 1705
 1773	0		Let us defy destiny together.	함께 운명에 맞서자	project	EN-only translated from EN
@@ -317,5 +317,5 @@ row	col	ja	en	ko	source	note
 1789	0		Gimme a fury ring!	분노의 반지 줘!	kr-term	glossary 1171
 1791	0		Gimme a dry ether!	에텔 드라이 줘!	kr-term	glossary 1222 dry ether=에텔 드라이
 1792	0		Gimme a moonstone!	문스톤 줘!	kr-term	glossary 1230
-1864	0		Shimmy on over and give daddy some sugar!	어서 와서 아빠 품에 안기렴!	project	EN-only Corneo-style line translated from EN; cf glossary 1862
+1864	0		Shimmy on over and give daddy some sugar!	어서 와서 내 품에 안기렴!	project	EN-only Corneo line; daddy=코르네오 자칭이라 glossary 1862 내 품으로를 따름
 1866	0	四番街プレート	四番街プレート	4번 플레이트	kr-term	glossary 571 (Sector 4 Plate, 4번 플레이트)
