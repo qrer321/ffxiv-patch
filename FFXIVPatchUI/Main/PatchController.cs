@@ -4188,7 +4188,7 @@ namespace FFXIVKoreanPatch.Main
 
         public void RequestTestPatch()
         {
-            StartLocalPatchBuild(true, true, true);
+            StartLocalPatchBuild(SelectionPatchesTextOrUiAssets(), true, true);
         }
 
         public void RequestFullPatch()
@@ -4197,12 +4197,13 @@ namespace FFXIVKoreanPatch.Main
 #if TEST_BUILD
             ShowMessage(ViewMessageKind.Warning, "테스트 빌드에서는 실제 글로벌 서버 클라이언트 폴더에 설치할 수 없어요.");
 #else
-            if (!ConfirmPatchComposition(true))
+            bool includeTextPatch = SelectionPatchesTextOrUiAssets();
+            if (!ConfirmPatchComposition(includeTextPatch))
             {
                 return;
             }
 
-            StartLocalPatchBuild(true, true, false);
+            StartLocalPatchBuild(includeTextPatch, true, false);
 #endif
         }
 
@@ -4279,13 +4280,11 @@ namespace FFXIVKoreanPatch.Main
             List<string> files = new List<string>();
             if (includeTextPatch)
             {
-                if (!preserveBaseStoryText || !preserveBaseBnpcNames || !preserveBaseActionNames ||
-                    !preserveBaseDutyNames || !preserveBaseItemNames || !preserveBasePlaceNames ||
-                    !preserveBaseCommonPhrases || !preserveBaseRemainderText)
+                if (SelectionPatchesText())
                 {
                     files.AddRange(textPatchFiles);
                 }
-                if (!preserveBaseUiAssets || !preserveBaseRemainderText)
+                if (SelectionPatchesUiAssets())
                 {
                     files.AddRange(uiPatchFiles);
                 }
@@ -4297,6 +4296,28 @@ namespace FFXIVKoreanPatch.Main
             }
 
             return files.Distinct(StringComparer.OrdinalIgnoreCase).ToArray();
+        }
+
+        private bool SelectionPatchesText()
+        {
+            return !preserveBaseStoryText || !preserveBaseBnpcNames || !preserveBaseActionNames ||
+                   !preserveBaseDutyNames || !preserveBaseItemNames || !preserveBasePlaceNames ||
+                   !preserveBaseCommonPhrases || !preserveBaseRemainderText;
+        }
+
+        private bool SelectionPatchesUiAssets()
+        {
+            return !preserveBaseUiAssets || !preserveBaseRemainderText;
+        }
+
+        // A selection that keeps every text scope and UI images in the base
+        // language patches nothing but fonts, so it is the font-only patch:
+        // building it as a text patch would add Korean-text font repairs
+        // (lobby Hangul allocation, label scaling) for text that stays in the
+        // base language.
+        private bool SelectionPatchesTextOrUiAssets()
+        {
+            return SelectionPatchesText() || SelectionPatchesUiAssets();
         }
 
         private string[] GetSelectedPatchFiles()

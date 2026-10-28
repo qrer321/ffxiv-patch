@@ -97,7 +97,7 @@ UI가 release 폴더를 적용할 때는 별도로 `manifest.json`을 생성해 
 - `story`: 임무 중 대사·목표 범위만 한국어로 라우팅하고 나머지 7개 범위는 대상 베이스 언어 원문을 유지합니다. 이미지형 UI까지 한국어로 바뀌지 않도록 `060000` UI 텍스처 생성도 제외합니다.
 - `custom`: 8개 범위의 결과를 `--text-scope-outcomes`로 모두 지정합니다. 형식은 `story=ko,bnpc=base,actions=ko,duty=base,item=base,place=base,common=base,remainder=base`입니다.
 
-UI 이미지는 아홉 번째 EXD 텍스트 범위가 아닙니다. `custom`에서 UI 이미지를 원문으로 유지하려면 `--skip-ui-texture-fix`를 함께 사용하고, 한국어 이미지를 만들려면 이 플래그를 생략합니다. WPF의 텍스트·UI 구성 작업은 프로필과 관계없이 `--include-font`를 항상 전달하며, `--font-only`는 별도 작업입니다.
+UI 이미지는 아홉 번째 EXD 텍스트 범위가 아닙니다. `custom`에서 UI 이미지를 원문으로 유지하려면 `--skip-ui-texture-fix`를 함께 사용하고, 한국어 이미지를 만들려면 이 플래그를 생략합니다. WPF의 텍스트·UI 구성 작업은 프로필과 관계없이 `--include-font`를 항상 전달하며, `--font-only`는 별도 작업입니다. 단, 8개 텍스트 범위와 UI 이미지가 모두 원문이면 WPF는 이 구성을 `--font-only`로 생성합니다.
 
 `--skip-ui-texture-fix`는 이미지 지역화만 제외합니다. `--include-font`와 한국어 `remainder`를 선택하면 PartyMemberList/ContentsFinder/RaidFinder의 기존 글자 표시용 ULD 보정은 유지합니다. 이 보정만 생성할 때는 한국 UI 텍스처와 글로벌 EXD 입력이 필요하지 않습니다.
 

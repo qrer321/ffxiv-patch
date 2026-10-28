@@ -216,3 +216,15 @@ clean/산출물별로 폰트당 사용 페이지, 패치 한글 페이지, 예�
 - 크래시 게이트(`verify-hd-fhd-lobby-crash-gate.ps1`) PASS: r9 통과 +
   known-bad 4종(release-hd-crash-head-ja, release-hd-crash-r34-ja,
   hd-fhd-current-main-ja, hd-fhd-retry-current-ja) 전부 verifier 거부.
+
+## 2026-10-17 텍스트 출력이 없는 빌드의 reclaim
+
+- 증상: 텍스트 전부 원문(`--include-font` + 모든 범위 `base`) 빌드에서 로그인 대기
+  팝업(`Error#13206`)의 `在/合/理/待/人`이 한글로 표시됨. 적용 산출물의 `AXIS_14_lobby`
+  에서 해당 한자 rect가 `닷/냥/탑/밝/개` 한글 rect와 겹친다(스크린샷과 일치).
+- 원인: `0a0000` 출력이 없으면 `CollectLobbyVisibleCjkCodepoints`가 빈 집합을 반환했고,
+  reclaim은 이를 "보이는 한자 없음"으로 해석해 로비 한자 셀 25,368개를 모두 회수 후보로 썼다.
+- 수정: 텍스트 출력이 없으면 로비가 그대로 표시하는 clean 텍스트 index로 조사한다.
+  clean index가 없거나 조사가 실패하면 `null`을 반환해 reclaim을 끈다(보이는 집합을
+  모르면 회수하지 않는다).
+- `--font-only`는 로비 FDT/텍스처를 바꾸지 않으므로 이 경로와 무관하다.

@@ -122,6 +122,7 @@ Do not close live client issues from generated-output checks alone.
 
 - `BuildOptions.ShouldBuildUiPatch` and both of its predicates (`ShouldBuildLocalizedUiImages`, `ShouldPatchUiTextFonts`) must return false when `FontOnly` is true.
 - UI `GetPatchFilesForSelection(false, true)` must select only `000000` font patch files.
+- A UI selection whose 8 text scopes and UI images are all base builds as font-only (`--font-only`), not as an all-base `--include-font` text patch. The latter applied full-patch lobby Hangul allocation and reclaimed lobby kanji cells that the unchanged base-language lobby text still renders.
 - `FontPatchGenerator` must skip full-patch-only font repairs when `FontOnly` is true:
   - lobby Hangul allocation
   - supplemental lobby font generation

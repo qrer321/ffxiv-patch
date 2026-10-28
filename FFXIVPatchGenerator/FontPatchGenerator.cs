@@ -5818,7 +5818,10 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
         // generated output's lobby sheet text (with clean global fallback for
         // unpatched pages). Rows kept in the base language are part of the
         // generated output, so this is the set of Japanese characters the
-        // patched lobby can still display from these sheets.
+        // patched lobby can still display from these sheets. Without a
+        // generated text index the lobby renders the clean text unchanged, so
+        // the clean archive alone is surveyed. null means the visible set is
+        // unknown and disables clean lobby cell reclaim.
         private HashSet<uint> _lobbyVisibleCjkCodepoints;
 
         private HashSet<uint> CollectLobbyVisibleCjkCodepoints(string outputDir, string globalSqpack)
@@ -5826,17 +5829,18 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
             HashSet<uint> codepoints = new HashSet<uint>();
             string textIndexPath = Path.Combine(outputDir, TextIndexFileName);
             string fallbackTextIndexPath = ResolvePatchedTextFallbackIndex(outputDir, globalSqpack);
-            if (!File.Exists(textIndexPath) || !File.Exists(fallbackTextIndexPath))
+            if (!File.Exists(fallbackTextIndexPath))
             {
-                AddLimitedWarning("Lobby visible CJK survey skipped: text index missing.");
-                return codepoints;
+                AddLimitedWarning("Lobby visible CJK survey skipped: clean text index missing; lobby kanji cells are not reclaimed.");
+                return null;
             }
 
             try
             {
-                using (SqPackArchive textArchive = new SqPackArchive(textIndexPath, outputDir, TextDatPrefix))
                 using (SqPackArchive fallbackArchive = new SqPackArchive(fallbackTextIndexPath, globalSqpack, TextDatPrefix))
+                using (SqPackArchive patchedArchive = File.Exists(textIndexPath) ? new SqPackArchive(textIndexPath, outputDir, TextDatPrefix) : null)
                 {
+                    SqPackArchive textArchive = patchedArchive ?? fallbackArchive;
                     Dictionary<string, List<LobbyHangulCoverageRowSpec>> rangesBySheet =
                         new Dictionary<string, List<LobbyHangulCoverageRowSpec>>(StringComparer.OrdinalIgnoreCase);
                     for (int i = 0; i < LobbyHangulCoverage.Rows.Length; i++)
@@ -5865,7 +5869,8 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
             }
             catch (Exception ex)
             {
-                AddLimitedWarning("Lobby visible CJK survey failed: " + ex.Message);
+                AddLimitedWarning("Lobby visible CJK survey failed: " + ex.Message + "; lobby kanji cells are not reclaimed.");
+                return null;
             }
 
             Console.WriteLine("Lobby visible base-language CJK codepoints: {0}", codepoints.Count);
