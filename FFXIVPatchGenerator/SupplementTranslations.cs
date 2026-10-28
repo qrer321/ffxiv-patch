@@ -106,7 +106,9 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
             get { return _entries.Values; }
         }
 
-        public static SupplementSheet Parse(TextReader reader)
+        // checkEntry adds the rules of one sheet (see SupplementTranslations.Parse) and returns a
+        // problem, or null for a valid entry.
+        public static SupplementSheet Parse(TextReader reader, Func<SupplementEntry, string> checkEntry = null)
         {
             string header = reader.ReadLine();
             if (!string.Equals(header == null ? null : header.TrimStart('\uFEFF'), Header, StringComparison.Ordinal))
@@ -147,9 +149,10 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
                     Korean = fields[4],
                     Source = fields[5],
                 };
-                if (entry.Korean.Length == 0 || (entry.Japanese.Length == 0 && entry.English.Length == 0))
+                string problem = CheckEntry(entry) ?? (checkEntry == null ? null : checkEntry(entry));
+                if (problem != null)
                 {
-                    throw new InvalidDataException("Supplement line " + lineNumber + ": ko and at least one of ja/en are required.");
+                    throw new InvalidDataException("Supplement line " + lineNumber + ": " + problem);
                 }
 
                 ulong key = Key(rowId, columnOffset);
@@ -163,6 +166,31 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
             }
 
             return sheet;
+        }
+
+        private static string CheckEntry(SupplementEntry entry)
+        {
+            if (entry.Korean.Length == 0 || (entry.Japanese.Length == 0 && entry.English.Length == 0))
+            {
+                return "ko and at least one of ja/en are required.";
+            }
+
+            if (!SupplementSources.IsKnown(entry.Source))
+            {
+                return "unknown source '" + entry.Source + "'.";
+            }
+
+            if (!SupplementTranslations.ContainsHangul(Encoding.UTF8.GetBytes(entry.Korean)))
+            {
+                return "ko has no Hangul: " + entry.Korean;
+            }
+
+            if (entry.Korean.Trim() != entry.Korean || entry.Korean.Contains("  "))
+            {
+                return "ko has stray spaces: '" + entry.Korean + "'";
+            }
+
+            return null;
         }
 
         public bool Manages(ushort columnOffset)
@@ -331,6 +359,32 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
         }
     }
 
+    // Where an entry's Korean comes from; the note keeps the details (rows, sheets, URLs).
+    internal static class SupplementSources
+    {
+        // kr-row:<row> copies a Korean-only row of the Korean client.
+        public const string KoreanRowPrefix = "kr-row:";
+        // Built from the Korean client's own terms in the same sheet.
+        public const string KoreanTerms = "kr-term";
+
+        // FFXIV KR terms of other sheets, FF7 Remake-series Korean releases, Korean community usage,
+        // and the project's own translation.
+        private static readonly string[] Others = { "ffxiv-kr", "ff7r-ko", "community", "project" };
+
+        public static bool IsKnown(string source)
+        {
+            uint row;
+            return IsKoreanClientWording(source) &&
+                   (source == KoreanTerms || uint.TryParse(source.Substring(KoreanRowPrefix.Length), out row)) ||
+                   Array.IndexOf(Others, source) >= 0;
+        }
+
+        public static bool IsKoreanClientWording(string source)
+        {
+            return source == KoreanTerms || source.StartsWith(KoreanRowPrefix, StringComparison.Ordinal);
+        }
+    }
+
     internal static class SupplementTranslations
     {
         public const string ResourcePrefix = "Supplements/";
@@ -340,6 +394,14 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
         public static string ResourceNameFor(string sheetName)
         {
             return ResourcePrefix + sheetName.Replace('/', '_') + ".tsv";
+        }
+
+        // Parses a supplement with the rules of its sheet.
+        public static SupplementSheet Parse(string sheetName, TextReader reader)
+        {
+            return SupplementSheet.Parse(
+                reader,
+                TypedWordText.IsTypedWordSheet(sheetName) ? new Func<SupplementEntry, string>(TypedWordText.CheckWord) : null);
         }
 
         public static bool ContainsHangul(byte[] bytes)
@@ -386,7 +448,7 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
             using (Stream stream = assembly.GetManifestResourceStream(resourceName))
             using (StreamReader reader = new StreamReader(stream, new UTF8Encoding(false, true)))
             {
-                return SupplementSheet.Parse(reader);
+                return Parse(sheetName, reader);
             }
         }
     }

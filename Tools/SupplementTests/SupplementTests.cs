@@ -181,17 +181,33 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
 
         private static void ExpectParseErrors()
         {
+            const string sheet = "OtherSheet";
+            const string typedWords = "KTGTypeWordTextData";
             List<string> problems = new List<string>();
-            ExpectRejected(problems, "duplicate key", SheetHeader + "\n1\t0\ta\t\t가\tproject\t\n1\t0\tb\t\t나\tproject\t");
-            ExpectRejected(problems, "missing ko", SheetHeader + "\n1\t0\ta\t\t\tproject\t");
-            ExpectRejected(problems, "no ja or en", SheetHeader + "\n1\t0\t\t\t가\tproject\t");
-            ExpectRejected(problems, "wrong field count", SheetHeader + "\n1\t0\ta\t가\tproject\t");
-            ExpectRejected(problems, "wrong header", "row\tcol\tko\n1\t0\t가");
-            Report("malformed supplement sheets are rejected", problems);
+            ExpectRejected(problems, "duplicate key", sheet, "1\t0\ta\t\t가\tproject\t\n1\t0\tb\t\t나\tproject\t");
+            ExpectRejected(problems, "missing ko", sheet, "1\t0\ta\t\t\tproject\t");
+            ExpectRejected(problems, "no ja or en", sheet, "1\t0\t\t\t가\tproject\t");
+            ExpectRejected(problems, "wrong field count", sheet, "1\t0\ta\t가\tproject\t");
+            ExpectRejected(problems, "unknown source", sheet, "1\t0\ta\t\t가\tglossary\t");
+            ExpectRejected(problems, "kr-row without a row", sheet, "1\t0\ta\t\t가\tkr-row:\t");
+            ExpectRejected(problems, "ko without Hangul", sheet, "1\t0\ta\t\tka\tproject\t");
+            ExpectRejected(problems, "stray spaces", sheet, "1\t0\ta\t\t가  나\tproject\t");
+            ExpectRejected(problems, "untypeable typed word", typedWords, "1\t0\ta\t\t가…\tproject\t");
+            ExpectRejected(problems, "own tilde in a typed word", typedWords, "1\t0\ta\t\t가~\tproject\t");
+            ExpectAccepted(problems, "Korean client's tilde in a typed word", typedWords, "1\t0\ta\t\t가~\tkr-row:5\t");
+            ExpectAccepted(problems, "tilde outside typed words", sheet, "1\t0\ta\t\t가~\tproject\t");
+            try
+            {
+                SupplementSheet.Parse(new StringReader("row\tcol\tko\n1\t0\t가"));
+                problems.Add("wrong header was accepted");
+            }
+            catch (InvalidDataException)
+            {
+            }
+
+            Report("malformed supplement entries and untypeable typed words are rejected", problems);
         }
 
-        // Every shipped sheet parses; Korean text is plain Hangul text. Typing-game words also have
-        // to be typeable on a Korean keyboard.
         private static void ExpectShippedSheets(string supplementDir)
         {
             List<string> problems = new List<string>();
@@ -204,74 +220,44 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
             for (int f = 0; f < files.Length; f++)
             {
                 string name = Path.GetFileNameWithoutExtension(files[f]);
-                bool typedWords = TypedWordText.IsTypedWordSheet(name);
-                SupplementSheet sheet;
                 try
                 {
                     using (StreamReader reader = new StreamReader(files[f], new UTF8Encoding(false, true)))
                     {
-                        sheet = SupplementSheet.Parse(reader);
+                        SupplementTranslations.Parse(name, reader);
                     }
                 }
                 catch (Exception exception)
                 {
                     problems.Add(name + ": " + exception.Message);
-                    continue;
-                }
-
-                foreach (SupplementEntry entry in sheet.Entries)
-                {
-                    string where = name + " row " + entry.RowId + ": ";
-                    if (!SupplementTranslations.ContainsHangul(Encoding.UTF8.GetBytes(entry.Korean)))
-                    {
-                        problems.Add(where + "ko has no Hangul: " + entry.Korean);
-                    }
-
-                    if (entry.Korean.Trim() != entry.Korean || entry.Korean.Contains("  "))
-                    {
-                        problems.Add(where + "ko has stray spaces: '" + entry.Korean + "'");
-                    }
-
-                    if (!IsKnownSource(entry.Source))
-                    {
-                        problems.Add(where + "unknown source: " + entry.Source);
-                    }
-
-                    for (int i = 0; i < entry.Korean.Length; i++)
-                    {
-                        char ch = entry.Korean[i];
-                        bool hangul = ch >= '\uAC00' && ch <= '\uD7A3';
-                        bool ascii = ch >= 0x20 && ch < 0x7F;
-                        bool typeable = hangul || (ch >= 'A' && ch <= 'Z') || (ch >= 'a' && ch <= 'z') ||
-                                        (ch >= '0' && ch <= '9') || " ,.!?-'&~".IndexOf(ch) >= 0;
-                        if (typedWords ? !typeable : !(hangul || ascii))
-                        {
-                            problems.Add(where + "character U+" + ((int)ch).ToString("X4") + " is not allowed in '" + entry.Korean + "'");
-                            break;
-                        }
-                    }
-
-                    // A tilde is only kept where it comes from the Korean client's own wording; on a
-                    // Japanese target the generator turns it into the fullwidth tilde the typing field enters.
-                    if (typedWords && entry.Korean.IndexOf('~') >= 0 &&
-                        !entry.Source.StartsWith("kr-row:", StringComparison.Ordinal) && entry.Source != "kr-term")
-                    {
-                        problems.Add(where + "'~' is only kept from the Korean client's wording: " + entry.Korean);
-                    }
                 }
             }
 
-            Report("shipped supplement sheets parse and their Korean text is typeable", problems);
+            Report("shipped supplement sheets pass the rules of their sheet", problems);
         }
 
-        // kr-row:<row> copies a Korean-only row of the Korean client; the others say where the wording
-        // comes from and keep the details in the note.
-        private static bool IsKnownSource(string source)
+        private static void ExpectRejected(List<string> problems, string name, string sheetName, string lines)
         {
-            uint row;
-            return (source.StartsWith("kr-row:", StringComparison.Ordinal) && uint.TryParse(source.Substring(7), out row)) ||
-                   source == "kr-term" || source == "ffxiv-kr" || source == "ff7r-ko" ||
-                   source == "community" || source == "project";
+            try
+            {
+                SupplementTranslations.Parse(sheetName, new StringReader(SheetHeader + "\n" + lines));
+                problems.Add(name + " was accepted");
+            }
+            catch (InvalidDataException)
+            {
+            }
+        }
+
+        private static void ExpectAccepted(List<string> problems, string name, string sheetName, string lines)
+        {
+            try
+            {
+                SupplementTranslations.Parse(sheetName, new StringReader(SheetHeader + "\n" + lines));
+            }
+            catch (InvalidDataException exception)
+            {
+                problems.Add(name + " was rejected: " + exception.Message);
+            }
         }
 
         private static void ExpectRejected(List<string> problems, string name, string text)

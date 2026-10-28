@@ -1197,7 +1197,7 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
                     diagnostics,
                     sheetName,
                     page.StartId.ToString(),
-                    "supplement-" + issue.Kind.ToString().ToLowerInvariant(),
+                    SupplementStatus(issue.Kind),
                     0, 0, 0, 0, 0,
                     "row=" + issue.RowId.ToString() + "; col=" + issue.ColumnOffset.ToString() + "; text=" + issue.TargetText);
             }
@@ -1236,10 +1236,21 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
                     diagnostics,
                     sheetName,
                     "-",
-                    "supplement-stale",
+                    SupplementStatus(SupplementIssueKind.Stale),
                     0, 0, 0, 0, 0,
                     "row=" + unvisited[i].RowId.ToString() + "; col=" + unvisited[i].ColumnOffset.ToString() + "; not in the target sheet");
             }
+        }
+
+        // supplement-applied/-restored for written cells, supplement-official/-stale/-missing for issues.
+        private static string SupplementStatus(string outcome)
+        {
+            return "supplement-" + outcome;
+        }
+
+        private static string SupplementStatus(SupplementIssueKind kind)
+        {
+            return SupplementStatus(kind.ToString().ToLowerInvariant());
         }
 
         private string ApplyJapaneseTypedWordTildes(string sheetName, ExcelHeader header, ref ExdPatchResult patchResult)
@@ -1682,10 +1693,10 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
                             byte[] beforeSupplement = selectedBytes ?? new byte[0];
                             SupplementCell cell = supplement.Resolve(targetRow.RowId, column.Offset, beforeSupplement, globalBytes ?? new byte[0], _options.TargetLanguage);
                             string supplementNote = cell.Applied
-                                ? "supplement-applied"
+                                ? SupplementStatus("applied")
                                 : cell.HasIssue
-                                    ? "supplement-" + cell.Issue.ToString().ToLowerInvariant()
-                                    : ExdStringPatcher.BytesEqual(cell.Selected, beforeSupplement) ? string.Empty : "supplement-restored";
+                                    ? SupplementStatus(cell.Issue)
+                                    : ExdStringPatcher.BytesEqual(cell.Selected, beforeSupplement) ? string.Empty : SupplementStatus("restored");
                             selectedBytes = cell.Selected;
                             if (supplementNote.Length > 0)
                             {

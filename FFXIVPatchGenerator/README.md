@@ -129,7 +129,8 @@ UI 이미지는 아홉 번째 EXD 텍스트 범위가 아닙니다. `custom`에�
 - 실행 요약에 `Supplement applied/restored/official/stale/missing`, `Typed word tildes`를 출력하고, UI 결과창에도 적용·공식·원문 변경·없음 수를 표시합니다.
 - `--diagnostic-csv`는 처리 열의 선택 문자열을 시트 적용 결과로 기록하고 note에 `supplement-applied`/`-restored`/`-official`/`-stale`/`-missing`을 남깁니다. JA 물결 변환은 CSV에 반영하지 않습니다.
 - `source`: `kr-row:<row>`(한국 전용 행의 공식 문구), `kr-term`(같은 시트 한국 공식 표기 조합), `ffxiv-kr`(FFXIV 한국판 다른 시트 표기), `ff7r-ko`(FF7 리메이크 시리즈 한국어판 표기), `community`(커뮤니티 통용 표기), `project`(직접 번역). 근거 행·시트·URL은 `note`에 적습니다.
-- 입력 단어 시트(`TypedWordText`)는 한국어 키보드로 입력할 수 있는 문자(한글, 영숫자, 공백, `, . ! ? - ' &`)만 씁니다. `~`는 한국 클라이언트 문구에서 온 경우만 허용합니다. `Scripts\test-supplements.ps1`이 이 규칙과 형식을 검사합니다.
+- `ko`는 한글을 포함하고 앞뒤·연속 공백이 없어야 합니다. 입력 단어 시트(`TypedWordText`)의 `ko`는 한국어 키보드로 입력할 수 있는 문자(한글, 영숫자, 공백, `, . ! ? - ' &`)만 쓰고, `~`는 한국 클라이언트 문구(`kr-row`/`kr-term`)에서 온 경우만 허용합니다.
+- 생성기는 시트를 읽을 때 형식과 위 규칙을 검사하고, 위반하면 그 시트 전체를 건너뛰고 경고합니다. `Scripts\test-supplements.ps1`은 내장 시트가 검사를 통과하는지 확인합니다.
 
 ## 진단과 정책 파일
 
