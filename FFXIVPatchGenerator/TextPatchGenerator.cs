@@ -126,6 +126,8 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
             new Regex("^Item.*$", RegexOptions.IgnoreCase | RegexOptions.Compiled),
             new Regex("^JobDef.*$", RegexOptions.IgnoreCase | RegexOptions.Compiled),
             new Regex("^Journal.*$", RegexOptions.IgnoreCase | RegexOptions.Compiled),
+            // Keybound Brawler typing words; see KeyboundBrawlerWords.
+            new Regex("^KTGTypeWordTextData$", RegexOptions.IgnoreCase | RegexOptions.Compiled),
             new Regex("^Leve.*$", RegexOptions.IgnoreCase | RegexOptions.Compiled),
             new Regex("^Lobby$", RegexOptions.IgnoreCase | RegexOptions.Compiled),
             new Regex("^LogFilter$", RegexOptions.IgnoreCase | RegexOptions.Compiled),
@@ -235,6 +237,7 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
         private readonly BuildReport _report = new BuildReport();
         private readonly HashSet<uint> _patchedOutputHangulCodepoints = new HashSet<uint>();
         private RsvStringResolver _rsvResolver = RsvStringResolver.Empty;
+        private HashSet<uint> _keyboundBrawlerEnglishRows = new HashSet<uint>();
 
         public TextPatchGenerator(BuildOptions options)
         {
@@ -663,6 +666,7 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
                 allowRowKeyFallback || sheetPolicy.HasSourceRowOverrides || sheetPolicy.HasGlobalEnglishRows || sheetPolicy.HasGlobalTargetRows);
             ApplyGlobalTargetSourceRows(sheetName, globalHeader, globalArchive, sheetPolicy, sourceMaps, diagnostics);
             ApplyGlobalEnglishSourceRows(sheetName, globalHeader, globalArchive, sheetPolicy, sourceMaps, diagnostics);
+            ApplyKeyboundBrawlerWordRows(sheetName, globalHeader, globalArchive, sourceHeader, sheetPolicy, sourceMaps, diagnostics);
             StringPatchPolicy stringPatchPolicy = new StringPatchPolicy(
                 sheetName,
                 IsAddonSheet(sheetName),
@@ -688,7 +692,11 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
                 ColumnRemap originalJobSubtitleRemap = sheetPolicy.GetColumnRemap(1975, 0);
                 bool jobSubtitleRemapped = PrepareCharacterSelectJobSubtitle(
                     sheetName, targetExd, globalHeader, globalArchive, sourceMaps, sheetPolicy, textSheetScopePolicy);
-                WriteDiagnosticCsvIfRequested(sheetName, page.StartId, diagnosticCsvDir, targetExd, sourceMaps, globalHeader, sourceHeader, stringColumns, allowRowKeyFallback, sheetPolicy, textSheetScopePolicy, _rsvResolver);
+                ExcelDataFile wordJapanese = KeyboundBrawlerWords.IsWordSheet(sheetName) &&
+                    (textSheetScopePolicy.MayUseKorean || IsDiagnosticCsvRequested(sheetName))
+                    ? LoadKeyboundBrawlerJapanesePage(sheetName, page, globalHeader, globalArchive, targetUsesLanguageSuffix, targetExd)
+                    : null;
+                WriteDiagnosticCsvIfRequested(sheetName, page.StartId, diagnosticCsvDir, targetExd, sourceMaps, globalHeader, sourceHeader, stringColumns, allowRowKeyFallback, sheetPolicy, textSheetScopePolicy, _rsvResolver, wordJapanese);
                 if (!textSheetScopePolicy.MayUseKorean)
                 {
                     continue;
@@ -709,8 +717,10 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
                     sheetPolicy.SetRowColumnRemap(1975, 0, originalJobSubtitleRemap);
                 }
                 string phraseNote = JoinPatchNotes(
-                    ApplyQuestChatPhraseAnonymization(sheetName, globalHeader, ref patchResult),
-                    ApplySayQuestPhrases(sheetName, globalHeader, targetExd, japaneseReference, ref patchResult));
+                    JoinPatchNotes(
+                        ApplyQuestChatPhraseAnonymization(sheetName, globalHeader, ref patchResult),
+                        ApplySayQuestPhrases(sheetName, globalHeader, targetExd, japaneseReference, ref patchResult)),
+                    ApplyKeyboundBrawlerTranslations(sheetName, globalHeader, targetExd, wordJapanese, sheetPolicy, ref patchResult));
                 _report.ProtectedUiStrings += patchResult.ProtectedUiStrings;
                 _report.RsvRows += patchResult.RsvRows;
                 _report.RsvStrings += patchResult.RsvStrings;
@@ -1086,6 +1096,79 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
             }
         }
 
+        private string ApplyKeyboundBrawlerTranslations(
+            string sheetName,
+            ExcelHeader header,
+            ExcelDataFile cleanTarget,
+            ExcelDataFile cleanJapanese,
+            PatchSheetPolicy sheetPolicy,
+            ref ExdPatchResult patchResult)
+        {
+            if (patchResult == null ||
+                patchResult.Data == null ||
+                !KeyboundBrawlerWords.IsWordSheet(sheetName))
+            {
+                return string.Empty;
+            }
+
+            if (cleanJapanese == null)
+            {
+                return "keybound-brawler-translations missing-japanese-reference";
+            }
+
+            KeyboundBrawlerTranslationResult result;
+            patchResult.Data = KeyboundBrawlerWords.ApplyTranslations(
+                header,
+                cleanTarget,
+                cleanJapanese,
+                patchResult.Data,
+                delegate(uint rowId) { return IsKeyboundBrawlerPolicyRow(sheetPolicy, rowId); },
+                out result);
+            if (result.Applied > 0)
+            {
+                patchResult.Changed = true;
+                patchResult.RowsPatched += result.NewlyChanged;
+            }
+
+            if (result.SkippedChangedJapanese > 0)
+            {
+                AddLimitedWarning("Keybound Brawler translations skipped for changed Japanese words: " + result.SkippedChangedJapanese.ToString());
+            }
+
+            return "keybound-brawler-translations applied=" + result.Applied.ToString() +
+                   ", skipped-changed-japanese=" + result.SkippedChangedJapanese.ToString();
+        }
+
+        // Rows that patch-policy pins (kept, global fallback, source override or remapped word) keep the
+        // policy result instead of the Keybound Brawler English fallback or community translation.
+        private static bool IsKeyboundBrawlerPolicyRow(PatchSheetPolicy sheetPolicy, uint rowId)
+        {
+            return sheetPolicy.ShouldKeepRow(rowId) ||
+                   sheetPolicy.ShouldKeepColumn(rowId, KeyboundBrawlerWords.WordColumnOffset) ||
+                   sheetPolicy.ShouldUseGlobalFallbackRow(rowId) ||
+                   sheetPolicy.SourceRowOverrides.ContainsKey(rowId) ||
+                   sheetPolicy.GetColumnRemap(rowId, KeyboundBrawlerWords.WordColumnOffset).Mode != ColumnRemapMode.Default;
+        }
+
+        // The community translations are keyed by the clean Japanese word, so the English target reads the
+        // Japanese page; a missing or unreadable Japanese page disables them.
+        private ExcelDataFile LoadKeyboundBrawlerJapanesePage(
+            string sheetName,
+            ExcelPageDefinition page,
+            ExcelHeader globalHeader,
+            SqPackArchive globalArchive,
+            bool targetUsesLanguageSuffix,
+            ExcelDataFile targetExd)
+        {
+            if (targetUsesLanguageSuffix &&
+                string.Equals(_options.TargetLanguage, "ja", StringComparison.OrdinalIgnoreCase))
+            {
+                return targetExd;
+            }
+
+            return LoadJapaneseReferencePage(sheetName, page, globalHeader, globalArchive, targetUsesLanguageSuffix);
+        }
+
         private string ApplySayQuestPhrases(
             string sheetName,
             ExcelHeader header,
@@ -1395,6 +1478,74 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
             AddGlobalRowsToSourceMaps(sheetName, globalHeader, globalArchive, "en", sheetPolicy.GlobalEnglishRows, sourceMaps, diagnostics, "global-english");
         }
 
+        // Keybound Brawler words are matched by row id only, because the word column looks like a
+        // string key to the generic matcher. Rows whose Korean word is still Japanese take the global
+        // English row when its word is typeable ASCII. Rows pinned by patch-policy keep the policy result.
+        private void ApplyKeyboundBrawlerWordRows(
+            string sheetName,
+            ExcelHeader globalHeader,
+            SqPackArchive globalArchive,
+            ExcelHeader sourceHeader,
+            PatchSheetPolicy sheetPolicy,
+            ExdSourceMaps sourceMaps,
+            StreamWriter diagnostics)
+        {
+            if (!KeyboundBrawlerWords.IsWordSheet(sheetName))
+            {
+                return;
+            }
+
+            sourceMaps.StringKeyRows.Clear();
+            HashSet<uint> englishRows = new HashSet<uint>();
+            _keyboundBrawlerEnglishRows = englishRows;
+            for (int i = 0; i < globalHeader.Pages.Count; i++)
+            {
+                ExcelPageDefinition page = globalHeader.Pages[i];
+                string englishPath = BuildExdPath(sheetName, page.StartId, "en");
+                byte[] englishExdBytes;
+                if (!globalArchive.TryReadFile(englishPath, out englishExdBytes))
+                {
+                    WriteDiagnostic(diagnostics, sheetName, page.StartId.ToString(), "missing-keybound-brawler-english-page", 0, 0, 0, 0, 0, englishPath);
+                    continue;
+                }
+
+                ExcelDataFile englishFile;
+                try
+                {
+                    englishFile = ExcelDataFile.Parse(englishExdBytes);
+                }
+                catch (Exception exception)
+                {
+                    WriteDiagnostic(diagnostics, sheetName, page.StartId.ToString(), "invalid-keybound-brawler-english-page", 0, 0, 0, 0, 0, exception.Message);
+                    continue;
+                }
+
+                for (int rowIndex = 0; rowIndex < englishFile.Rows.Count; rowIndex++)
+                {
+                    ExcelDataRow englishRow = englishFile.Rows[rowIndex];
+                    SourceRowRef koreanRow;
+                    if (IsKeyboundBrawlerPolicyRow(sheetPolicy, englishRow.RowId) ||
+                        !sourceMaps.RowKeyRows.TryGetValue(englishRow.RowId, out koreanRow))
+                    {
+                        continue;
+                    }
+
+                    byte[] koreanWord = koreanRow.File.GetStringBytesByColumnOffset(
+                        koreanRow.Row,
+                        koreanRow.Header ?? sourceHeader,
+                        KeyboundBrawlerWords.WordColumnOffset);
+                    byte[] englishWord = englishFile.GetStringBytesByColumnOffset(englishRow, globalHeader, KeyboundBrawlerWords.WordColumnOffset);
+                    if (KeyboundBrawlerWords.ShouldUseEnglishWord(koreanWord, englishWord))
+                    {
+                        englishRows.Add(englishRow.RowId);
+                    }
+                }
+            }
+
+            AddGlobalRowsToSourceMaps(sheetName, globalHeader, globalArchive, "en", englishRows, sourceMaps, diagnostics, "keybound-brawler-english");
+            WriteDiagnostic(diagnostics, sheetName, "-", "keybound-brawler-english-words", englishRows.Count, 0, englishRows.Count, 0, 0, string.Empty);
+        }
+
         private static string BuildExdPath(string sheetName, uint startId, string languageCode)
         {
             string path = "exd/" + sheetName + "_" + startId.ToString();
@@ -1442,11 +1593,22 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
             bool allowRowKeyFallback,
             PatchSheetPolicy sheetPolicy,
             TextSheetScopePolicy textSheetScopePolicy,
-            RsvStringResolver rsvResolver)
+            RsvStringResolver rsvResolver,
+            ExcelDataFile wordJapanese)
         {
             if (!IsDiagnosticCsvRequested(sheetName))
             {
                 return;
+            }
+
+            bool wordSheet = KeyboundBrawlerWords.IsWordSheet(sheetName);
+            Dictionary<uint, ExcelDataRow> wordJapaneseRows = new Dictionary<uint, ExcelDataRow>();
+            if (wordSheet && wordJapanese != null)
+            {
+                for (int i = 0; i < wordJapanese.Rows.Count; i++)
+                {
+                    wordJapaneseRows[wordJapanese.Rows[i].RowId] = wordJapanese.Rows[i];
+                }
             }
 
             Directory.CreateDirectory(diagnosticCsvDir);
@@ -1464,6 +1626,11 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
                     {
                         WriteDiagnosticCsvRow(writer, sheetName, pageStartId, targetRow.RowId, 0, "none", "-", "keep-global", string.Empty, string.Empty, string.Empty, "no source row");
                         continue;
+                    }
+
+                    if (wordSheet && _keyboundBrawlerEnglishRows.Contains(targetRow.RowId))
+                    {
+                        mappingMode = "keybound-brawler-english";
                     }
 
                     for (int columnIndex = 0; columnIndex < stringColumns.Count; columnIndex++)
@@ -1494,6 +1661,30 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
                             {
                                 selectedBytes = remap.LiteralBytes;
                                 note = "literal";
+                            }
+                        }
+
+                        ExcelDataRow wordJapaneseRow;
+                        if (wordSheet &&
+                            column.Offset == KeyboundBrawlerWords.WordColumnOffset &&
+                            string.Equals(action, "replace", StringComparison.Ordinal) &&
+                            !IsKeyboundBrawlerPolicyRow(sheetPolicy, targetRow.RowId) &&
+                            wordJapaneseRows.TryGetValue(targetRow.RowId, out wordJapaneseRow))
+                        {
+                            bool japaneseChanged;
+                            byte[] translation = KeyboundBrawlerWords.FindTranslation(
+                                targetRow.RowId,
+                                selectedBytes != null && selectedBytes.Length > 0 ? selectedBytes : globalBytes,
+                                wordJapanese.GetStringBytes(wordJapaneseRow, targetHeader, stringColumns[columnIndex]),
+                                out japaneseChanged);
+                            if (translation != null)
+                            {
+                                selectedBytes = translation;
+                                note = "keybound-brawler-translation";
+                            }
+                            else if (japaneseChanged)
+                            {
+                                note = "keybound-brawler-translation skipped-changed-japanese";
                             }
                         }
 

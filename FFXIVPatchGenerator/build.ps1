@@ -22,6 +22,8 @@ $sources = @(
     "PartyBonusRoleFontPatch.cs",
     "DutyFinderRoleFontPatch.cs",
     "InventorySubtitleSpacingPatch.cs",
+    "KeyboundBrawlerWords.cs",
+    "KeyboundBrawlerWordTranslations.cs",
     "LobbyScaledHangulPhrases.cs",
     "LobbyHangulCoverage.cs",
     "UiPatchGenerator.cs",

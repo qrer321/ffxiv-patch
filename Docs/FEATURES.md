@@ -221,6 +221,15 @@
   - 안전 규칙: 정답 row가 매크로를 포함하거나 비어 있거나 80자를 넘으면, 안내형 퀘스트에서 정답 원문 하나라도(한 한국어 문구가 여러 원문에 대응하면 각 원문마다) 안내나 대사 어디에도 표시할 수 없으면, 추리형 퀘스트에서 표시할 곳이 하나도 없으면 해당 퀘스트 전체를 한국어로 유지
   - 정답 판정용 row 목록은 제너레이터와 검증기가 같은 코드(`SayQuestPhraseLocalizer.BuildRows`)로 만들며, 키와 베이스 텍스트는 clean 대상 page에서 읽음
   - 회귀 테스트: `Scripts\test-say-quest-phrases.ps1`
+- 마법자판 난타전 단어: `KTGTypeWordTextData`(적 머리 위에 표시되고 입력과 비교되는 단어)를 row id로만 매칭해 한국어 단어로 교체. 기타 게임 텍스트(`remainder`) 범위
+  - 첫 문자열 열이 단어 자체라 일반 string key 매칭이 일본어=한국어 미번역 row끼리만 짝지어지므로, 이 시트는 string key 맵을 비우고 row id만 사용
+  - 둘째 열(히라가나 읽기)은 모든 언어에서 같은 값이며 그대로 유지. 일본어 클라이언트는 본문 또는 읽기 중 하나가 맞으면 성공으로 판정
+  - 한국어 원자료에 아직 일본어로 남은 단어는 `KeyboundBrawlerWordTranslations`의 자체 번역 292개로 교체. 패치된 단어에 한글이 없고 clean 일본어 단어가 번역 작성 당시와 같을 때만 적용하므로, 공식 한국어가 생기면 공식 번역이 우선. 진단 note `keybound-brawler-translations applied=…, skipped-changed-japanese=…`
+  - 자체 번역은 공식 한국어판 전용 행(일본어가 빈 1745~1865행 등)의 표현을 우선 따름. 일본어 참조 page를 읽을 수 없으면 번역을 건너뛰고 `missing-japanese-reference`를 기록
+  - 자체 번역이 적용되지 않은 미번역 단어는 글로벌 영어 단어가 인쇄 가능한 ASCII일 때 영어 row를 사용(진단 `keybound-brawler-english-words`, CSV mappingMode `keybound-brawler-english`). 영어도 일본어인 단어는 베이스 원문 유지. 영어 page를 파싱할 수 없으면 `invalid-keybound-brawler-english-page`를 남기고 영어 대체 없이 진행
+  - `patch-policy.json`의 보존 row/column, `global_target_rows`/`global_english_rows`, source row override, 단어 column remap이 걸린 row는 영어 대체와 자체 번역을 적용하지 않고 정책 결과를 유지. `--diagnostic-csv`도 같은 판정으로 선택 문자열을 기록
+  - 2026.09.15 데이터(JA 베이스): 공식 한국어 1496, 자체 번역 292, 빈 단어 79. 일본어 단어는 남지 않음. EN 베이스는 같은 1788행이 한국어이고, 79행 중 28행은 영어판에만 있는 단어라 영어 원문 유지
+  - 회귀 테스트: `Scripts\test-keybound-brawler-words.ps1`
 - `patch-policy.json` 기반 sheet/row/column 보존과 row/column remap
 - 텍스트 생성 또는 명시적 CSV 진단 시 `patch-diagnostics.tsv` 생성. 모든 텍스트가 Base이면 일반 실행은 자산 전용 경로 사용
 - `--diagnostic-csv` 지정 sheet의 row/column 비교 CSV 생성. Base 셀은 remap/RSV보다 먼저 원문으로 선택

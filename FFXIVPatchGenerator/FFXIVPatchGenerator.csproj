@@ -46,6 +46,8 @@
     <Compile Include="PartyBonusRoleFontPatch.cs" />
     <Compile Include="DutyFinderRoleFontPatch.cs" />
     <Compile Include="InventorySubtitleSpacingPatch.cs" />
+    <Compile Include="KeyboundBrawlerWords.cs" />
+    <Compile Include="KeyboundBrawlerWordTranslations.cs" />
     <Compile Include="LobbyScaledHangulPhrases.cs" />
     <Compile Include="LobbyHangulCoverage.cs" />
     <Compile Include="UiPatchGenerator.cs" />
