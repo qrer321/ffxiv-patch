@@ -34,11 +34,16 @@ $sources = @(
     "PatchPolicy.cs",
     "PlayerNameFormTransfer.cs",
     "SayQuestPhraseLocalizer.cs",
-    "ExdRowRewriter.cs"
+    "ExdRowRewriter.cs",
+    "SupplementTranslations.cs"
 ) | ForEach-Object { Join-Path $PSScriptRoot $_ }
 
+# Supplements\<sheet>.tsv is embedded as "Supplements/<sheet>.tsv" (see SupplementTranslations).
+$resources = Get-ChildItem -Path (Join-Path $PSScriptRoot "Supplements") -Filter "*.tsv" -File -ErrorAction SilentlyContinue |
+    ForEach-Object { "/resource:$($_.FullName),Supplements/$($_.Name)" }
+
 $exePath = Join-Path $outDir "FFXIVPatchGenerator.exe"
-& $csc /nologo /optimize+ /target:exe "/out:$exePath" /r:System.IO.Compression.dll /r:System.Web.Extensions.dll $sources
+& $csc /nologo /optimize+ /target:exe "/out:$exePath" /r:System.IO.Compression.dll /r:System.Web.Extensions.dll $resources $sources
 if ($LASTEXITCODE -ne 0) {
     exit $LASTEXITCODE
 }

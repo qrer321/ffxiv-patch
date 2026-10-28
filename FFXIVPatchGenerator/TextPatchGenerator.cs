@@ -126,6 +126,7 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
             new Regex("^Item.*$", RegexOptions.IgnoreCase | RegexOptions.Compiled),
             new Regex("^JobDef.*$", RegexOptions.IgnoreCase | RegexOptions.Compiled),
             new Regex("^Journal.*$", RegexOptions.IgnoreCase | RegexOptions.Compiled),
+            new Regex("^KTGTypeWordTextData$", RegexOptions.IgnoreCase | RegexOptions.Compiled),
             new Regex("^Leve.*$", RegexOptions.IgnoreCase | RegexOptions.Compiled),
             new Regex("^Lobby$", RegexOptions.IgnoreCase | RegexOptions.Compiled),
             new Regex("^LogFilter$", RegexOptions.IgnoreCase | RegexOptions.Compiled),
@@ -221,6 +222,13 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
             new Regex("^XPvP.*$", RegexOptions.IgnoreCase | RegexOptions.Compiled),
             new Regex("^YardCatalog.*$", RegexOptions.IgnoreCase | RegexOptions.Compiled),
             new Regex("^Ykw$", RegexOptions.IgnoreCase | RegexOptions.Compiled)
+        };
+
+        // Typing-game word sheets. On a Japanese target their Korean words use the fullwidth tilde
+        // that the typing field enters. See ApplyJapaneseTypedWordTildes.
+        private static readonly Regex[] TypedWordSheets = new Regex[]
+        {
+            new Regex("^KTGTypeWordTextData$", RegexOptions.IgnoreCase | RegexOptions.Compiled),
         };
 
         private static readonly Regex[] CommandRowKeySwappableSheets = new Regex[]
@@ -670,6 +678,7 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
                 sheetPolicy,
                 _rsvResolver,
                 _options.TextScopePolicy);
+            SupplementSheet supplement = LoadSupplement(sheetName);
 
             for (int i = 0; i < globalHeader.Pages.Count; i++)
             {
@@ -709,8 +718,12 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
                     sheetPolicy.SetRowColumnRemap(1975, 0, originalJobSubtitleRemap);
                 }
                 string phraseNote = JoinPatchNotes(
-                    ApplyQuestChatPhraseAnonymization(sheetName, globalHeader, ref patchResult),
-                    ApplySayQuestPhrases(sheetName, globalHeader, targetExd, japaneseReference, ref patchResult));
+                    JoinPatchNotes(
+                        ApplyQuestChatPhraseAnonymization(sheetName, globalHeader, ref patchResult),
+                        ApplySayQuestPhrases(sheetName, globalHeader, targetExd, japaneseReference, ref patchResult)),
+                    JoinPatchNotes(
+                        ApplySupplement(sheetName, page, supplement, globalHeader, targetExd, sheetPolicy, textSheetScopePolicy, diagnostics, ref patchResult),
+                        ApplyJapaneseTypedWordTildes(sheetName, globalHeader, ref patchResult)));
                 _report.ProtectedUiStrings += patchResult.ProtectedUiStrings;
                 _report.RsvRows += patchResult.RsvRows;
                 _report.RsvStrings += patchResult.RsvStrings;
@@ -1126,6 +1139,161 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
                    ", annotated=" + result.AnnotatedRows.ToString();
         }
 
+        private SupplementSheet LoadSupplement(string sheetName)
+        {
+            try
+            {
+                return SupplementTranslations.Load(sheetName);
+            }
+            catch (Exception exception)
+            {
+                AddLimitedWarning("Supplement for " + sheetName + " was skipped: " + exception.Message);
+                return null;
+            }
+        }
+
+        private string ApplySupplement(
+            string sheetName,
+            ExcelPageDefinition page,
+            SupplementSheet supplement,
+            ExcelHeader header,
+            ExcelDataFile cleanTarget,
+            PatchSheetPolicy sheetPolicy,
+            TextSheetScopePolicy scope,
+            StreamWriter diagnostics,
+            ref ExdPatchResult patchResult)
+        {
+            if (supplement == null || patchResult == null || patchResult.Data == null)
+            {
+                return string.Empty;
+            }
+
+            SupplementResult result;
+            byte[] data = supplement.Apply(
+                header,
+                cleanTarget,
+                patchResult.Data,
+                _options.TargetLanguage,
+                delegate(uint rowId, ushort columnOffset)
+                {
+                    return !scope.ShouldUseKorean(rowId, columnOffset) ||
+                           sheetPolicy.ShouldKeepRow(rowId) ||
+                           sheetPolicy.ShouldKeepColumn(rowId, columnOffset) ||
+                           sheetPolicy.ShouldUseGlobalFallbackRow(rowId) ||
+                           sheetPolicy.SourceRowOverrides.ContainsKey(rowId) ||
+                           sheetPolicy.GetColumnRemap(rowId, columnOffset).Mode != ColumnRemapMode.Default;
+                },
+                out result);
+            if (!ReferenceEquals(data, patchResult.Data))
+            {
+                patchResult.Data = data;
+                patchResult.Changed = true;
+                patchResult.RowsPatched = CountChangedRows(header, header.GetStringColumnIndexes(), cleanTarget, ExcelDataFile.Parse(data));
+            }
+
+            for (int i = 0; i < result.Issues.Count; i++)
+            {
+                SupplementIssue issue = result.Issues[i];
+                WriteDiagnostic(
+                    diagnostics,
+                    sheetName,
+                    page.StartId.ToString(),
+                    "supplement-" + issue.Kind.ToString().ToLowerInvariant(),
+                    0, 0, 0, 0, 0,
+                    "row=" + issue.RowId.ToString() + "; col=" + issue.ColumnOffset.ToString() + "; text=" + issue.TargetText);
+            }
+
+            return "supplement applied=" + result.Applied.ToString() +
+                   ", restored=" + result.Restored.ToString() +
+                   ", official=" + result.Count(SupplementIssueKind.Official).ToString() +
+                   ", stale=" + result.Count(SupplementIssueKind.Stale).ToString() +
+                   ", missing=" + result.Count(SupplementIssueKind.Missing).ToString();
+        }
+
+        // The Japanese client's typing field enters a typed tilde as U+FF5E and does not match it with
+        // the U+007E in Korean words, while its own words use only U+FF5E.
+        private string ApplyJapaneseTypedWordTildes(string sheetName, ExcelHeader header, ref ExdPatchResult patchResult)
+        {
+            if (patchResult == null ||
+                !patchResult.Changed ||
+                !string.Equals(_options.TargetLanguage, "ja", StringComparison.OrdinalIgnoreCase) ||
+                !IsTypedWordSheet(sheetName))
+            {
+                return string.Empty;
+            }
+
+            byte[] fullwidthTilde = Encoding.UTF8.GetBytes("\uFF5E");
+            ExcelDataFile page = ExcelDataFile.Parse(patchResult.Data);
+            List<int> stringColumns = header.GetStringColumnIndexes();
+            int words = 0;
+            for (int stringIndex = 0; stringIndex < stringColumns.Count; stringIndex++)
+            {
+                Dictionary<uint, byte[]> replacements = new Dictionary<uint, byte[]>();
+                for (int rowIndex = 0; rowIndex < page.Rows.Count; rowIndex++)
+                {
+                    ExcelDataRow row = page.Rows[rowIndex];
+                    byte[] word = page.GetStringBytes(row, header, stringColumns[stringIndex]);
+                    if (word == null ||
+                        Array.IndexOf(word, (byte)'~') < 0 ||
+                        Array.IndexOf(word, (byte)0x02) >= 0 ||
+                        !ExdStringPatcher.ContainsHangul(word))
+                    {
+                        continue;
+                    }
+
+                    List<byte> replaced = new List<byte>(word.Length + 4);
+                    for (int i = 0; i < word.Length; i++)
+                    {
+                        if (word[i] == (byte)'~')
+                        {
+                            replaced.AddRange(fullwidthTilde);
+                        }
+                        else
+                        {
+                            replaced.Add(word[i]);
+                        }
+                    }
+
+                    replacements[row.RowId] = replaced.ToArray();
+                }
+
+                if (replacements.Count > 0)
+                {
+                    page = ExcelDataFile.Parse(ExdRowRewriter.RewriteStringColumn(header, page, stringColumns[stringIndex], replacements));
+                    words += replacements.Count;
+                }
+            }
+
+            if (words == 0)
+            {
+                return string.Empty;
+            }
+
+            patchResult.Data = page.Data;
+            return "fullwidth-tilde words=" + words.ToString();
+        }
+
+        private static int CountChangedRows(ExcelHeader header, List<int> stringColumns, ExcelDataFile clean, ExcelDataFile patched)
+        {
+            int changed = 0;
+            for (int rowIndex = 0; rowIndex < patched.Rows.Count; rowIndex++)
+            {
+                ExcelDataRow row = patched.Rows[rowIndex];
+                for (int columnIndex = 0; columnIndex < stringColumns.Count; columnIndex++)
+                {
+                    if (!ExdStringPatcher.BytesEqual(
+                        patched.GetStringBytes(row, header, stringColumns[columnIndex]),
+                        clean.GetStringBytes(row.RowId, header, stringColumns[columnIndex])))
+                    {
+                        changed++;
+                        break;
+                    }
+                }
+            }
+
+            return changed;
+        }
+
         private string ApplyQuestChatPhraseAnonymization(string sheetName, ExcelHeader header, ref ExdPatchResult patchResult)
         {
             if (!_options.AnonymizeQuestChatPhrases || patchResult == null || patchResult.Data == null)
@@ -1361,6 +1529,19 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
             }
 
             return sourceExds;
+        }
+
+        private static bool IsTypedWordSheet(string sheetName)
+        {
+            for (int i = 0; i < TypedWordSheets.Length; i++)
+            {
+                if (TypedWordSheets[i].IsMatch(sheetName))
+                {
+                    return true;
+                }
+            }
+
+            return false;
         }
 
         private void ApplyGlobalTargetSourceRows(

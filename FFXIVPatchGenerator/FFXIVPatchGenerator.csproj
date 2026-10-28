@@ -59,6 +59,12 @@
     <Compile Include="PlayerNameFormTransfer.cs" />
     <Compile Include="SayQuestPhraseLocalizer.cs" />
     <Compile Include="ExdRowRewriter.cs" />
+    <Compile Include="SupplementTranslations.cs" />
+  </ItemGroup>
+  <ItemGroup>
+    <EmbeddedResource Include="Supplements\*.tsv">
+      <LogicalName>Supplements/%(Filename)%(Extension)</LogicalName>
+    </EmbeddedResource>
   </ItemGroup>
   <ItemGroup>
     <Content Include="FontPatchAssets\TTMPD.mpd" Condition="Exists('FontPatchAssets\TTMPD.mpd')">
