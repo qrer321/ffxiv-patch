@@ -40,29 +40,29 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
         private static void ExpectJapaneseTarget()
         {
             SupplementSheet sheet = Sheet(
-                "1\t0\tブーメランちょうだい！\tGimme a boomerang!\t부메랑 줘!\tkr-term\tglossary 1010",
-                "2\t0\tビッグス\tBiggs\t빅스 아님\tproject\t",
-                "3\t0\tウェッジ\tWedge\t웨지\tproject\t",
-                "4\t0\t\tDeepground SOLDIER\t딥그라운드 솔저\tproject\t");
+                "1\t0\t日本語1\tEnglish1\t보충1\tproject\t",
+                "2\t0\t日本語2\tEnglish2\t보충2\tproject\t",
+                "3\t0\t日本語3\tEnglish3\t보충3\tproject\t",
+                "4\t0\t\tEnglish4\t보충4\tproject\t");
             byte[] header = BuildHeader(5);
             ExcelHeader excelHeader = ExcelHeader.Parse(header);
             // Clean JA page; row 3 was changed by a game update after the entry was written.
             byte[] clean = BuildPage(
                 new uint[] { 0, 1, 2, 3, 4 },
-                new[] { "", "ブーメランちょうだい！", "ビッグス", "ウェッジだ", "" },
-                new[] { "", "ぶーめらんちょうだい", "びっぐす", "うぇっじだ", "" });
+                new[] { "", "日本語1", "日本語2", "日本語3改", "" },
+                new[] { "", "よみ1", "よみ2", "よみ3", "" });
             // After the Korean patch: row 2 has official Korean, the rest kept the target text.
             byte[] patched = BuildPage(
                 new uint[] { 0, 1, 2, 3, 4 },
-                new[] { "", "ブーメランちょうだい！", "빅스", "ウェッジだ", "" },
-                new[] { "", "ぶーめらんちょうだい", "びっぐす", "うぇっじだ", "" });
+                new[] { "", "日本語1", "공식2", "日本語3改", "" },
+                new[] { "", "よみ1", "よみ2", "よみ3", "" });
 
             SupplementResult result;
             ExcelDataFile output = ExcelDataFile.Parse(sheet.Apply(excelHeader, ExcelDataFile.Parse(clean), patched, "ja", null, out result));
             List<string> problems = new List<string>();
-            ExpectWord(problems, output, excelHeader, 1, "부메랑 줘!", "ぶーめらんちょうだい");
-            ExpectWord(problems, output, excelHeader, 2, "빅스", "びっぐす");
-            ExpectWord(problems, output, excelHeader, 3, "ウェッジだ", "うぇっじだ");
+            ExpectWord(problems, output, excelHeader, 1, "보충1", "よみ1");
+            ExpectWord(problems, output, excelHeader, 2, "공식2", "よみ2");
+            ExpectWord(problems, output, excelHeader, 3, "日本語3改", "よみ3");
             ExpectWord(problems, output, excelHeader, 4, "", "");
             ExpectCount(problems, "applied", result.Applied, 1);
             ExpectIssues(problems, result, SupplementIssueKind.Official, 2);
@@ -74,26 +74,26 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
         private static void ExpectEnglishTarget()
         {
             SupplementSheet sheet = Sheet(
-                "1\t0\tポーションちょうだい！\tGimme a potion!\t포션 줘!\tffxiv-kr\tItem#4551",
-                "4\t0\t\tDeepground SOLDIER\t딥그라운드 솔저\tproject\t");
+                "1\t0\t日本語1\tEnglish1\t보충1\tproject\t",
+                "4\t0\t\tEnglish4\t보충4\tproject\t");
             ExcelHeader excelHeader = ExcelHeader.Parse(BuildHeader(5));
             byte[] clean = BuildPage(
                 new uint[] { 1, 2, 3, 4 },
-                new[] { "Gimme a potion!", "Biggs", "Gimme a nail bat!", "Deepground SOLDIER" },
-                new[] { "ぽーしょんちょうだい", "びっぐす", "くぎばっとちょうだい", "" });
+                new[] { "English1", "English2", "English3", "English4" },
+                new[] { "よみ1", "よみ2", "よみ3", "" });
             // The Korean client's untranslated Japanese text was written over rows 1 and 3.
             byte[] patched = BuildPage(
                 new uint[] { 1, 2, 3, 4 },
-                new[] { "ポーションちょうだい！", "빅스", "釘バットちょうだい！", "Deepground SOLDIER" },
-                new[] { "ぽーしょんちょうだい", "びっぐす", "くぎばっとちょうだい", "" });
+                new[] { "日本語1", "공식2", "日本語3", "English4" },
+                new[] { "よみ1", "よみ2", "よみ3", "" });
 
             SupplementResult result;
             ExcelDataFile output = ExcelDataFile.Parse(sheet.Apply(excelHeader, ExcelDataFile.Parse(clean), patched, "en", null, out result));
             List<string> problems = new List<string>();
-            ExpectWord(problems, output, excelHeader, 1, "포션 줘!", "ぽーしょんちょうだい");
-            ExpectWord(problems, output, excelHeader, 2, "빅스", "びっぐす");
-            ExpectWord(problems, output, excelHeader, 3, "Gimme a nail bat!", "くぎばっとちょうだい");
-            ExpectWord(problems, output, excelHeader, 4, "딥그라운드 솔저", "");
+            ExpectWord(problems, output, excelHeader, 1, "보충1", "よみ1");
+            ExpectWord(problems, output, excelHeader, 2, "공식2", "よみ2");
+            ExpectWord(problems, output, excelHeader, 3, "English3", "よみ3");
+            ExpectWord(problems, output, excelHeader, 4, "보충4", "");
             ExpectCount(problems, "applied", result.Applied, 2);
             ExpectCount(problems, "restored", result.Restored, 1);
             ExpectIssues(problems, result, SupplementIssueKind.Missing, 3);
@@ -104,12 +104,12 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
         private static void ExpectDriftReported()
         {
             SupplementSheet sheet = Sheet(
-                "1\t0\tポーションちょうだい！\tGimme a potion!\t포션 줘!\tproject\t",
-                "2\t8\tビッグス\tBiggs\t빅스\tproject\tcol 8 is not a string column",
-                "9\t0\tウェッジ\tWedge\t웨지\tproject\trow 9 is not in the sheet");
+                "1\t0\t日本語1\tEnglish1\t보충1\tproject\t",
+                "2\t8\t日本語2\tEnglish2\t보충2\tproject\tcol 8 is not a string column",
+                "9\t0\t日本語9\tEnglish9\t보충9\tproject\trow 9 is not in the sheet");
             ExcelHeader excelHeader = ExcelHeader.Parse(BuildHeader(3));
             // Row 1 lost its Japanese word in an update.
-            byte[] clean = BuildPage(new uint[] { 1, 2 }, new[] { "", "ビッグス" }, new[] { "", "びっぐす" });
+            byte[] clean = BuildPage(new uint[] { 1, 2 }, new[] { "", "日本語2" }, new[] { "", "よみ2" });
 
             SupplementResult result;
             sheet.Apply(excelHeader, ExcelDataFile.Parse(clean), clean, "ja", null, out result);
@@ -132,24 +132,23 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
         private static void ExpectJapaneseTildes()
         {
             ExcelHeader excelHeader = ExcelHeader.Parse(BuildHeader(4));
-            string macroWord = "선택\u0002\u0010\u0001\u0003~";
+            string macroWord = "보충\u0002\u0010\u0001\u0003~";
             byte[] page = BuildPage(
                 new uint[] { 1, 2, 3 },
-                new[] { "호히~!", "Hi~", macroWord },
-                new[] { "ほひ～！", "", "" });
+                new[] { "보충~1", "English~2", macroWord },
+                new[] { "よみ～1", "", "" });
 
             int words;
-            ExcelDataFile output = ExcelDataFile.Parse(TypedWordText.UseJapaneseTildes(excelHeader, page, out words));
+            byte[] converted = TypedWordText.UseJapaneseTildes(excelHeader, page, out words);
+            ExcelDataFile output = ExcelDataFile.Parse(converted);
             List<string> problems = new List<string>();
-            ExpectWord(problems, output, excelHeader, 1, "호히\uFF5E!", "ほひ～！");
-            ExpectWord(problems, output, excelHeader, 2, "Hi~", "");
+            ExpectWord(problems, output, excelHeader, 1, "보충\uFF5E1", "よみ～1");
+            ExpectWord(problems, output, excelHeader, 2, "English~2", "");
             ExpectWord(problems, output, excelHeader, 3, macroWord, "");
             ExpectCount(problems, "tilde words", words, 1);
-
-            byte[] plain = BuildPage(new uint[] { 1 }, new[] { "부메랑 줘!" }, new[] { "ぶーめらんちょうだい" });
-            if (!ReferenceEquals(TypedWordText.UseJapaneseTildes(excelHeader, plain, out words), plain))
+            if (!ReferenceEquals(TypedWordText.UseJapaneseTildes(excelHeader, converted, out words), converted) || words != 0)
             {
-                problems.Add("a page without tildes must be returned as it is");
+                problems.Add("a page with nothing left to convert must be returned as it is");
             }
 
             if (!TypedWordText.IsTypedWordSheet("ktgtypewordtextdata") || TypedWordText.IsTypedWordSheet("Addon"))
@@ -162,10 +161,10 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
 
         private static void ExpectSkippedCells()
         {
-            SupplementSheet sheet = Sheet("1\t0\tポーションちょうだい！\tGimme a potion!\t포션 줘!\tproject\t");
+            SupplementSheet sheet = Sheet("1\t0\t日本語1\tEnglish1\t보충1\tproject\t");
             ExcelHeader excelHeader = ExcelHeader.Parse(BuildHeader(2));
-            byte[] clean = BuildPage(new uint[] { 1 }, new[] { "Gimme a potion!" }, new[] { "ぽーしょんちょうだい" });
-            byte[] patched = BuildPage(new uint[] { 1 }, new[] { "ポーションちょうだい！" }, new[] { "ぽーしょんちょうだい" });
+            byte[] clean = BuildPage(new uint[] { 1 }, new[] { "English1" }, new[] { "よみ1" });
+            byte[] patched = BuildPage(new uint[] { 1 }, new[] { "日本語1" }, new[] { "よみ1" });
 
             SupplementResult result;
             byte[] output = sheet.Apply(excelHeader, ExcelDataFile.Parse(clean), patched, "en", delegate { return true; }, out result);
