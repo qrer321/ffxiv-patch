@@ -103,9 +103,28 @@ body:
   - type: textarea
     id: logs
     attributes:
-      label: "로그"
-      description: "가능하면 `%LOCALAPPDATA%\\FFXIVKoreanPatch\\logs`의 관련 로그 파일을 끌어다 놓아주세요. 사용자 이름 등 개인정보가 포함된 경로는 가려주세요."
-      placeholder: "로그 파일을 이 영역에 끌어다 놓거나 관련 부분을 붙여넣어 주세요."
+      label: "패치 로그와 진단 파일"
+      description: |
+        `Win + R`을 누르고 `%LOCALAPPDATA%\FFXIVKoreanPatch`를 입력하면 관련 폴더가 열립니다.
+        가능하면 아래 두 파일을 이 영역에 끌어다 놓아주세요.
+        - `logs\*-build-release.log`
+        - `generated-release\<언어>\<게임 버전>\<생성 시각>\patch-diagnostics.tsv`
+        로그에 포함된 Windows 사용자 이름 등 개인정보는 가려주세요.
+      placeholder: "패치 생성·적용 로그와 patch-diagnostics.tsv를 이 영역에 끌어다 놓아주세요."
+
+  - type: textarea
+    id: crash_data
+    attributes:
+      label: "클라이언트 크래시 자료"
+      description: |
+        FFXIV가 종료됐다면 가능할 때 `Win + R`에서 `%ProgramData%\Microsoft\Windows\WER\ReportArchive`를 열고 `AppCrash_ffxiv_dx11.exe_*` 폴더를 찾아주세요.
+        폴더가 없으면 이벤트 뷰어의 `Windows 로그 > 응용 프로그램`에서 `ffxiv_dx11.exe`의 Application Error 또는 Windows Error Reporting 내용을 붙여주세요.
+        전체 `.dmp` 파일은 계정·세션 등 민감한 메모리를 포함할 수 있으므로 공개 이슈에 직접 첨부하지 말고, 존재 여부와 파일 크기만 적어주세요.
+      placeholder: |
+        WER 폴더: AppCrash_ffxiv_dx11.exe_...
+        예외 코드:
+        오류 모듈:
+        오류 오프셋:
 
   - type: textarea
     id: screenshots
