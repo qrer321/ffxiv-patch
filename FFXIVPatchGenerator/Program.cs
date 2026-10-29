@@ -60,6 +60,12 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
                 Console.WriteLine("  Say phrase rows:      {0}", report.SayQuestPhraseRows);
                 Console.WriteLine("  Say prompt rows:      {0}", report.SayQuestAnnotatedRows);
                 Console.WriteLine("  Say quests kept ko:   {0}", report.SayQuestsKeptKorean);
+                Console.WriteLine("  Supplement applied:   {0}", report.SupplementApplied);
+                Console.WriteLine("  Supplement restored:  {0}", report.SupplementRestored);
+                Console.WriteLine("  Supplement official:  {0}", report.SupplementOfficial);
+                Console.WriteLine("  Supplement stale:     {0}", report.SupplementStale);
+                Console.WriteLine("  Supplement missing:   {0}", report.SupplementMissing);
+                Console.WriteLine("  Typed word tildes:    {0}", report.TypedWordTildes);
                 Console.WriteLine("  Pages without mapping:{0}", report.PagesSkippedNoMapping);
                 Console.WriteLine("  Missing source pages: {0}", report.MissingSourcePages);
                 Console.WriteLine("  Missing target pages: {0}", report.MissingTargetPages);
@@ -591,6 +597,12 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
         public int SayQuestPhraseRows;
         public int SayQuestAnnotatedRows;
         public int SayQuestsKeptKorean;
+        public int SupplementApplied;
+        public int SupplementRestored;
+        public int SupplementOfficial;
+        public int SupplementStale;
+        public int SupplementMissing;
+        public int TypedWordTildes;
         public int PagesSkippedNoMapping;
         public int MissingSourcePages;
         public int MissingTargetPages;

@@ -857,7 +857,7 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
 
         private static bool IsShortNonKoreanUiToken(byte[] bytes)
         {
-            if (bytes == null || bytes.Length == 0 || ContainsHangul(bytes))
+            if (bytes == null || bytes.Length == 0 || HangulText.Contains(bytes))
             {
                 return false;
             }
@@ -898,7 +898,7 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
 
             bool replacementDropsDataCenterLookup =
                 ContainsKnownDataCenterLookup(original) && !ContainsKnownDataCenterLookup(replacement);
-            if (!ContainsHangul(replacement))
+            if (!HangulText.Contains(replacement))
             {
                 if (replacementDropsDataCenterLookup)
                 {
@@ -1056,7 +1056,7 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
                 }
 
                 ByteRange range = new ByteRange(textStart, cursor - textStart);
-                if (IsMeaningfulUiText(bytes, range) && (!requireHangul || ContainsHangul(bytes, range)))
+                if (IsMeaningfulUiText(bytes, range) && (!requireHangul || HangulText.Contains(bytes, range.Offset, range.Length)))
                 {
                     ranges.Add(range);
                 }
@@ -1268,40 +1268,6 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
             return true;
         }
 
-        private static bool ContainsHangul(byte[] bytes)
-        {
-            string text = new UTF8Encoding(false, false).GetString(bytes);
-            for (int i = 0; i < text.Length; i++)
-            {
-                char ch = text[i];
-                if ((ch >= '\uac00' && ch <= '\ud7a3') ||
-                    (ch >= '\u1100' && ch <= '\u11ff') ||
-                    (ch >= '\u3130' && ch <= '\u318f'))
-                {
-                    return true;
-                }
-            }
-
-            return false;
-        }
-
-        private static bool ContainsHangul(byte[] bytes, ByteRange range)
-        {
-            string text = new UTF8Encoding(false, false).GetString(bytes, range.Offset, range.Length);
-            for (int i = 0; i < text.Length; i++)
-            {
-                char ch = text[i];
-                if ((ch >= '\uac00' && ch <= '\ud7a3') ||
-                    (ch >= '\u1100' && ch <= '\u11ff') ||
-                    (ch >= '\u3130' && ch <= '\u318f'))
-                {
-                    return true;
-                }
-            }
-
-            return false;
-        }
-
         private static string ExtractVisibleAscii(byte[] bytes)
         {
             StringBuilder builder = new StringBuilder();
@@ -1392,7 +1358,7 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
                    (ch >= '{' && ch <= '~');
         }
 
-        private static bool BytesEqual(byte[] left, byte[] right)
+        internal static bool BytesEqual(byte[] left, byte[] right)
         {
             if (left == null || right == null)
             {
