@@ -180,7 +180,7 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
                 return "unknown source '" + entry.Source + "'.";
             }
 
-            if (!SupplementTranslations.ContainsHangul(Encoding.UTF8.GetBytes(entry.Korean)))
+            if (!HangulText.Contains(Encoding.UTF8.GetBytes(entry.Korean)))
             {
                 return "ko has no Hangul: " + entry.Korean;
             }
@@ -227,7 +227,7 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
             SupplementEntry entry;
             _entries.TryGetValue(Key(rowId, columnOffset), out entry);
             SupplementCell cell = new SupplementCell { Selected = target };
-            if (SupplementTranslations.ContainsHangul(patched))
+            if (HangulText.Contains(patched))
             {
                 cell.Selected = patched;
                 cell.SetIssue(entry != null, SupplementIssueKind.Official);
@@ -402,23 +402,6 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
             return SupplementSheet.Parse(
                 reader,
                 TypedWordText.IsTypedWordSheet(sheetName) ? new Func<SupplementEntry, string>(TypedWordText.CheckWord) : null);
-        }
-
-        public static bool ContainsHangul(byte[] bytes)
-        {
-            string text = new UTF8Encoding(false, false).GetString(bytes);
-            for (int i = 0; i < text.Length; i++)
-            {
-                char ch = text[i];
-                if ((ch >= '\uAC00' && ch <= '\uD7A3') ||
-                    (ch >= '\u1100' && ch <= '\u11FF') ||
-                    (ch >= '\u3130' && ch <= '\u318F'))
-                {
-                    return true;
-                }
-            }
-
-            return false;
         }
 
         // Returns the embedded supplement of a sheet, or null when the sheet has none.

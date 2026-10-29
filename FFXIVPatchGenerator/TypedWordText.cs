@@ -77,7 +77,7 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
                     if (word == null ||
                         Array.IndexOf(word, (byte)'~') < 0 ||
                         Array.IndexOf(word, (byte)0x02) >= 0 ||
-                        !SupplementTranslations.ContainsHangul(word))
+                        !HangulText.Contains(word))
                     {
                         continue;
                     }

@@ -36,7 +36,8 @@ $sources = @(
     "SayQuestPhraseLocalizer.cs",
     "ExdRowRewriter.cs",
     "SupplementTranslations.cs",
-    "TypedWordText.cs"
+    "TypedWordText.cs",
+    "HangulText.cs"
 ) | ForEach-Object { Join-Path $PSScriptRoot $_ }
 
 # Supplements\<sheet>.tsv is embedded as "Supplements/<sheet>.tsv" (see SupplementTranslations).
