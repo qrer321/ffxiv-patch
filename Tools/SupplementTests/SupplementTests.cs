@@ -23,7 +23,6 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
             ExpectEnglishTarget();
             ExpectSkippedCells();
             ExpectDriftReported();
-            ExpectJapaneseTildes();
             ExpectParseErrors();
             ExpectShippedSheets(supplementDir);
 
@@ -127,36 +126,6 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
             }
 
             Report("an entry whose target text is gone, row is missing or column is not a string column is reported stale", problems);
-        }
-
-        private static void ExpectJapaneseTildes()
-        {
-            ExcelHeader excelHeader = ExcelHeader.Parse(BuildHeader(4));
-            string macroWord = "보충\u0002\u0010\u0001\u0003~";
-            byte[] page = BuildPage(
-                new uint[] { 1, 2, 3 },
-                new[] { "보충~1", "English~2", macroWord },
-                new[] { "よみ～1", "", "" });
-
-            int words;
-            byte[] converted = TypedWordText.UseJapaneseTildes(excelHeader, page, out words);
-            ExcelDataFile output = ExcelDataFile.Parse(converted);
-            List<string> problems = new List<string>();
-            ExpectWord(problems, output, excelHeader, 1, "보충\uFF5E1", "よみ～1");
-            ExpectWord(problems, output, excelHeader, 2, "English~2", "");
-            ExpectWord(problems, output, excelHeader, 3, macroWord, "");
-            ExpectCount(problems, "tilde words", words, 1);
-            if (!ReferenceEquals(TypedWordText.UseJapaneseTildes(excelHeader, converted, out words), converted) || words != 0)
-            {
-                problems.Add("a page with nothing left to convert must be returned as it is");
-            }
-
-            if (!TypedWordText.IsTypedWordSheet("ktgtypewordtextdata") || TypedWordText.IsTypedWordSheet("Addon"))
-            {
-                problems.Add("typed-word sheet matching is wrong");
-            }
-
-            Report("Japanese target: Korean typed words take U+FF5E; other words and SeString values keep '~'", problems);
         }
 
         private static void ExpectSkippedCells()

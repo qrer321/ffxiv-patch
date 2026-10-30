@@ -714,9 +714,7 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
                     JoinPatchNotes(
                         ApplyQuestChatPhraseAnonymization(sheetName, globalHeader, ref patchResult),
                         ApplySayQuestPhrases(sheetName, globalHeader, targetExd, japaneseReference, ref patchResult)),
-                    JoinPatchNotes(
-                        ApplySupplement(sheetName, page, supplement, globalHeader, targetExd, sheetPolicy, textSheetScopePolicy, diagnostics, ref patchResult),
-                        ApplyJapaneseTypedWordTildes(sheetName, globalHeader, ref patchResult)));
+                    ApplySupplement(sheetName, page, supplement, globalHeader, targetExd, sheetPolicy, textSheetScopePolicy, diagnostics, ref patchResult));
                 _report.ProtectedUiStrings += patchResult.ProtectedUiStrings;
                 _report.RsvRows += patchResult.RsvRows;
                 _report.RsvStrings += patchResult.RsvStrings;
@@ -1251,22 +1249,6 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
         private static string SupplementStatus(SupplementIssueKind kind)
         {
             return SupplementStatus(kind.ToString().ToLowerInvariant());
-        }
-
-        private string ApplyJapaneseTypedWordTildes(string sheetName, ExcelHeader header, ref ExdPatchResult patchResult)
-        {
-            if (patchResult == null ||
-                !patchResult.Changed ||
-                !string.Equals(_options.TargetLanguage, "ja", StringComparison.OrdinalIgnoreCase) ||
-                !TypedWordText.IsTypedWordSheet(sheetName))
-            {
-                return string.Empty;
-            }
-
-            int words;
-            patchResult.Data = TypedWordText.UseJapaneseTildes(header, patchResult.Data, out words);
-            _report.TypedWordTildes += words;
-            return words == 0 ? string.Empty : "fullwidth-tilde words=" + words.ToString();
         }
 
         private static int CountChangedRows(ExcelHeader header, List<int> stringColumns, ExcelDataFile clean, ExcelDataFile patched)
