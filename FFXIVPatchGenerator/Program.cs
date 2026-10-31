@@ -61,6 +61,7 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
                 Console.WriteLine("  Say prompt rows:      {0}", report.SayQuestAnnotatedRows);
                 Console.WriteLine("  Say quests kept ko:   {0}", report.SayQuestsKeptKorean);
                 Console.WriteLine("  Supplement applied:   {0}", report.SupplementApplied);
+                Console.WriteLine("  Supplement corrected: {0}", report.SupplementCorrected);
                 Console.WriteLine("  Supplement restored:  {0}", report.SupplementRestored);
                 Console.WriteLine("  Supplement official:  {0}", report.SupplementOfficial);
                 Console.WriteLine("  Supplement stale:     {0}", report.SupplementStale);
@@ -597,6 +598,7 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
         public int SayQuestAnnotatedRows;
         public int SayQuestsKeptKorean;
         public int SupplementApplied;
+        public int SupplementCorrected;
         public int SupplementRestored;
         public int SupplementOfficial;
         public int SupplementStale;

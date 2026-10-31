@@ -1678,6 +1678,7 @@ namespace FFXIVKoreanPatch.Main
                 { "Say quest phrases", "say quest 입력 문구" },
                 { "Say quest rows", "say quest 보정 행" },
                 { "Supplement applied", "보충 번역 적용" },
+                { "Supplement corrected", "공식 오타 보정" },
                 { "Supplement official", "보충 번역 중 공식 번역 생김" },
                 { "Supplement stale", "보충 번역 원문 변경" },
                 { "Supplement missing", "보충 번역 없음" },

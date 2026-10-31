@@ -197,14 +197,15 @@
 - `global_target_rows` 정책으로 특정 row를 대상 글로벌 언어 원본으로 유지
 - `global_english_rows` 정책으로 특정 row를 글로벌 영어 원본으로 유지
 - 마법자판 난타전 단어 `KTGTypeWordTextData`(`remainder`)는 row id로 매칭. 한국/글로벌 row 번호와 읽기 열이 1:1로 같음
-  - 한국 클라이언트에 한국어가 없는 단어(일본어로 둔 행, EN 전용 행)는 보충 번역 시트 `KTGTypeWordTextData.tsv`로 채움. 행 수와 출처 분포는 `Docs/KNOWN_ISSUES.md`
+  - 한국 클라이언트에 한국어가 없는 단어(일본어로 둔 행, EN 전용 행)는 보충 번역 시트 `KTGTypeWordTextData.tsv`로 채우고, 확인된 한국 공식 오타 6개(`중갑장 전투원` → `중장갑 전투원` 등)는 같은 시트로 보정. 행 수·출처 분포·보정 목록은 `Docs/KNOWN_ISSUES.md`
   - 물결표는 JA·EN 대상 모두 한국 클라이언트 단어처럼 반각 `~` 유지(한국어 자판 입력과 같은 글자)
-- 보충 번역 시트(`FFXIVPatchGenerator/Supplements/<sheet>.tsv`, 생성기에 내장): 한국 클라이언트에 한국어가 없는 셀을 채움
-  - 열: `row`, `col`(문자열 열 offset), `ja`/`en`(번역 당시 대상 원문), `ko`, `source`, `note`. `source`는 `kr-row:<row>`(한국 전용 행 문구), `kr-term`(같은 시트 한국 표기 조합), `ffxiv-kr`(FFXIV 한국판 다른 시트), `ff7r-ko`, `community`, `project`
+- 보충 번역 시트(`FFXIVPatchGenerator/Supplements/<sheet>.tsv`, 생성기에 내장): 한국 클라이언트에 한국어가 없는 셀을 채우고 한국 클라이언트 오타를 보정
+  - 열: `row`, `col`(문자열 열 offset), `ja`/`en`(번역 당시 대상 원문), `kr`(보정할 한국 공식 원문, 번역 항목은 빈칸), `ko`, `source`, `note`. `source`는 `kr-row:<row>`(한국 전용 행 문구), `kr-term`(같은 시트 한국 표기 조합), `ffxiv-kr`(FFXIV 한국판 다른 시트), `ff7r-ko`, `community`, `project`
   - 시트에 항목이 있는 열만 다룸. 그 열에서 한국 텍스트에 한글이 없으면 한국 텍스트 대신 대상 원문을 유지하고, 대상 원문이 `ja`(JA 대상)/`en`(EN 대상) 칸과 같을 때만 `ko`로 교체. 한국 공식 한글이 있으면 공식 우선. 되돌린 결과 원문과 같아진 page는 쓰지 않음
+  - 보정 항목은 한국 텍스트가 `kr`과 정확히 같고 대상 원문이 `ja`/`en`과 같을 때만 `ko`로 바꿈. 한국 클라이언트가 문구를 바꾸면 공식 문구를 쓰고 `supplement-official`로 진단
   - 베이스 언어 범위와 `patch-policy` 보존·global fallback·remap 셀은 건드리지 않음
-  - 진단 note `supplement applied=…, restored=…, official=…, stale=…, missing=…`, 셀별 `supplement-official`/`-stale`/`-missing` 행(갱신할 항목 목록). 대상 원문이 바뀌거나 비었을 때, row가 없거나 `col`이 문자열 열이 아닐 때 `stale`
-  - 실행 요약 `Supplement applied/restored/official/stale/missing`. UI 결과창에 적용·공식·원문 변경·없음 수 표시
+  - 진단 note `supplement applied=…, corrected=…, restored=…, official=…, stale=…, missing=…`, 셀별 `supplement-official`/`-stale`/`-missing` 행(갱신할 항목 목록). 대상 원문이 바뀌거나 비었을 때, row가 없거나 `col`이 문자열 열이 아닐 때 `stale`
+  - 실행 요약 `Supplement applied/corrected/restored/official/stale/missing`. UI 결과창에 적용·오타 보정·공식·원문 변경·없음 수 표시
   - `--diagnostic-csv`의 처리 열 선택 문자열은 시트 적용 결과이며 note에 `supplement-*` 기록
   - 읽을 때 형식·출처·`ko`(한글 포함, 공백)·입력 단어 규칙(한국어 키보드 입력 가능 문자, `~`는 한국 클라이언트 문구만) 검사. 위반 시 시트 전체를 건너뛰고 경고
   - 회귀 테스트·내장 시트 검사: `Scripts\test-supplements.ps1`

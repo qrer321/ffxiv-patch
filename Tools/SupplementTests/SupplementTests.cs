@@ -23,6 +23,7 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
             ExpectEnglishTarget();
             ExpectSkippedCells();
             ExpectDriftReported();
+            ExpectCorrections();
             ExpectParseErrors();
             ExpectShippedSheets(supplementDir);
 
@@ -39,10 +40,10 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
         private static void ExpectJapaneseTarget()
         {
             SupplementSheet sheet = Sheet(
-                "1\t0\t日本語1\tEnglish1\t보충1\tproject\t",
-                "2\t0\t日本語2\tEnglish2\t보충2\tproject\t",
-                "3\t0\t日本語3\tEnglish3\t보충3\tproject\t",
-                "4\t0\t\tEnglish4\t보충4\tproject\t");
+                "1\t0\t日本語1\tEnglish1\t\t보충1\tproject\t",
+                "2\t0\t日本語2\tEnglish2\t\t보충2\tproject\t",
+                "3\t0\t日本語3\tEnglish3\t\t보충3\tproject\t",
+                "4\t0\t\tEnglish4\t\t보충4\tproject\t");
             byte[] header = BuildHeader(5);
             ExcelHeader excelHeader = ExcelHeader.Parse(header);
             // Clean JA page; row 3 was changed by a game update after the entry was written.
@@ -73,8 +74,8 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
         private static void ExpectEnglishTarget()
         {
             SupplementSheet sheet = Sheet(
-                "1\t0\t日本語1\tEnglish1\t보충1\tproject\t",
-                "4\t0\t\tEnglish4\t보충4\tproject\t");
+                "1\t0\t日本語1\tEnglish1\t\t보충1\tproject\t",
+                "4\t0\t\tEnglish4\t\t보충4\tproject\t");
             ExcelHeader excelHeader = ExcelHeader.Parse(BuildHeader(5));
             byte[] clean = BuildPage(
                 new uint[] { 1, 2, 3, 4 },
@@ -103,9 +104,9 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
         private static void ExpectDriftReported()
         {
             SupplementSheet sheet = Sheet(
-                "1\t0\t日本語1\tEnglish1\t보충1\tproject\t",
-                "2\t8\t日本語2\tEnglish2\t보충2\tproject\tcol 8 is not a string column",
-                "9\t0\t日本語9\tEnglish9\t보충9\tproject\trow 9 is not in the sheet");
+                "1\t0\t日本語1\tEnglish1\t\t보충1\tproject\t",
+                "2\t8\t日本語2\tEnglish2\t\t보충2\tproject\tcol 8 is not a string column",
+                "9\t0\t日本語9\tEnglish9\t\t보충9\tproject\trow 9 is not in the sheet");
             ExcelHeader excelHeader = ExcelHeader.Parse(BuildHeader(3));
             // Row 1 lost its Japanese word in an update.
             byte[] clean = BuildPage(new uint[] { 1, 2 }, new[] { "", "日本語2" }, new[] { "", "よみ2" });
@@ -128,9 +129,44 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
             Report("an entry whose target text is gone, row is missing or column is not a string column is reported stale", problems);
         }
 
+        // A Korean-client typo is corrected only while the Korean client still has that exact text
+        // and the target text is the one the entry was written for.
+        private static void ExpectCorrections()
+        {
+            SupplementSheet sheet = Sheet(
+                "1\t0\t日本語1\tEnglish1\t오타1\t정정1\tkr-term\t",
+                "2\t0\t日本語2\tEnglish2\t오타2\t정정2\tkr-term\t",
+                "3\t0\t日本語3\tEnglish3\t오타3\t정정3\tkr-term\t",
+                "4\t0\t\t\t오타4\t정정4\tkr-term\tKorean-only row");
+            ExcelHeader excelHeader = ExcelHeader.Parse(BuildHeader(5));
+            byte[] clean = BuildPage(
+                new uint[] { 1, 2, 3, 4 },
+                new[] { "日本語1", "日本語2", "日本語3改", "" },
+                new[] { "よみ1", "よみ2", "よみ3", "" });
+            // Row 2: the Korean client fixed its text in its own way.
+            byte[] patched = BuildPage(
+                new uint[] { 1, 2, 3, 4 },
+                new[] { "오타1", "고침2", "오타3", "오타4" },
+                new[] { "よみ1", "よみ2", "よみ3", "" });
+
+            SupplementResult result;
+            ExcelDataFile output = ExcelDataFile.Parse(sheet.Apply(excelHeader, ExcelDataFile.Parse(clean), patched, "ja", null, out result));
+            List<string> problems = new List<string>();
+            ExpectWord(problems, output, excelHeader, 1, "정정1", "よみ1");
+            ExpectWord(problems, output, excelHeader, 2, "고침2", "よみ2");
+            ExpectWord(problems, output, excelHeader, 3, "오타3", "よみ3");
+            ExpectWord(problems, output, excelHeader, 4, "정정4", "");
+            ExpectCount(problems, "corrected", result.Corrected, 2);
+            ExpectCount(problems, "applied", result.Applied, 0);
+            ExpectCount(problems, "restored", result.Restored, 0);
+            ExpectIssues(problems, result, SupplementIssueKind.Official, 2);
+            ExpectIssues(problems, result, SupplementIssueKind.Stale, 3);
+            Report("Korean-client typos are corrected only while the Korean text and the target text are unchanged", problems);
+        }
+
         private static void ExpectSkippedCells()
         {
-            SupplementSheet sheet = Sheet("1\t0\t日本語1\tEnglish1\t보충1\tproject\t");
+            SupplementSheet sheet = Sheet("1\t0\t日本語1\tEnglish1\t\t보충1\tproject\t");
             ExcelHeader excelHeader = ExcelHeader.Parse(BuildHeader(2));
             byte[] clean = BuildPage(new uint[] { 1 }, new[] { "English1" }, new[] { "よみ1" });
             byte[] patched = BuildPage(new uint[] { 1 }, new[] { "日本語1" }, new[] { "よみ1" });
@@ -153,18 +189,21 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
             const string sheet = "OtherSheet";
             const string typedWords = "KTGTypeWordTextData";
             List<string> problems = new List<string>();
-            ExpectRejected(problems, "duplicate key", sheet, "1\t0\ta\t\t가\tproject\t\n1\t0\tb\t\t나\tproject\t");
-            ExpectRejected(problems, "missing ko", sheet, "1\t0\ta\t\t\tproject\t");
-            ExpectRejected(problems, "no ja or en", sheet, "1\t0\t\t\t가\tproject\t");
-            ExpectRejected(problems, "wrong field count", sheet, "1\t0\ta\t가\tproject\t");
-            ExpectRejected(problems, "unknown source", sheet, "1\t0\ta\t\t가\tglossary\t");
-            ExpectRejected(problems, "kr-row without a row", sheet, "1\t0\ta\t\t가\tkr-row:\t");
-            ExpectRejected(problems, "ko without Hangul", sheet, "1\t0\ta\t\tka\tproject\t");
-            ExpectRejected(problems, "stray spaces", sheet, "1\t0\ta\t\t가  나\tproject\t");
-            ExpectRejected(problems, "untypeable typed word", typedWords, "1\t0\ta\t\t가…\tproject\t");
-            ExpectRejected(problems, "own tilde in a typed word", typedWords, "1\t0\ta\t\t가~\tproject\t");
-            ExpectAccepted(problems, "Korean client's tilde in a typed word", typedWords, "1\t0\ta\t\t가~\tkr-row:5\t");
-            ExpectAccepted(problems, "tilde outside typed words", sheet, "1\t0\ta\t\t가~\tproject\t");
+            ExpectRejected(problems, "duplicate key", sheet, "1\t0\ta\t\t\t가\tproject\t\n1\t0\tb\t\t\t나\tproject\t");
+            ExpectRejected(problems, "missing ko", sheet, "1\t0\ta\t\t\t\tproject\t");
+            ExpectRejected(problems, "no ja or en", sheet, "1\t0\t\t\t\t가\tproject\t");
+            ExpectRejected(problems, "wrong field count", sheet, "1\t0\ta\t\t가\tproject\t");
+            ExpectRejected(problems, "unknown source", sheet, "1\t0\ta\t\t\t가\tglossary\t");
+            ExpectRejected(problems, "kr-row without a row", sheet, "1\t0\ta\t\t\t가\tkr-row:\t");
+            ExpectRejected(problems, "ko without Hangul", sheet, "1\t0\ta\t\t\tka\tproject\t");
+            ExpectRejected(problems, "stray spaces", sheet, "1\t0\ta\t\t\t가  나\tproject\t");
+            ExpectRejected(problems, "kr without Hangul", sheet, "1\t0\ta\t\tka\t가\tproject\t");
+            ExpectRejected(problems, "kr equal to ko", sheet, "1\t0\ta\t\t가\t가\tproject\t");
+            ExpectAccepted(problems, "correction of a Korean-only row", sheet, "1\t0\t\t\t가\t나\tproject\t");
+            ExpectRejected(problems, "untypeable typed word", typedWords, "1\t0\ta\t\t\t가…\tproject\t");
+            ExpectRejected(problems, "own tilde in a typed word", typedWords, "1\t0\ta\t\t\t가~\tproject\t");
+            ExpectAccepted(problems, "Korean client's tilde in a typed word", typedWords, "1\t0\ta\t\t\t가~\tkr-row:5\t");
+            ExpectAccepted(problems, "tilde outside typed words", sheet, "1\t0\ta\t\t\t가~\tproject\t");
             try
             {
                 SupplementSheet.Parse(new StringReader("row\tcol\tko\n1\t0\t가"));

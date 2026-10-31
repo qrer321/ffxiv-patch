@@ -6,22 +6,31 @@ using System.Text;
 
 namespace FfxivKoreanPatch.FFXIVPatchGenerator
 {
-    // Korean text the Korean client does not have, kept as one TSV per sheet in Supplements/ and
+    // Korean text for cells the Korean client gets wrong, kept as one TSV per sheet in Supplements/ and
     // embedded as "Supplements/<sheet>.tsv" ('/' in a sheet path becomes '_'). Columns:
-    //   row  col  ja  en  ko  source  note
+    //   row  col  ja  en  kr  ko  source  note
     // `col` is the string column offset; `ja`/`en` are the target texts the entry was translated from.
     // In the string columns a sheet has entries for, a cell the Korean client leaves without Hangul
     // keeps the target text (the Korean client's untranslated text is never written), and an entry
     // replaces it only while the clean target text equals the entry's text for the target language.
-    // Official Korean text always wins; a changed target text keeps the global text.
+    // Official Korean text wins, except where an entry's `kr` names that exact text: such an entry
+    // corrects a typo of the Korean client and stops applying once the Korean client changes it.
+    // A changed target text keeps the global text.
     internal sealed class SupplementEntry
     {
         public uint RowId;
         public ushort ColumnOffset;
         public string Japanese;
         public string English;
+        // Official Korean text the entry corrects; empty for entries that fill missing Korean.
+        public string KoreanClient;
         public string Korean;
         public string Source;
+
+        public bool IsCorrection
+        {
+            get { return KoreanClient.Length > 0; }
+        }
 
         public string TextFor(string targetLanguage)
         {
@@ -55,6 +64,7 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
     internal sealed class SupplementResult
     {
         public int Applied;
+        public int Corrected;
         public int Restored;
         public readonly List<SupplementIssue> Issues = new List<SupplementIssue>();
 
@@ -78,6 +88,7 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
     {
         public byte[] Selected;
         public bool Applied;
+        public bool Corrected;
         public bool HasIssue;
         public SupplementIssueKind Issue;
 
@@ -90,7 +101,7 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
 
     internal sealed class SupplementSheet
     {
-        public const string Header = "row\tcol\tja\ten\tko\tsource\tnote";
+        public const string Header = "row\tcol\tja\ten\tkr\tko\tsource\tnote";
 
         private readonly Dictionary<ulong, SupplementEntry> _entries = new Dictionary<ulong, SupplementEntry>();
         private readonly HashSet<ushort> _columns = new HashSet<ushort>();
@@ -128,9 +139,9 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
                 }
 
                 string[] fields = line.Split('\t');
-                if (fields.Length != 7)
+                if (fields.Length != 8)
                 {
-                    throw new InvalidDataException("Supplement line " + lineNumber + ": expected 7 tab-separated fields, got " + fields.Length + ".");
+                    throw new InvalidDataException("Supplement line " + lineNumber + ": expected 8 tab-separated fields, got " + fields.Length + ".");
                 }
 
                 uint rowId;
@@ -146,8 +157,9 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
                     ColumnOffset = columnOffset,
                     Japanese = fields[2],
                     English = fields[3],
-                    Korean = fields[4],
-                    Source = fields[5],
+                    KoreanClient = fields[4],
+                    Korean = fields[5],
+                    Source = fields[6],
                 };
                 string problem = CheckEntry(entry) ?? (checkEntry == null ? null : checkEntry(entry));
                 if (problem != null)
@@ -170,9 +182,20 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
 
         private static string CheckEntry(SupplementEntry entry)
         {
-            if (entry.Korean.Length == 0 || (entry.Japanese.Length == 0 && entry.English.Length == 0))
+            if (entry.Korean.Length == 0)
             {
-                return "ko and at least one of ja/en are required.";
+                return "ko is required.";
+            }
+
+            if (!entry.IsCorrection && entry.Japanese.Length == 0 && entry.English.Length == 0)
+            {
+                return "at least one of ja/en is required (or kr for a correction).";
+            }
+
+            if (entry.IsCorrection &&
+                (!HangulText.Contains(Encoding.UTF8.GetBytes(entry.KoreanClient)) || entry.KoreanClient == entry.Korean))
+            {
+                return "kr must be the Korean client's Korean text and differ from ko.";
             }
 
             if (!SupplementSources.IsKnown(entry.Source))
@@ -230,6 +253,23 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
             if (HangulText.Contains(patched))
             {
                 cell.Selected = patched;
+                if (entry != null && entry.IsCorrection &&
+                    string.Equals(Encoding.UTF8.GetString(patched), entry.KoreanClient, StringComparison.Ordinal))
+                {
+                    if (string.Equals(entry.TextFor(targetLanguage), Encoding.UTF8.GetString(target), StringComparison.Ordinal))
+                    {
+                        cell.Selected = Encoding.UTF8.GetBytes(entry.Korean);
+                        cell.Corrected = true;
+                    }
+                    else
+                    {
+                        cell.SetIssue(true, SupplementIssueKind.Stale);
+                    }
+
+                    return cell;
+                }
+
+                // The Korean client has its own Korean; an entry for it can be removed.
                 cell.SetIssue(entry != null, SupplementIssueKind.Official);
                 return cell;
             }
@@ -311,13 +351,17 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
                     {
                         result.Applied++;
                     }
+                    else if (cell.Corrected)
+                    {
+                        result.Corrected++;
+                    }
 
                     if (BytesEqual(cell.Selected, patched))
                     {
                         continue;
                     }
 
-                    if (!cell.Applied)
+                    if (!cell.Applied && !cell.Corrected)
                     {
                         result.Restored++;
                     }

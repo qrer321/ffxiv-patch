@@ -1184,6 +1184,7 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
             int stale = result.Count(SupplementIssueKind.Stale);
             int missing = result.Count(SupplementIssueKind.Missing);
             _report.SupplementApplied += result.Applied;
+            _report.SupplementCorrected += result.Corrected;
             _report.SupplementRestored += result.Restored;
             _report.SupplementOfficial += official;
             _report.SupplementStale += stale;
@@ -1201,6 +1202,7 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
             }
 
             return "supplement applied=" + result.Applied.ToString() +
+                   ", corrected=" + result.Corrected.ToString() +
                    ", restored=" + result.Restored.ToString() +
                    ", official=" + official.ToString() +
                    ", stale=" + stale.ToString() +
@@ -1676,9 +1678,11 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
                             SupplementCell cell = supplement.Resolve(targetRow.RowId, column.Offset, beforeSupplement, globalBytes ?? new byte[0], _options.TargetLanguage);
                             string supplementNote = cell.Applied
                                 ? SupplementStatus("applied")
-                                : cell.HasIssue
-                                    ? SupplementStatus(cell.Issue)
-                                    : ExdStringPatcher.BytesEqual(cell.Selected, beforeSupplement) ? string.Empty : SupplementStatus("restored");
+                                : cell.Corrected
+                                    ? SupplementStatus("corrected")
+                                    : cell.HasIssue
+                                        ? SupplementStatus(cell.Issue)
+                                        : ExdStringPatcher.BytesEqual(cell.Selected, beforeSupplement) ? string.Empty : SupplementStatus("restored");
                             selectedBytes = cell.Selected;
                             if (supplementNote.Length > 0)
                             {
