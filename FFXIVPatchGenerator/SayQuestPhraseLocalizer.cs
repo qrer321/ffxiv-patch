@@ -399,6 +399,39 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
             }
         }
 
+        // Shows the base phrase after each quoted mention of a Korean phrase in a Korean text, as in
+        // quest prompts: "주문(base)". Macros are kept. Returns null when the text quotes no mention.
+        public static byte[] AnnotateQuotedPhrase(byte[] korean, string koreanPhrase, string basePhrase)
+        {
+            List<Segment> segments;
+            string koreanKey = Normalize(koreanPhrase);
+            if (korean == null || korean.Length == 0 || koreanKey.Length == 0 || !TrySplit(korean, out segments))
+            {
+                return null;
+            }
+
+            Dictionary<string, List<string>> bases = new Dictionary<string, List<string>>(StringComparer.Ordinal);
+            bases.Add(koreanKey, new List<string> { basePhrase });
+            HashSet<string> annotated = new HashSet<string>(StringComparer.Ordinal);
+            bool changed = false;
+            for (int i = 0; i < segments.Count; i++)
+            {
+                if (segments[i].Text == null)
+                {
+                    continue;
+                }
+
+                string updated = AnnotateQuoted(segments[i].Text, bases, string.Empty, annotated);
+                if (!string.Equals(updated, segments[i].Text, StringComparison.Ordinal))
+                {
+                    segments[i].Text = updated;
+                    changed = true;
+                }
+            }
+
+            return changed ? Join(segments) : null;
+        }
+
         // Inserts "(base)" after every occurrence of the Korean phrase that starts a word, so a short
         // answer is not annotated inside a longer word. Particles may follow, so only the start is checked.
         private static string AnnotateWords(

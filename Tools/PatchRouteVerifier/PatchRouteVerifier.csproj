@@ -190,6 +190,17 @@
     <Compile Include="..\..\FFXIVPatchGenerator\ExdRowRewriter.cs">
       <Link>Generator\ExdRowRewriter.cs</Link>
     </Compile>
+    <Compile Include="..\..\FFXIVPatchGenerator\SayContentPhrases.cs">
+      <Link>Generator\SayContentPhrases.cs</Link>
+    </Compile>
+    <Compile Include="..\..\FFXIVPatchGenerator\HangulText.cs">
+      <Link>Generator\HangulText.cs</Link>
+    </Compile>
+  </ItemGroup>
+  <ItemGroup>
+    <EmbeddedResource Include="..\..\FFXIVPatchGenerator\SayPhrases.tsv">
+      <LogicalName>SayPhrases.tsv</LogicalName>
+    </EmbeddedResource>
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
 </Project>

@@ -614,7 +614,7 @@ namespace FFXIVKoreanPatch.Main
                 AutomationProperties.SetName(koreanScopeButtons[i], scopeNames[i] + ": 한국어");
             }
             sayQuestBase.Content = baseLanguage;
-            sayQuestDescription.Text = "선택한 언어로 채팅창에 입력하면 인식합니다." + Environment.NewLine + baseLanguage +
+            sayQuestDescription.Text = "선택한 언어로 채팅창에 입력하면 인식합니다. 변형 던전 주문 포함." + Environment.NewLine + baseLanguage +
                 "를 선택하면 퀘스트 안내에 '안녕하세요(" + (index == 1 ? "Hello" : "こんにちは") + ")'처럼 함께 표기됩니다.";
             AutomationProperties.SetName(sayQuestBase, "말하기 퀘스트 입력 문구: " + baseLanguage);
             AutomationProperties.SetName(sayQuestKo, "말하기 퀘스트 입력 문구: 한국어");

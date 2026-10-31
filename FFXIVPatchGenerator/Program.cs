@@ -60,6 +60,9 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
                 Console.WriteLine("  Say phrase rows:      {0}", report.SayQuestPhraseRows);
                 Console.WriteLine("  Say prompt rows:      {0}", report.SayQuestAnnotatedRows);
                 Console.WriteLine("  Say quests kept ko:   {0}", report.SayQuestsKeptKorean);
+                Console.WriteLine("  Say duty phrases:     {0}", report.SayContentPhrases);
+                Console.WriteLine("  Say duty hints:       {0}", report.SayContentHints);
+                Console.WriteLine("  Say duty stale:       {0}", report.SayContentStale);
                 Console.WriteLine("  Supplement applied:   {0}", report.SupplementApplied);
                 Console.WriteLine("  Supplement corrected: {0}", report.SupplementCorrected);
                 Console.WriteLine("  Supplement restored:  {0}", report.SupplementRestored);
@@ -132,8 +135,8 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
             Console.WriteLine("  --policy           Optional JSON patch policy file.");
             Console.WriteLine("  --rsv-map          Optional RSV token map JSON. Also auto-detected beside the generator exe.");
             Console.WriteLine("  --say-quest-phrases ko|base");
-            Console.WriteLine("                     Phrases say quests expect. base keeps the base-language phrase and shows it");
-            Console.WriteLine("                     next to the Korean phrase in prompts. Default: ko.");
+            Console.WriteLine("                     Phrases say quests and duty chants (SayPhrases.tsv) expect. base keeps the");
+            Console.WriteLine("                     base-language phrase and shows it next to the Korean phrase in prompts. Default: ko.");
             Console.WriteLine("  --anonymize-quest-chat-phrases");
             Console.WriteLine("                     Disabled/no-op until quest say sheet coverage is complete.");
             Console.WriteLine("  --preserve-base-bnpc-names");
@@ -597,6 +600,9 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
         public int SayQuestPhraseRows;
         public int SayQuestAnnotatedRows;
         public int SayQuestsKeptKorean;
+        public int SayContentPhrases;
+        public int SayContentHints;
+        public int SayContentStale;
         public int SupplementApplied;
         public int SupplementCorrected;
         public int SupplementRestored;

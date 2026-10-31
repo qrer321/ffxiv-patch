@@ -16,7 +16,7 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
         private static int _failures;
         private static int _passed;
 
-        private static int Main()
+        private static int Main(string[] args)
         {
             // Prompted quests.
             Expect("phrase row keeps the base text and prompts show it",
@@ -187,6 +187,11 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
             // Page level: only the say rows are rebuilt; other rows are copied verbatim.
             ExpectPage();
 
+            // Say phrases outside quest sheets (duty chants).
+            ExpectContentPhrases();
+            ExpectContentHints();
+            ExpectContentTable(args.Length > 0 ? args[0] : null);
+
             Console.WriteLine();
             Console.WriteLine("{0} passed, {1} failed", _passed, _failures);
             return _failures == 0 ? 0 : 1;
@@ -255,6 +260,136 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
             }
 
             Report("page rewrite changes only say rows and keeps others verbatim", problems);
+        }
+
+        private const string ContentTable =
+            "sheet\trow\tja\ten\tko\thint_sheet\thint_row\tnote\n" +
+            "PhraseSheet\t1\t呪文1\tChant one.\t주문1\tHintSheet\t0\t\n" +
+            "PhraseSheet\t2\t呪文2\tChant two.\t주문2\tHintSheet\t1\tchanged by an update\n";
+
+        // In base say mode the phrase row keeps the target text; a changed target text is reported and
+        // left as patched; cells outside the Korean scope are not touched.
+        private static void ExpectContentPhrases()
+        {
+            List<SayContentPhrase> phrases = SayContentPhrases.Parse(new System.IO.StringReader(ContentTable));
+            string[] keys = { "K0", "K1", "K2" };
+            ExcelHeader header = ExcelHeader.Parse(BuildHeader(keys.Length));
+            ExcelDataFile clean = ExcelDataFile.Parse(BuildPage(keys, new string[] { "Other", "Chant one.", "Chant two, revised." }));
+            byte[] patched = BuildPage(keys, new string[] { "기타", "주문1", "주문2" });
+            List<string> problems = new List<string>();
+
+            HashSet<string> seen = new HashSet<string>();
+            SayContentResult result;
+            ExcelDataFile output = ExcelDataFile.Parse(SayContentPhrases.Apply(
+                "phrasesheet", header, clean, patched, "en", phrases, delegate { return true; }, seen, out result));
+            ExpectText(problems, output, header, 0, "기타");
+            ExpectText(problems, output, header, 1, "Chant one.");
+            ExpectText(problems, output, header, 2, "주문2");
+            if (result.Phrases != 1 || result.Issues.Count != 1 || seen.Count != 2)
+            {
+                problems.Add("phrases=" + result.Phrases + ", issues=" + result.Issues.Count + ", seen=" + seen.Count);
+            }
+
+            ExcelDataFile japaneseClean = ExcelDataFile.Parse(BuildPage(keys, new string[] { "他", "呪文1", "呪文2" }));
+            output = ExcelDataFile.Parse(SayContentPhrases.Apply(
+                "PhraseSheet", header, japaneseClean, patched, "ja", phrases, delegate { return true; }, new HashSet<string>(), out result));
+            ExpectText(problems, output, header, 1, "呪文1");
+            ExpectText(problems, output, header, 2, "呪文2");
+
+            byte[] untouched = SayContentPhrases.Apply(
+                "PhraseSheet", header, clean, patched, "en", phrases, delegate { return false; }, new HashSet<string>(), out result);
+            if (!ReferenceEquals(untouched, patched))
+            {
+                problems.Add("cells outside the Korean scope must be left as patched");
+            }
+
+            Report("duty phrase rows keep the target text; changed target text is reported", problems);
+        }
+
+        // A hint row shows the target phrase after its quoted Korean phrase, only where the target text
+        // still quotes it.
+        private static void ExpectContentHints()
+        {
+            List<SayContentPhrase> phrases = SayContentPhrases.Parse(new System.IO.StringReader(ContentTable));
+            string[] keys = { "K0", "K1" };
+            ExcelHeader header = ExcelHeader.Parse(BuildHeader(keys.Length));
+            ExcelDataFile clean = ExcelDataFile.Parse(BuildPage(keys, new string[]
+            {
+                "Stand here and chant, “Chant one.” Then dance.",
+                "Stand there and keep quiet.",
+            }));
+            byte[] patched = BuildPage(keys, new string[] { "여기서 \"주문1\"이라고 외우자.", "저기서 \"주문2\"라고 외우자." });
+            List<string> problems = new List<string>();
+
+            SayContentResult result;
+            ExcelDataFile output = ExcelDataFile.Parse(SayContentPhrases.Apply(
+                "HintSheet", header, clean, patched, "en", phrases, delegate { return true; }, new HashSet<string>(), out result));
+            ExpectText(problems, output, header, 0, "여기서 \"주문1(Chant one.)\"이라고 외우자.");
+            ExpectText(problems, output, header, 1, "저기서 \"주문2\"라고 외우자.");
+            if (result.Hints != 1 || result.Issues.Count != 1)
+            {
+                problems.Add("hints=" + result.Hints + ", issues=" + result.Issues.Count);
+            }
+
+            Report("duty hints show the target phrase after the quoted Korean phrase", problems);
+        }
+
+        private static void ExpectContentTable(string shippedTable)
+        {
+            List<string> problems = new List<string>();
+            string header = "sheet\trow\tja\ten\tko\thint_sheet\thint_row\tnote\n";
+            string[] invalid =
+            {
+                "sheet\trow\tko\nA\t1\t가\n",
+                header + "A\t1\t呪文\t\tju-mun\t\t\t\n",
+                header + "A\t1\t\t\t주문\t\t\t\n",
+                header + "A\t1\t呪文\t\t주문\t\t5\t\n",
+                header + "A\t1\t呪文\t\t주문\t\t\t\nA\t1\t呪文\t\t주문\t\t\t\n",
+            };
+            for (int i = 0; i < invalid.Length; i++)
+            {
+                try
+                {
+                    SayContentPhrases.Parse(new System.IO.StringReader(invalid[i]));
+                    problems.Add("invalid table " + i + " was accepted");
+                }
+                catch (System.IO.InvalidDataException)
+                {
+                }
+            }
+
+            if (shippedTable == null)
+            {
+                problems.Add("no shipped table path was given");
+            }
+            else
+            {
+                try
+                {
+                    using (System.IO.StreamReader reader = new System.IO.StreamReader(shippedTable, new UTF8Encoding(false, true)))
+                    {
+                        SayContentPhrases.Parse(reader);
+                    }
+                }
+                catch (Exception exception)
+                {
+                    problems.Add("shipped table: " + exception.Message);
+                }
+            }
+
+            Report("say phrase tables are validated and the shipped table parses", problems);
+        }
+
+        private static void ExpectText(List<string> problems, ExcelDataFile page, ExcelHeader header, uint rowId, string expected)
+        {
+            ExcelDataRow row;
+            string actual = page.TryGetRow(rowId, out row)
+                ? Encoding.UTF8.GetString(page.GetStringBytesByColumnOffset(row, header, 4) ?? new byte[0])
+                : "<missing>";
+            if (actual != expected)
+            {
+                problems.Add("row " + rowId + ": expected '" + expected + "', got '" + actual + "'");
+            }
         }
 
         private static byte[] Record(ExcelDataFile file, ExcelDataRow row)

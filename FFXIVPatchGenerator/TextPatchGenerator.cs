@@ -672,6 +672,8 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
                 _rsvResolver,
                 _options.TextScopePolicy);
             SupplementSheet supplement = LoadSupplement(sheetName);
+            List<SayContentPhrase> sayContent = LoadSayContentPhrases(sheetName);
+            HashSet<string> sayContentSeen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 
             for (int i = 0; i < globalHeader.Pages.Count; i++)
             {
@@ -714,7 +716,9 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
                     JoinPatchNotes(
                         ApplyQuestChatPhraseAnonymization(sheetName, globalHeader, ref patchResult),
                         ApplySayQuestPhrases(sheetName, globalHeader, targetExd, japaneseReference, ref patchResult)),
-                    ApplySupplement(sheetName, page, supplement, globalHeader, targetExd, sheetPolicy, textSheetScopePolicy, diagnostics, ref patchResult));
+                    JoinPatchNotes(
+                        ApplySayContentPhrases(sheetName, page, globalHeader, targetExd, sayContent, sheetPolicy, textSheetScopePolicy, sayContentSeen, diagnostics, ref patchResult),
+                        ApplySupplement(sheetName, page, supplement, globalHeader, targetExd, sheetPolicy, textSheetScopePolicy, diagnostics, ref patchResult)));
                 _report.ProtectedUiStrings += patchResult.ProtectedUiStrings;
                 _report.RsvRows += patchResult.RsvRows;
                 _report.RsvStrings += patchResult.RsvStrings;
@@ -780,6 +784,7 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
             }
 
             ReportUnvisitedSupplementEntries(sheetName, supplement, diagnostics);
+            ReportUnseenSayContentPhrases(sheetName, sayContent, sayContentSeen, diagnostics);
 
             PatchSecondaryLanguageSafetyRows(
                 sheetName,
@@ -1132,6 +1137,113 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
                    ", annotated=" + result.AnnotatedRows.ToString();
         }
 
+        // The say phrases of duties that involve this sheet, in base say mode only.
+        private List<SayContentPhrase> LoadSayContentPhrases(string sheetName)
+        {
+            if (_options.SayQuestPhrases != SayQuestPhraseMode.Base)
+            {
+                return null;
+            }
+
+            try
+            {
+                List<SayContentPhrase> phrases = SayContentPhrases.Load();
+                return SayContentPhrases.Involves(phrases, sheetName) ? phrases : null;
+            }
+            catch (Exception exception)
+            {
+                AddLimitedWarning("Say phrases for " + sheetName + " were skipped: " + exception.Message);
+                return null;
+            }
+        }
+
+        private string ApplySayContentPhrases(
+            string sheetName,
+            ExcelPageDefinition page,
+            ExcelHeader header,
+            ExcelDataFile cleanTarget,
+            List<SayContentPhrase> phrases,
+            PatchSheetPolicy sheetPolicy,
+            TextSheetScopePolicy scope,
+            HashSet<string> seen,
+            StreamWriter diagnostics,
+            ref ExdPatchResult patchResult)
+        {
+            if (phrases == null || patchResult == null || patchResult.Data == null)
+            {
+                return string.Empty;
+            }
+
+            SayContentResult result;
+            byte[] data = SayContentPhrases.Apply(
+                sheetName,
+                header,
+                cleanTarget,
+                patchResult.Data,
+                _options.TargetLanguage,
+                phrases,
+                delegate(uint rowId, ushort columnOffset) { return !IsLeftByKoreanPatch(sheetPolicy, scope, rowId, columnOffset); },
+                seen,
+                out result);
+            if (!ReferenceEquals(data, patchResult.Data))
+            {
+                // A phrase row back to the target text no longer counts as patched.
+                patchResult.Data = data;
+                patchResult.RowsPatched = CountChangedRows(header, header.GetStringColumnIndexes(), cleanTarget, ExcelDataFile.Parse(data));
+                patchResult.Changed = patchResult.RowsPatched > 0;
+                patchResult.StringKeyRows = Math.Min(patchResult.StringKeyRows, patchResult.RowsPatched);
+                patchResult.RowKeyRows = Math.Min(patchResult.RowKeyRows, patchResult.RowsPatched);
+            }
+
+            _report.SayContentPhrases += result.Phrases;
+            _report.SayContentHints += result.Hints;
+            _report.SayContentStale += result.Issues.Count;
+            for (int i = 0; i < result.Issues.Count; i++)
+            {
+                WriteDiagnostic(diagnostics, sheetName, page.StartId.ToString(), "say-content-stale", 0, 0, 0, 0, 0, result.Issues[i]);
+            }
+
+            return result.Phrases + result.Hints == 0
+                ? string.Empty
+                : "say-content-phrases base phrases=" + result.Phrases.ToString() + ", hints=" + result.Hints.ToString();
+        }
+
+        // Phrase and hint rows no page of the sheet had.
+        private void ReportUnseenSayContentPhrases(string sheetName, List<SayContentPhrase> phrases, HashSet<string> seen, StreamWriter diagnostics)
+        {
+            if (phrases == null)
+            {
+                return;
+            }
+
+            for (int i = 0; i < phrases.Count; i++)
+            {
+                SayContentPhrase phrase = phrases[i];
+                if (phrase.TextFor(_options.TargetLanguage).Length == 0)
+                {
+                    continue;
+                }
+
+                string missing = null;
+                if (string.Equals(phrase.Sheet, sheetName, StringComparison.OrdinalIgnoreCase) && !seen.Contains(SayContentPhrases.PhraseKey(phrase)))
+                {
+                    missing = "row=" + phrase.RowId.ToString();
+                }
+                else if (phrase.HasHint &&
+                         string.Equals(phrase.HintSheet, sheetName, StringComparison.OrdinalIgnoreCase) &&
+                         !seen.Contains(SayContentPhrases.HintKey(phrase)))
+                {
+                    missing = "hint row=" + phrase.HintRowId.ToString();
+                }
+
+                if (missing != null)
+                {
+                    _report.SayContentStale++;
+                    WriteDiagnostic(diagnostics, sheetName, "-", "say-content-stale", 0, 0, 0, 0, 0, missing + "; not in the target sheet");
+                }
+            }
+        }
+
         private SupplementSheet LoadSupplement(string sheetName)
         {
             try
@@ -1167,7 +1279,7 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
                 cleanTarget,
                 patchResult.Data,
                 _options.TargetLanguage,
-                delegate(uint rowId, ushort columnOffset) { return IsSupplementSkipped(sheetPolicy, scope, rowId, columnOffset); },
+                delegate(uint rowId, ushort columnOffset) { return IsLeftByKoreanPatch(sheetPolicy, scope, rowId, columnOffset); },
                 out result);
             if (!ReferenceEquals(data, patchResult.Data))
             {
@@ -1209,8 +1321,8 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
                    ", missing=" + missing.ToString();
         }
 
-        // Cells the Korean patch leaves alone are left alone by the supplement too.
-        private static bool IsSupplementSkipped(PatchSheetPolicy sheetPolicy, TextSheetScopePolicy scope, uint rowId, ushort columnOffset)
+        // Cells the Korean patch leaves alone (base-language scope, patch-policy rows and columns).
+        private static bool IsLeftByKoreanPatch(PatchSheetPolicy sheetPolicy, TextSheetScopePolicy scope, uint rowId, ushort columnOffset)
         {
             return !scope.ShouldUseKorean(rowId, columnOffset) ||
                    sheetPolicy.ShouldKeepRow(rowId) ||
@@ -1672,7 +1784,7 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
                         if (supplement != null &&
                             supplement.Manages(column.Offset) &&
                             string.Equals(action, "replace", StringComparison.Ordinal) &&
-                            !IsSupplementSkipped(sheetPolicy, textSheetScopePolicy, targetRow.RowId, column.Offset))
+                            !IsLeftByKoreanPatch(sheetPolicy, textSheetScopePolicy, targetRow.RowId, column.Offset))
                         {
                             byte[] beforeSupplement = selectedBytes ?? new byte[0];
                             SupplementCell cell = supplement.Resolve(targetRow.RowId, column.Offset, beforeSupplement, globalBytes ?? new byte[0], _options.TargetLanguage);

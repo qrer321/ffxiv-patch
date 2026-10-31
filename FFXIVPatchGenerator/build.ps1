@@ -37,13 +37,15 @@ $sources = @(
     "ExdRowRewriter.cs",
     "SupplementTranslations.cs",
     "TypedWordText.cs",
-    "HangulText.cs"
+    "HangulText.cs",
+    "SayContentPhrases.cs"
 ) | ForEach-Object { Join-Path $PSScriptRoot $_ }
 
 # Supplements\<sheet>.tsv is embedded as "Supplements/<sheet>.tsv" (see SupplementTranslations).
-$resources = Get-ChildItem -Path (Join-Path $PSScriptRoot "Supplements") -Filter "*.tsv" -File -ErrorAction SilentlyContinue |
-    ForEach-Object { "/resource:$($_.FullName),Supplements/$($_.Name)" }
-
+$resources = @(Get-ChildItem -Path (Join-Path $PSScriptRoot "Supplements") -Filter "*.tsv" -File -ErrorAction SilentlyContinue |
+    ForEach-Object { "/resource:$($_.FullName),Supplements/$($_.Name)" })
+# SayPhrases.tsv is embedded as "SayPhrases.tsv" (see SayContentPhrases).
+$resources += "/resource:$(Join-Path $PSScriptRoot 'SayPhrases.tsv'),SayPhrases.tsv"
 $exePath = Join-Path $outDir "FFXIVPatchGenerator.exe"
 & $csc /nologo /optimize+ /target:exe "/out:$exePath" /r:System.IO.Compression.dll /r:System.Web.Extensions.dll $resources $sources
 if ($LASTEXITCODE -ne 0) {

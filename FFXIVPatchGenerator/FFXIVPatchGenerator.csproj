@@ -62,10 +62,14 @@
     <Compile Include="SupplementTranslations.cs" />
     <Compile Include="TypedWordText.cs" />
     <Compile Include="HangulText.cs" />
+    <Compile Include="SayContentPhrases.cs" />
   </ItemGroup>
   <ItemGroup>
     <EmbeddedResource Include="Supplements\*.tsv">
       <LogicalName>Supplements/%(Filename)%(Extension)</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="SayPhrases.tsv">
+      <LogicalName>SayPhrases.tsv</LogicalName>
     </EmbeddedResource>
   </ItemGroup>
   <ItemGroup>

@@ -234,6 +234,7 @@
   - 안전 규칙: 정답 row가 매크로를 포함하거나 비어 있거나 80자를 넘으면, 안내형 퀘스트에서 정답 원문 하나라도(한 한국어 문구가 여러 원문에 대응하면 각 원문마다) 안내나 대사 어디에도 표시할 수 없으면, 추리형 퀘스트에서 표시할 곳이 하나도 없으면 해당 퀘스트 전체를 한국어로 유지
   - 정답 판정용 row 목록은 제너레이터와 검증기가 같은 코드(`SayQuestPhraseLocalizer.BuildRows`)로 만들며, 키와 베이스 텍스트는 clean 대상 page에서 읽음
   - 회귀 테스트: `Scripts\test-say-quest-phrases.ps1`
+  - 퀘스트 밖 변형 던전 주문: 내장 표 `SayPhrases.tsv`의 행(알로알로 섬 `InstanceContentTextData` 37631~37633, 상인 이야기 43653)을 원문으로 유지하고, 단서 행(`VVDNotebookContents` 27·31·34, `GimmickTalk` 57)의 따옴표 속 한국어 주문 뒤에 `(원문)` 삽입. clean 대상 원문이 표의 `ja`/`en`과 같거나(주문) 그 문구를 인용할 때(단서)만 적용하고, 아니면 `say-content-stale` 진단. 실행 요약 `Say duty phrases/hints/stale`. 스토리 검증기도 같은 규칙(`SayContentPhrases.ResolveCell`)으로 기대값 계산
 - `patch-policy.json` 기반 sheet/row/column 보존과 row/column remap
 - 텍스트 생성 또는 명시적 CSV 진단 시 `patch-diagnostics.tsv` 생성. 모든 텍스트가 Base이면 일반 실행은 자산 전용 경로 사용
 - `--diagnostic-csv` 지정 sheet의 row/column 비교 CSV 생성. Base 셀은 remap/RSV보다 먼저 원문으로 선택

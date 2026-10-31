@@ -361,11 +361,15 @@ namespace FfxivKoreanPatch.PatchRouteVerifier
                             if (sourceBytes != null && sourceBytes.Length > 0)
                             {
                                 byte[] nameFormReference = nameFormReferenceFile.GetStringBytes(cleanRow.RowId, cleanHeader, columnIndex) ?? cleanBytes;
-                                expectedBytes = ResolveExpectedSayQuestText(
-                                    sayQuestTexts,
+                                expectedBytes = ResolveExpectedSayContentText(
+                                    sheet,
                                     cleanRow.RowId,
-                                    column.Offset,
-                                    ResolveExpectedStoryBytes(sourceBytes, nameFormReference));
+                                    cleanBytes,
+                                    ResolveExpectedSayQuestText(
+                                        sayQuestTexts,
+                                        cleanRow.RowId,
+                                        column.Offset,
+                                        ResolveExpectedStoryBytes(sourceBytes, nameFormReference)));
                                 result.KoreanCellsChecked++;
                                 koreanSourceDiffers = !BytesEqual(cleanBytes, expectedBytes);
                                 if (koreanSourceDiffers)
@@ -383,7 +387,11 @@ namespace FfxivKoreanPatch.PatchRouteVerifier
                             else
                             {
                                 // The generator's say quest pass also annotates cells that fell back to base text.
-                                expectedBytes = ResolveExpectedSayQuestText(sayQuestTexts, cleanRow.RowId, column.Offset, cleanBytes);
+                                expectedBytes = ResolveExpectedSayContentText(
+                                    sheet,
+                                    cleanRow.RowId,
+                                    cleanBytes,
+                                    ResolveExpectedSayQuestText(sayQuestTexts, cleanRow.RowId, column.Offset, cleanBytes));
                                 result.SourceFallbackCellsChecked++;
                             }
                         }
@@ -497,6 +505,15 @@ namespace FfxivKoreanPatch.PatchRouteVerifier
             {
                 byte[] sayQuestText;
                 return columnOffset == 4 && sayQuestTexts.TryGetValue(rowId, out sayQuestText) ? sayQuestText : expected;
+            }
+
+            // Mirrors the generator's duty say phrase pass: phrase cells keep the clean target text and
+            // hint cells show it after the quoted Korean phrase.
+            private byte[] ResolveExpectedSayContentText(string sheet, uint rowId, byte[] cleanBytes, byte[] expected)
+            {
+                return _sayQuestPhrases == SayQuestPhraseMode.Base
+                    ? SayContentPhrases.ResolveCell(SayContentPhrases.Load(), sheet, rowId, cleanBytes, expected, _language)
+                    : expected;
             }
 
             // The generator copies player name forms from the Japanese page; an English target uses the

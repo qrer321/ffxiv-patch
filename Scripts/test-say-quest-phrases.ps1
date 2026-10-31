@@ -11,6 +11,8 @@ New-Item -ItemType Directory -Force -Path $outDir | Out-Null
 
 $sources = @(
     (Join-Path $repoRoot "FFXIVPatchGenerator\SayQuestPhraseLocalizer.cs"),
+    (Join-Path $repoRoot "FFXIVPatchGenerator\SayContentPhrases.cs"),
+    (Join-Path $repoRoot "FFXIVPatchGenerator\HangulText.cs"),
     (Join-Path $repoRoot "FFXIVPatchGenerator\ExdRowRewriter.cs"),
     (Join-Path $repoRoot "FFXIVPatchGenerator\Excel.cs"),
     (Join-Path $repoRoot "FFXIVPatchGenerator\HashAndEndian.cs"),
@@ -23,5 +25,5 @@ if ($LASTEXITCODE -ne 0) {
     exit $LASTEXITCODE
 }
 
-& $exePath
+& $exePath (Join-Path $repoRoot "FFXIVPatchGenerator\SayPhrases.tsv")
 exit $LASTEXITCODE
