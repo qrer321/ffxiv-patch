@@ -50,6 +50,7 @@
     <Compile Include="LobbyHangulCoverage.cs" />
     <Compile Include="UiPatchGenerator.cs" />
     <Compile Include="SqPack.cs" />
+    <Compile Include="SqPackIndexCheck.cs" />
     <Compile Include="Excel.cs" />
     <Compile Include="ExdStringPatcher.cs" />
     <Compile Include="RsvStringResolver.cs" />

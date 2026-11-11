@@ -58,6 +58,7 @@
 - `0a0000.win32.index/index2` 상태 확인
 - `000000.win32.index/index2` 상태 확인
 - dat1 참조 여부 확인
+- 설치된 `0a0000.win32.index/index2` 항목이 dat 파일의 실제 파일 레코드를 가리키는지 확인. 다른 게임 버전의 index면 실패로 처리하고 런처 파일 검사/복구 안내
 - clean/original index 복구 기준 생성 또는 발견
 - 릴리즈 빌드에서 한글 채팅용 Scancode Map 레지스트리 확인 및 설치
 - 사전 점검 결과를 본문의 펼침 영역에 표시
@@ -95,8 +96,10 @@
 - 백업으로 복구 전 현재 대상 파일 재백업
 - 수동 롤백용 sqpack 파일 패키지 생성
 - `restore-baseline`에 clean/original index 보관
-- `한글 패치 제거`로 `orig.*.index/index2` 또는 clean index 복구
-- `백업으로 복구`로 백업 폴더 선택 후 복구
+- `한글 패치 제거`로 패치 엔트리가 있는 index/index2만 복구. 패치 엔트리가 없는 index는 덮어쓰지 않음
+- 복구 원본은 설치된 index에서 패치 리다이렉트만 뺀 것과 항목이 같은 `orig.*.index/index2` 또는 clean index만 사용. 다른 게임 버전에서 저장된 index는 사용하지 않음
+- `restore-baseline`의 index가 설치된 index와 맞지 않으면 버리고 다시 저장
+- `백업으로 복구`로 백업 폴더 선택 후 같은 조건의 index 복구
 - 복구 대상에 index2 포함
 - 백업 가능한 파일이 없으면 복구 확인 팝업 전에 안내
 - dat1 파일이 남아도 index가 참조하지 않으면 제거된 상태로 처리
@@ -111,6 +114,7 @@
 - 사전 점검을 통과하지 않으면 실제 전체/폰트 패치 차단
 - 글로벌/한국 서버 버전이 다르면 실제 전체/폰트 패치 차단
 - 이미 패치된 index/index2가 감지되더라도 current/orig/같은 버전의 restore-baseline 중 clean base index를 확보할 수 있으면 최신 전체/폰트 패치를 재적용
+- 텍스트 패치 기준 index/index2가 글로벌 dat 파일과 맞지 않으면 제너레이터에서 중단
 - 출력 폴더가 원본 게임 폴더 내부면 제너레이터에서 중단
 - 원본 글로벌/한국 서버 게임 폴더에는 release 생성물을 직접 쓰지 않음
 
@@ -244,6 +248,7 @@
   - 데이터센터 row, 좁은 시간 단위, 숫자 glyph, 파티 리스트 본인 번호 glyph 확인
   - 로비/대사 문장 한글 glyph를 PNG와 `glyph-report.tsv`로 덤프해 특정 글자의 atlas 잔픽셀/겹침 여부 확인
 - unsafe sheet 스킵
+- 기준 `0a0000` index/index2의 모든 항목이 글로벌 dat 파일의 실제 파일 레코드를 가리키는지 확인하고, 아니면 생성 중단. 회귀 테스트: `Scripts\test-index-check.ps1`
 - 새 `0a0000.win32.dat1` 생성
 - 수정된 `0a0000.win32.index` 생성
 - 수정된 `0a0000.win32.index2` 생성

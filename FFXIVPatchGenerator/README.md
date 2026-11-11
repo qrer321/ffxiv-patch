@@ -220,6 +220,7 @@ UI 텍스처 패치는 `060000` UI 패키지를 대상으로 하며 새 `060000.
 - 글로벌/한국 서버 `ffxivgame.ver`가 다르면 중단합니다. `--allow-version-mismatch`는 진단용으로만 사용합니다.
 - 기본 index/index2가 이미 `dat1` 엔트리를 포함하면 중단합니다.
 - 이미 패치된 index를 기준으로 release를 만들려면 `--allow-patched-global`이 필요하지만, 이 옵션은 실험용입니다.
+- 텍스트 패치 기준 index/index2의 항목이 글로벌 dat 파일의 실제 파일 레코드를 가리키지 않으면 중단합니다. 게임 업데이트 이전에 저장된 index가 여기에 걸립니다. 이 상태로 생성하면 업데이트된 시트를 다른 시트의 EXD로 읽어 행이 빠진 패치가 만들어지고 클라이언트가 강제 종료될 수 있습니다. 회귀 테스트는 `Scripts\test-index-check.ps1`입니다.
 - 실제 배포용 release는 clean index 또는 UI가 확보한 복구용 original index를 `--base-index`, `--base-index2`, `--base-font-index`, `--base-font-index2`, `--base-ui-index`, `--base-ui-index2`로 지정하는 방식을 권장합니다.
 - 생성되는 `orig.*.index/index2`는 패치 제거 시 원본 index 참조로 되돌리기 위한 복구 파일입니다.
 - 수정된 index/index2는 파일 세그먼트 Adler32 checksum을 다시 계산해 저장합니다.

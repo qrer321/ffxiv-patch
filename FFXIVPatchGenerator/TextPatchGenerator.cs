@@ -270,6 +270,13 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
             string currentGlobalIndex2 = Path.Combine(globalSqpack, Index2FileName);
             string originalGlobalIndex2 = Path.Combine(globalSqpack, OrigIndex2FileName);
             string baseIndex2 = ResolveBaseIndex2(currentGlobalIndex2, originalGlobalIndex2, baseIndex);
+            if (buildTextPatch)
+            {
+                // The output index is a copy of the base index, so a base from another game version
+                // would be installed as-is and its stale entries would be read as patch targets.
+                RequireBaseIndexMatchesDatFiles(baseIndex, globalSqpack);
+                RequireBaseIndexMatchesDatFiles(baseIndex2, globalSqpack);
+            }
 
             string outputIndex = Path.Combine(outputDir, IndexFileName);
             string outputIndex2 = Path.Combine(outputDir, Index2FileName);
@@ -546,6 +553,22 @@ namespace FfxivKoreanPatch.FFXIVPatchGenerator
             }
 
             return baseIndex2;
+        }
+
+        private static void RequireBaseIndexMatchesDatFiles(string indexPath, string globalSqpack)
+        {
+            SqPackIndexCheck.DatRecordReport report =
+                SqPackIndexCheck.FindEntriesWithoutDatRecords(indexPath, globalSqpack, "0a0000.win32");
+            if (report.Missing == 0)
+            {
+                return;
+            }
+
+            throw new InvalidOperationException(
+                "The selected base " + Path.GetFileName(indexPath) + " does not match the global client's dat files: " +
+                report.Missing + " of " + report.Entries + " entries do not point at a file record (first: " +
+                report.FirstMissing + "). The index was saved from another game version. " +
+                "Restore the current index with the launcher's file repair, then build again.");
         }
 
         private void ProcessSheet(

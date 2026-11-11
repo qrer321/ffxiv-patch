@@ -11,6 +11,7 @@ using System.Reflection;
 using System.Security.Cryptography;
 using System.Text;
 using System.Threading;
+using FfxivKoreanPatch.FFXIVPatchGenerator;
 
 namespace FFXIVKoreanPatch.Main
 {
@@ -1627,6 +1628,16 @@ namespace FFXIVKoreanPatch.Main
             }
 
             if (!string.IsNullOrEmpty(output) &&
+                output.IndexOf("does not match the global client's dat files", StringComparison.OrdinalIgnoreCase) >= 0)
+            {
+                return
+                    "패치 기준으로 쓸 index가 현재 글로벌 서버 클라이언트의 데이터와 맞지 않아 패치를 중단했습니다." + Environment.NewLine + Environment.NewLine +
+                    "다른 게임 버전에서 저장된 index가 설치되어 있습니다. 이 상태로 패치하면 게임이 엉뚱한 데이터를 읽어 강제 종료될 수 있습니다." + Environment.NewLine + Environment.NewLine +
+                    "런처의 파일 검사/복구로 글로벌 서버 클라이언트를 원본 상태로 되돌린 뒤, 다시 사전 점검과 패치를 실행해주세요." + Environment.NewLine + Environment.NewLine +
+                    Tail(output, 2000);
+            }
+
+            if (!string.IsNullOrEmpty(output) &&
                 (output.IndexOf("already contains", StringComparison.OrdinalIgnoreCase) >= 0 ||
                  output.IndexOf("already containes", StringComparison.OrdinalIgnoreCase) >= 0) &&
                 (output.IndexOf("dat1 entries", StringComparison.OrdinalIgnoreCase) >= 0 ||
@@ -1799,36 +1810,6 @@ namespace FFXIVKoreanPatch.Main
             }
         }
 
-        private static bool IsIndex2FileName(string fileName)
-        {
-            return fileName.EndsWith(".index2", StringComparison.OrdinalIgnoreCase);
-        }
-
-        private bool CanSkipMissingRestoreFile(string fileName)
-        {
-            if (!fileName.EndsWith(".index", StringComparison.OrdinalIgnoreCase) &&
-                !IsIndex2FileName(fileName))
-            {
-                return false;
-            }
-
-            string sqpackDir = GetTargetSqpackDir();
-            if (string.IsNullOrEmpty(sqpackDir))
-            {
-                return false;
-            }
-
-            string currentPath = Path.Combine(sqpackDir, fileName);
-            if (!File.Exists(currentPath))
-            {
-                return false;
-            }
-
-            int dat1Count;
-            string error;
-            return IsCleanIndexFile(currentPath, out dat1Count, out error);
-        }
-
         private bool HasPatchedTargetIndexes()
         {
             string sqpackDir = GetTargetSqpackDir();
@@ -1906,7 +1887,7 @@ namespace FFXIVKoreanPatch.Main
             return false;
         }
 
-        private bool TryUnlockPatchAfterRestore(List<string> logLines)
+        private bool TryUnlockPatchAfterRestore(List<string> logLines, bool textIndexMatchesDat)
         {
             bool hasGlobalClient = HasValidGlobalClient();
             bool hasKoreaClient = HasValidKoreaClient();
@@ -1917,7 +1898,7 @@ namespace FFXIVKoreanPatch.Main
                 string.Equals(targetVersion, koreaVersion, StringComparison.OrdinalIgnoreCase);
             bool targetAlreadyPatched = hasGlobalClient && HasPatchedTargetIndexes();
 
-            if (hasGlobalClient && hasKoreaClient && versionsMatch && !targetAlreadyPatched)
+            if (hasGlobalClient && hasKoreaClient && versionsMatch && !targetAlreadyPatched && textIndexMatchesDat)
             {
                 lastPreflightPassed = true;
                 if (logLines != null)
@@ -1935,36 +1916,11 @@ namespace FFXIVKoreanPatch.Main
                     "Post-remove unlock skipped: globalClient=" + hasGlobalClient +
                     ", koreaClient=" + hasKoreaClient +
                     ", versionsMatch=" + versionsMatch +
-                    ", patchedIndex=" + targetAlreadyPatched + ".");
+                    ", patchedIndex=" + targetAlreadyPatched +
+                    ", textIndexMatchesDat=" + textIndexMatchesDat + ".");
             }
 
             return false;
-        }
-
-        private bool HasCleanOrigIndexes(string candidateDir)
-        {
-            foreach (string fileName in restoreFiles)
-            {
-                string origIndexPath = Path.Combine(candidateDir, "orig." + fileName);
-                if (!File.Exists(origIndexPath))
-                {
-                    if (CanSkipMissingRestoreFile(fileName))
-                    {
-                        continue;
-                    }
-
-                    return false;
-                }
-
-                int dat1Count;
-                string error;
-                if (!IsCleanIndexFile(origIndexPath, out dat1Count, out error))
-                {
-                    return false;
-                }
-            }
-
-            return true;
         }
 
         private sealed class RestoreFileCopy
@@ -2331,45 +2287,51 @@ namespace FFXIVKoreanPatch.Main
             foreach (string fileName in restoreFiles)
             {
                 string destinationPath = Path.Combine(outputDir, "orig." + fileName);
-                if (File.Exists(destinationPath))
+                string currentIndexPath = Path.Combine(sqpackDir, fileName);
+                if (!File.Exists(currentIndexPath))
                 {
+                    allReady = false;
                     continue;
                 }
 
-                string currentIndexPath = Path.Combine(sqpackDir, fileName);
-                string installedOrigPath = Path.Combine(sqpackDir, "orig." + fileName);
-                string sourcePath = null;
-
-                if (File.Exists(installedOrigPath))
+                if (File.Exists(destinationPath))
                 {
-                    int origDat1Count;
-                    string origError;
-                    if (IsCleanIndexFile(installedOrigPath, out origDat1Count, out origError))
+                    if (IsUnpatchedFormOfInstalledIndex(destinationPath, currentIndexPath))
                     {
-                        sourcePath = installedOrigPath;
+                        continue;
                     }
-                    else if (lines != null)
+
+                    // Saved from another state of the game data (for example before a game update).
+                    File.Delete(destinationPath);
+                    if (lines != null)
                     {
-                        lines.Add("[주의] " + Path.GetFileName(installedOrigPath) + "를 clean 복구 기준으로 저장하지 않았습니다. dat1 엔트리: " + origDat1Count.ToString() + (string.IsNullOrEmpty(origError) ? "" : ", 오류: " + origError));
+                        lines.Add("[주의] 저장된 복구 기준 orig." + fileName + "가 현재 설치된 index와 맞지 않아 다시 만듭니다.");
                     }
                 }
-                if (string.IsNullOrEmpty(sourcePath) && File.Exists(currentIndexPath))
+
+                // The installed index is the reference: unpatched, it is the launcher's current index.
+                // Otherwise only its own unpatched form is accepted, never an orig from another version.
+                string sourcePath = null;
+                int dat1Count = CountPatchedDataFileEntries(currentIndexPath);
+                if (dat1Count == 0)
                 {
-                    int dat1Count = CountPatchedDataFileEntries(currentIndexPath);
-                    if (dat1Count == 0)
-                    {
-                        sourcePath = currentIndexPath;
-                    }
-                    else if (lines != null)
+                    sourcePath = currentIndexPath;
+                }
+                else
+                {
+                    if (lines != null)
                     {
                         lines.Add("[주의] " + fileName + "는 이미 dat1 엔트리 " + dat1Count + "개를 포함하고 있어 복구 기준으로 저장하지 않았습니다.");
                     }
-                }
 
-                if (string.IsNullOrEmpty(sourcePath))
-                {
+                    string installedOrigPath = Path.Combine(sqpackDir, "orig." + fileName);
                     string existingBaselinePath;
-                    if (TryFindExistingRestoreBaselineIndex(fileName, out existingBaselinePath))
+                    if (IsUnpatchedFormOfInstalledIndex(installedOrigPath, currentIndexPath))
+                    {
+                        sourcePath = installedOrigPath;
+                    }
+                    else if (TryFindExistingRestoreBaselineIndex(fileName, out existingBaselinePath) &&
+                        IsUnpatchedFormOfInstalledIndex(existingBaselinePath, currentIndexPath))
                     {
                         sourcePath = existingBaselinePath;
                     }
@@ -3002,9 +2964,18 @@ namespace FFXIVKoreanPatch.Main
             }
         }
 
+        // Builds the copies that return every patched index to its unpatched form from one folder.
+        // An index without patch entries is left alone: after a game update it is the launcher's
+        // current index, and an older orig would point updated files at freed or reused dat records.
         private bool TryBuildCleanIndexRestorePlan(string candidateDir, out List<RestoreFileCopy> plan)
         {
             plan = new List<RestoreFileCopy>();
+
+            string sqpackDir = GetTargetSqpackDir();
+            if (string.IsNullOrEmpty(sqpackDir))
+            {
+                return false;
+            }
 
             string manualDir = Path.Combine(candidateDir, manualRollbackDirName);
             string[] sourceDirs = new string[]
@@ -3024,26 +2995,19 @@ namespace FFXIVKoreanPatch.Main
                 bool ok = true;
                 foreach (string fileName in restoreFiles)
                 {
+                    string installedPath = Path.Combine(sqpackDir, fileName);
+                    if (HasCleanIndexAtPath(installedPath))
+                    {
+                        continue;
+                    }
+
                     string sourcePath = Path.Combine(sourceDir, "orig." + fileName);
                     if (!File.Exists(sourcePath))
                     {
                         sourcePath = Path.Combine(sourceDir, fileName);
                     }
 
-                    if (!File.Exists(sourcePath))
-                    {
-                        if (CanSkipMissingRestoreFile(fileName))
-                        {
-                            continue;
-                        }
-
-                        ok = false;
-                        break;
-                    }
-
-                    int dat1Count;
-                    string error;
-                    if (!IsCleanIndexFile(sourcePath, out dat1Count, out error))
+                    if (!IsUnpatchedFormOfInstalledIndex(sourcePath, installedPath))
                     {
                         ok = false;
                         break;
@@ -3062,46 +3026,31 @@ namespace FFXIVKoreanPatch.Main
             return false;
         }
 
+        // True when candidatePath holds the installed index without this patcher's redirects. An orig
+        // index saved under another game version fails wherever the update moved a file.
+        private bool IsUnpatchedFormOfInstalledIndex(string candidatePath, string installedPath)
+        {
+            if (string.IsNullOrEmpty(candidatePath) || !File.Exists(candidatePath) || !File.Exists(installedPath))
+            {
+                return false;
+            }
+
+            try
+            {
+                return SqPackIndexCheck.IsUnpatchedFormOf(candidatePath, installedPath, GetPatchDataFileId(installedPath));
+            }
+            catch (Exception)
+            {
+                // An index that cannot be read is not a usable restore source.
+                return false;
+            }
+        }
+
         private List<RestoreFileCopy> BuildBackupRestorePlan(string backupDir)
         {
             List<RestoreFileCopy> plan;
-            if (TryBuildCleanIndexRestorePlan(backupDir, out plan))
-            {
-                return plan;
-            }
-
-            plan = new List<RestoreFileCopy>();
-            AddExactBackupFiles(backupDir, plan);
+            TryBuildCleanIndexRestorePlan(backupDir, out plan);
             return plan;
-        }
-
-        private void AddExactBackupFiles(string backupDir, List<RestoreFileCopy> plan)
-        {
-            string[] restorableFiles = textPatchFiles
-                .Concat(fontPatchFiles)
-                .Concat(uiPatchFiles)
-                .Concat(restoreFiles)
-                .Distinct(StringComparer.OrdinalIgnoreCase)
-                .ToArray();
-
-            foreach (string fileName in restorableFiles)
-            {
-                if (plan.Any(item => string.Equals(item.DestinationFileName, fileName, StringComparison.OrdinalIgnoreCase)))
-                {
-                    continue;
-                }
-
-                string sourcePath = Path.Combine(backupDir, fileName);
-                if (!File.Exists(sourcePath))
-                {
-                    sourcePath = Path.Combine(backupDir, manualRollbackDirName, fileName);
-                }
-
-                if (File.Exists(sourcePath))
-                {
-                    plan.Add(new RestoreFileCopy(sourcePath, fileName));
-                }
-            }
         }
 
         private bool HasRestorableBackupFiles(string backupDir)
@@ -3288,10 +3237,11 @@ namespace FFXIVKoreanPatch.Main
             return false;
         }
 
-        private bool RestoreFromLocalOrigIndexes(out string restoreSourceDir, out string backupDir)
+        private bool RestoreFromLocalOrigIndexes(out string restoreSourceDir, out string backupDir, out string[] restoredFiles)
         {
             restoreSourceDir = null;
             backupDir = null;
+            restoredFiles = new string[0];
 
             string sourceDir;
             List<RestoreFileCopy> restorePlan;
@@ -3329,6 +3279,7 @@ namespace FFXIVKoreanPatch.Main
             }
 
             restoreSourceDir = sourceDir;
+            restoredFiles = destinationFiles;
             return true;
         }
 
@@ -3354,25 +3305,10 @@ namespace FFXIVKoreanPatch.Main
                     return;
                 }
 
-                if (File.Exists(origIndexPath))
+                if (IsUnpatchedFormOfInstalledIndex(origIndexPath, indexPath))
                 {
-                    int origDat1Count;
-                    string origError;
-                    if (IsCleanIndexFile(origIndexPath, out origDat1Count, out origError))
-                    {
-                        warnings++;
-                        lines.Add("[주의] 글로벌 " + indexFileName + "에 dat1 엔트리 " + dat1Count + "개가 있지만, 같은 폴더에 clean orig index가 있어 복구 또는 빌더 기준 파일로 사용할 수 있습니다.");
-                    }
-                    else
-                    {
-#if TEST_BUILD
-                        warnings++;
-                        lines.Add("[주의] 글로벌 " + indexFileName + "와 orig." + indexFileName + " 모두 clean index가 아닙니다. 테스트 빌드는 진행 가능하지만 실제 적용에 쓰면 안 됩니다.");
-#else
-                        failures++;
-                        lines.Add("[실패] 글로벌 " + indexFileName + "가 패치된 상태이고 orig." + indexFileName + "도 clean index가 아닙니다. orig dat1 엔트리: " + origDat1Count.ToString() + ". 런처 복구 또는 clean index가 필요합니다.");
-#endif
-                    }
+                    warnings++;
+                    lines.Add("[주의] 글로벌 " + indexFileName + "에 dat1 엔트리 " + dat1Count + "개가 있지만, 같은 폴더에 이 index의 원본인 orig index가 있어 복구 또는 빌더 기준 파일로 사용할 수 있습니다.");
                 }
                 else
                 {
@@ -3389,6 +3325,40 @@ namespace FFXIVKoreanPatch.Main
             {
                 warnings++;
                 lines.Add("[주의] 글로벌 " + indexFileName + " dat1 상태를 읽지 못했습니다: " + exception.Message);
+            }
+        }
+
+        // A 0a0000 index left from another game version sends the sheets that version changed to freed
+        // or reused dat records; the client then loads the wrong EXD rows and can crash. Only the
+        // launcher's file repair brings the matching index back.
+        private void AddPreflightIndexDatStatus(List<string> lines, ref int failures, ref int warnings, string indexFileName)
+        {
+            string sqpackDir = GetTargetSqpackDir();
+            string indexPath = Path.Combine(sqpackDir, indexFileName);
+            if (!File.Exists(indexPath))
+            {
+                return;
+            }
+
+            try
+            {
+                SqPackIndexCheck.DatRecordReport report =
+                    SqPackIndexCheck.FindEntriesWithoutDatRecords(indexPath, sqpackDir, "0a0000.win32");
+                if (report.Missing == 0)
+                {
+                    lines.Add("[OK] 글로벌 " + indexFileName + " 항목이 dat 파일과 일치합니다.");
+                    return;
+                }
+
+                failures++;
+                lines.Add("[실패] 글로벌 " + indexFileName + "의 항목 " + report.Entries + "개 중 " + report.Missing +
+                    "개가 dat 파일의 실제 파일을 가리키지 않습니다(" + report.FirstMissing + "). 다른 게임 버전의 index가 설치되어 있어 게임이 강제 종료될 수 있습니다. " +
+                    "런처의 파일 검사/복구로 글로벌 서버 클라이언트를 원본 상태로 되돌린 뒤 다시 점검해주세요.");
+            }
+            catch (Exception exception)
+            {
+                warnings++;
+                lines.Add("[주의] 글로벌 " + indexFileName + " 항목과 dat 파일의 일치 여부를 확인하지 못했습니다: " + exception.Message);
             }
         }
 
@@ -3543,6 +3513,8 @@ namespace FFXIVKoreanPatch.Main
                     AddPreflightIndexStatus(lines, ref failures, ref warnings, "000000.win32.index2");
                     AddPreflightIndexStatus(lines, ref failures, ref warnings, "060000.win32.index");
                     AddPreflightIndexStatus(lines, ref failures, ref warnings, "060000.win32.index2");
+                    AddPreflightIndexDatStatus(lines, ref failures, ref warnings, "0a0000.win32.index");
+                    AddPreflightIndexDatStatus(lines, ref failures, ref warnings, "0a0000.win32.index2");
 
                     if (HasPatchedTargetIndexes())
                     {
@@ -3565,14 +3537,17 @@ namespace FFXIVKoreanPatch.Main
 
                 string localRestoreDir;
                 TryCreateLocalRestoreBaseline(lines, out localRestoreDir);
-                if (TryFindLocalOrigIndexDir(out localRestoreDir))
+                if (HasPatchedTargetIndexes())
                 {
-                    lines.Add("[OK] 로컬 복구용 orig index 발견: " + localRestoreDir);
-                }
-                else
-                {
-                    warnings++;
-                    lines.Add("[주의] 로컬 복구용 orig index를 찾지 못했습니다. 제거 시 이전 패쳐의 제거 기능 또는 런처 파일 검사/복구가 필요할 수 있습니다.");
+                    if (TryFindLocalOrigIndexDir(out localRestoreDir))
+                    {
+                        lines.Add("[OK] 로컬 복구용 orig index 발견: " + localRestoreDir);
+                    }
+                    else
+                    {
+                        warnings++;
+                        lines.Add("[주의] 설치된 index의 원본인 로컬 orig index를 찾지 못했습니다. 제거하려면 이전 패쳐의 제거 기능 또는 런처 파일 검사/복구가 필요합니다.");
+                    }
                 }
 
                 string summary = failures == 0
@@ -4600,13 +4575,35 @@ namespace FFXIVKoreanPatch.Main
 #if TEST_BUILD
                 throw new InvalidOperationException("테스트 빌드에서는 실제 글로벌 서버 클라이언트 폴더에 파일을 복사할 수 없어요.");
 #else
+                if (!HasPatchedTargetIndexes())
+                {
+                    logLines.Add("No installed index has patch entries; nothing was restored.");
+                    string notPatchedLogPath = WriteOperationLog("remove-not-patched", logLines);
+                    UpdateStatusLabel("제거할 한글 패치가 없습니다");
+                    ShowMessage(
+                        ViewMessageKind.Info,
+                        "글로벌 서버 클라이언트에 적용된 한글 패치가 없습니다.",
+                        "설치된 index는 그대로 두었습니다.",
+                        "로그: " + notPatchedLogPath);
+                    return;
+                }
+
                 string restoreSourceDir;
                 string localBackupDir;
-                if (RestoreFromLocalOrigIndexes(out restoreSourceDir, out localBackupDir))
+                string[] restoredFiles;
+                if (RestoreFromLocalOrigIndexes(out restoreSourceDir, out localBackupDir, out restoredFiles))
                 {
                     logLines.Add("Local restore source: " + restoreSourceDir);
                     logLines.Add("Backup before restore: " + localBackupDir);
-                    bool canPatchImmediately = TryUnlockPatchAfterRestore(logLines);
+                    // The restored index is the installed one without patch entries, so an index that
+                    // was already left from another game version is still installed after the restore.
+                    List<string> indexDatLines = new List<string>();
+                    int indexDatFailures = 0;
+                    int indexDatWarnings = 0;
+                    AddPreflightIndexDatStatus(indexDatLines, ref indexDatFailures, ref indexDatWarnings, "0a0000.win32.index");
+                    AddPreflightIndexDatStatus(indexDatLines, ref indexDatFailures, ref indexDatWarnings, "0a0000.win32.index2");
+                    logLines.AddRange(indexDatLines);
+                    bool canPatchImmediately = TryUnlockPatchAfterRestore(logLines, indexDatFailures == 0 && indexDatWarnings == 0);
                     string localRestoreLogPath = WriteOperationLog("remove-local-restore", logLines);
                     UpdateStatusLabel("한글 패치 제거 완료");
                     SetProgressValue(100);
@@ -4618,10 +4615,12 @@ namespace FFXIVKoreanPatch.Main
                     {
                         resultDetails.Add(new KeyValuePair<string, string>("복구 전 백업", localBackupDir));
                     }
-                    resultDetails.Add(new KeyValuePair<string, string>("복구 파일", string.Join(", ", restoreFiles)));
+                    resultDetails.Add(new KeyValuePair<string, string>("복구 파일", string.Join(", ", restoredFiles)));
                     resultDetails.Add(new KeyValuePair<string, string>(
                         "다음 패치",
-                        canPatchImmediately ? "사전 점검 없이 바로 실행 가능" : "사전 점검 후 실행 필요"));
+                        canPatchImmediately ? "사전 점검 없이 바로 실행 가능"
+                            : indexDatFailures > 0 ? "런처 파일 검사/복구 필요 (복구한 0a0000 index가 현재 게임 버전의 것이 아님)"
+                            : "사전 점검 후 실행 필요"));
 
                     ShowOperationResultDialog(
                         "패치 제거 완료",
@@ -4633,9 +4632,9 @@ namespace FFXIVKoreanPatch.Main
                 }
 
                 throw new InvalidOperationException(
-                    "로컬 복구용 clean index를 찾지 못했습니다." + Environment.NewLine +
-                    "검색 대상은 백업 폴더, manual-sqpack-rollback 폴더, 로컬 restore-baseline, 생성된 release의 orig index입니다." + Environment.NewLine +
-                    "백업을 직접 갖고 있다면 sqpack\\ffxiv 폴더에 clean index를 수동으로 붙여넣거나, FFXIV 런처 파일 검사/복구로 글로벌 서버 클라이언트를 원본 상태로 되돌려주세요.");
+                    "설치된 index의 원본에 해당하는 로컬 clean index를 찾지 못했습니다." + Environment.NewLine +
+                    "검색 대상은 백업 폴더, manual-sqpack-rollback 폴더, 로컬 restore-baseline, 생성된 release의 orig index입니다. 다른 게임 버전에서 저장된 index는 복구에 쓰지 않습니다." + Environment.NewLine +
+                    "FFXIV 런처 파일 검사/복구로 글로벌 서버 클라이언트를 원본 상태로 되돌려주세요.");
 #endif
             }
             catch (Exception exception)

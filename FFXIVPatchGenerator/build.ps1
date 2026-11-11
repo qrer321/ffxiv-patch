@@ -26,6 +26,7 @@ $sources = @(
     "LobbyHangulCoverage.cs",
     "UiPatchGenerator.cs",
     "SqPack.cs",
+    "SqPackIndexCheck.cs",
     "Excel.cs",
     "ExdStringPatcher.cs",
     "RsvStringResolver.cs",

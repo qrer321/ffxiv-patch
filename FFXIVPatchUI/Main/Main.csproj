@@ -59,6 +59,9 @@
   </ItemGroup>
   <ItemGroup>
     <Compile Include="PatchController.cs" />
+    <Compile Include="..\..\FFXIVPatchGenerator\SqPackIndexCheck.cs">
+      <Link>SqPackIndexCheck.cs</Link>
+    </Compile>
     <Compile Include="Ui\MainWindow.cs" />
     <Compile Include="Ui\Dialogs.cs" />
     <Compile Include="Program.cs" />
