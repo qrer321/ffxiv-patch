@@ -120,6 +120,8 @@ namespace FFXIVKoreanPatch.Main
             "0a0000.win32.index2"
         };
 
+        private const string otherVersionIndexNotice = "이미 원본 상태인 index는 저장해 둔 index와 게임 버전이 달라 덮어쓰지 않았습니다.";
+
         // Registry Scancode Map: maps Right Alt (E0 38) to Hangul key (00 72) for Korean chat IME toggle.
         private byte[] scancodeMap = new byte[]
         {
@@ -3001,11 +3003,7 @@ namespace FFXIVKoreanPatch.Main
                         continue;
                     }
 
-                    string sourcePath = Path.Combine(sourceDir, "orig." + fileName);
-                    if (!File.Exists(sourcePath))
-                    {
-                        sourcePath = Path.Combine(sourceDir, fileName);
-                    }
+                    string sourcePath = GetRestoreSourcePath(sourceDir, fileName);
 
                     if (!IsUnpatchedFormOfInstalledIndex(sourcePath, installedPath))
                     {
@@ -3044,6 +3042,27 @@ namespace FFXIVKoreanPatch.Main
                 // An index that cannot be read is not a usable restore source.
                 return false;
             }
+        }
+
+        private static string GetRestoreSourcePath(string sourceDir, string fileName)
+        {
+            string origPath = Path.Combine(sourceDir, "orig." + fileName);
+            return File.Exists(origPath) ? origPath : Path.Combine(sourceDir, fileName);
+        }
+
+        // Index files that sourceDir holds from another game version: clean, but not the installed
+        // index without its patch entries. Restoring one sends updated files to stale dat records.
+        private string[] FindOtherVersionIndexFiles(string sourceDir)
+        {
+            string sqpackDir = GetTargetSqpackDir();
+            return restoreFiles
+                .Where(fileName =>
+                {
+                    string sourcePath = GetRestoreSourcePath(sourceDir, fileName);
+                    return HasCleanIndexAtPath(sourcePath) &&
+                        !IsUnpatchedFormOfInstalledIndex(sourcePath, Path.Combine(sqpackDir, fileName));
+                })
+                .ToArray();
         }
 
         private List<RestoreFileCopy> BuildBackupRestorePlan(string backupDir)
@@ -3121,6 +3140,7 @@ namespace FFXIVKoreanPatch.Main
                 .Select(item => item.DestinationFileName)
                 .Distinct(StringComparer.OrdinalIgnoreCase)
                 .ToArray();
+            string[] otherVersionFiles = FindOtherVersionIndexFiles(Path.GetDirectoryName(restorePlan[0].SourcePath));
 
             string beforeRestoreBackup = BackupTargetFiles(destinationFiles, "before-backup-restore");
             foreach (RestoreFileCopy item in restorePlan)
@@ -3138,7 +3158,8 @@ namespace FFXIVKoreanPatch.Main
             {
                 "Restored backup: " + backupDir,
                 "Before restore backup: " + beforeRestoreBackup,
-                "Files: " + string.Join(", ", destinationFiles)
+                "Files: " + string.Join(", ", destinationFiles),
+                "Left unchanged (the backup holds another game version's index): " + string.Join(", ", otherVersionFiles)
             });
 
             List<KeyValuePair<string, string>> resultDetails = new List<KeyValuePair<string, string>>();
@@ -3146,10 +3167,16 @@ namespace FFXIVKoreanPatch.Main
             resultDetails.Add(new KeyValuePair<string, string>("복구한 백업", backupDir));
             resultDetails.Add(new KeyValuePair<string, string>("복구 전 백업", beforeRestoreBackup));
             resultDetails.Add(new KeyValuePair<string, string>("복구 파일", string.Join(", ", destinationFiles)));
+            if (otherVersionFiles.Length > 0)
+            {
+                resultDetails.Add(new KeyValuePair<string, string>("그대로 둔 파일", string.Join(", ", otherVersionFiles)));
+            }
 
             ShowOperationResultDialog(
                 "백업 복구 완료",
-                "선택한 백업으로 글로벌 서버 클라이언트 파일을 되돌렸습니다.",
+                otherVersionFiles.Length > 0
+                    ? "패치가 남아 있던 index만 선택한 백업으로 되돌렸습니다. " + otherVersionIndexNotice
+                    : "선택한 백업으로 글로벌 서버 클라이언트 파일을 되돌렸습니다.",
                 logPath,
                 resultDetails);
         }
@@ -3237,11 +3264,12 @@ namespace FFXIVKoreanPatch.Main
             return false;
         }
 
-        private bool RestoreFromLocalOrigIndexes(out string restoreSourceDir, out string backupDir, out string[] restoredFiles)
+        private bool RestoreFromLocalOrigIndexes(out string restoreSourceDir, out string backupDir, out string[] restoredFiles, out string[] otherVersionFiles)
         {
             restoreSourceDir = null;
             backupDir = null;
             restoredFiles = new string[0];
+            otherVersionFiles = new string[0];
 
             string sourceDir;
             List<RestoreFileCopy> restorePlan;
@@ -3264,6 +3292,7 @@ namespace FFXIVKoreanPatch.Main
                 .Select(item => item.DestinationFileName)
                 .Distinct(StringComparer.OrdinalIgnoreCase)
                 .ToArray();
+            otherVersionFiles = FindOtherVersionIndexFiles(Path.GetDirectoryName(restorePlan[0].SourcePath));
             backupDir = BackupTargetFiles(destinationFiles, "local-restore");
 
             for (int i = 0; i < restorePlan.Count; i++)
@@ -4072,6 +4101,7 @@ namespace FFXIVKoreanPatch.Main
                 ShowMessage(
                     ViewMessageKind.Info,
                     "복구할 수 있는 백업을 찾지 못했습니다.",
+                    "설치된 index와 게임 버전이 다른 백업은 복구에 쓰지 않습니다.",
                     "패치 제거는 [패치 제거] 버튼을 사용해주세요.",
                     "백업 검색 위치:" + Environment.NewLine + GetBackupSearchRootsText());
                 return;
@@ -4591,10 +4621,12 @@ namespace FFXIVKoreanPatch.Main
                 string restoreSourceDir;
                 string localBackupDir;
                 string[] restoredFiles;
-                if (RestoreFromLocalOrigIndexes(out restoreSourceDir, out localBackupDir, out restoredFiles))
+                string[] otherVersionFiles;
+                if (RestoreFromLocalOrigIndexes(out restoreSourceDir, out localBackupDir, out restoredFiles, out otherVersionFiles))
                 {
                     logLines.Add("Local restore source: " + restoreSourceDir);
                     logLines.Add("Backup before restore: " + localBackupDir);
+                    logLines.Add("Left unchanged (the source holds another game version's index): " + string.Join(", ", otherVersionFiles));
                     // The restored index is the installed one without patch entries, so an index that
                     // was already left from another game version is still installed after the restore.
                     List<string> indexDatLines = new List<string>();
@@ -4616,6 +4648,10 @@ namespace FFXIVKoreanPatch.Main
                         resultDetails.Add(new KeyValuePair<string, string>("복구 전 백업", localBackupDir));
                     }
                     resultDetails.Add(new KeyValuePair<string, string>("복구 파일", string.Join(", ", restoredFiles)));
+                    if (otherVersionFiles.Length > 0)
+                    {
+                        resultDetails.Add(new KeyValuePair<string, string>("그대로 둔 파일", string.Join(", ", otherVersionFiles)));
+                    }
                     resultDetails.Add(new KeyValuePair<string, string>(
                         "다음 패치",
                         canPatchImmediately ? "사전 점검 없이 바로 실행 가능"
@@ -4624,17 +4660,33 @@ namespace FFXIVKoreanPatch.Main
 
                     ShowOperationResultDialog(
                         "패치 제거 완료",
-                        "로컬 orig index로 글로벌 서버 클라이언트를 복구했습니다.",
+                        otherVersionFiles.Length > 0
+                            ? "패치가 남아 있던 index만 원본으로 되돌렸습니다. " + otherVersionIndexNotice
+                            : "로컬 orig index로 글로벌 서버 클라이언트를 복구했습니다.",
                         localRestoreLogPath,
                         resultDetails);
                     restoreSucceeded = true;
                     return;
                 }
 
-                throw new InvalidOperationException(
-                    "설치된 index의 원본에 해당하는 로컬 clean index를 찾지 못했습니다." + Environment.NewLine +
-                    "검색 대상은 백업 폴더, manual-sqpack-rollback 폴더, 로컬 restore-baseline, 생성된 release의 orig index입니다. 다른 게임 버전에서 저장된 index는 복구에 쓰지 않습니다." + Environment.NewLine +
-                    "FFXIV 런처 파일 검사/복구로 글로벌 서버 클라이언트를 원본 상태로 되돌려주세요.");
+                // No stored index is the installed one without its patch entries.
+                string otherVersionDir = EnumerateRestoreCandidateDirs()
+                    .FirstOrDefault(dir => FindOtherVersionIndexFiles(dir).Length > 0);
+                logLines.Add(otherVersionDir == null
+                    ? "No stored clean index matches the installed indexes."
+                    : "Stored index is from another game version and was not restored: " + otherVersionDir);
+                string noSourceLogPath = WriteOperationLog("remove-no-source", logLines);
+                UpdateStatusLabel("한글 패치 제거 실패", true);
+                SetProgressValue(0);
+                ShowMessage(
+                    ViewMessageKind.Warning,
+                    "한글 패치를 제거하지 못했습니다. 클라이언트 파일은 바꾸지 않았습니다.",
+                    otherVersionDir == null
+                        ? "설치된 index의 원본인 clean index를 백업, restore-baseline, 생성된 release에서 찾지 못했습니다."
+                        : "저장해 둔 index는 설치된 index와 게임 버전이 달라 복원하지 않았습니다. 복원하면 게임이 강제 종료될 수 있습니다." +
+                            Environment.NewLine + otherVersionDir,
+                    "FFXIV 런처의 파일 검사/복구로 글로벌 서버 클라이언트를 원본 상태로 되돌려주세요.",
+                    "로그: " + noSourceLogPath);
 #endif
             }
             catch (Exception exception)

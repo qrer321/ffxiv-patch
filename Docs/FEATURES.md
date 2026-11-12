@@ -97,7 +97,7 @@
 - 수동 롤백용 sqpack 파일 패키지 생성
 - `restore-baseline`에 clean/original index 보관
 - `한글 패치 제거`로 패치 엔트리가 있는 index/index2만 복구. 패치 엔트리가 없는 index는 덮어쓰지 않음
-- 복구 원본은 설치된 index에서 패치 리다이렉트만 뺀 것과 항목이 같은 `orig.*.index/index2` 또는 clean index만 사용. 다른 게임 버전에서 저장된 index는 사용하지 않음
+- 복구 원본은 설치된 index에서 패치 리다이렉트만 뺀 것과 항목이 같은 `orig.*.index/index2` 또는 clean index만 사용. 다른 게임 버전에서 저장된 index는 사용하지 않고, 덮어쓰지 않은 파일을 결과 창에 `그대로 둔 파일`로 표시. 맞는 원본이 없으면 파일을 바꾸지 않고 경고 창으로 런처 파일 검사/복구 안내
 - `restore-baseline`의 index가 설치된 index와 맞지 않으면 버리고 다시 저장
 - `백업으로 복구`로 백업 폴더 선택 후 같은 조건의 index 복구
 - 복구 대상에 index2 포함
